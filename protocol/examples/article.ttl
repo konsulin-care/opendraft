@@ -21,7 +21,7 @@ od:example-publication
     dcterms:identifier <https://doi.org/10.5555/example-opendraft-2026> ;
     od:repositoryUrl "https://github.com/opendraft/opendraft"^^xsd:anyURI ;
     od:manuscriptPath "manuscripts/distributed-scientific-publication/article.qmd" ;
-    od:sourceRevision "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5" ;
+    od:sourceRevision "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d" ;
     od:protocolRevision "0000000000000000000000000000000000000000" ;
 
     # --- Optional fields (ADR-008) ---
