@@ -16,8 +16,8 @@ description = "Validate RDF/Turtle files parse correctly"
 run = "rapper -i turtle -c protocol/opendraft.ttl && rapper -i turtle -c protocol/article.shacl.ttl && rapper -i turtle -c protocol/registry.shacl.ttl && rapper -i turtle -c protocol/registry.ttl"
 
 [tasks.test]
-description = "Run conformance tests"
-run = "bash tests/conformance/protocol/test_ttl_parse.sh"
+description = "Run all tests"
+run = "bash tests/run-tests.sh"
 
 [tasks.lint]
 description = "Run ESLint"
@@ -49,7 +49,7 @@ dir = "apps/bff"
 
 [tasks.test-go]
 description = "Run Go tests"
-run = "go test ./... || true"
+run = "go test ./..."
 
 dir = "apps/bff"
 

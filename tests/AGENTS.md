@@ -2,16 +2,26 @@
 
 ## Purpose
 
-Contains conformance tests that validate protocol compliance. These tests ensure artifacts meet the OpenDraft specification.
+Contains the test runner and conformance tests. Unit tests for Go and TypeScript are co-located with their source code (see [root AGENTS.md](../AGENTS.md) under **Testing (TDD)**).
 
-## Testing Philosophy
+## Test Categories
 
-- **Protocol conformance, not unit testing.**
-- Test the spec, not the implementation.
-- One test per conformance requirement.
-- Tests should be runnable independently.
+| Category | Location | Runner |
+|----------|----------|--------|
+| Go (BFF) | `apps/bff/*_test.go` | `go test ./...` |
+| TypeScript (webapp) | `apps/web/*.test.ts` | `vitest` |
+| TypeScript (packages) | `packages/{name}/tests/` | `vitest` |
+| RDF conformance | `tests/conformance/` | `test_ttl_parse.sh` |
 
-## Test Structure
+## Test Runner
+
+`tests/run-tests.sh` orchestrates all suites. Invoked by `mise run test`.
+
+## Conformance Tests
+
+Protocol conformance tests validate that RDF/Turtle artifacts meet the OpenDraft specification. These live under `tests/conformance/`.
+
+### Structure
 
 ```text
 tests/conformance/
@@ -21,7 +31,7 @@ tests/conformance/
 └── fixtures/          # Test data
 ```
 
-## Common Pitfalls
+### Common Pitfalls
 
 1. **Testing implementation instead of protocol** — test the spec, not the code.
 2. **Brittle assertions** — test semantic equivalence, not exact strings.
@@ -29,14 +39,8 @@ tests/conformance/
 4. **Coupling to specific tools** — use abstract validation where possible.
 5. **Forgetting fixtures** — test data belongs in fixtures/.
 
-## When to Read convention.md
-
-Read [convention.md](convention.md) when:
-- Adding new conformance tests
-- Modifying test fixtures
-- Changing test assertions
-
 ## References
 
-- [docs/agents/TESTING.md](../docs/agents/TESTING.md) — Testing strategy
+- [AGENTS.md](../AGENTS.md) — TDD workflow and test locations (source of truth)
+- [docs/agents/TESTING.md](../docs/agents/TESTING.md) — Conformance test categories
 - [docs/ADR/016-mvp-scope.md](../docs/ADR/016-mvp-scope.md) — What's tested
