@@ -61,7 +61,7 @@ pre-push:
 
     # Security
     govulncheck:
-      run: govulncheck ./...
+      run: mise run govulncheck
       dir: apps/bff
 
     # Complexity (prevents PR spaghetti)

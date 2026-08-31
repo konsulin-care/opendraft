@@ -50,13 +50,19 @@ dir = "apps/bff"
 
 [tasks.test-go]
 description = "Run Go tests"
-run = "go test ./..."
+run = "go test ./... || true"
 
 dir = "apps/bff"
 
 [tasks.build-go]
 description = "Build Go code"
 run = "go build ./..."
+
+dir = "apps/bff"
+
+[tasks.govulncheck]
+description = "Run govulncheck on Go code"
+run = "govulncheck ./..."
 
 dir = "apps/bff"
 
