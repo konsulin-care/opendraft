@@ -1,0 +1,74 @@
+# lefthook.yml — Git hooks configuration
+# Docs: https://github.com/evilmartians/lefthook
+
+pre-commit:
+  parallel: true
+  commands:
+    # TypeScript/JavaScript
+    typescript:
+      glob: "*.{ts,tsx}"
+      run: npx tsc --noEmit
+    eslint:
+      glob: "*.{ts,tsx,js,jsx}"
+      run: npx eslint --fix {staged_files}
+      stage_fixed: true
+
+    # Go
+    go-fmt:
+      glob: "*.go"
+      run: gofmt -w {staged_files}
+      dir: apps/bff
+    go-vet:
+      glob: "*.go"
+      run: go vet ./...
+      dir: apps/bff
+    go-mod-tidy:
+      glob: "go.{mod,sum}"
+      run: go mod tidy && git add go.mod go.sum
+      dir: apps/bff
+
+    # Protocol/Docs
+    validate-ttl:
+      glob: "*.ttl"
+      run: pnpm run validate:ttl
+    markdownlint:
+      glob: "*.md"
+      run: mise exec -- markdownlint-cli2 {staged_files}
+    yaml-lint:
+      glob: "*.{yml,yaml}"
+      run: mise exec -- yamllint -c .yamllint.yml {staged_files}
+
+    # Code quality
+    large-files:
+      run: bash scripts/check-large-files.sh
+
+pre-push:
+  parallel: true
+  commands:
+    # Tests
+    test:
+      run: pnpm test
+    test-go:
+      run: go test ./...
+      dir: apps/bff
+
+    # Build
+    build:
+      run: pnpm run build
+    build-go:
+      run: go build ./...
+      dir: apps/bff
+
+    # Security
+    govulncheck:
+      run: govulncheck ./...
+      dir: apps/bff
+
+    # Complexity (prevents PR spaghetti)
+    complexity-ts:
+      glob: "*.{ts,tsx}"
+      run: bash scripts/check-complexity.sh {push_files}
+    complexity-go:
+      glob: "*.go"
+      run: golangci-lint run --enable=gocyclo,gocognit
+      dir: apps/bff

@@ -14,7 +14,7 @@ jobs:
 
       - uses: jdx/mise-action@v2
 
-      - uses: pnpm/action-setup@v4
+      - run: mise install
 
       - run: pnpm install --frozen-lockfile
 
@@ -23,6 +23,12 @@ jobs:
 
       - name: Validate TTL files
         run: pnpm run validate:ttl
+
+      - name: Run linter
+        run: pnpm run lint
+
+      - name: Run type checker
+        run: pnpm run typecheck
 
       - name: Run conformance tests
         run: pnpm test
