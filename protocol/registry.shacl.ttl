@@ -1,0 +1,44 @@
+# OpenDraft Registry SHACL Shapes
+#
+# Validates registry structure: collection registries and publication registries
+# are mutually exclusive. A collection registry references other registries;
+# a publication registry references publications.
+
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix od: <urn:opendraft:ontology#> .
+
+# =============================================================================
+# Collection Registry Shape
+# =============================================================================
+
+od:CollectionRegistryShape
+    a sh:NodeShape ;
+    sh:targetClass od:CollectionRegistry ;
+    sh:property [
+        sh:path od:containsRegistry ;
+        sh:minCount 1 ;
+        sh:message "A collection registry must contain at least one registry." ;
+    ] ;
+    sh:property [
+        sh:path od:containsPublication ;
+        sh:maxCount 0 ;
+        sh:message "A collection registry must not contain publications. Use od:containsRegistry instead." ;
+    ] .
+
+# =============================================================================
+# Publication Registry Shape
+# =============================================================================
+
+od:PublicationRegistryShape
+    a sh:NodeShape ;
+    sh:targetClass od:PublicationRegistry ;
+    sh:property [
+        sh:path od:containsPublication ;
+        sh:minCount 1 ;
+        sh:message "A publication registry must contain at least one publication." ;
+    ] ;
+    sh:property [
+        sh:path od:containsRegistry ;
+        sh:maxCount 0 ;
+        sh:message "A publication registry must not contain registries. Use od:containsPublication instead." ;
+    ] .

@@ -1,0 +1,41 @@
+# OpenDraft Article SHACL Shapes
+#
+# Validates that an article RDF graph conforms to the OpenDraft protocol.
+# Phase 00: minimal shapes. Full validation in phase 01.
+
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix od: <urn:opendraft:ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# =============================================================================
+# Publication Shape
+# =============================================================================
+
+od:PublicationShape
+    a sh:NodeShape ;
+    sh:targetClass od:Publication ;
+    sh:property [
+        sh:path dcterms:title ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "A publication must have exactly one title." ;
+    ] ;
+    sh:property [
+        sh:path dcterms:creator ;
+        sh:minCount 1 ;
+        sh:message "A publication must have at least one creator." ;
+    ] ;
+    sh:property [
+        sh:path od:sourceRevision ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "A publication must have exactly one source revision." ;
+    ] ;
+    sh:property [
+        sh:path od:protocolRevision ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "A publication must have exactly one protocol revision." ;
+    ] .

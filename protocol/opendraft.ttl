@@ -1,0 +1,201 @@
+# OpenDraft Ontology
+#
+# The canonical RDF vocabulary for the OpenDraft protocol.
+# Namespace: urn:opendraft:ontology#
+# Prefix: od:
+#
+# This ontology reuses terms from:
+#   - Dublin Core Terms (dcterms): title, creator, subject, identifier, date, license, language, conformsTo
+#   - FOAF: Person, Organization, name, givenName, familyName, mbox
+#   - SKOS: Concept, prefLabel, inScheme, ConceptScheme
+#   - PROV-O: Agent (for subject assignment provenance)
+#
+# Custom od: terms cover only what existing vocabularies do not express:
+#   - Git-specific provenance (source revision, protocol revision)
+#   - Registry structure (collection vs publication registries)
+#   - Subject assignment reification (who assigned, when)
+
+@prefix od: <urn:opendraft:ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+
+# =============================================================================
+# CLASSES
+# =============================================================================
+
+od:Publication
+    rdf:type owl:Class ;
+    rdfs:label "Publication" ;
+    rdfs:comment "A published article with full provenance. Identified by DOI. Links to source repository, source revision, protocol revision, and subject assignments." .
+
+od:PublicationVersion
+    rdf:type owl:Class ;
+    rdfs:label "Publication Version" ;
+    rdfs:comment "A specific version of a publication, identified by DOI. Each version retains provenance to its source." .
+
+od:SourceRepository
+    rdf:type owl:Class ;
+    rdfs:label "Source Repository" ;
+    rdfs:comment "A Git repository containing manuscript source. Identified by URL." .
+
+od:SourceRevision
+    rdf:type owl:Class ;
+    rdfs:label "Source Revision" ;
+    rdfs:comment "A specific Git commit in the source repository that produced a publication." .
+
+od:ProtocolRevision
+    rdf:type owl:Class ;
+    rdfs:label "Protocol Revision" ;
+    rdfs:comment "A specific version of the OpenDraft protocol, identified by full Git commit SHA of the opendraft repository." .
+
+od:Registry
+    rdf:type owl:Class ;
+    rdfs:label "Registry" ;
+    rdfs:comment "Abstract base class for publication registries. Registries are either collection registries (referencing other registries) or publication registries (referencing publications). Never both." .
+
+od:CollectionRegistry
+    rdf:type owl:Class ;
+    rdfs:subClassOf od:Registry ;
+    rdfs:label "Collection Registry" ;
+    rdfs:comment "A registry that references other registries. Must not directly contain publications." .
+
+od:PublicationRegistry
+    rdf:type owl:Class ;
+    rdfs:subClassOf od:Registry ;
+    rdfs:label "Publication Registry" ;
+    rdfs:comment "A registry that references publications. Must not contain other registries." .
+
+od:SubjectAssignment
+    rdf:type owl:Class ;
+    rdfs:label "Subject Assignment" ;
+    rdfs:comment "A reified assertion linking a publication to a SKOS subject concept, with provenance about who assigned it and when. Distinguishes author-declared from indexer-assigned subjects." .
+
+
+# =============================================================================
+# PROPERTIES — Publication provenance
+# =============================================================================
+
+od:sourceRevision
+    rdf:type owl:ObjectProperty ;
+    rdfs:domain od:Publication ;
+    rdfs:range od:SourceRevision ;
+    rdfs:label "source revision" ;
+    rdfs:comment "The Git commit that produced this publication." .
+
+od:protocolRevision
+    rdf:type owl:ObjectProperty ;
+    rdfs:domain od:Publication ;
+    rdfs:range od:ProtocolRevision ;
+    rdfs:label "protocol revision" ;
+    rdfs:comment "The OpenDraft protocol version used to produce this publication." .
+
+od:repositoryUrl
+    rdf:type owl:DatatypeProperty ;
+    rdfs:domain od:SourceRepository ;
+    rdfs:range xsd:anyURI ;
+    rdfs:label "repository URL" ;
+    rdfs:comment "The URL of the Git source repository." .
+
+od:manuscriptPath
+    rdf:type owl:DatatypeProperty ;
+    rdfs:domain od:Publication ;
+    rdfs:range xsd:string ;
+    rdfs:label "manuscript path" ;
+    rdfs:comment "Path to the manuscript file within the source repository." .
+
+od:revisionSha
+    rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string ;
+    rdfs:label "revision SHA" ;
+    rdfs:comment "The full 40-character Git commit SHA identifying a source or protocol revision." .
+
+
+# =============================================================================
+# PROPERTIES — Subject assignment (reified pattern)
+# =============================================================================
+
+od:hasAssignment
+    rdf:type owl:ObjectProperty ;
+    rdfs:domain od:Publication ;
+    rdfs:range od:SubjectAssignment ;
+    rdfs:label "has subject assignment" ;
+    rdfs:comment "Links a publication to a subject assignment. Each assignment binds one SKOS concept to the publication with provenance." .
+
+od:assignedSubject
+    rdf:type owl:ObjectProperty ;
+    rdfs:domain od:SubjectAssignment ;
+    rdfs:range skos:Concept ;
+    rdfs:label "assigned subject" ;
+    rdfs:comment "The SKOS concept that was assigned to the publication." .
+
+od:assignedBy
+    rdf:type owl:ObjectProperty ;
+    rdfs:domain od:SubjectAssignment ;
+    rdfs:range foaf:Agent ;
+    rdfs:label "assigned by" ;
+    rdfs:comment "The agent (person or indexer) who performed the subject assignment." .
+
+od:assignedAt
+    rdf:type owl:DatatypeProperty ;
+    rdfs:domain od:SubjectAssignment ;
+    rdfs:range xsd:dateTime ;
+    rdfs:label "assigned at" ;
+    rdfs:comment "Timestamp when the subject was assigned." .
+
+
+# =============================================================================
+# PROPERTIES — Subject (subproperty of dcterms:subject)
+# =============================================================================
+
+od:hasSubject
+    rdf:type owl:ObjectProperty ;
+    rdfs:subPropertyOf dcterms:subject ;
+    rdfs:domain od:Publication ;
+    rdfs:range skos:Concept ;
+    rdfs:label "has subject" ;
+    rdfs:comment "A SKOS concept describing the subject of the publication. Subproperty of dcterms:subject for interoperability with Dublin Core consumers." .
+
+
+# =============================================================================
+# PROPERTIES — Author metadata (extending FOAF)
+# =============================================================================
+
+od:isCorrespondingAuthor
+    rdf:type owl:DatatypeProperty ;
+    rdfs:domain foaf:Person ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "corresponding author" ;
+    rdfs:comment "True if this person is the corresponding author of the publication." .
+
+od:creditRole
+    rdf:type owl:DatatypeProperty ;
+    rdfs:domain foaf:Person ;
+    rdfs:range xsd:string ;
+    rdfs:label "CRediT role" ;
+    rdfs:comment "A CRediT contributor role (e.g. 'Writing - Original Draft', 'Formal Analysis'). See https://credit.niso.org/." .
+
+
+# =============================================================================
+# PROPERTIES — Registry structure
+# =============================================================================
+
+od:containsRegistry
+    rdf:type owl:ObjectProperty ;
+    rdfs:domain od:CollectionRegistry ;
+    rdfs:range od:Registry ;
+    rdfs:label "contains registry" ;
+    rdfs:comment "A child registry referenced by this collection registry." .
+
+od:containsPublication
+    rdf:type owl:ObjectProperty ;
+    rdfs:domain od:PublicationRegistry ;
+    rdfs:range od:Publication ;
+    rdfs:label "contains publication" ;
+    rdfs:comment "A publication referenced by this publication registry." .

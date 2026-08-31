@@ -1,0 +1,16 @@
+{
+  "name": "opendraft",
+  "private": true,
+  "type": "module",
+  "description": "Client-first, Git-native, decentralized scientific publication.",
+  "license": "AGPL-3.0-only",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "validate:ttl": "rapper -c protocol/opendraft.ttl && rapper -c protocol/article.shacl.ttl && rapper -c protocol/registry.shacl.ttl && rapper -c protocol/registry.ttl",
+    "test": "bash tests/conformance/protocol/test_ttl_parse.sh",
+    "lint": "echo 'TODO: add linter'"
+  },
+  "devDependencies": {}
+}

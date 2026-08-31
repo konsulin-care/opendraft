@@ -4,7 +4,7 @@
 
 ```turtle
 # Prefixes at top of file
-@prefix od: <https://opendraft.org/ontology#> .
+@prefix od: <urn:opendraft:ontology#> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
@@ -32,9 +32,9 @@ od:ArticleShape
 
 ## Naming Conventions
 
-- Classes: PascalCase in URI (od:Article)
-- Properties: camelCase in URI (od:hasAuthor)
-- Shapes: PascalCase + Shape suffix (od:ArticleShape)
+- Classes: PascalCase in URI (od:Publication)
+- Properties: camelCase in URI (od:hasAssignment)
+- Shapes: PascalCase + Shape suffix (od:PublicationShape)
 - Files: lowercase with dots (article.shacl.ttl)
 
 ## Validation
