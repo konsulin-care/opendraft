@@ -75,11 +75,42 @@ All tasks are defined in `.mise.toml`. Run `mise tasks` to see all available tas
 mise run init            # Install dependencies and set up git hooks
 mise run lint            # Run ESLint
 mise run lint-fix        # Run ESLint with auto-fix
+mise run lint-go         # Run golangci-lint
+mise run fmt-go          # Check Go formatting
 mise run typecheck       # Run TypeScript type checker
 mise run build           # Build (placeholder)
+mise run build-go        # Build Go code
 mise run validate-ttl    # Validate RDF/Turtle files
 mise run test            # Run conformance tests
+mise run test-go         # Run Go tests
+mise run audit           # Run npm security audit
+mise run complexity-ts   # Check TypeScript complexity
+mise run check-large-files  # Check for files > 300 lines
+mise run coverage-ts     # Run TypeScript tests with coverage
+mise run coverage-go     # Run Go tests with coverage
 ```
+
+## CI/CD Pipeline
+
+GitHub Actions runs on PRs to `master` with 7 parallel jobs:
+
+| Job | What it checks |
+|-----|----------------|
+| lint | ESLint, golangci-lint, TTL validation, markdown/yaml lint |
+| test | Conformance tests, Go tests |
+| build | TypeScript build, Go build |
+| security | npm audit, govulncheck |
+| complexity | TypeScript complexity, Go complexity |
+| coverage | Test coverage for TS and Go |
+| pr-size | Fails if PR > 5000 lines changed |
+
+## Dependency Updates
+
+Renovate automatically creates PRs for dependency updates:
+
+- Minor/patch updates are auto-merged
+- Major updates require manual review
+- Covers npm, mise tool versions, and Go modules
 
 ## Workflow
 
