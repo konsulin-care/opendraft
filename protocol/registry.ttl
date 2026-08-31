@@ -1,49 +1,20 @@
 # OpenDraft Example: Collection Registry
 #
-# This is a working example of a collection registry that references
-# one child publication registry. It demonstrates the expected structure
-# for discovery hierarchies.
+# A working example of a collection registry (OD-013). It references
+# exactly one child publication registry by IRI and must not directly
+# contain publications.
+#
+# Validates clean against protocol/registry.shacl.ttl.
 
 @prefix od: <urn:opendraft:ontology#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 
-# =============================================================================
-# Collection Registry
-# =============================================================================
-
+# The collection registry itself. A discovery root that lists child
+# registries instead of publications.
 od:example-collection-registry
     a od:CollectionRegistry ;
     dcterms:title "OpenDraft Example Collection Registry" ;
     dcterms:description "A top-level collection registry for demonstration purposes." ;
     od:containsRegistry od:example-publication-registry ;
     foaf:homepage <https://github.com/opendraft/opendraft> .
-
-# =============================================================================
-# Publication Registry (referenced by the collection)
-# =============================================================================
-
-od:example-publication-registry
-    a od:PublicationRegistry ;
-    dcterms:title "OpenDraft Example Publication Registry" ;
-    dcterms:description "A publication registry containing example publications." ;
-    od:containsPublication od:example-publication .
-
-# =============================================================================
-# Example Publication
-# =============================================================================
-
-od:example-publication
-    a od:Publication ;
-    dcterms:title "Example Publication: OpenDraft Protocol" ;
-    dcterms:creator <https://orcid.org/0000-0002-1825-0097> ;
-    od:repositoryUrl <https://github.com/opendraft/opendraft> ;
-    od:manuscriptPath "manuscripts/distributed-scientific-publication/article.qmd" ;
-    od:sourceRevision [
-        a od:SourceRevision ;
-        od:revisionSha "abc123def456abc123def456abc123def456abc1" ;
-    ] ;
-    od:protocolRevision [
-        a od:ProtocolRevision ;
-        od:revisionSha "0000000000000000000000000000000000000000" ;
-    ] .
