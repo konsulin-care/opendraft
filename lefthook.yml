@@ -30,7 +30,7 @@ pre-commit:
     # Protocol/Docs
     validate-ttl:
       glob: "*.ttl"
-      run: pnpm run validate:ttl
+      run: mise run validate-ttl
     markdownlint:
       glob: "*.md"
       run: mise exec -- markdownlint-cli2 {staged_files}
@@ -47,14 +47,14 @@ pre-push:
   commands:
     # Tests
     test:
-      run: pnpm test
+      run: mise run test
     test-go:
       run: go test ./...
       dir: apps/bff
 
     # Build
     build:
-      run: pnpm run build
+      run: mise run build
     build-go:
       run: go build ./...
       dir: apps/bff

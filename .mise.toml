@@ -1,8 +1,37 @@
 [tools]
 node = "lts"
 pnpm = "11.13.0"
+go = "1.27"
 lefthook = "2.1.12"
 golangci-lint = "2.13.2"
 "go:golang.org/x/vuln/cmd/govulncheck" = "1.7.0"
 markdownlint-cli2 = "0.23.2"
 yamllint = "1.38.0"
+
+[tasks.init]
+description = "Install dependencies and set up git hooks"
+run = "pnpm install && lefthook install"
+
+[tasks.validate-ttl]
+description = "Validate RDF/Turtle files parse correctly"
+run = "rapper -i turtle -c protocol/opendraft.ttl && rapper -i turtle -c protocol/article.shacl.ttl && rapper -i turtle -c protocol/registry.shacl.ttl && rapper -i turtle -c protocol/registry.ttl"
+
+[tasks.test]
+description = "Run conformance tests"
+run = "bash tests/conformance/protocol/test_ttl_parse.sh"
+
+[tasks.lint]
+description = "Run ESLint"
+run = "pnpm exec eslint ."
+
+[tasks.lint-fix]
+description = "Run ESLint with auto-fix"
+run = "pnpm exec eslint . --fix"
+
+[tasks.typecheck]
+description = "Run TypeScript type checker"
+run = "pnpm exec tsc --noEmit"
+
+[tasks.build]
+description = "Build (placeholder)"
+run = "echo 'Placeholder for build script'"

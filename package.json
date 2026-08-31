@@ -7,14 +7,6 @@
   "engines": {
     "node": ">=20"
   },
-  "scripts": {
-    "validate:ttl": "rapper -i turtle -c protocol/opendraft.ttl && rapper -i turtle -c protocol/article.shacl.ttl && rapper -i turtle -c protocol/registry.shacl.ttl && rapper -i turtle -c protocol/registry.ttl",
-    "test": "bash tests/conformance/protocol/test_ttl_parse.sh",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "typecheck": "tsc --noEmit",
-    "build": "echo \"Placeholder for build script\""
-  },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",

@@ -22,13 +22,13 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y rapper
 
       - name: Validate TTL files
-        run: pnpm run validate:ttl
+        run: mise run validate-ttl
 
       - name: Run linter
-        run: pnpm run lint
+        run: mise run lint
 
       - name: Run type checker
-        run: pnpm run typecheck
+        run: mise run typecheck
 
       - name: Run conformance tests
-        run: pnpm test
+        run: mise run test

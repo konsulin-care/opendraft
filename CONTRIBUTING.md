@@ -3,14 +3,11 @@
 ## Development Setup
 
 ```bash
-# Install all tools (node, pnpm, lefthook, golangci-lint, etc.)
+# Install all tools (node, pnpm, go, lefthook, golangci-lint, etc.)
 mise install
 
-# Install dependencies
-pnpm install
-
-# Set up git hooks
-lefthook install
+# Install dependencies and set up git hooks
+mise run init
 ```
 
 ## Available Hooks
@@ -33,7 +30,7 @@ lefthook install
 
 | Check | What it does |
 |-------|--------------|
-| test | Runs pnpm test suite |
+| test | Runs conformance tests |
 | test-go | Runs Go test suite |
 | build | Validates build succeeds |
 | build-go | Validates Go build succeeds |
@@ -70,15 +67,18 @@ test: add or update tests
 
 Subject under 75 characters. Body explains what and why.
 
-## Available Scripts
+## Available Tasks
+
+All tasks are defined in `.mise.toml`. Run `mise tasks` to see all available tasks.
 
 ```bash
-pnpm run lint          # Run ESLint
-pnpm run lint:fix      # Run ESLint with auto-fix
-pnpm run typecheck     # Run TypeScript type checker
-pnpm run build         # Build (placeholder)
-pnpm run validate:ttl  # Validate RDF/Turtle files
-pnpm test              # Run conformance tests
+mise run init            # Install dependencies and set up git hooks
+mise run lint            # Run ESLint
+mise run lint-fix        # Run ESLint with auto-fix
+mise run typecheck       # Run TypeScript type checker
+mise run build           # Build (placeholder)
+mise run validate-ttl    # Validate RDF/Turtle files
+mise run test            # Run conformance tests
 ```
 
 ## Workflow
