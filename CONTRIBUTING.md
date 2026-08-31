@@ -30,8 +30,7 @@ mise run init
 
 | Check | What it does |
 |-------|--------------|
-| test | Runs conformance tests |
-| test-go | Runs Go test suite |
+| test | Runs all test suites (RDF, SHACL, Go, TypeScript) |
 | build | Validates build succeeds |
 | build-go | Validates Go build succeeds |
 | govulncheck | Checks for known Go vulnerabilities |
@@ -81,8 +80,7 @@ mise run typecheck       # Run TypeScript type checker
 mise run build           # Build (placeholder)
 mise run build-go        # Build Go code
 mise run validate-ttl    # Validate RDF/Turtle files
-mise run test            # Run conformance tests
-mise run test-go         # Run Go tests
+mise run test            # Run all test suites (RDF, SHACL, Go, TypeScript)
 mise run audit           # Run npm security audit
 mise run complexity-ts   # Check TypeScript complexity
 mise run check-large-files  # Check for files > 300 lines
@@ -97,7 +95,7 @@ GitHub Actions runs on PRs to `master` with 7 parallel jobs:
 | Job | What it checks |
 |-----|----------------|
 | lint | ESLint, golangci-lint, TTL validation, markdown/yaml lint |
-| test | Conformance tests, Go tests |
+| test | All test suites (RDF, SHACL, Go, TypeScript) |
 | build | TypeScript build, Go build |
 | security | npm audit, govulncheck |
 | complexity | TypeScript complexity, Go complexity |

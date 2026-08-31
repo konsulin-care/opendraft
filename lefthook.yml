@@ -45,9 +45,6 @@ pre-push:
     # Tests
     test:
       run: mise run test
-    test-go:
-      run: mise run test-go
-      dir: apps/bff
 
     # Build
     build:

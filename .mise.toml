@@ -51,12 +51,6 @@ run = "test -z \"$(gofmt -l .)\" || (gofmt -l . && exit 1)"
 
 dir = "apps/bff"
 
-[tasks.test-go]
-description = "Run Go tests"
-run = "go test ./..."
-
-dir = "apps/bff"
-
 [tasks.build-go]
 description = "Build Go code"
 run = "go build ./..."

@@ -51,7 +51,6 @@ Tests are co-located with the code they exercise.
 
 ```bash
 mise run test        # Run all suites (RDF, Go, TypeScript)
-mise run test-go     # Run Go tests only
 ```
 
 `mise run test` delegates to `tests/run-tests.sh` which runs all three suites and reports per-suite pass/fail.
