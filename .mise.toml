@@ -13,7 +13,11 @@ run = "pnpm install && lefthook install"
 
 [tasks.validate-ttl]
 description = "Validate RDF/Turtle files parse correctly"
-run = "rapper -i turtle -c protocol/opendraft.ttl && rapper -i turtle -c protocol/article.shacl.ttl && rapper -i turtle -c protocol/registry.shacl.ttl && rapper -i turtle -c protocol/registry.ttl"
+run = "bash tests/conformance/protocol/test_ttl_parse.sh"
+
+[tasks.validate-shacl]
+description = "Validate protocol fixtures against SHACL shapes"
+run = "node --import tsx tests/conformance/shacl/run-conformance.ts"
 
 [tasks.test]
 description = "Run all tests"

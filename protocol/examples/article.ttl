@@ -16,7 +16,7 @@ od:example-publication
     a od:Publication ;
 
     # --- Required fields (ADR-008) ---
-    dcterms:title "Example Publication: OpenDraft Protocol"@en ;
+    dcterms:title "Example Publication: OpenDraft Protocol" ;
     dcterms:creator <https://orcid.org/0000-0002-1825-0097> ;
     dcterms:identifier <https://doi.org/10.5555/example-opendraft-2026> ;
     od:repositoryUrl "https://github.com/opendraft/opendraft"^^xsd:anyURI ;
@@ -25,7 +25,7 @@ od:example-publication
     od:protocolRevision "0000000000000000000000000000000000000000" ;
 
     # --- Optional fields (ADR-008) ---
-    dcterms:abstract "A canonical example publication used to demonstrate the OpenDraft protocol."@en ;
+    dcterms:abstract "A canonical example publication used to demonstrate the OpenDraft protocol." ;
     od:hasSubject od:concept-distributed-scientific-publication ;
     dcterms:references <https://doi.org/10.5555/example-cited-work-2025> .
 

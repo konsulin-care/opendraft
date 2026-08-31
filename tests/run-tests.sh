@@ -52,14 +52,25 @@ else
   skip_suite "RDF Conformance" "rapper not installed"
 fi
 
-# --- Suite 2: Go Tests ---
+# --- Suite 3: SHACL Conformance ---
+if command -v node >/dev/null 2>&1 && [ -d "node_modules/tsx" ]; then
+  run_suite "SHACL Conformance" "node --import tsx tests/conformance/shacl/run-conformance.ts"
+else
+  skip_suite "SHACL Conformance" "tsx not installed"
+fi
+
+# --- Suite 4: Go Tests ---
 if command -v go >/dev/null 2>&1; then
-  run_suite "Go Tests" "go test ./..." "apps/bff"
+  if ls apps/bff/*.go >/dev/null 2>&1; then
+    run_suite "Go Tests" "go test ./..." "apps/bff"
+  else
+    skip_suite "Go Tests" "no Go sources in apps/bff"
+  fi
 else
   skip_suite "Go Tests" "go not installed"
 fi
 
-# --- Suite 3: TypeScript Tests ---
+# --- Suite 5: TypeScript Tests ---
 if command -v pnpm >/dev/null 2>&1; then
   if [ -f "vitest.config.ts" ] || [ -f "vitest.config.js" ]; then
     run_suite "TypeScript Tests" "pnpm exec vitest run --reporter=verbose"

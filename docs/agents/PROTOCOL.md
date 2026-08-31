@@ -8,7 +8,7 @@ The OpenDraft protocol defines how scientific publications are represented, vali
 
 - **Identity:** Drafts identified by repo + path; publications by DOI; protocol by commit SHA.
 - **Registry:** Static RDF files for discovery. Two types: collection (references registries) and publication (references articles).
-- **Publication:** Articles produce HTML and RDF/Turtle. RDF contains full provenance.
+- **Publication:** Articles produce HTML and RDF/Turtle. RDF contains full provenance as flat scalars on `od:Publication` (ADR-018): `od:repositoryUrl`, `od:sourceRevision`, `od:protocolRevision`.
 
 ## Artifacts
 
@@ -17,7 +17,9 @@ The OpenDraft protocol defines how scientific publications are represented, vali
 | opendraft.ttl | Core RDF vocabulary |
 | article.shacl.ttl | Article validation shapes |
 | registry.shacl.ttl | Registry validation shapes |
-| registry.ttl | Registry vocabulary |
+| registry.ttl | Example collection registry (see protocol/README.md) |
+| examples/article.ttl | Example publication |
+| examples/publication-registry.ttl | Example publication registry |
 
 ## Versioning
 
@@ -37,3 +39,4 @@ The OpenDraft protocol defines how scientific publications are represented, vali
 - [docs/ADR/007-protocol-artifacts.md](../ADR/007-protocol-artifacts.md)
 - [docs/ADR/008-publication-rdf.md](../ADR/008-publication-rdf.md)
 - [docs/ADR/009-registry-and-discovery.md](../ADR/009-registry-and-discovery.md)
+- [docs/ADR/018-flat-provenance-model.md](../ADR/018-flat-provenance-model.md)

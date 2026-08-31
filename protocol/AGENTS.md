@@ -11,7 +11,9 @@ Contains normative RDF artifacts defining the OpenDraft protocol. These files ar
 | opendraft.ttl | Core RDF vocabulary (classes, properties) |
 | article.shacl.ttl | SHACL shapes for article validation |
 | registry.shacl.ttl | SHACL shapes for registry validation |
-| registry.ttl | Registry vocabulary extensions |
+| registry.ttl | Example collection registry |
+| examples/article.ttl | Example publication (validated by article.shacl.ttl) |
+| examples/publication-registry.ttl | Example publication registry (validated by registry.shacl.ttl) |
 
 ## Normative vs Explanatory
 
