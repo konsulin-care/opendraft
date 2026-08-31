@@ -5,7 +5,6 @@ go = "1.27"
 lefthook = "2.1.12"
 golangci-lint = "2.13.2"
 "go:golang.org/x/vuln/cmd/govulncheck" = "1.7.0"
-markdownlint-cli2 = "0.23.2"
 yamllint = "1.38.0"
 
 [tasks.init]

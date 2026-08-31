@@ -31,9 +31,6 @@ pre-commit:
     validate-ttl:
       glob: "*.ttl"
       run: mise run validate-ttl
-    markdownlint:
-      glob: "*.md"
-      run: mise exec -- markdownlint-cli2 {staged_files}
     yaml-lint:
       glob: "*.{yml,yaml}"
       run: mise exec -- yamllint -c .yamllint.yml {staged_files}

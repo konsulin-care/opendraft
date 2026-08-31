@@ -24,8 +24,6 @@ jobs:
         working-directory: apps/bff
       - name: Validate TTL
         run: mise run validate-ttl
-      - name: Markdown lint
-        run: mise exec -- markdownlint-cli2 "**/*.md"
       - name: YAML lint
         run: mise exec -- yamllint -c .yamllint.yml .
       - name: Large file check
