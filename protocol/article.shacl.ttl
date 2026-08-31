@@ -1,7 +1,8 @@
 # OpenDraft Article SHACL Shapes
 #
 # Validates that an article RDF graph conforms to the OpenDraft protocol.
-# Phase 00: minimal shapes. Full validation in phase 01.
+# Phase 01: full required field set plus optional-field capability shapes.
+# Provenance scalars live directly on od:Publication (see ADR-018).
 
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix od: <urn:opendraft:ontology#> .
@@ -9,12 +10,13 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 # =============================================================================
-# Publication Shape
+# Publication Shape — required fields
 # =============================================================================
 
 od:PublicationShape
     a sh:NodeShape ;
     sh:targetClass od:Publication ;
+
     sh:property [
         sh:path dcterms:title ;
         sh:datatype xsd:string ;
@@ -28,14 +30,69 @@ od:PublicationShape
         sh:message "A publication must have at least one creator." ;
     ] ;
     sh:property [
-        sh:path od:sourceRevision ;
+        sh:path od:repositoryUrl ;
+        sh:datatype xsd:anyURI ;
         sh:minCount 1 ;
         sh:maxCount 1 ;
-        sh:message "A publication must have exactly one source revision." ;
+        sh:message "A publication must have exactly one repository URL with datatype xsd:anyURI." ;
+    ] ;
+    sh:property [
+        sh:path od:manuscriptPath ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "A publication must have exactly one manuscript path." ;
+    ] ;
+    sh:property [
+        sh:path od:sourceRevision ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:pattern "^[0-9a-f]{40}$" ;
+        sh:message "A publication must have exactly one source revision: a 40-character hexadecimal Git commit SHA." ;
     ] ;
     sh:property [
         sh:path od:protocolRevision ;
+        sh:datatype xsd:string ;
         sh:minCount 1 ;
         sh:maxCount 1 ;
-        sh:message "A publication must have exactly one protocol revision." ;
+        sh:pattern "^[0-9a-f]{40}$" ;
+        sh:message "A publication must have exactly one protocol revision: a 40-character hexadecimal Git commit SHA." ;
+    ] ;
+    sh:property [
+        sh:path dcterms:identifier ;
+        sh:minCount 1 ;
+        sh:message "A publication must have at least one identifier (e.g. a DOI)." ;
+    ] .
+
+# =============================================================================
+# Publication Shape — optional fields
+# =============================================================================
+
+od:PublicationOptionalShape
+    a sh:NodeShape ;
+    sh:targetClass od:Publication ;
+
+    sh:property [
+        sh:path dcterms:abstract ;
+        sh:maxCount 1 ;
+        sh:message "A publication may have at most one abstract." ;
+    ] .
+
+# =============================================================================
+# Publication Shape — informational (non-enforcing) capability notes
+# =============================================================================
+
+od:PublicationInfoShape
+    a sh:NodeShape ;
+    sh:targetClass od:Publication ;
+    sh:severity sh:Info ;
+
+    sh:property [
+        sh:path od:hasSubject ;
+        sh:message "Subjects may be expressed via od:hasSubject pointing to a SKOS concept." ;
+    ] ;
+    sh:property [
+        sh:path dcterms:references ;
+        sh:message "References may be expressed via dcterms:references." ;
     ] .
