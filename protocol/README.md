@@ -72,16 +72,18 @@ A working example of a collection registry referencing a child publication regis
 
 The protocol version is the **full Git commit SHA** of this repository at the time a publication was produced. No mutable refs (tags, branches) are used as protocol identifiers.
 
+See the normative spec for the revision model, commit-derivation rule, and artifact URI conventions: [protocol/versioning.md](versioning.md)
+
 Rationale: [docs/ADR/007-protocol-artifacts.md](../docs/ADR/007-protocol-artifacts.md)
 
 Flat provenance model: [docs/ADR/018-flat-provenance-model.md](../docs/ADR/018-flat-provenance-model.md)
 
 ## Protocol Commit Pinning
 
-Publications record the protocol commit SHA. The protocol artifacts can be retrieved via raw GitHub URL:
+Publications record the protocol commit SHA. Protocol artifacts are retrieved via immutable file-at-commit URLs, e.g.:
 
 ```
-https://raw.githubusercontent.com/opendraft/opendraft/<commit-sha>/protocol/opendraft.ttl
+https://raw.githubusercontent.com/konsulin-care/opendraft/<commit-sha>/protocol/opendraft.ttl
 ```
 
 This enables independent verification: any party can retrieve the exact protocol version that produced a publication.

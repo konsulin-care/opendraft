@@ -34,6 +34,8 @@ Protocol represented as RDF/Turtle:
 - Protocol and documentation evolve together.
 - No dependency on OpenDraft application.
 
+Revision model, commit-derivation rule, and artifact URI conventions are specified in [protocol/versioning.md](../../protocol/versioning.md).
+
 ## References
 
 - PROPOSAL.md §15, §16

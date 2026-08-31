@@ -17,4 +17,4 @@ od:example-collection-registry
     dcterms:title "OpenDraft Example Collection Registry" ;
     dcterms:description "A top-level collection registry for demonstration purposes." ;
     od:containsRegistry od:example-publication-registry ;
-    foaf:homepage <https://github.com/opendraft/opendraft> .
+    foaf:homepage <https://github.com/konsulin-care/opendraft> .

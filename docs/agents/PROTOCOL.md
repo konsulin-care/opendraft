@@ -26,6 +26,8 @@ The OpenDraft protocol defines how scientific publications are represented, vali
 - Protocol version = full Git commit SHA.
 - No mutable refs (tags, branches) as identifiers.
 - Publications record protocol commit for reproducibility.
+- Revision model, commit-derivation rule, and artifact URI conventions: [protocol/versioning.md](../../protocol/versioning.md).
+- Canonical repository: `https://github.com/konsulin-care/opendraft`.
 
 ## Validation
 
