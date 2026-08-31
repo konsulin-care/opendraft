@@ -37,12 +37,12 @@ echo ""
 
 # Valid TTL files should parse
 for f in protocol/opendraft.ttl protocol/article.shacl.ttl protocol/registry.shacl.ttl protocol/registry.ttl; do
-  run_test "$f parses" pass "rapper -c $f"
+  run_test "$f parses" pass "rapper -i turtle -c $f"
 done
 
 # Invalid TTL should fail
 echo "not valid turtle" > /tmp/bad.ttl
-run_test "invalid TTL rejected" fail "rapper -c /tmp/bad.ttl"
+run_test "invalid TTL rejected" fail "rapper -i turtle -c /tmp/bad.ttl"
 rm /tmp/bad.ttl
 
 echo ""
