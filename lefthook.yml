@@ -1,0 +1,71 @@
+# lefthook.yml — Git hooks configuration
+# Docs: https://github.com/evilmartians/lefthook
+
+pre-commit:
+  parallel: true
+  commands:
+    # TypeScript/JavaScript
+    typescript:
+      glob: "*.{ts,tsx}"
+      run: mise run typecheck
+    eslint:
+      glob: "*.{ts,tsx,js,jsx}"
+      run: mise run lint
+      stage_fixed: true
+
+    # Go
+    go-fmt:
+      glob: "*.go"
+      run: mise run fmt-go
+      dir: apps/bff
+    go-vet:
+      glob: "*.go"
+      run: mise run lint-go
+      dir: apps/bff
+    go-mod-tidy:
+      glob: "go.{mod,sum}"
+      run: go mod tidy && git add go.mod go.sum
+      dir: apps/bff
+
+    # Protocol/Docs
+    validate-ttl:
+      glob: "*.ttl"
+      run: mise run validate-ttl
+    yaml-lint:
+      glob: "*.{yml,yaml}"
+      run: mise exec -- yamllint -c .yamllint.yml {staged_files}
+
+    # Code quality
+    large-files:
+      run: mise run check-large-files
+
+pre-push:
+  parallel: true
+  commands:
+    # Tests
+    test:
+      run: mise run test
+    test-go:
+      run: mise run test-go
+      dir: apps/bff
+
+    # Build
+    build:
+      run: mise run build
+    build-go:
+      run: mise run build-go
+      dir: apps/bff
+
+    # Security
+    govulncheck:
+      run: mise run govulncheck
+      dir: apps/bff
+
+    # Complexity (prevents PR spaghetti)
+    complexity-ts:
+      glob: "*.{ts,tsx}"
+      run: mise run complexity-ts
+    complexity-go:
+      glob: "*.go"
+      run: mise run lint-go
+      dir: apps/bff

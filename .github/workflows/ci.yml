@@ -2,27 +2,129 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
-  validate:
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: jdx/mise-action@v2
-
-      - uses: pnpm/action-setup@v4
-
+      - run: mise install
       - run: pnpm install --frozen-lockfile
-
       - name: Install rapper (RDF parser)
-        run: sudo apt-get update && sudo apt-get install -y rapper
+        run: sudo apt-get update && sudo apt-get install -y raptor2-utils
+      - name: ESLint
+        run: mise run lint
+      - name: golangci-lint
+        run: mise run lint-go
+        working-directory: apps/bff
+      - name: Validate TTL
+        run: mise run validate-ttl
+      - name: YAML lint
+        run: mise exec -- yamllint -c .yamllint.yml .
+      - name: Large file check
+        run: mise run check-large-files
 
-      - name: Validate TTL files
-        run: pnpm run validate:ttl
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - run: mise install
+      - run: pnpm install --frozen-lockfile
+      - name: Install rapper (RDF parser)
+        run: sudo apt-get update && sudo apt-get install -y raptor2-utils
+      - name: Conformance tests
+        run: mise run test
+      - name: Go tests
+        run: mise run test-go
+        working-directory: apps/bff
 
-      - name: Run conformance tests
-        run: pnpm test
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - run: mise install
+      - run: pnpm install --frozen-lockfile
+      - name: Build TS
+        run: mise run build
+      - name: Build Go
+        run: mise run build-go
+        working-directory: apps/bff
+
+  security:
+    name: Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - run: mise install
+      - run: pnpm install --frozen-lockfile
+      - name: npm audit
+        run: mise run audit
+      - name: govulncheck
+        run: mise run govulncheck
+
+  complexity:
+    name: Complexity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - run: mise install
+      - run: pnpm install --frozen-lockfile
+      - name: TypeScript complexity
+        run: mise run complexity-ts
+      - name: Go complexity
+        run: mise run lint-go
+        working-directory: apps/bff
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - run: mise install
+      - run: pnpm install --frozen-lockfile
+      - name: TypeScript coverage
+        run: mise run coverage-ts
+      - name: Go coverage
+        run: mise run coverage-go
+        working-directory: apps/bff
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: apps/bff/coverage.out
+
+  pr-size:
+    name: PR Size
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - run: mise install
+      - name: Check PR size
+        run: |
+          PR_NUM=${{ github.event.pull_request.number }}
+          gh pr view "$PR_NUM" \
+            --json additions,deletions \
+            -q '.additions + .deletions' > /tmp/pr_size.txt
+          TOTAL=$(cat /tmp/pr_size.txt)
+          echo "PR size: $TOTAL lines (limit: 5000)"
+          if [ "$TOTAL" -gt 5000 ]; then
+            echo "::error::PR exceeds 5000 lines"
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

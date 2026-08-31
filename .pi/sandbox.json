@@ -1,0 +1,10 @@
+{
+  "filesystem": {
+    "denyRead": [".env"],
+    "denyWrite": [".pi/*"]
+  },
+  "bash": {
+    "commandWhitelist": ["node", "go", "mise"]
+  }
+}
+

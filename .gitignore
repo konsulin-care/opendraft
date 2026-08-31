@@ -1,4 +1,45 @@
-**/.archive/
+# Dependencies
 node_modules/
-.mise/
+
+# Build output
+dist/
+build/
+out/
+
+# Environment/secrets
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
 *.log
+npm-debug.log*
+
+# Test/coverage
+coverage/
+.nyc_output/
+
+# Quarto output
+manuscripts/_output/
+manuscripts/_freeze/
+
+# mise
+.mise/
+
+# Archive
+**/.archive/
+
+# Go
+vendor/
+*.exe
+*.test
+*.out

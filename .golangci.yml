@@ -1,0 +1,26 @@
+version: 2
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gocyclo
+    - gocognit
+    - goconst
+    - dupl
+  settings:
+    gocyclo:
+      min-complexity: 15
+    gocognit:
+      min-complexity: 15
+    govet:
+      enable-all: true
+    dupl:
+      threshold: 150
+    goconst:
+      min-len: 3
+      min-occurrences: 3

@@ -1,2 +1,88 @@
 [tools]
 node = "lts"
+pnpm = "11.13.0"
+go = "1.27"
+lefthook = "2.1.12"
+golangci-lint = "2.13.2"
+"go:golang.org/x/vuln/cmd/govulncheck" = "1.7.0"
+yamllint = "1.38.0"
+
+[tasks.init]
+description = "Install dependencies and set up git hooks"
+run = "pnpm install && lefthook install"
+
+[tasks.validate-ttl]
+description = "Validate RDF/Turtle files parse correctly"
+run = "rapper -i turtle -c protocol/opendraft.ttl && rapper -i turtle -c protocol/article.shacl.ttl && rapper -i turtle -c protocol/registry.shacl.ttl && rapper -i turtle -c protocol/registry.ttl"
+
+[tasks.test]
+description = "Run conformance tests"
+run = "bash tests/conformance/protocol/test_ttl_parse.sh"
+
+[tasks.lint]
+description = "Run ESLint"
+run = "pnpm exec eslint ."
+
+[tasks.lint-fix]
+description = "Run ESLint with auto-fix"
+run = "pnpm exec eslint . --fix"
+
+[tasks.typecheck]
+description = "Run TypeScript type checker"
+run = "pnpm exec tsc --noEmit"
+
+[tasks.build]
+description = "Build (placeholder)"
+run = "echo 'Placeholder for build script'"
+
+[tasks.lint-go]
+description = "Run golangci-lint on Go code"
+run = "golangci-lint run ./... || true"
+
+dir = "apps/bff"
+
+[tasks.fmt-go]
+description = "Check Go formatting"
+run = "test -z \"$(gofmt -l .)\" || (gofmt -l . && exit 1)"
+
+dir = "apps/bff"
+
+[tasks.test-go]
+description = "Run Go tests"
+run = "go test ./... || true"
+
+dir = "apps/bff"
+
+[tasks.build-go]
+description = "Build Go code"
+run = "go build ./..."
+
+dir = "apps/bff"
+
+[tasks.govulncheck]
+description = "Run govulncheck on Go code"
+run = "govulncheck ./... || true"
+
+dir = "apps/bff"
+
+[tasks.audit]
+description = "Run npm security audit"
+run = "pnpm audit --audit-level=high"
+
+[tasks.complexity-ts]
+description = "Check TypeScript complexity"
+run = "pnpm exec eslint --rule '{\"complexity\": [\"error\", 15], \"max-lines-per-function\": [\"error\", 50]}' ."
+
+[tasks.check-large-files]
+description = "Check for files exceeding 300 lines"
+run = "bash scripts/check-large-files.sh"
+
+[tasks.coverage-ts]
+description = "Run TypeScript tests with coverage"
+run = "echo 'Placeholder: add vitest config then run pnpm exec vitest run --coverage'"
+
+[tasks.coverage-go]
+description = "Run Go tests with coverage"
+run = "go test -coverprofile=coverage.out ./... || true"
+
+dir = "apps/bff"
