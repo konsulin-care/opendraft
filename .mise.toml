@@ -35,3 +35,49 @@ run = "pnpm exec tsc --noEmit"
 [tasks.build]
 description = "Build (placeholder)"
 run = "echo 'Placeholder for build script'"
+
+[tasks.lint-go]
+description = "Run golangci-lint on Go code"
+run = "golangci-lint run ./..."
+
+dir = "apps/bff"
+
+[tasks.fmt-go]
+description = "Check Go formatting"
+run = "test -z \"$(gofmt -l .)\" || (gofmt -l . && exit 1)"
+
+dir = "apps/bff"
+
+[tasks.test-go]
+description = "Run Go tests"
+run = "go test ./..."
+
+dir = "apps/bff"
+
+[tasks.build-go]
+description = "Build Go code"
+run = "go build ./..."
+
+dir = "apps/bff"
+
+[tasks.audit]
+description = "Run npm security audit"
+run = "pnpm audit --audit-level=high"
+
+[tasks.complexity-ts]
+description = "Check TypeScript complexity"
+run = "pnpm exec eslint --rule '{\"complexity\": [\"error\", 15], \"max-lines-per-function\": [\"error\", 50]}' ."
+
+[tasks.check-large-files]
+description = "Check for files exceeding 300 lines"
+run = "bash scripts/check-large-files.sh"
+
+[tasks.coverage-ts]
+description = "Run TypeScript tests with coverage"
+run = "echo 'Placeholder: add vitest config then run pnpm exec vitest run --coverage'"
+
+[tasks.coverage-go]
+description = "Run Go tests with coverage"
+run = "go test -coverprofile=coverage.out ./..."
+
+dir = "apps/bff"
