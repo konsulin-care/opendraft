@@ -7,20 +7,20 @@ pre-commit:
     # TypeScript/JavaScript
     typescript:
       glob: "*.{ts,tsx}"
-      run: npx tsc --noEmit
+      run: mise run typecheck
     eslint:
       glob: "*.{ts,tsx,js,jsx}"
-      run: npx eslint --fix {staged_files}
+      run: mise run lint
       stage_fixed: true
 
     # Go
     go-fmt:
       glob: "*.go"
-      run: gofmt -w {staged_files}
+      run: mise run fmt-go
       dir: apps/bff
     go-vet:
       glob: "*.go"
-      run: go vet ./...
+      run: mise run lint-go
       dir: apps/bff
     go-mod-tidy:
       glob: "go.{mod,sum}"
@@ -40,7 +40,7 @@ pre-commit:
 
     # Code quality
     large-files:
-      run: bash scripts/check-large-files.sh
+      run: mise run check-large-files
 
 pre-push:
   parallel: true
@@ -49,14 +49,14 @@ pre-push:
     test:
       run: mise run test
     test-go:
-      run: go test ./...
+      run: mise run test-go
       dir: apps/bff
 
     # Build
     build:
       run: mise run build
     build-go:
-      run: go build ./...
+      run: mise run build-go
       dir: apps/bff
 
     # Security
@@ -67,8 +67,8 @@ pre-push:
     # Complexity (prevents PR spaghetti)
     complexity-ts:
       glob: "*.{ts,tsx}"
-      run: bash scripts/check-complexity.sh {push_files}
+      run: mise run complexity-ts
     complexity-go:
       glob: "*.go"
-      run: golangci-lint run --enable=gocyclo,gocognit
+      run: mise run lint-go
       dir: apps/bff
