@@ -1,0 +1,18 @@
+# Invalid fixture: publication without dcterms:title
+#
+# Violates protocol/article.shacl.ttl — dcterms:title is required
+# (exactly 1, xsd:string). Parses as valid Turtle but must FAIL
+# article SHACL validation.
+
+@prefix od: <urn:opendraft:ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+od:invalid-publication
+    a od:Publication ;
+    dcterms:creator <https://orcid.org/0000-0002-1825-0097> ;
+    dcterms:identifier <https://doi.org/10.5555/example-missing-title> ;
+    od:repositoryUrl "https://github.com/opendraft/opendraft"^^xsd:anyURI ;
+    od:manuscriptPath "manuscripts/article.qmd" ;
+    od:sourceRevision "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d" ;
+    od:protocolRevision "0000000000000000000000000000000000000000" .

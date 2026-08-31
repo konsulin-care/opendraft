@@ -1,0 +1,16 @@
+# Invalid fixture: collection registry that also contains a publication
+#
+# Violates protocol/registry.shacl.ttl — a od:CollectionRegistry must
+# contain at least one registry AND must not contain publications.
+# This fixture has both od:containsRegistry and od:containsPublication,
+# triggering both exclusion rules. Parses as valid Turtle but must FAIL
+# registry SHACL validation.
+
+@prefix od: <urn:opendraft:ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+od:mixed-registry
+    a od:CollectionRegistry ;
+    dcterms:title "Mixed registry" ;
+    od:containsRegistry od:example-publication-registry ;
+    od:containsPublication od:example-publication .
