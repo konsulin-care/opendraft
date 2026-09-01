@@ -73,8 +73,11 @@ importers:
   packages/schema:
     dependencies:
       ajv:
-        specifier: ^8.17.1
+        specifier: ^8.20.0
         version: 8.20.0
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
     devDependencies:
       typescript:
         specifier: ^6.0.3
@@ -2122,7 +2125,6 @@ snapshots:
 
   word-wrap@1.2.5: {}
 
-  yaml@2.9.0:
-    optional: true
+  yaml@2.9.0: {}
 
   yocto-queue@0.1.0: {}

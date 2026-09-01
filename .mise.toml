@@ -92,3 +92,7 @@ description = "Run Go tests with coverage"
 run = "go test -coverprofile=coverage.out ./... || true"
 
 dir = "apps/bff"
+
+[tasks.validate-project]
+description = "Validate opendraft.yml and manuscript structure"
+run = "node --import tsx packages/schema/src/cli.ts"

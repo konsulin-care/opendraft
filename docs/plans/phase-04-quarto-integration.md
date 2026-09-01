@@ -8,7 +8,7 @@
 
 ### Atomic Instruction
 
-Create a manuscript using `metadata-files` to include `_author.yml`, `_abstract.yml`, `_frontmatter.yml`, and `_other.yml`.
+Create a manuscript using `metadata-files` to include `_author.yml`, `_abstract.yml`, and `_frontmatter.yml`.
 
 ### Definition of Done
 

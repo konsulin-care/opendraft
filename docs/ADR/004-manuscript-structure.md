@@ -27,13 +27,13 @@ Metadata is split into focused YAML files:
 - `_author.yml` — author information
 - `_abstract.yml` — abstract text
 - `_frontmatter.yml` — title, keywords, dates
-- `_other.yml` — funding, acknowledgments, etc.
 
 ### Repository Integration
 `opendraft.yml` at repo root declares protocol version and manuscript paths.
 
 ## Consequences
 
+- Three metadata files keep concerns separated: authors, abstract, and frontmatter.
 - Metadata is maintainable and diffable.
 - Quarto-compatible via `metadata-files` directive.
 - OpenDraft UI manages YAML forms.

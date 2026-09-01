@@ -50,7 +50,7 @@ Create a bootstrap manuscript template.
 
 ### Atomic Instruction
 
-Define responsibilities of `_author.yml`, `_abstract.yml`, `_frontmatter.yml`, and `_other.yml`.
+Define responsibilities of `_author.yml`, `_abstract.yml`, and `_frontmatter.yml`.
 
 ### Definition of Done
 
