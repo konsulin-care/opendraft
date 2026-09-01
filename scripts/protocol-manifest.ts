@@ -25,23 +25,11 @@ export const TTL_GLOB_PATHSPEC = ':(glob)protocol/**/*.ttl';
 const SHA40 = /^[0-9a-f]{40}$/;
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 /** Protocol revision model: name, version, repository, commit (protocol/versioning.md). */
-export interface ProtocolBlock {
-  name: string;
-  version: string;
-  repository: string;
-  commit: string;
-}
+export interface ProtocolBlock { name: string; version: string; repository: string; commit: string; }
 /** One pinned protocol artifact and its expected SHA-256 digest. */
-export interface ArtifactRef {
-  path: string;
-  sha256: string;
-}
+export interface ArtifactRef { path: string; sha256: string; }
 /** The committed verification manifest. */
-export interface Manifest {
-  protocol: ProtocolBlock;
-  artifacts: ArtifactRef[];
-  generatedBy: string;
-}
+export interface Manifest { protocol: ProtocolBlock; artifacts: ArtifactRef[]; generatedBy: string; }
 /** Git operations shared by manifest generation and verification. */
 export interface GitOps {
   lastTtlCommit(): string;
@@ -51,19 +39,12 @@ export interface GitOps {
   isAncestorOrSelf(commit: string): boolean;
 }
 /** Options accepted by both update and check flows. */
-export interface ManifestOptions {
-  root: string;
-  canonical: boolean;
-  originUrl?: string | null;
-  declaredRepository?: string;
-}
+export interface ManifestOptions { root: string; canonical: boolean; originUrl?: string | null; declaredRepository?: string; }
 
 /** SHA-256 hex digest of a byte buffer. */
 export function hashBytes(data: Buffer): string { return createHash('sha256').update(data).digest('hex'); }
 /** SHA-256 hex digest of the file at an absolute path. */
-export async function hashFile(absPath: string): Promise<string> {
-  return hashBytes(await readFile(absPath));
-}
+export async function hashFile(absPath: string): Promise<string> { return hashBytes(await readFile(absPath)); }
 /** Sorted protocol-relative paths of every .ttl artifact below <root>/protocol. */
 export async function collectArtifacts(root: string): Promise<string[]> {
   const entries = await readdir(root, { recursive: true });
@@ -122,8 +103,8 @@ export function parseProtocolBlock(yamlText: string): ProtocolBlock {
   }
   const block: Record<string, string> = {};
   for (const entry of entries) {
-    const idx = entry.indexOf(':');
-    block[entry.slice(0, idx).trim()] = entry.slice(idx + 1).trim();
+    const [key, ...rest] = entry.split(':');
+    block[key.trim()] = rest.join(':').trim();
   }
   for (const key of ['name', 'version', 'repository', 'commit'] as const) {
     if (!block[key]) throw new Error(`template is missing protocol.${key}`);
@@ -132,10 +113,7 @@ export function parseProtocolBlock(yamlText: string): ProtocolBlock {
 }
 /** Renders the generated project template YAML for a protocol block. */
 export function renderProtocolYaml(block: ProtocolBlock): string {
-  return [
-    'protocol:', `  name: ${block.name}`, `  version: ${block.version}`,
-    `  repository: ${block.repository}`, `  commit: ${block.commit}`, 'manuscripts: []', '',
-  ].join('\n');
+  return ['protocol:', `  name: ${block.name}`, `  version: ${block.version}`, `  repository: ${block.repository}`, `  commit: ${block.commit}`, 'manuscripts: []', ''].join('\n');
 }
 /** Parses and structurally validates a manifest document. */
 export function parseManifest(text: string): Manifest {
@@ -160,9 +138,7 @@ export function blocksEqual(a: ProtocolBlock, b: ProtocolBlock): boolean { retur
 export async function readTemplateBlock(root: string): Promise<ProtocolBlock | null> {
   try {
     return parseProtocolBlock(await readFile(join(root, TEMPLATE_PATH), 'utf8'));
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 /** Returns identity and schema failures for the manifest protocol block. */
 function schemaFailures(m: Manifest): string[] {
@@ -189,9 +165,7 @@ async function artifactFailures(m: Manifest, root: string): Promise<string[]> {
   for (const a of m.artifacts) {
     const fileHash = await hashFile(join(root, a.path)).catch(() => null);
     if (fileHash === null) failures.push(`artifact ${a.path} is missing on disk`);
-    else if (fileHash !== a.sha256) {
-      failures.push(`artifact ${a.path} content changed (declared ${a.sha256.slice(0, 8)}, found ${fileHash.slice(0, 8)})`);
-    }
+    else if (fileHash !== a.sha256) failures.push(`artifact ${a.path} content changed (declared ${a.sha256.slice(0, 8)}, found ${fileHash.slice(0, 8)})`);
   }
   return failures;
 }
@@ -202,10 +176,38 @@ async function templateFailures(m: Manifest, root: string): Promise<string[]> {
   if (!blocksEqual(template, m.protocol)) return ['template protocol block drifted from manifest'];
   return [];
 }
+/** Returns commit consistency failures: resolvable SHA, ancestry, per-artifact git content. */
+function commitFailures(m: Manifest, gitOps: GitOps): string[] {
+  if (!gitOps.commitExists(m.protocol.commit)) {
+    return [`commit ${m.protocol.commit} is not resolvable in local history`];
+  }
+  if (!gitOps.isAncestorOrSelf(m.protocol.commit)) {
+    return [`commit ${m.protocol.commit} is not an ancestor-or-self of HEAD`];
+  }
+  const failures: string[] = [];
+  for (const a of m.artifacts) {
+    let gitHash: string | null = null;
+    try {
+      gitHash = hashBytes(gitOps.readCommitFile(m.protocol.commit, a.path));
+    } catch {
+      // path missing at the declared commit; reported below
+    }
+    if (gitHash !== a.sha256) {
+      failures.push(`artifact ${a.path} at commit ${m.protocol.commit} does not match declared sha256`);
+    }
+  }
+  return failures;
+}
 /** Returns human-readable failures for a manifest; an empty array means it verifies. */
 export async function describeFailures(manifest: Manifest, gitOps: GitOps, options: ManifestOptions): Promise<string[]> {
+  const canonicalFailure =
+    options.canonical && manifest.protocol.repository !== CANONICAL_REPOSITORY
+      ? [`repository '${manifest.protocol.repository}' is not canonical`]
+      : [];
   return [
     ...schemaFailures(manifest),
+    ...canonicalFailure,
+    ...commitFailures(manifest, gitOps),
     ...(await artifactFailures(manifest, options.root)),
     ...(await templateFailures(manifest, options.root)),
   ];
@@ -213,15 +215,12 @@ export async function describeFailures(manifest: Manifest, gitOps: GitOps, optio
 /** Resolves the repository URL, enforcing the canonical-origin intent gate. */
 function resolveRepository(options: ManifestOptions): string {
   if (options.declaredRepository) {
-    const normalized = normalizeOrigin(options.declaredRepository);
-    if (!normalized) throw new Error(`--repository '${options.declaredRepository}' is not a usable HTTPS URL`);
-    return normalized;
+    const declared = normalizeOrigin(options.declaredRepository);
+    if (declared) return declared;
+    throw new Error(`--repository '${options.declaredRepository}' is not a usable HTTPS URL`);
   }
   if (normalizeOrigin(options.originUrl ?? null) === CANONICAL_REPOSITORY) return CANONICAL_REPOSITORY;
-  throw new Error(
-    `origin '${options.originUrl ?? '<none>'}' is not the canonical repository (${CANONICAL_REPOSITORY}); ` +
-      'pass --repository <url> to override for an upstream-targeted PR',
-  );
+  throw new Error(`origin '${options.originUrl ?? '<none>'}' is not the canonical repository (${CANONICAL_REPOSITORY}); pass --repository <url> to override for an upstream-targeted PR`);
 }
 /** Regenerates the manifest and project template for the current revision. */
 export async function updateManifest(gitOps: GitOps, options: ManifestOptions): Promise<Manifest> {

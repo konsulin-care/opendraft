@@ -19,6 +19,14 @@ run = "bash tests/conformance/protocol/test_ttl_parse.sh"
 description = "Validate protocol fixtures against SHACL shapes"
 run = "node --import tsx tests/conformance/shacl/run-conformance.ts"
 
+[tasks.verify-protocol]
+description = "Verify protocol artifacts against the committed manifest"
+run = "node --import tsx scripts/protocol-manifest.ts --check"
+
+[tasks.update-protocol-manifest]
+description = "Regenerate protocol/protocol.manifest.json and pin templates/project/opendraft.yml"
+run = "node --import tsx scripts/protocol-manifest.ts --update"
+
 [tasks.test]
 description = "Run all tests"
 run = "bash tests/run-tests.sh"

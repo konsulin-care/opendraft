@@ -59,6 +59,13 @@ else
   skip_suite "SHACL Conformance" "tsx not installed"
 fi
 
+# --- Protocol Verification ---
+if command -v node >/dev/null 2>&1 && [ -d "node_modules/tsx" ]; then
+  run_suite "Protocol Verification" "node --import tsx scripts/protocol-manifest.ts --check"
+else
+  skip_suite "Protocol Verification" "tsx not installed"
+fi
+
 # --- Suite 4: Go Tests ---
 if command -v go >/dev/null 2>&1; then
   if ls apps/bff/*.go >/dev/null 2>&1; then
