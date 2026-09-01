@@ -13,11 +13,23 @@ run = "pnpm install && lefthook install"
 
 [tasks.validate-ttl]
 description = "Validate RDF/Turtle files parse correctly"
-run = "rapper -i turtle -c protocol/opendraft.ttl && rapper -i turtle -c protocol/article.shacl.ttl && rapper -i turtle -c protocol/registry.shacl.ttl && rapper -i turtle -c protocol/registry.ttl"
+run = "bash tests/conformance/protocol/test_ttl_parse.sh"
+
+[tasks.validate-shacl]
+description = "Validate protocol fixtures against SHACL shapes"
+run = "node --import tsx tests/conformance/shacl/run-conformance.ts"
+
+[tasks.verify-protocol]
+description = "Verify protocol artifacts against the committed manifest"
+run = "node --import tsx scripts/protocol-manifest.ts --check"
+
+[tasks.update-protocol-manifest]
+description = "Regenerate protocol/protocol.manifest.json and pin templates/project/opendraft.yml"
+run = "node --import tsx scripts/protocol-manifest.ts --update"
 
 [tasks.test]
-description = "Run conformance tests"
-run = "bash tests/conformance/protocol/test_ttl_parse.sh"
+description = "Run all tests"
+run = "bash tests/run-tests.sh"
 
 [tasks.lint]
 description = "Run ESLint"
@@ -44,12 +56,6 @@ dir = "apps/bff"
 [tasks.fmt-go]
 description = "Check Go formatting"
 run = "test -z \"$(gofmt -l .)\" || (gofmt -l . && exit 1)"
-
-dir = "apps/bff"
-
-[tasks.test-go]
-description = "Run Go tests"
-run = "go test ./... || true"
 
 dir = "apps/bff"
 

@@ -1,0 +1,17 @@
+# OpenDraft Example: Publication Registry
+#
+# A working example of a publication registry (OD-014). It references
+# articles by IRI and must not contain other registries.
+#
+# Validates clean against protocol/registry.shacl.ttl.
+
+@prefix od: <urn:opendraft:ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+# The publication registry itself. Lists publications available in a
+# collection; the referenced article lives in protocol/examples/article.ttl.
+od:example-publication-registry
+    a od:PublicationRegistry ;
+    dcterms:title "OpenDraft Example Publication Registry" ;
+    dcterms:description "A publication registry containing example publications." ;
+    od:containsPublication od:example-publication .

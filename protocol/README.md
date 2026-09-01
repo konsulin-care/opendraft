@@ -19,11 +19,19 @@ Prefix `od:` is used throughout all TTL files. This namespace is a URN (RFC 3986
 | `opendraft.ttl` | Core RDF vocabulary (classes, properties) |
 | `article.shacl.ttl` | SHACL shapes for article validation |
 | `registry.shacl.ttl` | SHACL shapes for registry validation |
-| `registry.ttl` | Example registry (collection registry) |
+| `registry.ttl` | Example collection registry |
+
+Examples and fixtures:
+
+| File | Purpose |
+|------|---------|
+| `examples/article.ttl` | Example publication (valid article) |
+| `examples/publication-registry.ttl` | Example publication registry |
+| `examples/` | Reference examples validated against the shapes |
 
 ### `opendraft.ttl` — Core Vocabulary
 
-Defines the OpenDraft ontology: classes for publications, source repositories, revisions, registries, and subject assignments; properties linking them together.
+Defines the OpenDraft ontology: classes for publications, registries, and subject assignments; properties linking them together.
 
 Reuses established vocabularies where possible:
 - **Dublin Core Terms** (`dcterms:`) — title, creator, subject, identifier, date, license, conformsTo
@@ -33,15 +41,22 @@ Reuses established vocabularies where possible:
 
 Custom `od:` terms cover only what existing vocabularies do not express: Git-specific provenance, registry structure, and subject assignment reification.
 
+Provenance follows the **flat model** (ADR-018): scalars live directly on `od:Publication`.
+
 ### `article.shacl.ttl` — Article Validation
 
-SHACL shapes validating that an article RDF graph conforms to the protocol. Phase 00 includes minimal shapes; full validation is in phase 01.
+SHACL shapes validating that an article RDF graph conforms to the protocol. See ADR-018 for the provenance model.
 
 Required properties for a valid publication:
-- `dcterms:title` (exactly 1)
+- `dcterms:title` (exactly 1, `xsd:string`)
 - `dcterms:creator` (at least 1)
-- `od:sourceRevision` (exactly 1)
-- `od:protocolRevision` (exactly 1)
+- `dcterms:identifier` (at least 1, DOI)
+- `od:repositoryUrl` (exactly 1, `xsd:anyURI`)
+- `od:manuscriptPath` (exactly 1)
+- `od:sourceRevision` (exactly 1, 40-char hex SHA `^[0-9a-f]{40}$`)
+- `od:protocolRevision` (exactly 1, 40-char hex SHA `^[0-9a-f]{40}$`)
+
+Optional fields validated for structure: `dcterms:abstract` (at most 1). Subject (`od:hasSubject`) and references (`dcterms:references`) have informational, non-enforcing shapes.
 
 ### `registry.shacl.ttl` — Registry Validation
 
@@ -49,35 +64,41 @@ SHACL shapes enforcing mutual exclusivity between registry types:
 - **Collection registries** must contain at least one registry and must not contain publications.
 - **Publication registries** must contain at least one publication and must not contain other registries.
 
-### `registry.ttl` — Example Registry
+### `registry.ttl` — Example Collection Registry
 
-A working example of a collection registry referencing a child publication registry. Demonstrates the expected structure for discovery hierarchies.
+A working example of a collection registry referencing a child publication registry by IRI. Publication registries live in `examples/publication-registry.ttl`; articles in `examples/article.ttl`. Demonstrates the expected structure for discovery hierarchies.
 
 ## Protocol Versioning
 
 The protocol version is the **full Git commit SHA** of this repository at the time a publication was produced. No mutable refs (tags, branches) are used as protocol identifiers.
 
+See the normative spec for the revision model, commit-derivation rule, and artifact URI conventions: [protocol/versioning.md](versioning.md)
+
 Rationale: [docs/ADR/007-protocol-artifacts.md](../docs/ADR/007-protocol-artifacts.md)
+
+Flat provenance model: [docs/ADR/018-flat-provenance-model.md](../docs/ADR/018-flat-provenance-model.md)
 
 ## Protocol Commit Pinning
 
-Publications record the protocol commit SHA. The protocol artifacts can be retrieved via raw GitHub URL:
+Publications record the protocol commit SHA. Protocol artifacts are retrieved via immutable file-at-commit URLs, e.g.:
 
 ```
-https://raw.githubusercontent.com/opendraft/opendraft/<commit-sha>/protocol/opendraft.ttl
+https://raw.githubusercontent.com/konsulin-care/opendraft/<commit-sha>/protocol/opendraft.ttl
 ```
 
 This enables independent verification: any party can retrieve the exact protocol version that produced a publication.
 
 ## Conformance Testing
 
-Run the conformance test suite:
+Run the conformance suite (wired into pre-push and CI):
 
 ```bash
-pnpm test
+mise run validate-ttl      # TTL syntax (rapper) over all protocol and fixture files
+mise run validate-shacl    # SHACL conformance of examples and invalid fixtures
+mise run test              # All suites: RDF, SHACL, Go, TypeScript
 ```
 
-This executes `tests/conformance/protocol/test_ttl_parse.sh`, which validates that all protocol TTL files parse correctly with `rapper` (RDF parser) and that invalid TTL is rejected.
+`test_ttl_parse.sh` validates that all protocol TTL files (core, `examples/`, invalid fixtures) parse correctly with `rapper` and that invalid TTL is rejected. `run-conformance.ts` validates every example against the SHACL shapes (expecting conform) and every invalid fixture (expecting non-conform).
 
 ## Common Pitfalls
 
@@ -85,4 +106,4 @@ This executes `tests/conformance/protocol/test_ttl_parse.sh`, which validates th
 2. **Breaking SHACL shapes** — run conformance tests after changes.
 3. **Using mutable refs** — always use full commit SHA for protocol version.
 4. **Mixing normative and explanatory** — keep TTL in protocol/, docs in manuscripts/.
-5. **Forgetting to validate** — run `pnpm run validate:ttl` before committing.
+5. **Forgetting to validate** — run `mise run validate-shacl` before committing.

@@ -1,0 +1,35 @@
+# OpenDraft Example Article
+#
+# A minimal valid publication demonstrating the flat provenance model
+# (ADR-018). Shows every required field declared by ADR-008 plus the
+# optional layer (abstract, subject assignment, references).
+#
+# Validates clean against protocol/article.shacl.ttl.
+
+@prefix od: <urn:opendraft:ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+# The publication itself. Identified by DOI; carries full provenance.
+od:example-publication
+    a od:Publication ;
+
+    # --- Required fields (ADR-008) ---
+    dcterms:title "Example Publication: OpenDraft Protocol" ;
+    dcterms:creator <https://orcid.org/0000-0002-1825-0097> ;
+    dcterms:identifier <https://doi.org/10.5555/example-opendraft-2026> ;
+    od:repositoryUrl "https://github.com/konsulin-care/opendraft"^^xsd:anyURI ;
+    od:manuscriptPath "manuscripts/distributed-scientific-publication/article.qmd" ;
+    od:sourceRevision "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d" ;
+    od:protocolRevision "0000000000000000000000000000000000000000" ;
+
+    # --- Optional fields (ADR-008) ---
+    dcterms:abstract "A canonical example publication used to demonstrate the OpenDraft protocol." ;
+    od:hasSubject od:concept-distributed-scientific-publication ;
+    dcterms:references <https://doi.org/10.5555/example-cited-work-2025> .
+
+# A SKOS concept used as the subject of the example publication.
+od:concept-distributed-scientific-publication
+    a skos:Concept ;
+    skos:prefLabel "Distributed scientific publication"@en .

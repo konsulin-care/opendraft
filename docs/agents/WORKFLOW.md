@@ -63,12 +63,13 @@ Use `--no-verify` to skip hooks. Bypassed hooks still run in CI.
 
 ## CI/CD Pipeline
 
-GitHub Actions workflow in `.github/workflows/ci.yml` runs 7 parallel jobs on PRs to `master`:
+GitHub Actions workflow in `.github/workflows/ci.yml` runs 8 parallel jobs on PRs to `master`:
 
 | Job | Checks |
 |-----|--------|
 | lint | ESLint, golangci-lint, TTL validation, markdown/yaml lint, large files |
-| test | Conformance tests, Go tests |
+| test | Conformance tests, protocol verification, Go tests |
+| verify-protocol | Protocol artifacts against the committed manifest (uses full git history) |
 | build | TypeScript build, Go build |
 | security | npm audit, govulncheck |
 | complexity | TypeScript complexity, Go complexity |

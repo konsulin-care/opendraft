@@ -2,7 +2,7 @@
 
 **Status:** Accepted  
 **Date:** 2024-12-01  
-**Updated:** 2025-01-15
+**Updated:** 2026-08-31
 
 ## Context
 
@@ -38,8 +38,7 @@ Use **mise** as the single source of truth for tool versions and quality tasks.
 | `lint-go` | Run golangci-lint |
 | `fmt-go` | Check Go formatting |
 | `typecheck` | TypeScript type checking |
-| `test` | Conformance tests |
-| `test-go` | Go tests |
+| `test` | All test suites (RDF, SHACL, Go, TypeScript) |
 | `build` | Build (placeholder) |
 | `build-go` | Build Go code |
 | `validate-ttl` | Validate RDF/Turtle files |
@@ -74,7 +73,7 @@ Checks are distributed across three layers based on cost and blocking behavior. 
 | Layer | Purpose | Checks | Blocking |
 |-------|---------|--------|----------|
 | **pre-commit** | Fast feedback on common issues | TypeScript type-check, ESLint (with --fix), Go fmt, Go vet, Go mod tidy, TTL validation, Markdown lint, YAML lint, Large file check | Yes |
-| **pre-push** | Validate readiness for review | Tests (pnpm + Go), Build validation, govulncheck, Complexity analysis (TS + Go) | Yes |
+| **pre-push** | Validate readiness for review | Full test suite, Build validation, govulncheck, Complexity analysis (TS + Go) | Yes |
 | **CI** | Comprehensive analysis + broader checks | All pre-commit/pre-push checks + npm audit, coverage, PR size check | Yes (PR merge) |
 
 #### Pre-commit Rationale
@@ -104,7 +103,7 @@ CI provides the final gate with 7 parallel jobs:
 | Job | What it checks |
 |-----|----------------|
 | lint | ESLint, golangci-lint, TTL validation, markdown/yaml lint, large files |
-| test | Conformance tests, Go tests |
+| test | All test suites (RDF, SHACL, Go, TypeScript) |
 | build | TypeScript build, Go build |
 | security | npm audit, govulncheck |
 | complexity | TypeScript complexity, Go complexity |

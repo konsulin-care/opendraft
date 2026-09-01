@@ -1,0 +1,19 @@
+# Invalid fixture: publication with a non-SHA od:sourceRevision
+#
+# Violates protocol/article.shacl.ttl — od:sourceRevision must match
+# sh:pattern ^[0-9a-f]{40}$. This value is short and non-hexadecimal.
+# Parses as valid Turtle but must FAIL article SHACL validation.
+
+@prefix od: <urn:opendraft:ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+od:invalid-publication
+    a od:Publication ;
+    dcterms:title "Publication with a bad source revision" ;
+    dcterms:creator <https://orcid.org/0000-0002-1825-0097> ;
+    dcterms:identifier <https://doi.org/10.5555/example-invalid-revision> ;
+    od:repositoryUrl "https://github.com/opendraft/opendraft"^^xsd:anyURI ;
+    od:manuscriptPath "manuscripts/article.qmd" ;
+    od:sourceRevision "not-a-sha" ;
+    od:protocolRevision "0000000000000000000000000000000000000000" .

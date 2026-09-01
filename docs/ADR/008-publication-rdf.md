@@ -2,7 +2,10 @@
 
 **Status:** Accepted  
 **Date:** 2024-01-01  
-**PROPOSAL.md:** §14
+**PROPOSAL.md:** §14  
+**Superseded in part by:** [ADR-018](018-flat-provenance-model.md)  
+
+> **Supersedure note (2026-08-31):** ADR-018 replaces the reified-node provenance model with flat scalars on `od:Publication`. The clauses below describing reified `sourceRepository`/source-revision/protocol-revision nodes, the `od:SourceRepository`, `od:SourceRevision`, `od:ProtocolRevision` classes, and `od:revisionSha` are superseded. The required/optional field lists and provenance intent remain in effect.
 
 ## Context
 

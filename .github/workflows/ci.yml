@@ -34,16 +34,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: jdx/mise-action@v2
       - run: mise install
       - run: pnpm install --frozen-lockfile
       - name: Install rapper (RDF parser)
         run: sudo apt-get update && sudo apt-get install -y raptor2-utils
-      - name: Conformance tests
+      - name: Run all tests
         run: mise run test
-      - name: Go tests
-        run: mise run test-go
-        working-directory: apps/bff
+
+  verify-protocol:
+    name: Verify Protocol
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: jdx/mise-action@v2
+      - run: mise install
+      - run: pnpm install --frozen-lockfile
+      - name: Verify protocol artifacts
+        run: mise run verify-protocol
 
   build:
     name: Build

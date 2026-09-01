@@ -11,7 +11,7 @@
 #   - PROV-O: Agent (for subject assignment provenance)
 #
 # Custom od: terms cover only what existing vocabularies do not express:
-#   - Git-specific provenance (source revision, protocol revision)
+#   - Git-specific provenance (source revision, protocol revision, repository URL)
 #   - Registry structure (collection vs publication registries)
 #   - Subject assignment reification (who assigned, when)
 
@@ -33,27 +33,12 @@
 od:Publication
     rdf:type owl:Class ;
     rdfs:label "Publication" ;
-    rdfs:comment "A published article with full provenance. Identified by DOI. Links to source repository, source revision, protocol revision, and subject assignments." .
+    rdfs:comment "A published article with full provenance. Identified by DOI. Carries repository URL, source revision, protocol revision, and subject assignments." .
 
 od:PublicationVersion
     rdf:type owl:Class ;
     rdfs:label "Publication Version" ;
     rdfs:comment "A specific version of a publication, identified by DOI. Each version retains provenance to its source." .
-
-od:SourceRepository
-    rdf:type owl:Class ;
-    rdfs:label "Source Repository" ;
-    rdfs:comment "A Git repository containing manuscript source. Identified by URL." .
-
-od:SourceRevision
-    rdf:type owl:Class ;
-    rdfs:label "Source Revision" ;
-    rdfs:comment "A specific Git commit in the source repository that produced a publication." .
-
-od:ProtocolRevision
-    rdf:type owl:Class ;
-    rdfs:label "Protocol Revision" ;
-    rdfs:comment "A specific version of the OpenDraft protocol, identified by full Git commit SHA of the opendraft repository." .
 
 od:Registry
     rdf:type owl:Class ;
@@ -79,29 +64,29 @@ od:SubjectAssignment
 
 
 # =============================================================================
-# PROPERTIES — Publication provenance
+# PROPERTIES — Publication provenance (flat scalars, see ADR-018)
 # =============================================================================
-
-od:sourceRevision
-    rdf:type owl:ObjectProperty ;
-    rdfs:domain od:Publication ;
-    rdfs:range od:SourceRevision ;
-    rdfs:label "source revision" ;
-    rdfs:comment "The Git commit that produced this publication." .
-
-od:protocolRevision
-    rdf:type owl:ObjectProperty ;
-    rdfs:domain od:Publication ;
-    rdfs:range od:ProtocolRevision ;
-    rdfs:label "protocol revision" ;
-    rdfs:comment "The OpenDraft protocol version used to produce this publication." .
 
 od:repositoryUrl
     rdf:type owl:DatatypeProperty ;
-    rdfs:domain od:SourceRepository ;
+    rdfs:domain od:Publication ;
     rdfs:range xsd:anyURI ;
     rdfs:label "repository URL" ;
-    rdfs:comment "The URL of the Git source repository." .
+    rdfs:comment "URL of the Git source repository that produced this publication." .
+
+od:sourceRevision
+    rdf:type owl:DatatypeProperty ;
+    rdfs:domain od:Publication ;
+    rdfs:range xsd:string ;
+    rdfs:label "source revision" ;
+    rdfs:comment "Full 40-character Git commit SHA of the source revision." .
+
+od:protocolRevision
+    rdf:type owl:DatatypeProperty ;
+    rdfs:domain od:Publication ;
+    rdfs:range xsd:string ;
+    rdfs:label "protocol revision" ;
+    rdfs:comment "Full 40-character Git commit SHA of the OpenDraft protocol revision." .
 
 od:manuscriptPath
     rdf:type owl:DatatypeProperty ;
@@ -109,12 +94,6 @@ od:manuscriptPath
     rdfs:range xsd:string ;
     rdfs:label "manuscript path" ;
     rdfs:comment "Path to the manuscript file within the source repository." .
-
-od:revisionSha
-    rdf:type owl:DatatypeProperty ;
-    rdfs:range xsd:string ;
-    rdfs:label "revision SHA" ;
-    rdfs:comment "The full 40-character Git commit SHA identifying a source or protocol revision." .
 
 
 # =============================================================================

@@ -1,0 +1,6 @@
+protocol:
+  name: opendraft
+  version: e849ba8a46528d523d5f3d18f5f0171853f13030
+  repository: https://github.com/konsulin-care/opendraft
+  commit: e849ba8a46528d523d5f3d18f5f0171853f13030
+manuscripts: []

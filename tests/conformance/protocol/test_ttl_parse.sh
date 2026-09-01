@@ -35,8 +35,9 @@ run_test() {
 echo "=== TTL Syntax Validation ==="
 echo ""
 
-# Valid TTL files should parse
-for f in protocol/opendraft.ttl protocol/article.shacl.ttl protocol/registry.shacl.ttl protocol/registry.ttl; do
+# Valid TTL files should parse: core artifacts, examples, and invalid
+# fixtures (which must still be syntactically valid Turtle).
+for f in protocol/*.ttl protocol/examples/*.ttl tests/conformance/fixtures/invalid/*.ttl; do
   run_test "$f parses" pass "rapper -i turtle -c $f"
 done
 
