@@ -3,3 +3,15 @@ date: 2024-01-15
 keywords:
   - keyword1
   - keyword2
+# license: "CC BY"
+# copyright: "Copyright 2024 Acme Inc. All Rights Reserved."
+# funding: "The author(s) received no specific funding for this work."
+# citation:
+#   container-title: "Journal Name"
+#   volume: 1
+#   issue: 1
+#   doi: "10.5555/12345678"
+# subject:
+#   text: "Distributed scientific publication"
+#   authority: "http://www.w3.org/2004/02/skos/core#"
+#   term: "concept-distributed-scientific-publication"

@@ -43,6 +43,27 @@ function mapErrors(errors: AjvError[] | undefined | null): ValidationError[] {
 export type MetadataType = 'author' | 'abstract' | 'frontmatter';
 
 /**
+ * Normalize author metadata: alias `author` to `authors` or vice versa.
+ * Returns a new object (no mutation of the original).
+ */
+function normalizeAuthorData(data: Record<string, unknown>): Record<string, unknown> {
+  if (!('author' in data) && !('authors' in data)) return data;
+
+  const result = { ...data };
+
+  // If only `author` exists, copy to `authors`
+  if ('author' in result && !('authors' in result)) {
+    result.authors = result.author;
+  }
+  // If only `authors` exists, copy to `author`
+  if ('authors' in result && !('author' in result)) {
+    result.author = result.authors;
+  }
+
+  return result;
+}
+
+/**
  * Validate a parsed metadata file against its schema.
  *
  * @param data - Parsed YAML content.
@@ -51,7 +72,13 @@ export type MetadataType = 'author' | 'abstract' | 'frontmatter';
  */
 export function validateMetadata(data: unknown, type: MetadataType): ValidationResult {
   const validate = schemas[type];
-  const valid = validate(data) as boolean;
+
+  // Normalize author/alias before validation
+  const normalized = type === 'author' && typeof data === 'object' && data !== null
+    ? normalizeAuthorData(data as Record<string, unknown>)
+    : data;
+
+  const valid = validate(normalized) as boolean;
   return {
     valid,
     errors: mapErrors(validate.errors as unknown as AjvError[]),

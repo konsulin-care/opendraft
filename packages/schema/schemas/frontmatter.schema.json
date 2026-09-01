@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://opendraft.dev/schemas/frontmatter.schema.json",
   "title": "Frontmatter Metadata",
-  "description": "Schema for _frontmatter.yml — title, date, keywords.",
+  "description": "Schema for _frontmatter.yml — title, date, keywords, license, copyright, funding, citation, subject.",
   "type": "object",
   "properties": {
     "title": {
@@ -19,6 +19,42 @@
       "items": {
         "type": "string"
       }
+    },
+    "license": {
+      "type": "string",
+      "description": "License for the article (e.g. 'CC BY')."
+    },
+    "copyright": {
+      "type": "string",
+      "description": "Copyright statement for the article."
+    },
+    "funding": {
+      "type": "string",
+      "description": "Funding statement for the article."
+    },
+    "citation": {
+      "type": "object",
+      "description": "CSL citation metadata for the article itself.",
+      "additionalProperties": true
+    },
+    "subject": {
+      "type": "object",
+      "description": "Subject classification using SKOS.",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "The subject text (skos:prefLabel)."
+        },
+        "authority": {
+          "type": "string",
+          "description": "The SKOS concept scheme URI."
+        },
+        "term": {
+          "type": "string",
+          "description": "The concept identifier within the scheme."
+        }
+      },
+      "required": ["text", "authority", "term"]
     }
   },
   "required": ["title"],
