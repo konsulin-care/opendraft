@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://opendraft.dev/schemas/frontmatter.schema.json",
+  "title": "Frontmatter Metadata",
+  "description": "Schema for _frontmatter.yml — title, date, keywords.",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "The article title."
+    },
+    "date": {
+      "type": "string",
+      "description": "Publication or submission date."
+    },
+    "keywords": {
+      "type": "array",
+      "description": "Keywords for the article.",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": ["title"],
+  "additionalProperties": true
+}

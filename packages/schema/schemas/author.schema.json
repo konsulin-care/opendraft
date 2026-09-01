@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://opendraft.dev/schemas/author.schema.json",
+  "title": "Author Metadata",
+  "description": "Schema for _author.yml — author information.",
+  "type": "object",
+  "properties": {
+    "authors": {
+      "type": "array",
+      "description": "List of authors.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Full name of the author."
+          },
+          "orcid": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{4}-\\d{4}-\\d{3}[\\dX]$",
+            "description": "ORCID identifier (16 digits with hyphens, last digit may be X)."
+          },
+          "affiliations": {
+            "type": "array",
+            "description": "Author affiliations.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Institution or organization name."
+                }
+              },
+              "required": ["name"],
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": ["name"],
+        "additionalProperties": true
+      }
+    }
+  },
+  "required": ["authors"],
+  "additionalProperties": true
+}

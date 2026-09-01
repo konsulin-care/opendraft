@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://opendraft.dev/schemas/abstract.schema.json",
+  "title": "Abstract Metadata",
+  "description": "Schema for _abstract.yml — abstract text.",
+  "type": "object",
+  "properties": {
+    "abstract": {
+      "type": "string",
+      "description": "The abstract text."
+    }
+  },
+  "required": ["abstract"],
+  "additionalProperties": true
+}
