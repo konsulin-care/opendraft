@@ -80,6 +80,8 @@ mise run typecheck       # Run TypeScript type checker
 mise run build           # Build (placeholder)
 mise run build-go        # Build Go code
 mise run validate-ttl    # Validate RDF/Turtle files
+mise run verify-protocol # Verify protocol artifacts against the committed manifest (CI + pre-push)
+mise run update-protocol-manifest  # Regenerate protocol manifest and pin project template
 mise run test            # Run all test suites (RDF, SHACL, Go, TypeScript)
 mise run audit           # Run npm security audit
 mise run complexity-ts   # Check TypeScript complexity
@@ -90,12 +92,13 @@ mise run coverage-go     # Run Go tests with coverage
 
 ## CI/CD Pipeline
 
-GitHub Actions runs on PRs to `master` with 7 parallel jobs:
+GitHub Actions runs on PRs to `master` with 8 parallel jobs:
 
 | Job | What it checks |
 |-----|----------------|
 | lint | ESLint, golangci-lint, TTL validation, markdown/yaml lint |
-| test | All test suites (RDF, SHACL, Go, TypeScript) |
+| test | All test suites (RDF, SHACL, Go, TypeScript, protocol verification) |
+| verify-protocol | Protocol artifacts against the committed manifest (full git history) |
 | build | TypeScript build, Go build |
 | security | npm audit, govulncheck |
 | complexity | TypeScript complexity, Go complexity |
@@ -117,6 +120,20 @@ See [docs/agents/WORKFLOW.md](docs/agents/WORKFLOW.md) for full Git workflow, PR
 ## Tooling Decisions
 
 See [docs/ADR/017-tooling-environment.md](docs/ADR/017-tooling-environment.md) for rationale on tool choices and hook placement philosophy.
+
+## Protocol Manifest Policy
+
+Any change to a `.ttl` artifact under `protocol/` must ship with a refreshed `protocol/protocol.manifest.json` and `templates/project/opendraft.yml`. Without that refresh, `mise run verify-protocol` fails — locally, in pre-push, and in the CI `verify-protocol` job (`feat: any protocol/**/*.ttl change without manifest/template refresh fails verify-protocol`).
+
+Regeneration rules:
+
+- Run `mise run update-protocol-manifest` to regenerate. It resolves the revision from the last commit touching protocol artifacts (`git rev-list -1 HEAD -- ':(glob)protocol/**/*.ttl'`), so doc/CI-only changes never bump the revision.
+- Regeneration is a **canonical-repository operation**. On a fork, the generator refuses to run unless you pass an explicit `--repository <url>` (see `mise run update-protocol-manifest --help`), which is how upstream-targeted fork PRs declare intent.
+- A fork PR that changes protocol artifacts without refreshing the manifest/template fails CI.
+- After a squash-merge, a maintainer regenerates once on `master`. Because the manifest commit never touches `.ttl`, the declared protocol SHA stays stable across regeneration.
+- Protocol changes to the canonical repository: run `mise run update-protocol-manifest --canonical` on `master` (or `--check --canonical`) to enforce the canonical repository URL.
+
+Spec: [protocol/versioning.md](protocol/versioning.md).
 
 ## Protocol Changes
 
