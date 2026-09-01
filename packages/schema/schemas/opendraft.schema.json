@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://opendraft.dev/schemas/opendraft.schema.json",
+  "title": "OpenDraft Configuration",
+  "description": "Schema for opendraft.yml — the root configuration file in an OpenDraft repository.",
+  "type": "object",
+  "properties": {
+    "protocol": {
+      "type": "object",
+      "description": "Protocol revision block. Identifies which version of the OpenDraft protocol this repository uses.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "const": "opendraft",
+          "description": "Fixed protocol name."
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$",
+          "description": "Full 40-character Git commit SHA of the protocol revision."
+        },
+        "repository": {
+          "type": "string",
+          "pattern": "^https?://",
+          "description": "Canonical repository URL."
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$",
+          "description": "Full 40-character Git commit SHA (must equal version)."
+        }
+      },
+      "required": ["name", "version", "repository", "commit"],
+      "additionalProperties": true
+    },
+    "manuscripts": {
+      "type": "array",
+      "description": "List of manuscripts in this repository.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Manuscript identifier (lowercase alphanumeric + hyphens)."
+          },
+          "path": {
+            "type": "string",
+            "description": "Relative path to the manuscript directory."
+          }
+        },
+        "required": ["id", "path"],
+        "additionalProperties": true
+      }
+    }
+  },
+  "required": ["protocol", "manuscripts"],
+  "additionalProperties": true
+}
