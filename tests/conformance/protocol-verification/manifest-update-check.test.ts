@@ -233,3 +233,16 @@ describe('canonical repository integration (committed state)', () => {
     expect(failures).toEqual([]);
   });
 });
+
+describe('project template pinning (committed state)', () => {
+  it('pins the manifest revision in templates/project/opendraft.yml', async () => {
+    const root = process.cwd();
+    const manifest = parseManifest(await readFile(join(root, MANIFEST_PATH), 'utf8'));
+    const template = parseProtocolBlock(await readFile(join(root, TEMPLATE_PATH), 'utf8'));
+    expect(template).toEqual(manifest.protocol);
+    expect(template.version).toBe(template.commit);
+    expect(template.version).toMatch(/^[0-9a-f]{40}$/);
+    expect(template.name).toBe(PROTOCOL_NAME);
+    expect(template.repository).toBe(CANONICAL_REPOSITORY);
+  });
+});
