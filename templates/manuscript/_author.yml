@@ -1,0 +1,32 @@
+authors:
+  - name: Jane Doe
+    orcid: "0000-0001-2345-6789"
+    email: jane.doe@example.com
+    # phone: "+1-555-123-4567"
+    # fax: "+1-555-123-4568"
+    # url: "https://example.com/janedoe"
+    # degrees:
+    #   - PhD
+    corresponding: true
+    # equal-contributor: false
+    # deceased: false
+    # note: "Contributed to the theoretical framework."
+    # acknowledgements: "Thanks to the reviewers."
+    # roles:
+    #   - conceptualization
+    #   - writing – original draft
+    # id: "jd"
+    affiliations:
+      - name: University Example
+        department: Computer Science
+        # group: "AI Research Lab"
+        city: "Cambridge"
+        # region: "Massachusetts"
+        state: "MA"
+        country: "US"
+        # postal-code: "02139"
+        # url: "https://www.example.edu"
+        # ringgold: 6752
+        # isni: 1234567890123456
+        # ror: "https://ror.org/03yrm5c26"
+        # id: "uni-example"

@@ -1,0 +1,26 @@
+name: Quarto Render
+
+on:
+  pull_request:
+    paths:
+      - 'manuscripts/**'
+      - 'packages/schema/**'
+      - 'packages/metadata/**'
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - run: mise install
+      - run: pnpm install --frozen-lockfile
+
+      - uses: quarto-dev/quarto-actions/setup@v2
+
+      - uses: quarto-dev/quarto-actions/render@v2
+        with:
+          path: manuscripts/quarto-test
+
+      - name: Validate project
+        run: mise run validate-project

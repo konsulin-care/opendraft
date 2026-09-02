@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opendraft.dev/schemas/bibtex.schema.json",
+  "title": "BibTeX Database Schema",
+  "description": "Schema defining valid BibTeX entries and field constraints.",
+  "type": "array",
+  "items": {
+    "$ref": "#/$defs/bibtexEntry"
+  },
+  "$defs": {
+    "bibtexEntry": {
+      "type": "object",
+      "properties": {
+        "citeKey": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:\\-]+$",
+          "description": "Unique citation key used to reference the entry in LaTeX documents."
+        },
+        "entryType": {
+          "type": "string",
+          "enum": [
+            "article",
+            "book",
+            "booklet",
+            "conference",
+            "inbook",
+            "incollection",
+            "inproceedings",
+            "manual",
+            "mastersthesis",
+            "misc",
+            "phdthesis",
+            "proceedings",
+            "techreport",
+            "unpublished"
+          ]
+        },
+        "fields": {
+          "type": "object",
+          "properties": {
+            "address": { "type": "string" },
+            "annote": { "type": "string" },
+            "author": { "type": "string" },
+            "booktitle": { "type": "string" },
+            "chapter": { "type": "string" },
+            "doi": { "type": "string" },
+            "edition": { "type": "string" },
+            "editor": { "type": "string" },
+            "howpublished": { "type": "string" },
+            "institution": { "type": "string" },
+            "isbn": { "type": "string" },
+            "issn": { "type": "string" },
+            "journal": { "type": "string" },
+            "month": { "type": "string" },
+            "note": { "type": "string" },
+            "number": { "type": "string" },
+            "organization": { "type": "string" },
+            "pages": { "type": "string" },
+            "publisher": { "type": "string" },
+            "school": { "type": "string" },
+            "series": { "type": "string" },
+            "title": { "type": "string" },
+            "type": { "type": "string" },
+            "url": { "type": "string" },
+            "volume": { "type": "string" },
+            "year": { "type": "string", "pattern": "^[0-9]{4}$" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "required": ["citeKey", "entryType", "fields"]
+    }
+  }
+}

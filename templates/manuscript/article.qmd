@@ -1,0 +1,27 @@
+---
+metadata-files:
+  - _author.yml
+  - _abstract.yml
+  - _frontmatter.yml
+---
+
+# Introduction
+
+Write your introduction here.
+
+# Methods
+
+Write your methods here.
+
+# Results
+
+Write your results here.
+
+# Discussion
+
+Write your discussion here.
+
+# References
+
+::: {#refs}
+:::

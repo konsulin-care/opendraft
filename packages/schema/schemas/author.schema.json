@@ -1,0 +1,156 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://opendraft.dev/schemas/author.schema.json",
+  "title": "Author Metadata",
+  "description": "Schema for _author.yml — author information.",
+  "type": "object",
+  "properties": {
+    "authors": {
+      "type": "array",
+      "description": "List of authors.",
+      "items": {
+        "$ref": "#/definitions/authorObject"
+      }
+    }
+  },
+  "required": ["authors"],
+  "additionalProperties": true,
+  "definitions": {
+    "authorObject": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Full name of the author."
+        },
+        "email": {
+          "type": "string",
+          "description": "Contact email for the author."
+        },
+        "phone": {
+          "type": "string",
+          "description": "Contact phone for the author."
+        },
+        "fax": {
+          "type": "string",
+          "description": "Contact fax for the author."
+        },
+        "url": {
+          "type": "string",
+          "description": "URL for the author."
+        },
+        "degrees": {
+          "type": "array",
+          "description": "Academic titles or professional certifications.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "orcid": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{4}-\\d{4}-\\d{3}[\\dX]$",
+          "description": "ORCID identifier (16 digits with hyphens, last digit may be X)."
+        },
+        "note": {
+          "type": "string",
+          "description": "Notes to attach to the author."
+        },
+        "acknowledgements": {
+          "type": "string",
+          "description": "Author's acknowledgements."
+        },
+        "roles": {
+          "type": "array",
+          "description": "Author's roles (CRediT contributor roles).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "corresponding": {
+          "type": "boolean",
+          "description": "Whether this author is the corresponding author."
+        },
+        "equal-contributor": {
+          "type": "boolean",
+          "description": "Whether this author contributed equally."
+        },
+        "deceased": {
+          "type": "boolean",
+          "description": "Whether this author is deceased."
+        },
+        "id": {
+          "type": "string",
+          "description": "Identifier for referencing this author in other fields."
+        },
+        "affiliations": {
+          "type": "array",
+          "description": "Author affiliations.",
+          "items": {
+            "$ref": "#/definitions/affiliationObject"
+          }
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": true
+    },
+    "affiliationObject": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Institution or organization name."
+        },
+        "department": {
+          "type": "string",
+          "description": "Department within the affiliation."
+        },
+        "group": {
+          "type": "string",
+          "description": "Team or research group within the affiliation."
+        },
+        "city": {
+          "type": "string",
+          "description": "City of the affiliation."
+        },
+        "region": {
+          "type": "string",
+          "description": "Region of the affiliation."
+        },
+        "state": {
+          "type": "string",
+          "description": "State of the affiliation."
+        },
+        "country": {
+          "type": "string",
+          "description": "Country of the affiliation."
+        },
+        "postal-code": {
+          "type": "string",
+          "description": "Postal code of the affiliation."
+        },
+        "url": {
+          "type": "string",
+          "description": "URL of the affiliation."
+        },
+        "isni": {
+          "type": "number",
+          "description": "16-digit International Standard Name Identifier."
+        },
+        "ringgold": {
+          "type": "number",
+          "description": "4-6 digit Ringgold ID."
+        },
+        "ror": {
+          "type": "string",
+          "description": "Research Organization Registry (ROR) ID."
+        },
+        "id": {
+          "type": "string",
+          "description": "Identifier for referencing this affiliation."
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": true
+    }
+  }
+}
