@@ -1,5 +1,21 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Editor } from '@tiptap/core';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { DragHandle } from './DragHandle';
 
 interface Section {
   id: string;
@@ -13,91 +29,87 @@ interface SectionSidebarProps {
 }
 
 /** Extract sections from editor document. */
-function extractSectionsFromDoc(editor: Editor): Section[] {
-  const { doc } = editor.state;
+function extractSections(editor: Editor): Section[] {
   const result: Section[] = [];
-
-  doc.descendants((node, pos) => {
+  editor.state.doc.descendants((node, pos) => {
     if (node.type.name === 'section') {
       const heading = node.child(0);
       if (heading?.type.name === 'heading') {
-        result.push({
-          id: `section-${result.length}`,
-          title: heading.textContent,
-          position: pos,
-        });
+        result.push({ id: `s${result.length}`, title: heading.textContent, position: pos });
       }
     }
   });
-
   return result;
 }
 
-/** Find which section the cursor is in. */
-function findActiveSection(editor: Editor, sections: Section[]): number {
-  const { selection } = editor.state;
-  const { $from } = selection;
-
-  for (let depth = $from.depth; depth >= 0; depth--) {
-    if ($from.node(depth).type.name === 'section') {
-      const sectionPos = $from.before(depth);
-      return sections.findIndex(s => s.position === sectionPos);
+/** Find active section index from cursor. */
+function findActive(editor: Editor, sections: Section[]): number {
+  const { $from } = editor.state.selection;
+  for (let d = $from.depth; d >= 0; d--) {
+    if ($from.node(d).type.name === 'section') {
+      return sections.findIndex(s => s.position === $from.before(d));
     }
   }
   return 0;
 }
 
+/** Navigate to section position. */
+function goToSection(editor: Editor, position: number) {
+  editor.chain().focus().command(({ tr, dispatch }) => {
+    if (dispatch) {
+      tr.setSelection(editor.state.schema.nodeSelection(tr.doc.resolve(position + 1)));
+    }
+    return true;
+  }).run();
+}
+
 /**
- * Sidebar listing sections in document order with navigation.
- *
- * @param editor - TipTap editor instance
- * @param onSectionClick - Callback when section is clicked
+ * Sidebar listing sections with drag-to-reorder.
  */
 export function SectionSidebar({ editor, onSectionClick }: SectionSidebarProps) {
   const [sections, setSections] = useState<Section[]>([]);
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [active, setActive] = useState(0);
+  const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
 
-  const updateSections = useCallback(() => {
-    setSections(extractSectionsFromDoc(editor));
-  }, [editor]);
-
-  useEffect(() => {
-    updateSections();
-    editor.on('update', updateSections);
-    return () => { editor.off('update', updateSections); };
-  }, [editor, updateSections]);
+  const sync = useCallback(() => setSections(extractSections(editor)), [editor]);
 
   useEffect(() => {
-    const handler = () => setActiveIndex(findActiveSection(editor, sections));
-    editor.on('selectionUpdate', handler);
-    return () => { editor.off('selectionUpdate', handler); };
+    sync();
+    editor.on('update', sync);
+    return () => { editor.off('update', sync); };
+  }, [editor, sync]);
+
+  useEffect(() => {
+    const h = () => setActive(findActive(editor, sections));
+    editor.on('selectionUpdate', h);
+    return () => { editor.off('selectionUpdate', h); };
   }, [editor, sections]);
 
-  const handleClick = (position: number) => {
-    editor.chain().focus().command(({ tr, dispatch }) => {
-      if (dispatch) {
-        const $pos = tr.doc.resolve(position + 1);
-        tr.setSelection(editor.state.schema.nodeSelection($pos));
-      }
-      return true;
-    }).run();
-    onSectionClick?.(position);
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return;
+    const old = sections.findIndex(s => s.id === active.id);
+    const nxt = sections.findIndex(s => s.id === over.id);
+    setSections(arrayMove(sections, old, nxt));
+    editor.chain().reorderSections(old, nxt).run();
   };
+
+  const onClick = (pos: number) => { goToSection(editor, pos); onSectionClick?.(pos); };
 
   return (
     <nav className="section-sidebar">
       <h2>Sections</h2>
-      <ul>
-        {sections.map((section, index) => (
-          <li
-            key={section.id}
-            className={index === activeIndex ? 'active' : ''}
-            onClick={() => handleClick(section.position)}
-          >
-            {section.title}
-          </li>
-        ))}
-      </ul>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <SortableContext items={sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
+          <ul>
+            {sections.map((s, i) => (
+              <li key={s.id} className={i === active ? 'active' : ''}>
+                <DragHandle id={s.id} index={i} />
+                <span onClick={() => onClick(s.position)}>{s.title}</span>
+              </li>
+            ))}
+          </ul>
+        </SortableContext>
+      </DndContext>
     </nav>
   );
 }
