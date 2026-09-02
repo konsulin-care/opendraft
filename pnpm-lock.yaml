@@ -41,6 +41,9 @@ importers:
 
   packages/metadata:
     dependencies:
+      '@opendraft/references':
+        specifier: workspace:*
+        version: link:../references
       '@opendraft/schema':
         specifier: workspace:*
         version: link:../schema

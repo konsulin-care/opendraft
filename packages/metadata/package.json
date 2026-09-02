@@ -15,6 +15,7 @@
     "generate-types": "tsx scripts/generate-types.ts"
   },
   "dependencies": {
+    "@opendraft/references": "workspace:*",
     "@opendraft/schema": "workspace:*",
     "yaml": "^2.9.0"
   },
