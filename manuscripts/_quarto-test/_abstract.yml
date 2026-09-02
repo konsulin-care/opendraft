@@ -1,0 +1,3 @@
+abstract: |
+  This is a minimal test manuscript to verify that Quarto rendering
+  works correctly in the OpenDraft CI pipeline.

@@ -1,0 +1,27 @@
+---
+metadata-files:
+  - _author.yml
+  - _abstract.yml
+  - _frontmatter.yml
+---
+
+# Introduction
+
+This is a minimal test manuscript to verify Quarto rendering works correctly in CI.
+
+# Methods
+
+Standard methods were applied.
+
+# Results
+
+Results demonstrate successful rendering.
+
+# Discussion
+
+The test manuscript validates the OpenDraft Quarto integration.
+
+# References
+
+::: {#refs}
+:::
