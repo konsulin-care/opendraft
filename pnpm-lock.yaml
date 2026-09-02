@@ -53,6 +53,9 @@ importers:
       '@opendraft/editor':
         specifier: workspace:*
         version: link:../../packages/editor
+      '@opendraft/git':
+        specifier: workspace:*
+        version: link:../../packages/git
       '@opendraft/workspace':
         specifier: workspace:*
         version: link:../../packages/workspace
