@@ -4,55 +4,74 @@
 
 ---
 
-## OD-040 — Build minimal Quarto manuscript
+## OD-041 — Author metadata model
 
-### Atomic Instruction
+**Atomic Instruction:** Generate TypeScript interfaces from JSON schemas in `@opendraft/schema` using `json-schema-to-typescript`. Expose these types as the canonical metadata model from `@opendraft/metadata`.
 
-Create a manuscript using `metadata-files` to include `_author.yml`, `_abstract.yml`, and `_frontmatter.yml`.
-
-### Definition of Done
-
-- [ ] Quarto successfully renders the manuscript.
-
----
-
-## OD-041 — Implement author metadata model
-
-### Atomic Instruction
-
-Define the OpenDraft author structure.
-
-### Definition of Done
-
-- [ ] Model supports name.
-- [ ] Model supports affiliation.
-- [ ] Model supports ORCID.
-- [ ] Model supports corresponding-author designation.
-- [ ] Model supports optional CRediT roles.
+**Definition of Done:**
+- [ ] `json-schema-to-typescript` added as dev dependency
+- [ ] `generate-types` script in `packages/metadata/package.json` generates `src/types/` from `packages/schema/schemas/`
+- [ ] Generated files have `/* DO NOT MODIFY BY HAND */` banner
+- [ ] Types exported from `packages/metadata/src/index.ts`: `Author`, `Affiliation`, `Abstract`, `Frontmatter`
+- [ ] `pnpm generate` regenerates types without manual intervention
+- [ ] Generated types pass typecheck
 
 ---
 
-## OD-042 — Implement metadata compiler
+## OD-043 — BibTeX ingestion
 
-### Atomic Instruction
+**Atomic Instruction:** Implement a BibTeX parser in `@opendraft/references` and define a JSON schema for BibTeX entry validation in `@opendraft/schema`.
 
-Convert YAML metadata into normalized publication metadata.
-
-### Definition of Done
-
-- [ ] Compiler produces deterministic output from identical source files.
+**Definition of Done:**
+- [ ] `bibtex.schema.json` added to `packages/schema/schemas/` — 14 entry types, 27 fields, `additionalProperties: true`
+- [ ] `packages/references/src/parser.ts` parses `.bib` strings into typed `Reference[]` entries
+- [ ] Parser handles: nested braces in values, string concatenation (`#`), line comments (`%`), multiline values
+- [ ] Parser produces `Reference` objects: `{ citeKey, entryType, fields }` matching schema structure
+- [ ] Invalid BibTeX produces structured errors with line numbers
+- [ ] `parseBibTeX` exported from `packages/references/src/index.ts`
+- [ ] Unit tests cover: valid entries, nested braces, all 14 entry types, malformed input errors, DOI extraction
+- [ ] Tests pass
 
 ---
 
-## OD-043 — Implement BibTeX ingestion
+## OD-042 — Metadata compiler
 
-### Atomic Instruction
+**Atomic Instruction:** Implement a compiler in `@opendraft/metadata` that reads manuscript YAML files + optional BibTeX, validates them, and returns a normalized `PublicationMetadata` object.
 
-Read `references.bib` and expose its references to the semantic compiler.
+**Definition of Done:**
+- [ ] `packages/metadata/src/compiler.ts` implements `compileManuscript(dir: string): PublicationMetadata`
+- [ ] Compiler reads `_author.yml`, `_abstract.yml`, `_frontmatter.yml`, optional `references.bib`
+- [ ] YAML validated via existing `validateMetadata()` from `@opendraft/schema`
+- [ ] BibTeX validated against `bibtex.schema.json`
+- [ ] Required-field checks per entry type enforced in compiler (not schema): article (author, title, journal, year), book (author/editor, title, publisher, year), inproceedings (author, title, booktitle, year), etc.
+- [ ] Output is deterministic: sorted keys, normalized dates, consistent ordering
+- [ ] Missing required YAML files produce clear error messages
+- [ ] `compileManuscript` exported from `packages/metadata/src/index.ts`
+- [ ] Unit tests cover: full manuscript, missing files, BibTeX integration, deterministic output
+- [ ] Tests pass
 
-### Definition of Done
+---
 
-- [ ] Valid BibTeX parses.
-- [ ] DOI is retained where present.
-- [ ] Citation keys are retained.
-- [ ] Invalid BibTeX produces a useful error.
+## OD-040 — Minimal Quarto manuscript + CI
+
+**Atomic Instruction:** Create a test manuscript at `manuscripts/_quarto-test/` and add a GitHub Actions workflow that renders it via Quarto on every PR.
+
+**Definition of Done:**
+- [ ] `manuscripts/_quarto-test/` created with: `article.qmd`, `_author.yml`, `_abstract.yml`, `_frontmatter.yml`, `references.bib`
+- [ ] Manuscript listed in `opendraft.yml` under manuscripts
+- [ ] GitHub Actions workflow (`.github/workflows/quarto-render.yml`) uses `quarto-dev/quarto-actions/setup@v2` and `quarto-dev/quarto-actions/render@v2`
+- [ ] Workflow triggers on pull requests
+- [ ] `quarto render manuscripts/_quarto-test` succeeds locally
+- [ ] `opendraft validate-project` passes with new manuscript
+
+---
+
+## Dependency Graph
+
+```
+OD-041 (types) ──────┐
+                      ├──> OD-042 (compiler) ──> OD-040 (Quarto + CI)
+OD-043 (BibTeX) ─────┘
+```
+
+OD-041 and OD-043 can run in parallel. OD-042 depends on both. OD-040 depends on OD-042.
