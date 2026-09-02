@@ -12,6 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - run: mise install
+      - run: pnpm install --frozen-lockfile
 
       - uses: quarto-dev/quarto-actions/setup@v2
 
@@ -20,5 +23,4 @@ jobs:
           path: manuscripts/quarto-test
 
       - name: Validate project
-        run: |
-          npx tsx packages/schema/src/cli.ts
+        run: mise run validate-project
