@@ -13,6 +13,10 @@
   "dependencies": {
     "@opendraft/workspace": "workspace:*",
     "@opendraft/editor": "workspace:*",
+    "@tiptap/react": "^2.24.0",
+    "@tiptap/pm": "^2.24.0",
+    "@tiptap/starter-kit": "^2.24.0",
+    "@tiptap/extension-placeholder": "^2.24.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
@@ -23,6 +27,8 @@
     "jsdom": "^25.0.0",
     "typescript": "^6.0.3",
     "vite": "^6.0.0",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "@testing-library/react": "^16.0.0",
+    "@testing-library/jest-dom": "^6.0.0"
   }
 }
