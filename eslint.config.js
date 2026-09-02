@@ -22,11 +22,11 @@ export default tseslint.config(
   },
   {
     ignores: [
-      'node_modules/',
-      'dist/',
-      'build/',
-      'coverage/',
-      '*.min.js',
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/build/**',
+      '**/coverage/**',
+      '**/*.min.js',
       'pnpm-lock.yaml',
     ],
   },
