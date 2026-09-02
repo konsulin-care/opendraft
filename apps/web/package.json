@@ -13,6 +13,7 @@
   "dependencies": {
     "@opendraft/workspace": "workspace:*",
     "@opendraft/editor": "workspace:*",
+    "@tiptap/core": "^2.24.0",
     "@tiptap/react": "^2.24.0",
     "@tiptap/pm": "^2.24.0",
     "@tiptap/starter-kit": "^2.24.0",
