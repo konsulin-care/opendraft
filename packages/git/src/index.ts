@@ -92,3 +92,4 @@ export class GitOperations {
 }
 
 export { MemoryFS } from './memory-fs.js';
+export { preCommitAssembly } from './commit.js';

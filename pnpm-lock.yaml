@@ -157,6 +157,12 @@ importers:
       '@isomorphic-git/lightning-fs':
         specifier: ^4.6.0
         version: 4.7.0
+      '@opendraft/metadata':
+        specifier: workspace:*
+        version: link:../metadata
+      '@opendraft/schema':
+        specifier: workspace:*
+        version: link:../schema
       '@opendraft/workspace':
         specifier: workspace:*
         version: link:../workspace
