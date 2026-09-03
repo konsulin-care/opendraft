@@ -1,5 +1,5 @@
 import type { WorkspaceAdapter } from '@opendraft/workspace';
-import { compileArticle } from '@opendraft/metadata';
+import { compileArticle } from '@opendraft/metadata/src/article-compiler.js';
 import { validateBlockStructure } from '@opendraft/schema';
 
 interface PreCommitResult {

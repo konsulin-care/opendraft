@@ -1,9 +1,10 @@
-import { createRequire } from 'node:module';
+import AjvModule from 'ajv';
+
+// TS 6 (NodeNext) types the CJS default import as the module namespace,
+// while Node ESM interop and Vite both provide the constructable class.
+const Ajv = AjvModule as unknown as typeof import('ajv').default;
 import type { ValidationResult, ValidationError } from './types.js';
 import manifestSchema from '../schemas/manifest.schema.json' with { type: 'json' };
-
-const require = createRequire(import.meta.url);
-const Ajv = require('ajv') as typeof import('ajv').default;
 
 interface AjvError {
   instancePath: string;
