@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { TextSelection } from 'prosemirror-state';
@@ -8,8 +8,15 @@ import { SectionMerge } from '../src/extensions/section-merge.js';
 
 // @vitest-environment jsdom
 
+const editors: Editor[] = [];
+
+afterEach(() => {
+  editors.forEach((editor) => editor.destroy());
+  editors.length = 0;
+});
+
 function createEditor(content?: string) {
-  return new Editor({
+  const editor = new Editor({
     extensions: [
       SectionDocument,
       Section,
@@ -18,6 +25,9 @@ function createEditor(content?: string) {
     ],
     content,
   });
+
+  editors.push(editor);
+  return editor;
 }
 
 function selectFirstHeading(editor: Editor) {

@@ -69,6 +69,10 @@ describe('collectArtifacts', () => {
       'protocol/sub/extra.ttl',
     ]);
   });
+
+  it('returns an empty list when the protocol directory is missing', async () => {
+    expect(await collectArtifacts(join(tmp, 'missing'))).toEqual([]);
+  });
 });
 
 describe('parseManifest and template parsing', () => {
