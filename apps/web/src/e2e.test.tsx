@@ -1,60 +1,78 @@
-import 'fake-indexeddb/auto';
-import '@testing-library/jest-dom';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { App } from './App';
+import { render, waitFor } from '@testing-library/react';
+import { MemoryWorkspace } from '@opendraft/workspace';
+import { ManuscriptEditor, type EditorTestApi } from './components/ManuscriptEditor';
+import { seedWorkspace } from './seed';
 
 // @vitest-environment jsdom
 
-async function clearIndexedDB() {
-  const dbs = await indexedDB.databases();
-  for (const db of dbs) {
-    if (db.name) indexedDB.deleteDatabase(db.name);
-  }
-}
+describe('End-to-end manuscript editing flow', () => {
+  let workspace: MemoryWorkspace;
+  let api: EditorTestApi | null;
 
-async function waitForApp() {
-  await waitFor(() => expect(screen.getByText('Manuscript')).toBeDefined());
-}
-
-describe('End-to-end manuscript workflow', () => {
-  beforeEach(clearIndexedDB);
-
-  it('seeds a default manuscript on first run', async () => {
-    const { unmount } = render(<App />);
-    await waitForApp();
-
-    // Seed contents are asserted in seed.test.ts; the block-list UI is
-    // replaced by the block rail in the manuscript editor step.
-    await waitFor(() => expect(screen.getAllByText('Blocks').length).toBeGreaterThan(0));
-    // Let in-flight workspace reads settle before unmount to avoid
-    // polluting the next test's IndexedDB lifecycle.
-    await new Promise((r) => setTimeout(r, 50));
-    unmount();
+  beforeEach(() => {
+    workspace = new MemoryWorkspace();
+    api = null;
   });
 
-  it('persists metadata changes across reloads', async () => {
-    const { unmount } = render(<App />);
-    await waitForApp();
+  it('autosaves edits to per-slug block files and rebuilds the doc on reload', async () => {    await seedWorkspace(workspace);
 
-    // Switch to Metadata and edit
-    fireEvent.click(screen.getAllByText('Metadata')[0]);
-    await waitFor(() => expect(screen.getByText('_author.yml')).toBeDefined());
+    const first = render(
+      <ManuscriptEditor workspace={workspace} onEditorReady={(ready) => (api = ready)} />,
+    );
+    await waitFor(() => expect(api).not.toBeNull(), { timeout: 10000 });
 
-    const textarea = screen.getAllByPlaceholderText(/_author\.yml/i)[0];
-    fireEvent.change(textarea, { target: { value: 'name: Test Author' } });
-    await waitFor(() => expect(textarea).toHaveValue('name: Test Author'));
+    api!.insertText('A fresh sentence appeared.');
+    await waitFor(
+      async () => {
+        const intro = await workspace.readFile('blocks/intro.qmd');
+        expect(intro).toContain('A fresh sentence appeared.');
+      },
+      { timeout: 5000 },
+    );
 
-    // Simulate reload
-    unmount();
-    render(<App />);
-    await waitForApp();
+    first.unmount();
+    api = null;
 
-    // Verify persistence
-    fireEvent.click(screen.getAllByText('Metadata')[0]);
-    await waitFor(() => expect(screen.getByText('_author.yml')).toBeDefined());
+    // Reload: the doc is rebuilt from files, not from memory.
+    render(<ManuscriptEditor workspace={workspace} onEditorReady={(ready) => (api = ready)} />);
+    await waitFor(() => expect(api).not.toBeNull(), { timeout: 10000 });
+    expect(api!.getMarkdown()).toContain('A fresh sentence appeared.');
 
-    const textareaAfter = screen.getAllByPlaceholderText(/_author\.yml/i)[0];
-    expect(textareaAfter).toHaveValue('name: Test Author');
+    const article = await workspace.readFile('article.qmd');
+    expect(article).toContain('{{< include blocks/intro.qmd >}}');
+    expect(article).toContain('# References');
+  }, 20000);
+});
+
+describe('manuscript draft handling', () => {
+  let workspace: MemoryWorkspace;
+  let api: EditorTestApi | null;
+
+  beforeEach(() => {
+    workspace = new MemoryWorkspace();
+    api = null;
   });
+
+  it('keeps unlinked drafts out of the assembly across edits', async () => {
+    await workspace.writeFile('article.qmd', '{{< include blocks/intro.qmd >}}');
+    await workspace.writeFile('blocks/intro.qmd', '# Intro {#intro}\n\nbody');
+    await workspace.writeFile('blocks/scratch.qmd', '# Scratch {#scratch}\n\nnotes');
+
+    render(<ManuscriptEditor workspace={workspace} onEditorReady={(ready) => (api = ready)} />);
+    await waitFor(() => expect(api).not.toBeNull(), { timeout: 10000 });
+
+    api!.insertText(' more');
+    await waitFor(
+      async () => {
+        const scratch = await workspace.readFile('blocks/scratch.qmd');
+        expect(scratch).toContain('more');
+      },
+      { timeout: 10000 },
+    );
+
+    const article = await workspace.readFile('article.qmd');
+    expect(article).not.toContain('blocks/scratch.qmd');
+    expect(await workspace.readFile('blocks/scratch.qmd')).not.toBeNull();
+  }, 20000);
 });
