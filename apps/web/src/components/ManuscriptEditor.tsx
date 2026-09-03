@@ -20,6 +20,8 @@ export interface EditorTestApi {
 interface ManuscriptEditorProps {
   workspace: WorkspaceAdapter;
   onEditorReady?: (api: EditorTestApi) => void;
+  /** Invoked after each debounced autosave completes. */
+  onSaved?: () => void;
 }
 
 const SAVE_DEBOUNCE_MS = 800;
@@ -45,13 +47,14 @@ function collectDraftSlugs(doc: Node): Set<string> {
 }
 
 /** Debounced autosave writing block files + assembly for a workspace. */
-function debouncedSaver(workspace: WorkspaceAdapter) {
+function debouncedSaver(workspace: WorkspaceAdapter, onSaved?: () => void) {
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   const save = (markdown: string, draftSlugs: ReadonlySet<string>): void => {
     void (async () => {
       const doc = createManuscriptDoc(markdown);
       await saveManuscript(workspace, applyDraftFlags(doc, draftSlugs));
+      onSaved?.();
     })().catch((error) => console.error('manuscript autosave failed:', error));
   };
 
@@ -86,10 +89,11 @@ function mountEditor(
   root: HTMLElement,
   workspace: WorkspaceAdapter,
   onEditorReady?: (api: EditorTestApi) => void,
+  onSaved?: () => void,
 ): () => void {
   let disposed = false;
   let crepe: Crepe | null = null;
-  const saver = debouncedSaver(workspace);
+  const saver = debouncedSaver(workspace, onSaved);
 
   void (async () => {
     try {
@@ -118,8 +122,7 @@ function mountEditor(
       await editor.create();
       if (disposed) return;
       crepe = editor;
-      onEditorReady?.(createTestApi(editor));
-    } catch (error) {
+      onEditorReady?.(createTestApi(editor));    } catch (error) {
       console.error('manuscript editor mount failed:', error);
     }
   })();
@@ -136,13 +139,13 @@ function mountEditor(
  *
  * @param props - Workspace adapter and optional test-ready callback.
  */
-export function ManuscriptEditor({ workspace, onEditorReady }: ManuscriptEditorProps) {
+export function ManuscriptEditor({ workspace, onEditorReady, onSaved }: ManuscriptEditorProps) {
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const root = rootRef.current;
-    return root ? mountEditor(root, workspace, onEditorReady) : undefined;
-  }, [workspace, onEditorReady]);
+    return root ? mountEditor(root, workspace, onEditorReady, onSaved) : undefined;
+  }, [workspace, onEditorReady, onSaved]);
 
   return (
     <div data-testid="manuscript-editor">
