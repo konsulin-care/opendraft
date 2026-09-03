@@ -7,7 +7,6 @@ interface CommitDialogProps {
   onClose: () => void;
   onCommit: (message: string) => void;
   workspace: WorkspaceAdapter;
-  manifestPath: string;
 }
 
 interface ErrorListProps {
@@ -48,8 +47,10 @@ function CommitActions({ isCompiling, message, onClose, onCommit }: CommitAction
 
 /**
  * Modal dialog for committing changes.
+ *
+ * Runs the assembly-first pre-commit validation before committing.
  */
-export function CommitDialog({ isOpen, onClose, onCommit, workspace, manifestPath }: CommitDialogProps) {
+export function CommitDialog({ isOpen, onClose, onCommit, workspace }: CommitDialogProps) {
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
   const [isCompiling, setIsCompiling] = useState(false);
@@ -59,7 +60,7 @@ export function CommitDialog({ isOpen, onClose, onCommit, workspace, manifestPat
   const handleCommit = async () => {
     setIsCompiling(true);
     setErrors([]);
-    const result = await preCommitAssembly(workspace, manifestPath, '');
+    const result = await preCommitAssembly(workspace);
     if (result.success) {
       onCommit(message);
       setMessage('');

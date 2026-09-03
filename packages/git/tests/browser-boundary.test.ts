@@ -6,10 +6,10 @@ import { fileURLToPath } from 'node:url';
 const COMMIT_SRC = resolve(dirname(fileURLToPath(import.meta.url)), '../src/commit.ts');
 
 describe('packages/git browser boundary', () => {
-  it('imports compileArticle from the browser-safe leaf module', () => {
+  it('imports compileAssembly from the browser-safe leaf module', () => {
     const content = readFileSync(COMMIT_SRC, 'utf-8');
     expect(content).toContain(
-      "import { compileArticle } from '@opendraft/metadata/src/article-compiler.js'",
+      "import { compileAssembly } from '@opendraft/metadata/src/article-compiler.js'",
     );
   });
 

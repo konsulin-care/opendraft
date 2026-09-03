@@ -1,95 +1,69 @@
 import type { WorkspaceAdapter } from '@opendraft/workspace';
-import { compileArticle } from '@opendraft/metadata/src/article-compiler.js';
-import { validateBlockStructure } from '@opendraft/schema';
+import { compileAssembly } from '@opendraft/metadata/src/article-compiler.js';
+import { validateAssembly } from '@opendraft/schema';
 
 interface PreCommitResult {
   success: boolean;
+  /** Blocking errors (missing/malformed assembly or blocks). */
   errors: string[];
+  /** Non-blocking findings (e.g. draft files not included). */
+  warnings: string[];
   article: string;
 }
 
-/** Read manifest and parse JSON. */
-async function readManifest(workspace: WorkspaceAdapter, path: string): Promise<unknown | null> {
-  const content = await workspace.readFile(path);
-  if (!content) return null;
-  try {
-    return JSON.parse(content);
-  } catch {
-    return null;
-  }
-}
+/** Path of the authored assembly at the manuscript root. */
+export const ARTICLE_PATH = 'article.qmd';
 
-/** Read all block files from manifest. */
-async function readBlocks(
-  workspace: WorkspaceAdapter,
-  blocksDir: string,
-  manifestObj: { blocks?: Array<{ file: string }> },
-): Promise<{ blocks: Record<string, string>; errors: string[] }> {
-  const blocks: Record<string, string> = {};
-  const errors: string[] = [];
-
-  if (manifestObj.blocks) {
-    for (const block of manifestObj.blocks) {
-      const content = await workspace.readFile(`${blocksDir}${block.file}`);
-      if (content === null) {
-        errors.push(`Missing block file: ${blocksDir}${block.file}`);
-      } else {
-        blocks[block.file] = content;
-      }
-    }
-  }
-  return { blocks, errors };
-}
-
-/** Validate block structure against manifest. */
-async function validateBlocks(
-  workspace: WorkspaceAdapter,
-  blocksDir: string,
-  manifest: unknown,
-  blocks: Record<string, string>,
-): Promise<string[]> {
-  const files = await workspace.listFiles(blocksDir);
-  const validation = validateBlockStructure(manifest, files, blocks);
-  return validation.errors.map(e => `${e.path}: ${e.message}`);
-}
+/** Directory holding per-slug block files. */
+export const BLOCKS_DIR = 'blocks/';
 
 /**
- * Pre-commit assembly flow.
+ * Pre-commit assembly flow (assembly-first).
+ *
+ * Reads the authored article.qmd plus blocks/, validates file<->include
+ * consistency, normalizes include shortcodes and writes article.qmd back.
+ * Draft (orphan) block files are reported as warnings, never failing the
+ * commit.
+ *
  * @param workspace - Workspace adapter for file I/O.
- * @param manifestPath - Path to manifest.json.
- * @param metadataFiles - Newline-separated metadata file names.
- * @returns Pre-commit result with success flag, errors, and compiled article.
+ * @param articlePath - Authored assembly path (default article.qmd).
+ * @param blocksDir - Block directory (default blocks/).
+ * @returns Pre-commit result with diagnostics and the normalized article.
  */
 export async function preCommitAssembly(
   workspace: WorkspaceAdapter,
-  manifestPath: string,
-  metadataFiles: string,
+  articlePath: string = ARTICLE_PATH,
+  blocksDir: string = BLOCKS_DIR,
 ): Promise<PreCommitResult> {
-  const manifest = await readManifest(workspace, manifestPath);
-  if (!manifest) {
-    return { success: false, errors: ['Manifest file not found'], article: '' };
+  const assembly = await workspace.readFile(articlePath);
+  if (assembly === null) {
+    return { success: false, errors: [`${articlePath} not found`], warnings: [], article: '' };
   }
 
-  const blocksDir = manifestPath.replace(/manifest\.json$/, '');
-  const { blocks, errors: blockErrors } = await readBlocks(
-    workspace,
-    blocksDir,
-    manifest as { blocks?: Array<{ file: string }> },
-  );
-
-  const validationErrors = await validateBlocks(workspace, blocksDir, manifest, blocks);
-  const allErrors = [...blockErrors, ...validationErrors];
-
-  if (allErrors.length > 0) {
-    return { success: false, errors: allErrors, article: '' };
+  const files = await workspace.listFiles(blocksDir);
+  const blockFiles: Record<string, string> = {};
+  for (const file of files) {
+    if (!file.endsWith('.qmd')) continue;
+    const content = await workspace.readFile(`${blocksDir}${file}`);
+    if (content !== null) blockFiles[`blocks/${file}`] = content;
   }
 
-  try {
-    const article = compileArticle(manifest, metadataFiles, blocks);
-    await workspace.writeFile(`${blocksDir}article.qmd`, article);
-    return { success: true, errors: [], article };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { success: false, errors: [message], article: '' };
+  const validation = validateAssembly({ assembly, blockFiles, files });
+  const warnings = validation.warnings.map((entry) => `${entry.path}: ${entry.message}`);
+  if (!validation.valid) {
+    return {
+      success: false,
+      errors: validation.errors.map((entry) => `${entry.path}: ${entry.message}`),
+      warnings,
+      article: '',
+    };
   }
+
+  const result = compileAssembly(assembly, blockFiles);
+  if (!result.success) {
+    return { success: false, errors: result.errors, warnings, article: '' };
+  }
+
+  await workspace.writeFile(articlePath, result.article);
+  return { success: true, errors: [], warnings, article: result.article };
 }

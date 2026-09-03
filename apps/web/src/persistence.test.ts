@@ -1,101 +1,99 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { MemoryWorkspace } from '@opendraft/workspace';
 import {
-  saveSections,
-  loadSections,
-  createSection,
-  deleteSection,
-  reorderSections,
-} from './persistence';
+  createManuscriptDoc,
+  parseManuscript,
+  renameBlock,
+  serializeManuscript,
+} from '@opendraft/editor';
+import { loadManuscript, saveManuscript } from './persistence';
 
+/**
+ * Manuscript persistence: article.qmd holds the authored include assembly,
+ * blocks/<slug>.qmd hold per-block markdown. Drafts exist on disk only.
+ */
 let workspace: MemoryWorkspace;
 
 beforeEach(() => {
   workspace = new MemoryWorkspace();
 });
 
-describe('saveSections', () => {
-  it('creates section files and manifest', async () => {
-    const sections = [
-      { id: 'abc12345', title: 'Introduction', content: 'Hello world' },
-    ];
+describe('saveManuscript', () => {
+  it('writes the assembly and per-slug block files', async () => {
+    const doc = createManuscriptDoc('# Intro {#intro}\n\npara\n\n# Methods {#methods}\n\nbody');
+    await saveManuscript(workspace, doc);
 
-    await saveSections(workspace, 'blocks/manifest.json', sections);
+    const article = await workspace.readFile('article.qmd');
+    expect(article).toContain('{{< include blocks/intro.qmd >}}');
+    expect(article).toContain('{{< include blocks/methods.qmd >}}');
+    expect(article).toContain('# References');
 
-    const manifest = await workspace.readFile('blocks/manifest.json');
-    expect(manifest).toBeDefined();
-
-    const parsed = JSON.parse(manifest!);
-    expect(parsed.version).toBe('1.0.0');
-    expect(parsed.blocks).toHaveLength(1);
+    const intro = await workspace.readFile('blocks/intro.qmd');
+    expect(intro).toContain('# Intro {#intro}');
   });
 
-  it('removes deleted section files', async () => {
-    await workspace.writeFile('blocks/old.qmd', '# Old');
-    await saveSections(workspace, 'blocks/manifest.json', [
-      { id: 'new', title: 'New', content: 'Content' },
-    ]);
+  it('keeps draft sections on disk but out of the assembly', async () => {
+    const { doc } = parseManuscript({
+      assembly: '{{< include blocks/intro.qmd >}}',
+      blockFiles: {
+        intro: '# Intro {#intro}\n\npara',
+        draft: '# Draft {#draft}\n\nnotes',
+      },
+    });
+    await saveManuscript(workspace, doc);
+
+    const article = await workspace.readFile('article.qmd');
+    expect(article).not.toContain('blocks/draft.qmd');
+    expect(article).toContain('blocks/intro.qmd');
+    expect(await workspace.readFile('blocks/draft.qmd')).not.toBeNull();
+  });
+
+  it('removes stale block files that are no longer in the manuscript', async () => {
+    await workspace.writeFile('blocks/stale.qmd', '# Stale\n\ngone');
+    const doc = createManuscriptDoc('# Intro {#intro}\n\npara');
+    await saveManuscript(workspace, doc);
 
     const files = await workspace.listFiles('blocks/');
-    expect(files).not.toContain('old.qmd');
+    expect(files).not.toContain('stale.qmd');
+    expect(files).toContain('intro.qmd');
   });
 });
 
-describe('loadSections', () => {
-  it('loads sections from workspace', async () => {
-    await workspace.writeFile('blocks/manifest.json', JSON.stringify({
-      version: '1.0.0',
-      blocks: [{ id: 'abc', file: 'abc.qmd', title: 'Title' }],
-    }));
-    await workspace.writeFile('blocks/abc.qmd', '# Title\n\nContent');
+describe('loadManuscript', () => {
+  it('reconstructs the doc from assembly and block files', async () => {
+    const doc = createManuscriptDoc('# Intro {#intro}\n\npara\n\n# Methods {#methods}\n\nbody');
+    await saveManuscript(workspace, doc);
 
-    const sections = await loadSections(workspace, 'blocks/manifest.json');
-    expect(sections).toHaveLength(1);
-    expect(sections[0].title).toBe('Title');
+    const { doc: loaded, warnings } = await loadManuscript(workspace);
+    expect(warnings).toEqual([]);
+    expect(loaded.toJSON()).toEqual(serializeManuscript(doc).blocks.size > 0 ? doc.toJSON() : doc.toJSON());
   });
 
-  it('returns empty array for missing manifest', async () => {
-    const sections = await loadSections(workspace, 'blocks/manifest.json');
-    expect(sections).toEqual([]);
+  it('flags orphan block files as drafts', async () => {
+    await workspace.writeFile('article.qmd', '{{< include blocks/intro.qmd >}}');
+    await workspace.writeFile('blocks/intro.qmd', '# Intro {#intro}\n\npara');
+    await workspace.writeFile('blocks/scratch.qmd', '# Scratch {#scratch}\n\nnotes');
+
+    const { doc } = await loadManuscript(workspace);
+    expect(doc.childCount).toBe(2);
+    expect(doc.child(1).attrs.id).toBe('scratch');
+    expect(doc.child(1).attrs.draft).toBe(true);
   });
-});
 
-describe('createSection', () => {
-  it('creates new section and updates manifest', async () => {
-    const id = await createSection(workspace, 'blocks/manifest.json', 'New Section');
+  it('reflects a renamed slug in file and include line', async () => {
+    const doc = createManuscriptDoc('# Intro {#intro}\n\npara');
+    const renamed = renameBlock(doc, 'intro', 'introduction');
+    if (!renamed.ok) throw new Error(renamed.error);
 
-    expect(id).toMatch(/^[a-f0-9]{8}$/);
+    await saveManuscript(workspace, renamed.doc);
+    expect(workspace.readFile('article.qmd')).resolves.toContain('blocks/introduction.qmd');
 
-    const manifest = JSON.parse(await workspace.readFile('blocks/manifest.json')!);
-    expect(manifest.blocks).toHaveLength(1);
-  });
-});
+    const files = await workspace.listFiles('blocks/');
+    expect(files).not.toContain('intro.qmd');
+    expect(files).toContain('introduction.qmd');
 
-describe('deleteSection', () => {
-  it('removes section file and manifest entry', async () => {
-    await saveSections(workspace, 'blocks/manifest.json', [
-      { id: 'abc', title: 'A', content: '' },
-      { id: 'def', title: 'B', content: '' },
-    ]);
-
-    await deleteSection(workspace, 'blocks/manifest.json', 'abc');
-
-    const manifest = JSON.parse(await workspace.readFile('blocks/manifest.json')!);
-    expect(manifest.blocks).toHaveLength(1);
-    expect(manifest.blocks[0].id).toBe('def');
-  });
-});
-
-describe('reorderSections', () => {
-  it('reorders sections in manifest', async () => {
-    await saveSections(workspace, 'blocks/manifest.json', [
-      { id: 'abc', title: 'A', content: '' },
-      { id: 'def', title: 'B', content: '' },
-    ]);
-
-    await reorderSections(workspace, 'blocks/manifest.json', ['def', 'abc']);
-
-    const manifest = JSON.parse(await workspace.readFile('blocks/manifest.json')!);
-    expect(manifest.blocks.map((b: { id: string }) => b.id)).toEqual(['def', 'abc']);
+    const { doc: loaded } = await loadManuscript(workspace);
+    expect(loaded.childCount).toBe(1);
+    expect(loaded.child(0).attrs.id).toBe('introduction');
   });
 });

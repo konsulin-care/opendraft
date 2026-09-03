@@ -2,7 +2,7 @@
  * Article compiler: assembles article.qmd from a block manifest.
  */
 
-import { validateManifest, type ManifestData } from '@opendraft/schema';
+import { validateManifest, validateAssembly, type ManifestData } from '@opendraft/schema';
 
 /** Front matter block with metadata-files list. */
 function buildFrontMatter(metadataFiles: string[]): string[] {
@@ -84,4 +84,37 @@ function validateBlockFilesExist(
       throw new Error(`Empty block file: blocks/${block.file}`);
     }
   }
+}
+
+export interface AssemblyCompileResult {
+  success: boolean;
+  /** Normalized article.qmd content when validation passed. */
+  article: string;
+  /** Blocking validation errors. */
+  errors: string[];
+}
+
+/**
+ * Validate and normalize an authored assembly into article.qmd.
+ *
+ * The assembly is the source of truth: front matter, glue prose and the
+ * references trailer pass through verbatim; only include shortcodes are
+ * rewritten to their canonical `{{< include blocks/<file>.qmd >}}` form.
+ * Draft (orphan) files are allowed; they simply are not included.
+ *
+ * @param assembly - Authored assembly markdown (article.qmd content).
+ * @param blocks - Block contents keyed by `blocks/<slug>.qmd`.
+ * @returns The compile result with diagnostics.
+ */
+export function compileAssembly(assembly: string, blocks: Record<string, string>): AssemblyCompileResult {
+  const validation = validateAssembly({ assembly, blockFiles: blocks, files: [] });
+  if (!validation.valid) {
+    return { success: false, article: '', errors: validation.errors.map((e) => `${e.path}: ${e.message}`) };
+  }
+
+  const canonical = assembly.replace(
+    /\{\{< include\s+(blocks\/[a-z0-9][a-z0-9-]*\.qmd)\s*>\}\}/g,
+    (_line: string, path: string) => `{{< include ${path} >}}`,
+  );
+  return { success: true, article: `${canonical.trimEnd()}\n`, errors: [] };
 }
