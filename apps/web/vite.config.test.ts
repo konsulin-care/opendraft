@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect } from 'vitest';
 import { loadConfigFromFile } from 'vite';
 import { resolve, dirname } from 'path';
@@ -14,5 +15,17 @@ describe('vite.config', () => {
     );
 
     expect(result?.config.server?.host).toBe('127.0.0.1');
+  });
+
+  it('should include the Tailwind CSS plugin', async () => {
+    const result = await loadConfigFromFile(
+      { command: 'serve', mode: 'development' },
+      resolve(__dirname, 'vite.config.ts'),
+    );
+
+    const pluginNames = (result?.config.plugins ?? [])
+      .flat()
+      .map((p) => (p as { name?: string }).name);
+    expect(pluginNames.some((name) => name?.includes('tailwind'))).toBe(true);
   });
 });
