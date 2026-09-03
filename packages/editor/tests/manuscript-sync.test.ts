@@ -4,7 +4,7 @@ import type { Node } from '@milkdown/kit/prose/model';
 import { buildManuscriptSchema } from '../src/milkdown/manuscript-schema.js';
 import { createManuscriptRemark } from '../src/milkdown/manuscript-remark.js';
 import { ensureSectionIds } from '../src/milkdown/identity.js';
-import { parseManuscript, serializeManuscript } from '../src/milkdown/manuscript-sync.js';
+import { parseManuscript, serializeManuscript, wholeDocMarkdown, applyDraftFlags } from '../src/milkdown/manuscript-sync.js';
 
 /**
  * Sync layer: serializeManuscript splits the doc into block files and an
@@ -53,11 +53,9 @@ describe('manuscript sync layer', () => {
     });
 
     expect(warnings).toEqual([]);
-    expect(doc.childCount).toBe(3);
     const draft = doc.child(2);
     expect(draft.type.name).toBe('section');
-    expect(draft.attrs.id).toBe('scratch');
-    expect(draft.attrs.draft).toBe(true);
+    expect([draft.attrs.id, draft.attrs.draft]).toEqual(['scratch', true]);
 
     const reserialized = serializeManuscript(doc);
     expect(reserialized.blocks.has('scratch')).toBe(true);
@@ -74,5 +72,22 @@ describe('manuscript sync layer', () => {
     const marker = doc.child(0);
     expect(marker.type.name).toBe('quartoBlock');
     expect(marker.attrs.value).toBe('{{< include blocks/ghost.qmd >}}');
+  });
+});
+
+describe('manuscript sync helpers', () => {
+  it('wholeDocMarkdown serializes sections inline for the editor', () => {
+    const doc = ensureSectionIds(parse(EXPANDED));
+    expect(wholeDocMarkdown(doc)).toBe(EXPANDED);
+  });
+
+  it('applyDraftFlags keeps draft sections out of the assembly', () => {
+    const doc = ensureSectionIds(parse(EXPANDED));
+    const flagged = applyDraftFlags(doc, new Set(['intro']));
+
+    const { assembly, blocks } = serializeManuscript(flagged);
+    expect(assembly).not.toContain('blocks/intro.qmd');
+    expect(blocks.has('intro')).toBe(true);
+    expect(assembly).toContain('blocks/methods.qmd');
   });
 });

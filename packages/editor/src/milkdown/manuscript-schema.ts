@@ -7,6 +7,21 @@ import {
   stripHeadingId,
   textSchema,
 } from './minimal-schema.js';
+import {
+  blockquoteSchema,
+  bulletListSchema,
+  codeBlockSchema,
+  codeMark,
+  emMark,
+  hardBreakSchema,
+  hrSchema,
+  imageSchema,
+  linkMark,
+  listItemSchema,
+  orderedListSchema,
+  strikeMark,
+  strongMark,
+} from './commonmark-ext.js';
 
 const sectionSchema: NodeSchema = {
   group: 'block',
@@ -76,7 +91,7 @@ const quartoBlockSchema: NodeSchema = {
     },
   },
   parseMarkdown: {
-    match: (node) => node.type === 'quartoBlock',
+    match: (node) => node.type === 'quartoBlock' || node.type === 'html',
     runner: (state, node, type) => state.addNode(type, { value: node.value }),
   },
 };
@@ -114,6 +129,21 @@ export function buildManuscriptSchema(): Schema {
       heading: headingSchema,
       paragraph: paragraphSchema,
       text: textSchema,
+      blockquote: blockquoteSchema,
+      bulletList: bulletListSchema,
+      orderedList: orderedListSchema,
+      listItem: listItemSchema,
+      codeBlock: codeBlockSchema,
+      image: imageSchema,
+      hr: hrSchema,
+      hardBreak: hardBreakSchema,
+    },
+    marks: {
+      strong: strongMark,
+      em: emMark,
+      code: codeMark,
+      link: linkMark,
+      strike: strikeMark,
     },
   });
 }

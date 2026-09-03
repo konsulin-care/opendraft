@@ -13,6 +13,8 @@ export {
   serializeManuscript,
   parseManuscript,
   createManuscriptDoc,
+  wholeDocMarkdown,
+  applyDraftFlags,
 } from './milkdown/manuscript-sync.js';
 export { ensureSectionIds, renameBlock, collectSectionIds } from './milkdown/identity.js';
 export type { Node } from '@milkdown/kit/prose/model';

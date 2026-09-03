@@ -51,6 +51,35 @@ export function createManuscriptDoc(markdown: string): Node {
   return ensureSectionIds(parseSync(markdown));
 }
 
+/**
+ * Serialize the whole doc to flat markdown for the editor surface.
+ * Sections flow inline; include markers vanish (they are assembly-time).
+ *
+ * @param doc - The manuscript document.
+ * @returns Flat markdown ready for the editor.
+ */
+export function wholeDocMarkdown(doc: Node): string {
+  return SerializerState.create(doc.type.schema, remark)(doc).trim();
+}
+
+/**
+ * Return a doc where sections whose id is in the set are flagged draft,
+ * preserving draft state across a markdown->doc->markdown round-trip.
+ *
+ * @param doc - The manuscript document.
+ * @param draftSlugs - Slugs that must be excluded from the assembly.
+ * @returns A new document with draft flags applied.
+ */
+export function applyDraftFlags(doc: Node, draftSlugs: ReadonlySet<string>): Node {
+  const content: Node[] = [];
+  for (let i = 0; i < doc.childCount; i += 1) {
+    const child = doc.child(i);
+    const flag = child.type.name === 'section' && draftSlugs.has(String(child.attrs.id));
+    content.push(flag ? child.type.create({ ...child.attrs, draft: true }, child.content, child.marks) : child);
+  }
+  return doc.type.create(doc.attrs, content, doc.marks);
+}
+
 export interface SerializedManuscript {
   /** Authored assembly: include shortcodes, glue and the refs trailer. */
   assembly: string;
