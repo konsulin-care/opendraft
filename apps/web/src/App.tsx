@@ -46,7 +46,6 @@ export function App() {
         onClose={() => setShowCommitDialog(false)}
         onCommit={(message) => console.log('Committed:', message)}
         workspace={workspace}
-        manifestPath="blocks/manifest.json"
       />
     </div>
   );

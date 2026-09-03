@@ -10,45 +10,45 @@ describe('preCommitAssembly', () => {
   });
 
   async function setupValidWorkspace(): Promise<void> {
-    await workspace.writeFile('blocks/manifest.json', JSON.stringify({
-      version: '1.0.0',
-      blocks: [
-        { id: 'intro', file: 'intro.qmd', title: 'Introduction' },
-        { id: 'methods', file: 'methods.qmd', title: 'Methods' },
-      ],
-    }));
+    await workspace.writeFile('article.qmd', [
+      '{{< include blocks/intro.qmd >}}',
+      '{{< include blocks/methods.qmd >}}',
+    ].join('\n'));
     await workspace.writeFile('blocks/intro.qmd', '# Introduction\n\nThis is the intro.');
     await workspace.writeFile('blocks/methods.qmd', '# Methods\n\nThese are the methods.');
-    await workspace.writeFile('metadata/_author.yml', 'name: John Doe');
-    await workspace.writeFile('metadata/_abstract.yml', 'title: My Paper');
   }
 
-  it('generates article.qmd from manifest and blocks', async () => {
+  it('validates and normalizes a consistent assembly', async () => {
     await setupValidWorkspace();
-    const result = await preCommitAssembly(workspace, 'blocks/manifest.json', 'metadata/_author.yml\nmetadata/_abstract.yml');
+    const result = await preCommitAssembly(workspace);
 
     expect(result.success).toBe(true);
     expect(result.errors).toHaveLength(0);
+    expect(result.warnings).toHaveLength(0);
     expect(result.article).toContain('{{< include blocks/intro.qmd >}}');
     expect(result.article).toContain('{{< include blocks/methods.qmd >}}');
   });
 
-  it('returns errors when manifest is invalid', async () => {
-    await workspace.writeFile('blocks/manifest.json', JSON.stringify({ version: '1.0.0', blocks: [] }));
-    const result = await preCommitAssembly(workspace, 'blocks/manifest.json', '');
-
+  it('fails when the assembly file is missing', async () => {
+    const result = await preCommitAssembly(workspace);
     expect(result.success).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
+    expect(result.errors.some((error) => error.includes('not found'))).toBe(true);
   });
 
-  it('returns errors when block file is missing', async () => {
-    await workspace.writeFile('blocks/manifest.json', JSON.stringify({
-      version: '1.0.0',
-      blocks: [{ id: 'intro', file: 'intro.qmd', title: 'Introduction' }],
-    }));
-    const result = await preCommitAssembly(workspace, 'blocks/manifest.json', '');
+  it('fails when an include references a missing block file', async () => {
+    await workspace.writeFile('article.qmd', '{{< include blocks/ghost.qmd >}}');
+    const result = await preCommitAssembly(workspace);
 
     expect(result.success).toBe(false);
-    expect(result.errors.some(e => e.includes('Missing block file'))).toBe(true);
+    expect(result.errors.some((error) => error.includes('ghost.qmd'))).toBe(true);
+  });
+
+  it('reports orphan drafts as warnings without failing', async () => {
+    await setupValidWorkspace();
+    await workspace.writeFile('blocks/scratch.qmd', '# Scratch\n\nnotes');
+    const result = await preCommitAssembly(workspace);
+
+    expect(result.success).toBe(true);
+    expect(result.warnings.some((warning) => warning.includes('scratch.qmd'))).toBe(true);
   });
 });
