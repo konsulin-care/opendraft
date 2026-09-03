@@ -1,12 +1,19 @@
 import { Schema } from '@milkdown/kit/prose/model';
 import type { NodeSchema } from '@milkdown/kit/transformer';
-import { docSchema, headingSchema, paragraphSchema, textSchema } from './minimal-schema.js';
+import {
+  docSchema,
+  headingSchema,
+  paragraphSchema,
+  stripHeadingId,
+  textSchema,
+} from './minimal-schema.js';
 
 const sectionSchema: NodeSchema = {
   group: 'block',
   content: 'heading block*',
   defining: true,
   isolate: true,
+  attrs: { id: { default: null } },
   toMarkdown: {
     match: (node) => node.type.name === 'section',
     // Sections serialize inline: their children flow directly under root.
@@ -15,7 +22,9 @@ const sectionSchema: NodeSchema = {
   parseMarkdown: {
     match: (node) => node.type === 'section',
     runner: (state, node, type) => {
-      state.openNode(type);
+      const first = node.children?.[0];
+      const id = first?.type === 'heading' ? stripHeadingId(first).id : null;
+      state.openNode(type, id ? { id } : {});
       state.next(node.children);
       state.closeNode();
     },

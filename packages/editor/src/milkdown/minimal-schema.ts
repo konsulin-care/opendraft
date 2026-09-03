@@ -30,8 +30,47 @@ export const paragraphSchema: NodeSchema = {
   },
 };
 
+interface MdastHeadingNode {
+  type: string;
+  depth?: number;
+  value?: string;
+  children?: MdastHeadingNode[];
+  [k: string]: unknown;
+}
+
+/** Matches a trailing `{#slug}` heading attribute. */
+const HEADING_ID_RE = /\{#([a-zA-Z0-9-]+)\}\s*$/;
+
+/**
+ * Extract a trailing `{#slug}` attribute from an mdast heading: returns the
+ * id and a copy of the heading children with the attribute stripped.
+ *
+ * @param node - An mdast heading node.
+ * @returns The extracted id (or null) and the attribute-stripped children.
+ */
+export function stripHeadingId(node: MdastHeadingNode): {
+  id: string | null;
+  children?: MdastHeadingNode[];
+} {
+  const children = node.children ? [...node.children] : undefined;
+  const last = children?.[children.length - 1];
+  if (last && last.type === 'text' && typeof last.value === 'string') {
+    const match = HEADING_ID_RE.exec(last.value);
+    if (match) {
+      const value = last.value.slice(0, match.index).trimEnd();
+      if (value.length > 0) {
+        children![children.length - 1] = { ...last, value };
+      } else {
+        children!.pop();
+      }
+      return { id: match[1], children };
+    }
+  }
+  return { id: null, children };
+}
+
 export const headingSchema: NodeSchema = {
-  attrs: { level: { default: 1 } },
+  attrs: { level: { default: 1 }, id: { default: null } },
   content: 'inline*',
   group: 'block',
   defining: true,
@@ -40,6 +79,10 @@ export const headingSchema: NodeSchema = {
     runner: (state, node) => {
       state.openNode('heading', undefined, { depth: node.attrs.level as number });
       state.next(node.content);
+      const id = node.attrs.id;
+      if (typeof id === 'string' && id.length > 0) {
+        state.addNode('text', undefined, ` {#${id}}`);
+      }
       state.closeNode();
     },
   },
@@ -47,8 +90,9 @@ export const headingSchema: NodeSchema = {
     match: (node) => node.type === 'heading',
     runner: (state, node, type) => {
       const level = typeof node.depth === 'number' ? node.depth : 1;
-      state.openNode(type, { level });
-      state.next(node.children);
+      const { id, children } = stripHeadingId(node);
+      state.openNode(type, { level, id: id ?? null });
+      state.next(children);
       state.closeNode();
     },
   },
