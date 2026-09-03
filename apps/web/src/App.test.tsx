@@ -6,19 +6,17 @@ import { App } from './App';
 // @vitest-environment jsdom
 
 describe('App', () => {
-  it('renders manuscript workspace', async () => {
+  it('boots into the single manuscript editor', async () => {
     render(<App />);
-    await waitFor(() => {
-      expect(screen.getByText('Manuscript')).toBeDefined();
-    });
+    await waitFor(
+      () => expect(screen.getByTestId('manuscript-editor')).toBeDefined(),
+      { timeout: 10000 },
+    );
   });
 
-  it('shows sidebar navigation', async () => {
+  it('shows the header with commit action', async () => {
     render(<App />);
-    await waitFor(() => {
-      expect(screen.getAllByText('Blocks').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('Metadata').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('References').length).toBeGreaterThan(0);
-    });
+    await waitFor(() => expect(screen.getByText('OpenDraft')).toBeDefined());
+    expect(screen.getByText('Commit')).toBeDefined();
   });
 });

@@ -1,35 +1,23 @@
 import type { WorkspaceAdapter } from '@opendraft/workspace';
+import { MANUSCRIPT_PATH, saveManuscript } from './persistence';
 
-/** Path of the authored assembly file at the manuscript root. */
-export const DEFAULT_ARTICLE_PATH = 'article.qmd';
+/** Path of the manuscript file at the workspace root. */
+export const DEFAULT_ARTICLE_PATH = MANUSCRIPT_PATH;
 
-/** Slug of the default starter block. */
-export const DEFAULT_BLOCK_ID = 'intro';
-
-/** Starter block content (markdown with an explicit `{#intro}` id). */
-export const DEFAULT_BLOCK_CONTENT = [
-  '# Introduction {#intro}',
+/** Starter manuscript content — plain commonmark, no blocks or includes. */
+export const STARTER_MANUSCRIPT = [
+  '# Introduction',
   '',
-  'Start writing your manuscript here. Use the block handle to add sections.',
-].join('\n');
-
-/** Starter assembly: one include plus the references trailer. */
-export const DEFAULT_ARTICLE_ASSEMBLY = [
-  '{{< include blocks/intro.qmd >}}',
-  '',
-  '# References',
-  '',
-  '::: {#refs}',
-  ':::',
+  'Start writing your manuscript here.',
 ].join('\n');
 
 /**
- * Seed an empty workspace with a starter manuscript: article.qmd (the
- * authored include assembly) plus one blocks/intro.qmd block file.
+ * Ensure a workspace has a starter manuscript: creates the single
+ * markdown file when the workspace is empty.
  *
  * @param workspace - Workspace adapter to seed (in-place).
  */
 export async function seedWorkspace(workspace: WorkspaceAdapter): Promise<void> {
-  await workspace.writeFile(`blocks/${DEFAULT_BLOCK_ID}.qmd`, `${DEFAULT_BLOCK_CONTENT}\n`);
-  await workspace.writeFile(DEFAULT_ARTICLE_PATH, `${DEFAULT_ARTICLE_ASSEMBLY}\n`);
+  if ((await workspace.readFile(MANUSCRIPT_PATH)) !== null) return;
+  await saveManuscript(workspace, STARTER_MANUSCRIPT);
 }

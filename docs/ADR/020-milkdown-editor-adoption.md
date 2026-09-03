@@ -69,6 +69,23 @@ authored**:
   `blocks/`.
 - Legacy flat manuscripts still migrate via `migrateToBlockLayout`.
 
+## Superseded (2026-09-04): Single-File Manuscript Editor
+
+The section/block/draft document model described above is retired. The web
+app is now a single Milkdown/Crepe editor over **plain markdown** persisted
+as one `manuscript.md` at the workspace root:
+
+- `packages/editor` (`@opendraft/editor`) is deleted; the editor uses the
+  stock Crepe commonmark pipeline, and the Quarto `{#attr}` section identity
+  and draft-flag machinery no longer exist.
+- The workspace chrome (sidebar, block rail, metadata/references tabs) is
+  removed; the page is just the editor.
+- The editor integrates via the Milkdown React recipe
+  (`MilkdownProvider` + `useEditor` + `CrepeBuilder`/`Crepe` + `<Milkdown />`),
+  with the TopBar feature disabled.
+- Persistence is `loadManuscript`/`saveManuscript` over `manuscript.md`;
+  debounced autosave keeps a single canonical markdown file.
+
 ## Consequences
 
 - Block files are canonical Markdown everywhere; HTML lives only inside the

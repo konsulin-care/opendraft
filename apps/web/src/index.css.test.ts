@@ -6,23 +6,22 @@ import { fileURLToPath } from 'node:url';
 const css = readFileSync(fileURLToPath(new URL('./index.css', import.meta.url)), 'utf8');
 
 const COMPONENT_CLASSES = [
-  'manuscript-page',
   'manuscript-editor',
-  'block-rail',
-  'block-rail-drafts',
-  'rail-row',
-  'rail-title',
-  'draft-badge',
-  'dimmed',
-  'sidebar',
-  'workspace-content',
-  'metadata-editor',
-  'metadata-file',
-  'references-editor',
   'commit-dialog-overlay',
   'commit-dialog',
   'commit-actions',
   'commit-errors',
+];
+
+const REMOVED_CHROME = [
+  'sidebar',
+  'workspace-content',
+  'manuscript-page',
+  'block-rail',
+  'rail-row',
+  'draft-badge',
+  'metadata-editor',
+  'references-editor',
 ];
 
 describe('index.css contract', () => {
@@ -40,7 +39,21 @@ describe('index.css contract', () => {
     expect(editorBlock).toMatch(/ProseMirror h1\s*\{/);
   });
 
+  it('makes the editor own its scroll region', () => {
+    expect(css).toMatch(/\.manuscript-editor \.milkdown\s*\{[^}]*overflow-y:\s*auto/);
+  });
+
+  it('constrains the editor to a reading-width column', () => {
+    expect(css).toMatch(/\.manuscript-editor \.editor\s*\{[^}]*max-width:\s*46rem/);
+  });
+
   it('styles the editor placeholder', () => {
     expect(css).toMatch(/data-placeholder/);
+  });
+
+  it('no longer styles removed workspace chrome', () => {
+    for (const cls of REMOVED_CHROME) {
+      expect(css, `still styles removed class ${cls}`).not.toContain(cls);
+    }
   });
 });

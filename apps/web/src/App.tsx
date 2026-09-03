@@ -1,23 +1,32 @@
 import { useState, useEffect } from 'react';
+import { MilkdownProvider } from '@milkdown/react';
 import { IndexedDBWorkspace } from '@opendraft/workspace';
-import { ManuscriptWorkspace } from './components/ManuscriptWorkspace';
+import { ManuscriptEditor } from './components/ManuscriptEditor';
 import { CommitDialog } from './components/CommitDialog';
-import { seedWorkspace, DEFAULT_ARTICLE_PATH } from './seed';
+import { seedWorkspace } from './seed';
+import { loadManuscript } from './persistence';
 
 const WORKSPACE_ID = 'opendraft-manuscript';
 
+/**
+ * App shell: header with commit action plus the single continuous
+ * manuscript editor filling the viewport.
+ */
 export function App() {
   const [workspace, setWorkspace] = useState<IndexedDBWorkspace | null>(null);
+  const [markdown, setMarkdown] = useState<string | null>(null);
   const [showCommitDialog, setShowCommitDialog] = useState(false);
 
   useEffect(() => {
     let active = true;
     const ws = new IndexedDBWorkspace(WORKSPACE_ID);
     (async () => {
-      if ((await ws.readFile(DEFAULT_ARTICLE_PATH)) === null) {
-        await seedWorkspace(ws);
+      await seedWorkspace(ws);
+      const md = await loadManuscript(ws);
+      if (active) {
+        setWorkspace(ws);
+        setMarkdown(md);
       }
-      if (active) setWorkspace(ws);
     })().catch((err) => {
       console.error('App boot failed:', err);
     });
@@ -28,7 +37,7 @@ export function App() {
     };
   }, []);
 
-  if (!workspace) {
+  if (!workspace || markdown === null) {
     return <div>Loading workspace...</div>;
   }
 
@@ -39,7 +48,9 @@ export function App() {
         <button onClick={() => setShowCommitDialog(true)}>Commit</button>
       </header>
       <main style={{ flex: 1, overflow: 'hidden' }}>
-        <ManuscriptWorkspace workspace={workspace} />
+        <MilkdownProvider>
+          <ManuscriptEditor workspace={workspace} defaultValue={markdown} />
+        </MilkdownProvider>
       </main>
       <CommitDialog
         isOpen={showCommitDialog}

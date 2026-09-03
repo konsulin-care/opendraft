@@ -15,95 +15,24 @@
 }
 
 @layer components {
-  /* App shell */
-  .manuscript-workspace {
-    @apply flex h-full min-h-0;
-  }
-
-  /* Sidebar navigation */
-  .sidebar {
-    @apply flex w-56 shrink-0 flex-col gap-2 border-r border-stone-300 bg-stone-50 p-4;
-  }
-
-  .sidebar h2 {
-    @apply mb-2 text-sm font-semibold tracking-wide text-stone-500 uppercase;
-  }
-
-  .sidebar ul {
-    @apply flex flex-col gap-1;
-  }
-
-  .sidebar li {
-    @apply cursor-pointer rounded-md px-3 py-2 text-sm;
-  }
-
-  .sidebar li:hover {
-    @apply bg-stone-200;
-  }
-
-  .sidebar li.active {
-    @apply bg-sky-100 font-medium text-sky-900;
-  }
-
-  /* Workspace main content */
-  .workspace-content {
-    @apply flex flex-1 min-w-0 gap-4 overflow-auto p-6;
-  }
-
-  /* Manuscript page: rail + continuous editor */
-  .manuscript-page {
-    @apply flex w-full min-w-0 gap-4;
-  }
-
-  /* Block rail */
-  .block-rail {
-    @apply w-60 shrink-0;
-  }
-
-  .block-rail h3,
-  .block-rail h4 {
-    @apply mb-2 text-sm font-semibold tracking-wide text-stone-500 uppercase;
-  }
-
-  .block-rail ul {
-    @apply flex flex-col gap-1;
-  }
-
-  .block-rail li {
-    @apply list-none;
-  }
-
-  .block-rail li.dimmed {
-    @apply opacity-40;
-  }
-
-  .rail-row {
-    @apply flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm;
-  }
-
-  .rail-row:hover {
-    @apply bg-stone-200;
-  }
-
-  .rail-title {
-    @apply min-w-0 truncate;
-  }
-
-  .draft-badge {
-    @apply rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800;
-  }
-
-  .block-rail-drafts {
-    @apply mt-4;
-  }
-
-  /* Continuous manuscript editor */
+  /* Continuous manuscript editor: owns height + scroll, overlays glue to it */
   .manuscript-editor {
-    @apply flex min-h-40 min-w-0 flex-1 flex-col text-base text-stone-900;
+    height: 100%;
+    min-height: 0;
   }
 
-  .manuscript-editor .ProseMirror {
-    @apply min-h-40;
+  /* The milkdown surface is the scroll container for the whole page */
+  .manuscript-editor .milkdown {
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  /* Reading-width column for prose */
+  .manuscript-editor .editor {
+    max-width: 46rem;
+    margin: 0 auto;
+    padding: 2rem 1rem 4rem;
   }
 
   .manuscript-editor .ProseMirror p {
@@ -117,44 +46,6 @@
   .manuscript-editor .ProseMirror p.is-empty:first-child::before {
     content: attr(data-placeholder);
     @apply pointer-events-none float-left h-0 text-stone-400;
-  }
-
-  /* Metadata editor */
-  .metadata-editor {
-    @apply flex flex-1 flex-col gap-4;
-  }
-
-  .metadata-editor h3 {
-    @apply mb-1 text-sm font-semibold tracking-wide text-stone-500 uppercase;
-  }
-
-  .metadata-file {
-    @apply flex flex-col gap-1;
-  }
-
-  .metadata-file label {
-    @apply text-xs font-medium text-stone-500;
-  }
-
-  .metadata-editor textarea {
-    @apply min-h-24 w-full rounded-md border border-stone-300 bg-white p-2 font-mono text-sm;
-  }
-
-  /* References editor */
-  .references-editor {
-    @apply flex flex-1 flex-col gap-2;
-  }
-
-  .references-editor h3 {
-    @apply mb-1 text-sm font-semibold tracking-wide text-stone-500 uppercase;
-  }
-
-  .references-editor label {
-    @apply text-xs font-medium text-stone-500;
-  }
-
-  .references-editor textarea {
-    @apply min-h-48 w-full flex-1 rounded-md border border-stone-300 bg-white p-2 font-mono text-sm;
   }
 
   /* Commit dialog */
