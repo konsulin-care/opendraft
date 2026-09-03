@@ -1,5 +1,6 @@
 import { remark } from 'remark';
 import type { Root } from '@milkdown/kit/transformer';
+import { quarantineLiterals, reinsertLiteralBlocks, splitInlineShortcodes } from './quarto-literals.js';
 
 /** Minimal mdast node shape used by the grouping transform. */
 interface MdastNode {
@@ -49,6 +50,14 @@ export function groupManuscript(): (tree: MdastNode) => void {
         current = null;
         continue;
       }
+      if (child.type === 'quartoBlock') {
+        if (current) {
+          current.children?.push(child);
+        } else {
+          grouped.push(child);
+        }
+        continue;
+      }
       if (current) {
         current.children?.push(child);
       } else {
@@ -64,8 +73,23 @@ export function groupManuscript(): (tree: MdastNode) => void {
 /**
  * Build the remark processor for manuscript parse/serialize pipelines.
  *
- * @returns A remark processor with the manuscript grouping transform.
+ * The processor quarantines Quarto literals before parsing, runs the
+ * section grouping transform, then splits inline shortcodes.
+ *
+ * @returns A remark processor with the manuscript transforms.
  */
 export function createManuscriptRemark() {
-  return remark().use(() => groupManuscript());
+  const processor = remark()
+    .use(() => groupManuscript())
+    .use(() => (tree) => splitInlineShortcodes(tree as Root));
+  const originalParse = processor.parse.bind(processor) as (doc: string) => Root;
+
+  processor.parse = ((doc: string): Root => {
+    const { markdown, cells } = quarantineLiterals(doc);
+    const tree = originalParse(markdown);
+    reinsertLiteralBlocks(tree, cells);
+    return tree;
+  }) as typeof processor.parse;
+
+  return processor;
 }

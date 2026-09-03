@@ -55,6 +55,38 @@ const glueSchema: NodeSchema = {
   },
 };
 
+const quartoBlockSchema: NodeSchema = {
+  group: 'block',
+  atom: true,
+  attrs: { value: { default: '' } },
+  toMarkdown: {
+    match: (node) => node.type.name === 'quartoBlock',
+    runner: (state, node) => {
+      const value = (node.attrs.value as string).trimEnd();
+      state.addNode('html', undefined, value);
+    },
+  },
+  parseMarkdown: {
+    match: (node) => node.type === 'quartoBlock',
+    runner: (state, node, type) => state.addNode(type, { value: node.value }),
+  },
+};
+
+const quartoInlineSchema: NodeSchema = {
+  group: 'inline',
+  inline: true,
+  atom: true,
+  attrs: { value: { default: '' } },
+  toMarkdown: {
+    match: (node) => node.type.name === 'quartoInline',
+    runner: (state, node) => state.addNode('html', undefined, node.attrs.value as string),
+  },
+  parseMarkdown: {
+    match: (node) => node.type === 'quartoInline',
+    runner: (state, node, type) => state.addNode(type, { value: node.value }),
+  },
+};
+
 /**
  * Build the manuscript schema: doc restricts top level to sections,
  * include atoms, glue atoms and (later) quarto literals.
@@ -68,6 +100,8 @@ export function buildManuscriptSchema(): Schema {
       section: sectionSchema,
       include: includeSchema,
       glue: glueSchema,
+      quartoBlock: quartoBlockSchema,
+      quartoInline: quartoInlineSchema,
       heading: headingSchema,
       paragraph: paragraphSchema,
       text: textSchema,
