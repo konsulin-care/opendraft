@@ -21,7 +21,7 @@ This study examines...
 
 ### Block-Based Layout
 
-`article.qmd` is derived (compiled from blocks):
+`article.qmd` is the **authored assembly** (front matter + glue + includes):
 
 ```markdown
 ---
@@ -31,9 +31,11 @@ metadata-files:
   - _frontmatter.yml
 ---
 
-{{< include blocks/a1b2c3d4.qmd >}}
+{{< include blocks/intro.qmd >}}
 
-{{< include blocks/e5f6a7b8.qmd >}}
+Some glue prose between includes.
+
+{{< include blocks/methods.qmd >}}
 
 # References
 
@@ -41,27 +43,21 @@ metadata-files:
 :::
 ```
 
-Each block file (`blocks/<slug>.qmd`) contains one section:
+Each block file (`blocks/<slug>.qmd`) contains one section with a stable
+slug id on its heading:
 
 ```markdown
-# Introduction
+# Introduction {#intro}
 
 This study examines...
 ```
 
-### Block Manifest
+### Assembly Order
 
-`blocks/manifest.json` orders the blocks:
-
-```json
-{
-  "version": "1.0.0",
-  "blocks": [
-    { "id": "a1b2c3d4", "file": "a1b2c3d4.qmd", "title": "Introduction" },
-    { "id": "e5f6a7b8", "file": "e5f6a7b8.qmd", "title": "Methods" }
-  ]
-}
-```
+Order is defined by the include shortcodes in `article.qmd` — there is no
+JSON manifest. A block present in `blocks/` but not included is a **draft**:
+it renders flagged in the editor rail, stays out of the assembly, and is
+reported as a warning (never an error) by the assembly validator.
 
 - `id`: first 8 characters of SHA-256 of block content.
 - `file`: always `<id>.qmd`.

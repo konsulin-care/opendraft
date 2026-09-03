@@ -97,6 +97,11 @@ A **block** is defined by the highest-level heading (H1 first, then H2–H6) tha
 - Block splitting is deterministic — same content always produces the same slugs.
 - `article.qmd` becomes a derived file; users edit block files, not the assembly.
 
+> **Note (ADR-020):** The `article.qmd`-is-derived rule and the
+> `blocks/manifest.json` order source are superseded for new manuscripts —
+> `article.qmd` is now the authored assembly and identity is a stable slug
+> (see ADR-020). `migrateToBlockLayout` remains for legacy workspaces.
+
 ## References
 
 - ADR-004: Manuscript Structure & Metadata (superseded in part)

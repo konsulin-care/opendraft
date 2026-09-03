@@ -6,17 +6,19 @@ import { fileURLToPath } from 'node:url';
 const css = readFileSync(fileURLToPath(new URL('./index.css', import.meta.url)), 'utf8');
 
 const COMPONENT_CLASSES = [
-  'manuscript-workspace',
+  'manuscript-page',
+  'manuscript-editor',
+  'block-rail',
+  'block-rail-drafts',
+  'rail-row',
+  'rail-title',
+  'draft-badge',
+  'dimmed',
   'sidebar',
   'workspace-content',
-  'block-list',
-  'selected',
-  'editor-container',
   'metadata-editor',
   'metadata-file',
   'references-editor',
-  'section-sidebar',
-  'drag-handle',
   'commit-dialog-overlay',
   'commit-dialog',
   'commit-actions',
@@ -31,15 +33,14 @@ describe('index.css contract', () => {
     }
   });
 
-  it('scopes editor content styles to the .tiptap container', () => {
-    expect(css).toMatch(/\.tiptap\s*\{/);
-    // Nested paragraph and heading rules inside .tiptap (TipTap docs pattern).
-    const tiptapBlock = css.slice(css.indexOf('.tiptap'));
-    expect(tiptapBlock).toMatch(/p\s*\{/);
-    expect(tiptapBlock).toMatch(/h1\s*\{/);
+  it('scopes editor content styles to the manuscript editor container', () => {
+    expect(css).toMatch(/\.manuscript-editor\s*\{/);
+    const editorBlock = css.slice(css.indexOf('.manuscript-editor'));
+    expect(editorBlock).toMatch(/ProseMirror p\s*\{/);
+    expect(editorBlock).toMatch(/ProseMirror h1\s*\{/);
   });
 
-  it('styles the TipTap placeholder', () => {
-    expect(css).toMatch(/is-editor-empty/);
+  it('styles the editor placeholder', () => {
+    expect(css).toMatch(/data-placeholder/);
   });
 });

@@ -19,11 +19,6 @@
     "@opendraft/editor": "workspace:*",
     "@opendraft/git": "workspace:*",
     "@opendraft/workspace": "workspace:*",
-    "@tiptap/core": "^2.27.2",
-    "@tiptap/extension-placeholder": "^2.27.2",
-    "@tiptap/pm": "^2.27.2",
-    "@tiptap/react": "^2.27.2",
-    "@tiptap/starter-kit": "^2.27.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
