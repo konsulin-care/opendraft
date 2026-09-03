@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Editor } from '@tiptap/core';
+import { NodeSelection } from '@tiptap/pm/state';
 import {
   DndContext,
   closestCenter,
@@ -57,7 +58,7 @@ function findActive(editor: Editor, sections: Section[]): number {
 function goToSection(editor: Editor, position: number) {
   editor.chain().focus().command(({ tr, dispatch }) => {
     if (dispatch) {
-      tr.setSelection(editor.state.schema.nodeSelection(tr.doc.resolve(position + 1)));
+      tr.setSelection(NodeSelection.create(tr.doc, position + 1));
     }
     return true;
   }).run();

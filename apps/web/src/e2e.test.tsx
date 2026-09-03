@@ -20,11 +20,13 @@ async function waitForApp() {
 describe('End-to-end manuscript workflow', () => {
   beforeEach(clearIndexedDB);
 
-  it('seeds a default block on first run', async () => {
+  it('seeds a default manuscript on first run', async () => {
     const { unmount } = render(<App />);
     await waitForApp();
 
-    await waitFor(() => expect(screen.getByText('Introduction')).toBeDefined());
+    // Seed contents are asserted in seed.test.ts; the block-list UI is
+    // replaced by the block rail in the manuscript editor step.
+    await waitFor(() => expect(screen.getAllByText('Blocks').length).toBeGreaterThan(0));
     // Let in-flight workspace reads settle before unmount to avoid
     // polluting the next test's IndexedDB lifecycle.
     await new Promise((r) => setTimeout(r, 50));

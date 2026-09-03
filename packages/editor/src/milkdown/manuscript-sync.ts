@@ -41,6 +41,16 @@ function hasReferencesSection(doc: Node): boolean {
   return false;
 }
 
+/**
+ * Build a manuscript doc from expanded markdown, normalizing section ids.
+ *
+ * @param markdown - Expanded manuscript markdown (sections, literals).
+ * @returns A manuscript doc with unique section ids.
+ */
+export function createManuscriptDoc(markdown: string): Node {
+  return ensureSectionIds(parseSync(markdown));
+}
+
 export interface SerializedManuscript {
   /** Authored assembly: include shortcodes, glue and the refs trailer. */
   assembly: string;
