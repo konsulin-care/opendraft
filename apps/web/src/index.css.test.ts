@@ -30,4 +30,16 @@ describe('index.css contract', () => {
       expect(css, `missing style block for .${cls}`).toMatch(new RegExp(`\\.${escaped}\\s*\\{`));
     }
   });
+
+  it('scopes editor content styles to the .tiptap container', () => {
+    expect(css).toMatch(/\.tiptap\s*\{/);
+    // Nested paragraph and heading rules inside .tiptap (TipTap docs pattern).
+    const tiptapBlock = css.slice(css.indexOf('.tiptap'));
+    expect(tiptapBlock).toMatch(/p\s*\{/);
+    expect(tiptapBlock).toMatch(/h1\s*\{/);
+  });
+
+  it('styles the TipTap placeholder', () => {
+    expect(css).toMatch(/is-editor-empty/);
+  });
 });

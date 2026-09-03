@@ -20,6 +20,17 @@ async function waitForApp() {
 describe('End-to-end manuscript workflow', () => {
   beforeEach(clearIndexedDB);
 
+  it('seeds a default block on first run', async () => {
+    const { unmount } = render(<App />);
+    await waitForApp();
+
+    await waitFor(() => expect(screen.getByText('Introduction')).toBeDefined());
+    // Let in-flight workspace reads settle before unmount to avoid
+    // polluting the next test's IndexedDB lifecycle.
+    await new Promise((r) => setTimeout(r, 50));
+    unmount();
+  });
+
   it('persists metadata changes across reloads', async () => {
     const { unmount } = render(<App />);
     await waitForApp();

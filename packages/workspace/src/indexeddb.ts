@@ -75,6 +75,17 @@ export class IndexedDBWorkspace implements WorkspaceAdapter {
   }
 
   /**
+   * Close the underlying IndexedDB connection.
+   *
+   * Call when the workspace is no longer needed (e.g. navigation or teardown)
+   * so the connection does not block database deletion or upgrade.
+   */
+  async close(): Promise<void> {
+    const db = await this.getDB();
+    db.close();
+  }
+
+  /**
    * List files in a directory.
    * @param dir - Relative path to the directory.
    * @returns Array of filenames (not full paths) in the directory.

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { IndexedDBWorkspace } from '@opendraft/workspace';
 import { ManuscriptWorkspace } from './components/ManuscriptWorkspace';
 import { CommitDialog } from './components/CommitDialog';
+import { seedWorkspace, DEFAULT_MANIFEST_PATH } from './seed';
 
 const WORKSPACE_ID = 'opendraft-manuscript';
 
@@ -10,7 +11,21 @@ export function App() {
   const [showCommitDialog, setShowCommitDialog] = useState(false);
 
   useEffect(() => {
-    setWorkspace(new IndexedDBWorkspace(WORKSPACE_ID));
+    let active = true;
+    const ws = new IndexedDBWorkspace(WORKSPACE_ID);
+    (async () => {
+      if ((await ws.readFile(DEFAULT_MANIFEST_PATH)) === null) {
+        await seedWorkspace(ws);
+      }
+      if (active) setWorkspace(ws);
+    })().catch((err) => {
+      console.error('App boot failed:', err);
+    });
+
+    return () => {
+      active = false;
+      ws.close();
+    };
   }, []);
 
   if (!workspace) {

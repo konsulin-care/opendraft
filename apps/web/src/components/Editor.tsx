@@ -41,6 +41,12 @@ export function Editor({
       }),
     ],
     content: initialContent || '<div data-section><h1>Title</h1><p></p></div>',
+    editorProps: {
+      attributes: {
+        role: 'textbox',
+        class: 'tiptap h-full min-h-40 p-4 focus:outline-none',
+      },
+    },
     onUpdate: ({ editor: e }) => {
       if (onSave) {
         onSave(e.getHTML());

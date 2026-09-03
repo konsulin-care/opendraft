@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import 'fake-indexeddb/auto';
+import { indexedDB } from 'fake-indexeddb';
 import { IndexedDBWorkspace } from '../src/indexeddb.js';
 
 function createWorkspace(): IndexedDBWorkspace {
@@ -78,5 +79,22 @@ describe('IndexedDBWorkspace.listFiles', () => {
     await workspace.writeFile('other/file.txt', 'a');
     const files = await workspace.listFiles('empty/');
     expect(files).toEqual([]);
+  });
+});
+
+describe('IndexedDBWorkspace.close', () => {
+  it('closes the connection so the database can be deleted without blocking', async () => {
+    const name = 'opendraft-workspace-close-test';
+    const workspace = new IndexedDBWorkspace('close-test');
+    await workspace.writeFile('test.txt', 'hello');
+    await workspace.close();
+
+    const deleteResult = await new Promise<string>((resolve, reject) => {
+      const req = indexedDB.deleteDatabase(name);
+      req.onsuccess = () => resolve('deleted');
+      req.onerror = () => reject(req.error);
+      req.onblocked = () => reject(new Error('delete blocked by open connection'));
+    });
+    expect(deleteResult).toBe('deleted');
   });
 });

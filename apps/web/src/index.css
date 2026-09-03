@@ -71,6 +71,19 @@
     @apply bg-stone-200;
   }
 
+  .block-list p {
+    @apply text-sm text-stone-500;
+  }
+
+  /* Empty block editor state */
+  .block-editor-empty {
+    @apply flex flex-1 items-center justify-center rounded-md border border-dashed border-stone-300 text-stone-500;
+  }
+
+  .block-editor-empty p {
+    @apply text-sm;
+  }
+
   /* Selected block */
   .selected {
     @apply bg-sky-100 font-medium text-sky-900;
@@ -79,6 +92,24 @@
   /* TipTap editor shell */
   .editor-container {
     @apply flex flex-1 min-w-0 min-h-0 flex-col;
+  }
+
+  /* TipTap editor content, scoped per the style-editor docs */
+  .tiptap {
+    @apply min-h-40 text-base text-stone-900;
+
+    p {
+      @apply my-4 text-base leading-relaxed first:mt-0 last:mb-0;
+    }
+
+    h1 {
+      @apply mt-8 mb-4 text-3xl font-bold first:mt-0 last:mb-0;
+    }
+
+    p.is-editor-empty:first-child::before {
+      content: attr(data-placeholder);
+      @apply pointer-events-none float-left h-0 text-stone-400;
+    }
   }
 
   /* Metadata editor */
