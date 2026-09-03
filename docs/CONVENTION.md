@@ -8,7 +8,9 @@ This document defines the manuscript directory structure, identifier rules, and 
 
 ## Manuscript Directory Structure
 
-Each manuscript is a directory under `manuscripts/<id>/`:
+Each manuscript is a directory under `manuscripts/<id>/`. Two layouts are supported:
+
+### Legacy Layout
 
 ```text
 manuscripts/<id>/
@@ -19,15 +21,35 @@ manuscripts/<id>/
 └── references.bib
 ```
 
+### Block-Based Layout
+
+```text
+manuscripts/<id>/
+├── article.qmd              # derived — do not edit directly
+├── _author.yml
+├── _abstract.yml
+├── _frontmatter.yml
+├── references.bib
+└── blocks/
+    ├── manifest.json         # ordered block list
+    └── <slug>.qmd            # one file per block
+```
+
+**Detection:** Presence of `blocks/manifest.json` signals block-based layout.
+
+**Migration:** Use `migrateToBlockLayout()` to convert legacy layout to block-based.
+
 ### Required Files
 
-| File | Purpose |
-|------|---------|
-| `article.qmd` | Quarto Markdown source |
-| `_author.yml` | Author information |
-| `_abstract.yml` | Abstract text |
-| `_frontmatter.yml` | Title, date, keywords |
-| `references.bib` | BibTeX references |
+| File | Legacy | Block-Based | Purpose |
+|------|--------|-------------|---------|
+| `article.qmd` | Required | Derived | Quarto Markdown source |
+| `_author.yml` | Required | Required | Author information |
+| `_abstract.yml` | Required | Required | Abstract text |
+| `_frontmatter.yml` | Required | Required | Title, date, keywords |
+| `references.bib` | Required | Required | BibTeX references |
+| `blocks/manifest.json` | — | Required | Ordered block list |
+| `blocks/<slug>.qmd` | — | Required | Section-per-block files |
 
 ### Optional Files
 

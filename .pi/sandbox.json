@@ -4,7 +4,7 @@
     "denyWrite": [".pi/*"]
   },
   "bash": {
-    "commandWhitelist": ["node", "go", "mise"]
+    "commandWhitelist": ["node", "go", "mise", "pnpm"]
   }
 }
 

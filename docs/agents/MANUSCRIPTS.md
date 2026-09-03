@@ -2,7 +2,9 @@
 
 ## Quarto Markdown (.qmd)
 
-Manuscript source is Quarto Markdown:
+Manuscript source is Quarto Markdown. Two layouts are supported:
+
+### Legacy Layout
 
 ```markdown
 ---
@@ -16,6 +18,54 @@ metadata-files:
 
 This study examines...
 ```
+
+### Block-Based Layout
+
+`article.qmd` is derived (compiled from blocks):
+
+```markdown
+---
+metadata-files:
+  - _author.yml
+  - _abstract.yml
+  - _frontmatter.yml
+---
+
+{{< include blocks/a1b2c3d4.qmd >}}
+
+{{< include blocks/e5f6a7b8.qmd >}}
+
+# References
+
+::: {#refs}
+:::
+```
+
+Each block file (`blocks/<slug>.qmd`) contains one section:
+
+```markdown
+# Introduction
+
+This study examines...
+```
+
+### Block Manifest
+
+`blocks/manifest.json` orders the blocks:
+
+```json
+{
+  "version": "1.0.0",
+  "blocks": [
+    { "id": "a1b2c3d4", "file": "a1b2c3d4.qmd", "title": "Introduction" },
+    { "id": "e5f6a7b8", "file": "e5f6a7b8.qmd", "title": "Methods" }
+  ]
+}
+```
+
+- `id`: first 8 characters of SHA-256 of block content.
+- `file`: always `<id>.qmd`.
+- Array order = canonical section order.
 
 ## Metadata Files
 
@@ -71,4 +121,5 @@ Recent work [@doe2024; @smith2023] confirms...
 - Metadata files are prefixed with `_`.
 - OpenDraft UI manages YAML forms.
 - Users should not construct complex YAML manually.
-- See ADR-004 for rationale.
+- See ADR-004 for legacy layout rationale.
+- See ADR-019 for block-based layout rationale.

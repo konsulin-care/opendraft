@@ -1,11 +1,8 @@
 #!/usr/bin/env node
 /**
- * protocol-manifest.ts — generate and verify the protocol verification manifest.
- *   --update               regenerate protocol/protocol.manifest.json and templates/project/opendraft.yml
- *   --check                verify committed artifacts against the manifest
- *   --repository <url>     (with --update) explicit-intent repository override (fork PRs)
- * Spec: protocol/versioning.md. The revision commit is the last commit touching
- * a TTL artifact below protocol/, never the repository tip.
+ * protocol-manifest.ts — generate/verify the protocol verification manifest.
+ * Usage: --update | --check [--canonical] [--repository <url>]
+ * Spec: protocol/versioning.md. Pins the last TTL-touching commit below protocol/.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -22,8 +19,7 @@ export const TEMPLATE_PATH = 'templates/project/opendraft.yml';
 export const GENERATED_BY = 'mise run update-protocol-manifest';
 export const TTL_GLOB_PATHSPEC = ':(glob)protocol/**/*.ttl';
 
-const SHA40 = /^[0-9a-f]{40}$/;
-const SHA256_HEX = /^[0-9a-f]{64}$/;
+const SHA40 = /^[0-9a-f]{40}$/, SHA256_HEX = /^[0-9a-f]{64}$/;
 /** Protocol revision model: name, version, repository, commit (protocol/versioning.md). */
 export interface ProtocolBlock { name: string; version: string; repository: string; commit: string; }
 /** One pinned protocol artifact and its expected SHA-256 digest. */
@@ -47,10 +43,16 @@ export function hashBytes(data: Buffer): string { return createHash('sha256').up
 export async function hashFile(absPath: string): Promise<string> { return hashBytes(await readFile(absPath)); }
 /** Sorted protocol-relative paths of every .ttl artifact below <root>/protocol. */
 export async function collectArtifacts(root: string): Promise<string[]> {
-  const entries = await readdir(root, { recursive: true });
+  // Scan protocol/ only; the result filter guarantees artifacts live there.
+  let entries: string[];
+  try {
+    entries = await readdir(join(root, 'protocol'), { recursive: true });
+  } catch {
+    return [];
+  }
   return entries
-    .filter((entry) => entry.startsWith('protocol/') && entry.endsWith('.ttl'))
-    .map((entry) => entry.split(sep).join('/'))
+    .filter((entry) => entry.endsWith('.ttl'))
+    .map((entry) => `protocol/${entry.split(sep).join('/')}`)
     .sort();
 }
 /** Normalizes a Git remote URL to its HTTPS form, or null when unrecognized. */

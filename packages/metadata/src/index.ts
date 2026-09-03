@@ -4,6 +4,9 @@
 
 export { compileManuscript } from './compiler.js';
 export type { PublicationMetadata } from './compiler.js';
+export { compileArticle } from './article-compiler.js';
+export { migrateToBlockLayout } from './migration.js';
+export type { MigrationResult } from './migration.js';
 
 // Re-export generated types from JSON schemas
 export type {

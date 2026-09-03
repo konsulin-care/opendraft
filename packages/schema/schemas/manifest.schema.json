@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://opendraft.dev/schemas/manifest.schema.json",
+  "title": "Block Manifest",
+  "description": "Schema for blocks/manifest.json — ordered list of manuscript blocks.",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "enum": ["1.0.0"],
+      "description": "Manifest schema version (semver)."
+    },
+    "blocks": {
+      "type": "array",
+      "description": "Ordered list of blocks. Array order is canonical section order.",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/blockEntry"
+      }
+    }
+  },
+  "required": ["version", "blocks"],
+  "additionalProperties": false,
+  "definitions": {
+    "blockEntry": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]{1,20}$",
+          "description": "Block identifier — first 8 chars of SHA-256 of block content."
+        },
+        "file": {
+          "type": "string",
+          "description": "Filename in blocks/ directory — must equal <id>.qmd."
+        },
+        "title": {
+          "type": "string",
+          "description": "Block heading text."
+        }
+      },
+      "required": ["id", "file", "title"],
+      "additionalProperties": false
+    }
+  }
+}

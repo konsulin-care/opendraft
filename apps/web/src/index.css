@@ -1,0 +1,219 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-stone-100 text-stone-900 antialiased;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+      "Helvetica Neue", Arial, sans-serif;
+  }
+
+  button,
+  textarea,
+  [contenteditable="true"] {
+    @apply focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600;
+  }
+}
+
+@layer components {
+  /* App shell */
+  .manuscript-workspace {
+    @apply flex h-full min-h-0;
+  }
+
+  /* Sidebar navigation */
+  .sidebar {
+    @apply flex w-56 shrink-0 flex-col gap-2 border-r border-stone-300 bg-stone-50 p-4;
+  }
+
+  .sidebar h2 {
+    @apply mb-2 text-sm font-semibold tracking-wide text-stone-500 uppercase;
+  }
+
+  .sidebar ul {
+    @apply flex flex-col gap-1;
+  }
+
+  .sidebar li {
+    @apply cursor-pointer rounded-md px-3 py-2 text-sm;
+  }
+
+  .sidebar li:hover {
+    @apply bg-stone-200;
+  }
+
+  .sidebar li.active {
+    @apply bg-sky-100 font-medium text-sky-900;
+  }
+
+  /* Workspace main content */
+  .workspace-content {
+    @apply flex flex-1 min-w-0 gap-4 overflow-auto p-6;
+  }
+
+  /* Block list */
+  .block-list {
+    @apply w-60 shrink-0;
+  }
+
+  .block-list h3 {
+    @apply mb-2 text-sm font-semibold tracking-wide text-stone-500 uppercase;
+  }
+
+  .block-list ul {
+    @apply flex flex-col gap-1;
+  }
+
+  .block-list li {
+    @apply cursor-pointer rounded-md px-3 py-2 text-sm;
+  }
+
+  .block-list li:hover {
+    @apply bg-stone-200;
+  }
+
+  .block-list p {
+    @apply text-sm text-stone-500;
+  }
+
+  /* Empty block editor state */
+  .block-editor-empty {
+    @apply flex flex-1 items-center justify-center rounded-md border border-dashed border-stone-300 text-stone-500;
+  }
+
+  .block-editor-empty p {
+    @apply text-sm;
+  }
+
+  /* Selected block */
+  .selected {
+    @apply bg-sky-100 font-medium text-sky-900;
+  }
+
+  /* TipTap editor shell */
+  .editor-container {
+    @apply flex flex-1 min-w-0 min-h-0 flex-col;
+  }
+
+  /* TipTap editor content, scoped per the style-editor docs */
+  .tiptap {
+    @apply min-h-40 text-base text-stone-900;
+
+    p {
+      @apply my-4 text-base leading-relaxed first:mt-0 last:mb-0;
+    }
+
+    h1 {
+      @apply mt-8 mb-4 text-3xl font-bold first:mt-0 last:mb-0;
+    }
+
+    p.is-editor-empty:first-child::before {
+      content: attr(data-placeholder);
+      @apply pointer-events-none float-left h-0 text-stone-400;
+    }
+  }
+
+  /* Metadata editor */
+  .metadata-editor {
+    @apply flex flex-1 flex-col gap-4;
+  }
+
+  .metadata-editor h3 {
+    @apply mb-1 text-sm font-semibold tracking-wide text-stone-500 uppercase;
+  }
+
+  .metadata-file {
+    @apply flex flex-col gap-1;
+  }
+
+  .metadata-file label {
+    @apply text-xs font-medium text-stone-500;
+  }
+
+  .metadata-editor textarea {
+    @apply min-h-24 w-full rounded-md border border-stone-300 bg-white p-2 font-mono text-sm;
+  }
+
+  /* References editor */
+  .references-editor {
+    @apply flex flex-1 flex-col gap-2;
+  }
+
+  .references-editor h3 {
+    @apply mb-1 text-sm font-semibold tracking-wide text-stone-500 uppercase;
+  }
+
+  .references-editor label {
+    @apply text-xs font-medium text-stone-500;
+  }
+
+  .references-editor textarea {
+    @apply min-h-48 w-full flex-1 rounded-md border border-stone-300 bg-white p-2 font-mono text-sm;
+  }
+
+  /* Section sidebar */
+  .section-sidebar {
+    @apply flex w-52 shrink-0 flex-col gap-2 border-r border-stone-300 bg-stone-50 p-3;
+  }
+
+  .section-sidebar h2 {
+    @apply mb-2 text-sm font-semibold tracking-wide text-stone-500 uppercase;
+  }
+
+  .section-sidebar ul {
+    @apply flex flex-col gap-1;
+  }
+
+  .section-sidebar li {
+    @apply flex items-center gap-2 rounded-md px-2 py-1.5 text-sm;
+  }
+
+  .section-sidebar li.active {
+    @apply bg-sky-100 font-medium text-sky-900;
+  }
+
+  /* Drag handle */
+  .drag-handle {
+    @apply cursor-grab rounded p-1 text-stone-400 hover:text-stone-600;
+  }
+
+  /* Commit dialog */
+  .commit-dialog-overlay {
+    @apply fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4;
+  }
+
+  .commit-dialog {
+    @apply flex w-full max-w-md flex-col gap-3 rounded-lg border border-stone-300 bg-white p-6 shadow-lg;
+  }
+
+  .commit-dialog h2 {
+    @apply text-lg font-semibold;
+  }
+
+  .commit-dialog textarea {
+    @apply w-full rounded-md border border-stone-300 p-2 font-mono text-sm;
+  }
+
+  .commit-errors {
+    @apply rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800;
+  }
+
+  .commit-errors p {
+    @apply font-medium;
+  }
+
+  .commit-actions {
+    @apply flex justify-end gap-2;
+  }
+
+  .commit-actions button {
+    @apply rounded-md border border-stone-300 px-4 py-2 text-sm;
+  }
+
+  .commit-actions button:not(:disabled):hover {
+    @apply bg-stone-100;
+  }
+
+  .commit-actions button:disabled {
+    @apply cursor-not-allowed opacity-50;
+  }
+}

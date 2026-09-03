@@ -136,43 +136,28 @@ function sortKeys(obj: unknown): unknown {
  * @throws {Error} If required files are missing or validation fails.
  */
 export function compileManuscript(dir: string): PublicationMetadata {
-  // Validate required files exist
   for (const file of REQUIRED_FILES) {
     if (!existsSync(join(dir, file))) {
       throw new Error(`Missing required file: ${file}`);
     }
   }
 
-  // Read and validate YAML files
   const authorData = readAndValidateYaml(dir, '_author.yml', 'author');
   const abstractData = readAndValidateYaml(dir, '_abstract.yml', 'abstract');
   const frontmatterData = readAndValidateYaml(dir, '_frontmatter.yml', 'frontmatter');
 
-  // Extract authors
   const authors = extractAuthors(authorData);
-
-  // Extract abstract
   const abstract = abstractData.abstract as string;
-
-  // Extract frontmatter
   const title = frontmatterData.title as string;
   const date = frontmatterData.date as string | undefined;
   const keywords = Array.isArray(frontmatterData.keywords)
     ? (frontmatterData.keywords as string[])
     : undefined;
-
-  // Read references (optional)
   const references = readReferences(dir);
 
   const metadata: PublicationMetadata = {
-    title,
-    abstract,
-    authors,
-    date,
-    keywords,
-    references,
+    title, abstract, authors, date, keywords, references,
   };
 
-  // Return with sorted keys for deterministic output
   return sortKeys(metadata) as PublicationMetadata;
 }

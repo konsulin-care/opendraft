@@ -43,3 +43,10 @@ vendor/
 *.exe
 *.test
 *.out
+
+# TypeScript build info
+*.tsbuildinfo
+
+# tsc -b emit artifacts (tsconfig.node.json emits alongside vite.config.ts)
+apps/web/vite.config.js
+apps/web/vite.config.d.ts

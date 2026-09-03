@@ -4,6 +4,7 @@ import { parse as parseYaml } from 'yaml';
 import { validateOpendraft } from './opendraft.js';
 import { validateManuscript } from './manuscript.js';
 import { validateMetadata, type MetadataType } from './metadata.js';
+import { validateManifest, validateBlockStructure } from './manifest.js';
 
 const METADATA_FILES: MetadataType[] = ['author', 'abstract', 'frontmatter'];
 const FILE_MAP: Record<MetadataType, string> = {
@@ -23,6 +24,21 @@ function readAndParseYaml(filePath: string): unknown {
   return parseYaml(content);
 }
 
+function readAndParseJson(filePath: string): unknown {
+  const content = readFileSync(filePath, 'utf8');
+  return JSON.parse(content);
+}
+
+function yamlError(location: string, err: unknown): CliError {
+  const message = err instanceof Error ? err.message : String(err);
+  return { location, path: '', message: `Failed to parse YAML: ${message}` };
+}
+
+function jsonError(location: string, err: unknown): CliError {
+  const message = err instanceof Error ? err.message : String(err);
+  return { location, path: '', message: `Failed to parse JSON: ${message}` };
+}
+
 function validateConfig(configPath: string): CliError[] {
   if (!existsSync(configPath)) {
     return [{ location: 'opendraft.yml', path: '', message: 'File not found.' }];
@@ -32,12 +48,13 @@ function validateConfig(configPath: string): CliError[] {
   try {
     config = readAndParseYaml(configPath);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return [{ location: 'opendraft.yml', path: '', message: `Failed to parse YAML: ${message}` }];
+    return [yamlError('opendraft.yml', err)];
   }
 
   const result = validateOpendraft(config);
-  return result.errors.map((e) => ({ location: 'opendraft.yml', path: e.path, message: e.message }));
+  return result.errors.map((e) => ({
+    location: 'opendraft.yml', path: e.path, message: e.message,
+  }));
 }
 
 function validateMetadataFile(
@@ -50,18 +67,63 @@ function validateMetadataFile(
   if (!files.includes(fileName)) return [];
 
   const filePath = join(manuscriptDir, fileName);
+  const location = `${manuscriptPath}/${fileName}`;
   try {
     const data = readAndParseYaml(filePath);
     const result = validateMetadata(data, type);
-    return result.errors.map((e) => ({
-      location: `${manuscriptPath}/${fileName}`,
-      path: e.path,
-      message: e.message,
-    }));
+    return result.errors.map((e) => ({ location, path: e.path, message: e.message }));
+  } catch (err) {
+    return [yamlError(location, err)];
+  }
+}
+
+function validateManifestFile(location: string, manifest: unknown): CliError[] {
+  const result = validateManifest(manifest);
+  return result.errors.map((e) => ({ location, path: e.path, message: e.message }));
+}
+
+/** Read blocks directory or throw on failure. */
+function readBlocksDir(blocksDir: string): string[] {
+  try {
+    return readdirSync(blocksDir);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return [{ location: `${manuscriptPath}/${fileName}`, path: '', message: `Failed to parse YAML: ${message}` }];
+    throw new Error(`Failed to read blocks directory: ${message}`, { cause: err });
   }
+}
+
+function validateBlockLayout(
+  manuscriptDir: string,
+  manuscriptPath: string,
+): CliError[] {
+  const manifestLocation = `${manuscriptPath}/blocks/manifest.json`;
+  const blocksLocation = `${manuscriptPath}/blocks/`;
+  const manifestPath = join(manuscriptDir, 'blocks', 'manifest.json');
+
+  let manifest: unknown;
+  try {
+    manifest = readAndParseJson(manifestPath);
+  } catch (err) {
+    return [jsonError(manifestLocation, err)];
+  }
+
+  const errors = validateManifestFile(manifestLocation, manifest);
+
+  try {
+    const blockFiles = readBlocksDir(join(manuscriptDir, 'blocks'));
+    const structureResult = validateBlockStructure(manifest, blockFiles);
+    for (const e of structureResult.errors) {
+      errors.push({ location: blocksLocation, path: e.path, message: e.message });
+    }
+  } catch (err) {
+    errors.push({
+      location: blocksLocation,
+      path: '',
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  return errors;
 }
 
 function validateManuscriptDir(
@@ -90,6 +152,10 @@ function validateManuscriptDir(
 
   for (const type of METADATA_FILES) {
     errors.push(...validateMetadataFile(manuscriptDir, manuscript.path, type, files));
+  }
+
+  if (files.includes('blocks/manifest.json')) {
+    errors.push(...validateBlockLayout(manuscriptDir, manuscript.path));
   }
 
   return errors;
