@@ -1,7 +1,7 @@
 import { Schema } from '@milkdown/kit/prose/model';
 import type { NodeSchema } from '@milkdown/kit/transformer';
 
-const textSchema: NodeSchema = {
+export const textSchema: NodeSchema = {
   group: 'inline',
   toMarkdown: {
     match: (node) => node.isText,
@@ -13,7 +13,7 @@ const textSchema: NodeSchema = {
   },
 };
 
-const paragraphSchema: NodeSchema = {
+export const paragraphSchema: NodeSchema = {
   content: 'inline*',
   group: 'block',
   toMarkdown: {
@@ -30,7 +30,7 @@ const paragraphSchema: NodeSchema = {
   },
 };
 
-const headingSchema: NodeSchema = {
+export const headingSchema: NodeSchema = {
   attrs: { level: { default: 1 } },
   content: 'inline*',
   group: 'block',
@@ -54,7 +54,7 @@ const headingSchema: NodeSchema = {
   },
 };
 
-const docSchema: NodeSchema = {
+export const docSchema: NodeSchema = {
   content: 'block+',
   toMarkdown: {
     match: (node) => node.type.name === 'doc',
