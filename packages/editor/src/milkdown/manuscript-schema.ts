@@ -13,7 +13,7 @@ const sectionSchema: NodeSchema = {
   content: 'heading block*',
   defining: true,
   isolate: true,
-  attrs: { id: { default: null } },
+  attrs: { id: { default: null }, draft: { default: false } },
   toMarkdown: {
     match: (node) => node.type.name === 'section',
     // Sections serialize inline: their children flow directly under root.
