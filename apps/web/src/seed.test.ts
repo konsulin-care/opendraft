@@ -12,8 +12,8 @@ describe('seedWorkspace', () => {
     expect(article).toBe(`${STARTER_MANUSCRIPT.trimEnd()}\n`);
   });
 
-  it('keeps the starter content plain commonmark without block machinery', () => {
-    expect(STARTER_MANUSCRIPT).toContain('# Introduction');
+  it('starts from a blank manuscript without block machinery', () => {
+    expect(STARTER_MANUSCRIPT).toBe('');
     expect(STARTER_MANUSCRIPT).not.toContain('{{< include');
     expect(STARTER_MANUSCRIPT).not.toContain('blocks/');
     expect(STARTER_MANUSCRIPT).not.toMatch(/\{#/);

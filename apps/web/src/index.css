@@ -43,9 +43,33 @@
     @apply mt-8 mb-4 text-3xl font-bold first:mt-0 last:mb-0;
   }
 
-  .manuscript-editor .ProseMirror p.is-empty:first-child::before {
-    content: attr(data-placeholder);
-    @apply pointer-events-none float-left h-0 text-stone-400;
+  .manuscript-editor .ProseMirror h2 {
+    @apply mt-8 mb-4 text-2xl font-semibold;
+  }
+
+  .manuscript-editor .ProseMirror h3 {
+    @apply mt-6 mb-3 text-xl font-semibold;
+  }
+
+  .manuscript-editor .ProseMirror h4 {
+    @apply mt-6 mb-2 text-lg font-semibold;
+  }
+
+  .manuscript-editor .ProseMirror h5,
+  .manuscript-editor .ProseMirror h6 {
+    @apply mt-4 mb-2 text-base font-semibold;
+  }
+
+  .manuscript-editor .ProseMirror hr {
+    @apply my-6 border-stone-300;
+  }
+
+  .manuscript-editor .ProseMirror blockquote {
+    @apply my-4 border-l-4 border-stone-300 pl-4 text-stone-600;
+  }
+
+  .manuscript-editor .ProseMirror code {
+    @apply rounded bg-stone-200 px-1 py-0.5 font-mono text-sm;
   }
 
   /* Commit dialog */

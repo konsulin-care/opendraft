@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Crepe } from '@milkdown/crepe';
 import { Milkdown, useEditor } from '@milkdown/react';
 import { editorViewCtx, type Editor } from '@milkdown/kit/core';
@@ -6,10 +6,10 @@ import { listenerCtx } from '@milkdown/kit/plugin/listener';
 import { getMarkdown } from '@milkdown/kit/utils';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { saveManuscript } from '../persistence';
+import { pickPlaceholderHint } from '../placeholder';
 
+import '@milkdown/crepe/theme/common/style.css';
 import '@milkdown/crepe/theme/classic.css';
-import '@milkdown/crepe/theme/common/prosemirror.css';
-import '@milkdown/crepe/theme/common/reset.css';
 
 /** Imperative handle exposed for tests and external tools. */
 export interface EditorTestApi {
@@ -77,6 +77,7 @@ function debouncedSaver(workspace: WorkspaceAdapter) {
  * @param props - Workspace adapter, initial markdown, optional ready callback.
  */
 export function ManuscriptEditor({ workspace, defaultValue, onEditorReady }: ManuscriptEditorProps) {
+  const placeholderText = useMemo(pickPlaceholderHint, []);
   const { loading, get } = useEditor(
     (root) =>
       new Crepe({
@@ -85,6 +86,9 @@ export function ManuscriptEditor({ workspace, defaultValue, onEditorReady }: Man
         features: {
           [Crepe.Feature.TopBar]: false,
           [Crepe.Feature.AI]: false,
+        },
+        featureConfigs: {
+          [Crepe.Feature.Placeholder]: { text: placeholderText, mode: 'block' },
         },
       }),
     [defaultValue],

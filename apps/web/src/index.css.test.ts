@@ -47,8 +47,12 @@ describe('index.css contract', () => {
     expect(css).toMatch(/\.manuscript-editor \.editor\s*\{[^}]*max-width:\s*46rem/);
   });
 
-  it('styles the editor placeholder', () => {
-    expect(css).toMatch(/data-placeholder/);
+  it('drops the app-level placeholder rule in favor of Crepe', () => {
+    expect(css).not.toContain('is-empty');
+  });
+
+  it('provides a heading scale for prose', () => {
+    expect(css).toMatch(/ProseMirror h2\s*\{/);
   });
 
   it('no longer styles removed workspace chrome', () => {

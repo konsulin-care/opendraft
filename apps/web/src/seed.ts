@@ -4,12 +4,8 @@ import { MANUSCRIPT_PATH, saveManuscript } from './persistence';
 /** Path of the manuscript file at the workspace root. */
 export const DEFAULT_ARTICLE_PATH = MANUSCRIPT_PATH;
 
-/** Starter manuscript content — plain commonmark, no blocks or includes. */
-export const STARTER_MANUSCRIPT = [
-  '# Introduction',
-  '',
-  'Start writing your manuscript here.',
-].join('\n');
+/** Starter manuscript content — blank; the editor shows a random hint instead. */
+export const STARTER_MANUSCRIPT = '';
 
 /**
  * Ensure a workspace has a starter manuscript: creates the single
