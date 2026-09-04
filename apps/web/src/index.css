@@ -1,3 +1,9 @@
+/* layer priority: crepe < theme < base < components < utilities */
+@layer crepe, theme, base, components, utilities;
+
+@import "@milkdown/crepe/theme/common/style.css" layer(crepe);
+@import "@milkdown/crepe/theme/classic.css" layer(crepe);
+
 @import "tailwindcss";
 
 @layer base {
@@ -15,23 +21,34 @@
 }
 
 @layer components {
-  /* Continuous manuscript editor: owns height + scroll, overlays glue to it */
+  /* outer fixed-height frame */
   .manuscript-editor {
+    display: flex;
+    flex-direction: column;
     height: 100%;
     min-height: 0;
+    overflow: hidden;
   }
 
-  /* The milkdown surface is the scroll container for the whole page */
-  .manuscript-editor .milkdown {
-    height: 100%;
+  /* scroll viewport — the root wrapper that @milkdown/react renders */
+  .manuscript-editor > [data-milkdown-root] {
+    flex: 1 1 auto;
+    min-width: 0;
     min-height: 0;
     overflow-y: auto;
   }
 
-  /* Reading-width column for prose */
+  /* content surface — NOT the scroll container */
+  .manuscript-editor > [data-milkdown-root] > .milkdown {
+    min-height: 100%;
+    overflow: visible;
+    position: relative;
+  }
+
+  /* reading-width column for prose */
   .manuscript-editor .editor {
     max-width: 46rem;
-    margin: 0 auto;
+    margin-inline: auto;
     padding: 2rem 1rem 4rem;
   }
 

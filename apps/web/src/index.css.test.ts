@@ -39,8 +39,11 @@ describe('index.css contract', () => {
     expect(editorBlock).toMatch(/ProseMirror h1\s*\{/);
   });
 
-  it('makes the editor own its scroll region', () => {
-    expect(css).toMatch(/\.manuscript-editor \.milkdown\s*\{[^}]*overflow-y:\s*auto/);
+  it('makes the root wrapper the scroll viewport, not .milkdown', () => {
+    expect(css).toMatch(/\.manuscript-editor > \[data-milkdown-root\]\s*\{[^}]*overflow-y:\s*auto/);
+    // .milkdown must NOT have overflow-y
+    const milkdownBlock = css.slice(css.indexOf('.milkdown'));
+    expect(milkdownBlock).not.toMatch(/\.milkdown\s*\{[^}]*overflow-y/);
   });
 
   it('constrains the editor to a reading-width column', () => {

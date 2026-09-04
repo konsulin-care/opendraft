@@ -8,9 +8,6 @@ import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { saveManuscript } from '../persistence';
 import { pickPlaceholderHint } from '../placeholder';
 
-import '@milkdown/crepe/theme/common/style.css';
-import '@milkdown/crepe/theme/classic.css';
-
 /** Imperative handle exposed for tests and external tools. */
 export interface EditorTestApi {
   /** Insert text at the end of the document through the editor state. */
