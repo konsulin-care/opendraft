@@ -1,6 +1,6 @@
 [tools]
 node = "lts"
-pnpm = "11.25.0"
+pnpm = "12.3.4"
 go = "1.27"
 lefthook = "2.1.12"
 golangci-lint = "2.13.2"
