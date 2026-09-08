@@ -24,8 +24,8 @@ describe('ManuscriptEditor crepe theme integration', () => {
     expect(source).not.toContain('@milkdown/crepe/theme/common/reset.css');
   });
 
-  it('imports Crepe theme CSS in index.css inside a cascade layer', () => {
-    expect(css).toMatch(/@layer\s+crepe/);
+  it('imports Crepe theme CSS in index.css without a cascade layer', () => {
+    expect(css).not.toMatch(/@layer\s+crepe/);
     expect(css).toContain('@milkdown/crepe/theme/common/style.css');
     expect(css).toContain('@milkdown/crepe/theme/classic.css');
   });

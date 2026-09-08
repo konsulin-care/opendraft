@@ -1,132 +1,200 @@
-/* layer priority: crepe < theme < base < components < utilities */
-@layer crepe, theme, base, components, utilities;
+@import "@milkdown/crepe/theme/common/style.css";
+@import "@milkdown/crepe/theme/classic.css";
 
-@import "@milkdown/crepe/theme/common/style.css" layer(crepe);
-@import "@milkdown/crepe/theme/classic.css" layer(crepe);
+/* ── Palette: monochrome + error red ── */
+.milkdown {
+  --crepe-color-background: #ffffff;
+  --crepe-color-on-background: #212529;
+  --crepe-color-surface: #ffffff;
+  --crepe-color-surface-low: #f8f9fa;
+  --crepe-color-on-surface: #212529;
+  --crepe-color-on-surface-variant: #6c757d;
+  --crepe-color-outline: #adb5bd;
+  --crepe-color-primary: #212529;
+  --crepe-color-secondary: #dee2e6;
+  --crepe-color-on-secondary: #212529;
+  --crepe-color-inverse: #343a40;
+  --crepe-color-on-inverse: #f8f9fa;
+  --crepe-color-hover: #e9ecef;
+  --crepe-color-selected: #dee2e6;
+  --crepe-color-inline-code: #495057;
+  --crepe-color-error: #dc3545;
+}
 
-@import "tailwindcss";
+/* ── Fonts ── */
+:root {
+  --crepe-font-default: 'Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --crepe-font-title: 'Source Serif 4', Georgia, serif;
+  --crepe-font-code: 'IBM Plex Mono', ui-monospace, monospace;
+}
 
-@layer base {
-  body {
-    @apply bg-stone-100 text-stone-900 antialiased;
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-      "Helvetica Neue", Arial, sans-serif;
-  }
-
-  button,
-  textarea,
-  [contenteditable="true"] {
-    @apply focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600;
+/* ── Responsive sizing ── */
+/* Small: < 640px — base 14px */
+@media (max-width: 639px) {
+  :root {
+    --crepe-base-font-size: 14px;
   }
 }
 
-@layer components {
-  /* outer fixed-height frame */
-  .manuscript-editor {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    min-height: 0;
-    overflow: hidden;
+/* Medium: 640px–1024px — base 16px */
+@media (min-width: 640px) and (max-width: 1023px) {
+  :root {
+    --crepe-base-font-size: 16px;
   }
+}
 
-  /* scroll viewport — the root wrapper that @milkdown/react renders */
-  .manuscript-editor > [data-milkdown-root] {
-    flex: 1 1 auto;
-    min-width: 0;
-    min-height: 0;
-    overflow-y: auto;
+/* Large: >= 1024px — base 18px */
+@media (min-width: 1024px) {
+  :root {
+    --crepe-base-font-size: 18px;
   }
+}
 
-  /* content surface — NOT the scroll container */
-  .manuscript-editor > [data-milkdown-root] > .milkdown {
-    min-height: 100%;
-    overflow: visible;
-    position: relative;
-  }
+/* ── Slash menu: fix padding + prevent horizontal scroll ── */
+.milkdown .milkdown-slash-menu {
+  max-width: 320px;
+}
 
-  /* reading-width column for prose */
-  .manuscript-editor .editor {
-    max-width: 46rem;
-    margin-inline: auto;
-    padding: 2rem 1rem 4rem;
-  }
+.milkdown .milkdown-slash-menu .tab-group {
+  padding-left: 16px;
+  padding-right: 16px;
+}
 
-  .manuscript-editor .ProseMirror p {
-    @apply my-4 text-base leading-relaxed first:mt-0 last:mb-0;
-  }
+.milkdown .milkdown-slash-menu .menu-groups {
+  padding-left: 16px;
+  padding-right: 16px;
+}
 
-  .manuscript-editor .ProseMirror h1 {
-    @apply mt-8 mb-4 text-3xl font-bold first:mt-0 last:mb-0;
-  }
+.milkdown .milkdown-slash-menu .menu-groups .menu-group li {
+  min-width: 0;
+  padding-left: 16px;
+  padding-right: 16px;
+}
 
-  .manuscript-editor .ProseMirror h2 {
-    @apply mt-8 mb-4 text-2xl font-semibold;
-  }
+@import "tailwindcss";
 
-  .manuscript-editor .ProseMirror h3 {
-    @apply mt-6 mb-3 text-xl font-semibold;
-  }
+body {
+  @apply bg-stone-100 text-stone-900 antialiased;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+}
 
-  .manuscript-editor .ProseMirror h4 {
-    @apply mt-6 mb-2 text-lg font-semibold;
-  }
+button,
+textarea,
+[contenteditable="true"] {
+  @apply focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600;
+}
 
-  .manuscript-editor .ProseMirror h5,
-  .manuscript-editor .ProseMirror h6 {
-    @apply mt-4 mb-2 text-base font-semibold;
-  }
+/* outer fixed-height frame */
+.manuscript-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
 
-  .manuscript-editor .ProseMirror hr {
-    @apply my-6 border-stone-300;
-  }
+/* scroll viewport — the root wrapper that @milkdown/react renders */
+.manuscript-editor > [data-milkdown-root] {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
 
-  .manuscript-editor .ProseMirror blockquote {
-    @apply my-4 border-l-4 border-stone-300 pl-4 text-stone-600;
-  }
+/* content surface — NOT the scroll container */
+.manuscript-editor > [data-milkdown-root] > .milkdown {
+  min-height: 100%;
+  overflow: visible;
+  position: relative;
+}
 
-  .manuscript-editor .ProseMirror code {
-    @apply rounded bg-stone-200 px-1 py-0.5 font-mono text-sm;
-  }
+/* reading-width column for prose */
+.manuscript-editor .editor {
+  max-width: 46rem;
+  margin-inline: auto;
+  padding: 2rem 1rem 4rem;
+}
 
-  /* Commit dialog */
-  .commit-dialog-overlay {
-    @apply fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4;
-  }
+.manuscript-editor .ProseMirror p {
+  @apply my-4 text-base leading-relaxed first:mt-0 last:mb-0;
+}
 
-  .commit-dialog {
-    @apply flex w-full max-w-md flex-col gap-3 rounded-lg border border-stone-300 bg-white p-6 shadow-lg;
-  }
+.manuscript-editor .ProseMirror h1 {
+  font-family: var(--crepe-font-title);
+  @apply mt-8 mb-4 text-3xl font-bold first:mt-0 last:mb-0;
+}
 
-  .commit-dialog h2 {
-    @apply text-lg font-semibold;
-  }
+.manuscript-editor .ProseMirror h2 {
+  font-family: var(--crepe-font-title);
+  @apply mt-8 mb-4 text-2xl font-semibold;
+}
 
-  .commit-dialog textarea {
-    @apply w-full rounded-md border border-stone-300 p-2 font-mono text-sm;
-  }
+.manuscript-editor .ProseMirror h3 {
+  font-family: var(--crepe-font-title);
+  @apply mt-6 mb-3 text-xl font-semibold;
+}
 
-  .commit-errors {
-    @apply rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800;
-  }
+.manuscript-editor .ProseMirror h4 {
+  font-family: var(--crepe-font-title);
+  @apply mt-6 mb-2 text-lg font-semibold;
+}
 
-  .commit-errors p {
-    @apply font-medium;
-  }
+.manuscript-editor .ProseMirror h5,
+.manuscript-editor .ProseMirror h6 {
+  font-family: var(--crepe-font-title);
+  @apply mt-4 mb-2 text-base font-semibold;
+}
 
-  .commit-actions {
-    @apply flex justify-end gap-2;
-  }
+.manuscript-editor .ProseMirror hr {
+  @apply my-6 border-stone-300;
+}
 
-  .commit-actions button {
-    @apply rounded-md border border-stone-300 px-4 py-2 text-sm;
-  }
+.manuscript-editor .ProseMirror blockquote {
+  @apply my-4 border-l-4 border-stone-300 pl-4 text-stone-600;
+}
 
-  .commit-actions button:not(:disabled):hover {
-    @apply bg-stone-100;
-  }
+.manuscript-editor .ProseMirror code {
+  @apply rounded bg-stone-200 px-1 py-0.5 font-mono text-sm;
+}
 
-  .commit-actions button:disabled {
-    @apply cursor-not-allowed opacity-50;
-  }
+/* Commit dialog */
+.commit-dialog-overlay {
+  @apply fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4;
+}
+
+.commit-dialog {
+  @apply flex w-full max-w-md flex-col gap-3 rounded-lg border border-stone-300 bg-white p-6 shadow-lg;
+}
+
+.commit-dialog h2 {
+  @apply text-lg font-semibold;
+}
+
+.commit-dialog textarea {
+  @apply w-full rounded-md border border-stone-300 p-2 font-mono text-sm;
+}
+
+.commit-errors {
+  @apply rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800;
+}
+
+.commit-errors p {
+  @apply font-medium;
+}
+
+.commit-actions {
+  @apply flex justify-end gap-2;
+}
+
+.commit-actions button {
+  @apply rounded-md border border-stone-300 px-4 py-2 text-sm;
+}
+
+.commit-actions button:not(:disabled):hover {
+  @apply bg-stone-100;
+}
+
+.commit-actions button:disabled {
+  @apply cursor-not-allowed opacity-50;
 }

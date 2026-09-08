@@ -1,66 +1,29 @@
-// @vitest-environment node
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 
-const css = readFileSync(fileURLToPath(new URL('./index.css', import.meta.url)), 'utf8');
+const CSS_PATH = resolve(__dirname, 'index.css');
+const css = readFileSync(CSS_PATH, 'utf-8');
 
-const COMPONENT_CLASSES = [
-  'manuscript-editor',
-  'commit-dialog-overlay',
-  'commit-dialog',
-  'commit-actions',
-  'commit-errors',
-];
-
-const REMOVED_CHROME = [
-  'sidebar',
-  'workspace-content',
-  'manuscript-page',
-  'block-rail',
-  'rail-row',
-  'draft-badge',
-  'metadata-editor',
-  'references-editor',
-];
-
-describe('index.css contract', () => {
-  it('defines a style block for every component class used in the app', () => {
-    for (const cls of COMPONENT_CLASSES) {
-      const escaped = cls.replace(/[-.]/g, (c) => `\\${c}`);
-      expect(css, `missing style block for .${cls}`).toMatch(new RegExp(`\\.${escaped}\\s*\\{`));
-    }
+describe('index.css — no CSS cascade layers', () => {
+  it('contains zero @layer declarations or wrappers', () => {
+    // Matches @layer at the start of a line (not inside a comment or @import)
+    const layerDeclarations = css.match(/^@layer\s+/gm);
+    expect(layerDeclarations).toBeNull();
   });
 
-  it('scopes editor content styles to the manuscript editor container', () => {
-    expect(css).toMatch(/\.manuscript-editor\s*\{/);
-    const editorBlock = css.slice(css.indexOf('.manuscript-editor'));
-    expect(editorBlock).toMatch(/ProseMirror p\s*\{/);
-    expect(editorBlock).toMatch(/ProseMirror h1\s*\{/);
+  it('imports Crepe CSS without layer(...) parameter', () => {
+    const crepeImports = css.match(
+      /@import\s+["']@milkdown\/crepe\/theme\/[^"']+["']\s+layer\(/gm,
+    );
+    expect(crepeImports).toBeNull();
   });
 
-  it('makes the root wrapper the scroll viewport, not .milkdown', () => {
-    expect(css).toMatch(/\.manuscript-editor > \[data-milkdown-root\]\s*\{[^}]*overflow-y:\s*auto/);
-    // .milkdown must NOT have overflow-y
-    const milkdownBlock = css.slice(css.indexOf('.milkdown'));
-    expect(milkdownBlock).not.toMatch(/\.milkdown\s*\{[^}]*overflow-y/);
+  it('retains @import for Crepe common/style.css', () => {
+    expect(css).toContain('@import "@milkdown/crepe/theme/common/style.css"');
   });
 
-  it('constrains the editor to a reading-width column', () => {
-    expect(css).toMatch(/\.manuscript-editor \.editor\s*\{[^}]*max-width:\s*46rem/);
-  });
-
-  it('drops the app-level placeholder rule in favor of Crepe', () => {
-    expect(css).not.toContain('is-empty');
-  });
-
-  it('provides a heading scale for prose', () => {
-    expect(css).toMatch(/ProseMirror h2\s*\{/);
-  });
-
-  it('no longer styles removed workspace chrome', () => {
-    for (const cls of REMOVED_CHROME) {
-      expect(css, `still styles removed class ${cls}`).not.toContain(cls);
-    }
+  it('retains @import for Crepe classic.css', () => {
+    expect(css).toContain('@import "@milkdown/crepe/theme/classic.css"');
   });
 });
