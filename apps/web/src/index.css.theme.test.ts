@@ -51,3 +51,24 @@ describe('theme — no cascade layers', () => {
     expect(css).toContain('min-width: 0');
   });
 });
+
+describe('index.css — editor focus and blockquote styling', () => {
+  it('does not apply focus-visible outline to contenteditable elements', () => {
+    // The [contenteditable] selector must not appear in the focus-visible rule
+    const focusVisibleBlock = css.match(
+      /(?:button|textarea)[^}]*focus-visible[^}]*}/s,
+    );
+    if (focusVisibleBlock) {
+      expect(focusVisibleBlock[0]).not.toContain('[contenteditable');
+    }
+  });
+
+  it('does not apply border-left to blockquotes (avoids double border)', () => {
+    const blockquoteRule = css.match(
+      /\.manuscript-editor\s+\.ProseMirror\s+blockquote\s*\{[^}]+\}/,
+    );
+    expect(blockquoteRule).not.toBeNull();
+    expect(blockquoteRule![0]).not.toContain('border-l-4');
+    expect(blockquoteRule![0]).not.toContain('border-stone-300');
+  });
+});

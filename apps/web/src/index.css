@@ -80,8 +80,7 @@ body {
 }
 
 button,
-textarea,
-[contenteditable="true"] {
+textarea {
   @apply focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600;
 }
 
@@ -151,7 +150,7 @@ textarea,
 }
 
 .manuscript-editor .ProseMirror blockquote {
-  @apply my-4 border-l-4 border-stone-300 pl-4 text-stone-600;
+  @apply my-4 pl-4 text-stone-600;
 }
 
 .manuscript-editor .ProseMirror code {
