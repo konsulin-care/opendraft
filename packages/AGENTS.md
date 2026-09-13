@@ -8,7 +8,6 @@ Contains shared libraries used by apps/. Each package is independently importabl
 
 | Package | Purpose |
 |---------|---------|
-| editor | Manuscript editing interface components |
 | git | Browser-side Git operations (via isomorphic-git) |
 | github | GitHub API client, auth helpers |
 | metadata | YAML metadata parsing and validation |

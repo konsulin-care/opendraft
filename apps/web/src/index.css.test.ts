@@ -1,46 +1,29 @@
-// @vitest-environment node
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 
-const css = readFileSync(fileURLToPath(new URL('./index.css', import.meta.url)), 'utf8');
+const CSS_PATH = resolve(__dirname, 'index.css');
+const css = readFileSync(CSS_PATH, 'utf-8');
 
-const COMPONENT_CLASSES = [
-  'manuscript-page',
-  'manuscript-editor',
-  'block-rail',
-  'block-rail-drafts',
-  'rail-row',
-  'rail-title',
-  'draft-badge',
-  'dimmed',
-  'sidebar',
-  'workspace-content',
-  'metadata-editor',
-  'metadata-file',
-  'references-editor',
-  'commit-dialog-overlay',
-  'commit-dialog',
-  'commit-actions',
-  'commit-errors',
-];
-
-describe('index.css contract', () => {
-  it('defines a style block for every component class used in the app', () => {
-    for (const cls of COMPONENT_CLASSES) {
-      const escaped = cls.replace(/[-.]/g, (c) => `\\${c}`);
-      expect(css, `missing style block for .${cls}`).toMatch(new RegExp(`\\.${escaped}\\s*\\{`));
-    }
+describe('index.css — no CSS cascade layers', () => {
+  it('contains zero @layer declarations or wrappers', () => {
+    // Matches @layer at the start of a line (not inside a comment or @import)
+    const layerDeclarations = css.match(/^@layer\s+/gm);
+    expect(layerDeclarations).toBeNull();
   });
 
-  it('scopes editor content styles to the manuscript editor container', () => {
-    expect(css).toMatch(/\.manuscript-editor\s*\{/);
-    const editorBlock = css.slice(css.indexOf('.manuscript-editor'));
-    expect(editorBlock).toMatch(/ProseMirror p\s*\{/);
-    expect(editorBlock).toMatch(/ProseMirror h1\s*\{/);
+  it('imports Crepe CSS without layer(...) parameter', () => {
+    const crepeImports = css.match(
+      /@import\s+["']@milkdown\/crepe\/theme\/[^"']+["']\s+layer\(/gm,
+    );
+    expect(crepeImports).toBeNull();
   });
 
-  it('styles the editor placeholder', () => {
-    expect(css).toMatch(/data-placeholder/);
+  it('retains @import for Crepe common/style.css', () => {
+    expect(css).toContain('@import "@milkdown/crepe/theme/common/style.css"');
+  });
+
+  it('retains @import for Crepe classic.css', () => {
+    expect(css).toContain('@import "@milkdown/crepe/theme/classic.css"');
   });
 });

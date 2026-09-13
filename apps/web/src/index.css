@@ -1,200 +1,199 @@
-@import "tailwindcss";
+@import "@milkdown/crepe/theme/common/style.css";
+@import "@milkdown/crepe/theme/classic.css";
 
-@layer base {
-  body {
-    @apply bg-stone-100 text-stone-900 antialiased;
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-      "Helvetica Neue", Arial, sans-serif;
-  }
+/* ── Palette: monochrome + error red ── */
+.milkdown {
+  --crepe-color-background: #ffffff;
+  --crepe-color-on-background: #212529;
+  --crepe-color-surface: #ffffff;
+  --crepe-color-surface-low: #f8f9fa;
+  --crepe-color-on-surface: #212529;
+  --crepe-color-on-surface-variant: #6c757d;
+  --crepe-color-outline: #adb5bd;
+  --crepe-color-primary: #212529;
+  --crepe-color-secondary: #dee2e6;
+  --crepe-color-on-secondary: #212529;
+  --crepe-color-inverse: #343a40;
+  --crepe-color-on-inverse: #f8f9fa;
+  --crepe-color-hover: #e9ecef;
+  --crepe-color-selected: #dee2e6;
+  --crepe-color-inline-code: #495057;
+  --crepe-color-error: #dc3545;
+}
 
-  button,
-  textarea,
-  [contenteditable="true"] {
-    @apply focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600;
+/* ── Fonts ── */
+:root {
+  --crepe-font-default: 'Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --crepe-font-title: 'Source Serif 4', Georgia, serif;
+  --crepe-font-code: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+/* ── Responsive sizing ── */
+/* Small: < 640px — base 14px */
+@media (max-width: 639px) {
+  :root {
+    --crepe-base-font-size: 14px;
   }
 }
 
-@layer components {
-  /* App shell */
-  .manuscript-workspace {
-    @apply flex h-full min-h-0;
+/* Medium: 640px–1024px — base 16px */
+@media (min-width: 640px) and (max-width: 1023px) {
+  :root {
+    --crepe-base-font-size: 16px;
   }
+}
 
-  /* Sidebar navigation */
-  .sidebar {
-    @apply flex w-56 shrink-0 flex-col gap-2 border-r border-stone-300 bg-stone-50 p-4;
+/* Large: >= 1024px — base 18px */
+@media (min-width: 1024px) {
+  :root {
+    --crepe-base-font-size: 18px;
   }
+}
 
-  .sidebar h2 {
-    @apply mb-2 text-sm font-semibold tracking-wide text-stone-500 uppercase;
-  }
+/* ── Slash menu: fix padding + prevent horizontal scroll ── */
+.milkdown .milkdown-slash-menu {
+  max-width: 320px;
+}
 
-  .sidebar ul {
-    @apply flex flex-col gap-1;
-  }
+.milkdown .milkdown-slash-menu .tab-group {
+  padding-left: 16px;
+  padding-right: 16px;
+}
 
-  .sidebar li {
-    @apply cursor-pointer rounded-md px-3 py-2 text-sm;
-  }
+.milkdown .milkdown-slash-menu .menu-groups {
+  padding-left: 16px;
+  padding-right: 16px;
+}
 
-  .sidebar li:hover {
-    @apply bg-stone-200;
-  }
+.milkdown .milkdown-slash-menu .menu-groups .menu-group li {
+  min-width: 0;
+  padding-left: 16px;
+  padding-right: 16px;
+}
 
-  .sidebar li.active {
-    @apply bg-sky-100 font-medium text-sky-900;
-  }
+@import "tailwindcss";
 
-  /* Workspace main content */
-  .workspace-content {
-    @apply flex flex-1 min-w-0 gap-4 overflow-auto p-6;
-  }
+body {
+  @apply bg-stone-100 text-stone-900 antialiased;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+}
 
-  /* Manuscript page: rail + continuous editor */
-  .manuscript-page {
-    @apply flex w-full min-w-0 gap-4;
-  }
+button,
+textarea {
+  @apply focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600;
+}
 
-  /* Block rail */
-  .block-rail {
-    @apply w-60 shrink-0;
-  }
+/* outer fixed-height frame */
+.manuscript-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
 
-  .block-rail h3,
-  .block-rail h4 {
-    @apply mb-2 text-sm font-semibold tracking-wide text-stone-500 uppercase;
-  }
+/* scroll viewport — the root wrapper that @milkdown/react renders */
+.manuscript-editor > [data-milkdown-root] {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
 
-  .block-rail ul {
-    @apply flex flex-col gap-1;
-  }
+/* content surface — NOT the scroll container */
+.manuscript-editor > [data-milkdown-root] > .milkdown {
+  min-height: 100%;
+  overflow: visible;
+  position: relative;
+}
 
-  .block-rail li {
-    @apply list-none;
-  }
+/* reading-width column for prose */
+.manuscript-editor .editor {
+  max-width: 46rem;
+  margin-inline: auto;
+  padding: 2rem 1rem 4rem;
+}
 
-  .block-rail li.dimmed {
-    @apply opacity-40;
-  }
+.manuscript-editor .ProseMirror p {
+  @apply my-4 text-base leading-relaxed first:mt-0 last:mb-0;
+}
 
-  .rail-row {
-    @apply flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm;
-  }
+.manuscript-editor .ProseMirror h1 {
+  font-family: var(--crepe-font-title);
+  @apply mt-8 mb-4 text-3xl font-bold first:mt-0 last:mb-0;
+}
 
-  .rail-row:hover {
-    @apply bg-stone-200;
-  }
+.manuscript-editor .ProseMirror h2 {
+  font-family: var(--crepe-font-title);
+  @apply mt-8 mb-4 text-2xl font-semibold;
+}
 
-  .rail-title {
-    @apply min-w-0 truncate;
-  }
+.manuscript-editor .ProseMirror h3 {
+  font-family: var(--crepe-font-title);
+  @apply mt-6 mb-3 text-xl font-semibold;
+}
 
-  .draft-badge {
-    @apply rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800;
-  }
+.manuscript-editor .ProseMirror h4 {
+  font-family: var(--crepe-font-title);
+  @apply mt-6 mb-2 text-lg font-semibold;
+}
 
-  .block-rail-drafts {
-    @apply mt-4;
-  }
+.manuscript-editor .ProseMirror h5,
+.manuscript-editor .ProseMirror h6 {
+  font-family: var(--crepe-font-title);
+  @apply mt-4 mb-2 text-base font-semibold;
+}
 
-  /* Continuous manuscript editor */
-  .manuscript-editor {
-    @apply flex min-h-40 min-w-0 flex-1 flex-col text-base text-stone-900;
-  }
+.manuscript-editor .ProseMirror hr {
+  @apply my-6 border-stone-300;
+}
 
-  .manuscript-editor .ProseMirror {
-    @apply min-h-40;
-  }
+.manuscript-editor .ProseMirror blockquote {
+  @apply my-4 pl-4 text-stone-600;
+}
 
-  .manuscript-editor .ProseMirror p {
-    @apply my-4 text-base leading-relaxed first:mt-0 last:mb-0;
-  }
+.manuscript-editor .ProseMirror code {
+  @apply rounded bg-stone-200 px-1 py-0.5 font-mono text-sm;
+}
 
-  .manuscript-editor .ProseMirror h1 {
-    @apply mt-8 mb-4 text-3xl font-bold first:mt-0 last:mb-0;
-  }
+/* Commit dialog */
+.commit-dialog-overlay {
+  @apply fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4;
+}
 
-  .manuscript-editor .ProseMirror p.is-empty:first-child::before {
-    content: attr(data-placeholder);
-    @apply pointer-events-none float-left h-0 text-stone-400;
-  }
+.commit-dialog {
+  @apply flex w-full max-w-md flex-col gap-3 rounded-lg border border-stone-300 bg-white p-6 shadow-lg;
+}
 
-  /* Metadata editor */
-  .metadata-editor {
-    @apply flex flex-1 flex-col gap-4;
-  }
+.commit-dialog h2 {
+  @apply text-lg font-semibold;
+}
 
-  .metadata-editor h3 {
-    @apply mb-1 text-sm font-semibold tracking-wide text-stone-500 uppercase;
-  }
+.commit-dialog textarea {
+  @apply w-full rounded-md border border-stone-300 p-2 font-mono text-sm;
+}
 
-  .metadata-file {
-    @apply flex flex-col gap-1;
-  }
+.commit-errors {
+  @apply rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800;
+}
 
-  .metadata-file label {
-    @apply text-xs font-medium text-stone-500;
-  }
+.commit-errors p {
+  @apply font-medium;
+}
 
-  .metadata-editor textarea {
-    @apply min-h-24 w-full rounded-md border border-stone-300 bg-white p-2 font-mono text-sm;
-  }
+.commit-actions {
+  @apply flex justify-end gap-2;
+}
 
-  /* References editor */
-  .references-editor {
-    @apply flex flex-1 flex-col gap-2;
-  }
+.commit-actions button {
+  @apply rounded-md border border-stone-300 px-4 py-2 text-sm;
+}
 
-  .references-editor h3 {
-    @apply mb-1 text-sm font-semibold tracking-wide text-stone-500 uppercase;
-  }
+.commit-actions button:not(:disabled):hover {
+  @apply bg-stone-100;
+}
 
-  .references-editor label {
-    @apply text-xs font-medium text-stone-500;
-  }
-
-  .references-editor textarea {
-    @apply min-h-48 w-full flex-1 rounded-md border border-stone-300 bg-white p-2 font-mono text-sm;
-  }
-
-  /* Commit dialog */
-  .commit-dialog-overlay {
-    @apply fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4;
-  }
-
-  .commit-dialog {
-    @apply flex w-full max-w-md flex-col gap-3 rounded-lg border border-stone-300 bg-white p-6 shadow-lg;
-  }
-
-  .commit-dialog h2 {
-    @apply text-lg font-semibold;
-  }
-
-  .commit-dialog textarea {
-    @apply w-full rounded-md border border-stone-300 p-2 font-mono text-sm;
-  }
-
-  .commit-errors {
-    @apply rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800;
-  }
-
-  .commit-errors p {
-    @apply font-medium;
-  }
-
-  .commit-actions {
-    @apply flex justify-end gap-2;
-  }
-
-  .commit-actions button {
-    @apply rounded-md border border-stone-300 px-4 py-2 text-sm;
-  }
-
-  .commit-actions button:not(:disabled):hover {
-    @apply bg-stone-100;
-  }
-
-  .commit-actions button:disabled {
-    @apply cursor-not-allowed opacity-50;
-  }
+.commit-actions button:disabled {
+  @apply cursor-not-allowed opacity-50;
 }
