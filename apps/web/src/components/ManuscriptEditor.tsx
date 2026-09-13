@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Crepe } from '@milkdown/crepe';
 import { Milkdown, useEditor } from '@milkdown/react';
 import { editorViewCtx, type Editor } from '@milkdown/kit/core';
 import { listenerCtx } from '@milkdown/kit/plugin/listener';
-import { getMarkdown } from '@milkdown/kit/utils';
+import { getMarkdown, replaceAll } from '@milkdown/kit/utils';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { saveManuscript } from '../persistence';
 import { pickPlaceholderHint } from '../placeholder';
+import { SourceEditor, type SourceEditorHandle } from './SourceEditor';
 
 /** Imperative handle exposed for tests and external tools. */
 export interface EditorTestApi {
@@ -14,6 +15,10 @@ export interface EditorTestApi {
   insertText(text: string): void;
   /** Current markdown as seen by the editor. */
   getMarkdown(): string;
+  /** Replace the entire editor content with new markdown. */
+  setMarkdown(markdown: string): void;
+  /** Switch between wysiwyg and source mode. */
+  setMode(mode: 'wysiwyg' | 'source'): void;
 }
 
 interface ManuscriptEditorProps {
@@ -23,12 +28,17 @@ interface ManuscriptEditorProps {
   defaultValue: string;
   /** Called once the editor instance is ready. */
   onEditorReady?: (api: EditorTestApi) => void;
+  /** Editing mode: 'wysiwyg' (default) or 'source' (raw markdown). */
+  mode?: 'wysiwyg' | 'source';
 }
 
 const SAVE_DEBOUNCE_MS = 800;
 
 /** Build the imperative test/external API around a milkdown editor. */
-function createTestApi(editor: Editor): EditorTestApi {
+function createTestApi(
+  editor: Editor,
+  syncContent: (mode: 'wysiwyg' | 'source') => void,
+): EditorTestApi {
   return {
     insertText: (text) => {
       editor.action((ctx) => {
@@ -38,6 +48,8 @@ function createTestApi(editor: Editor): EditorTestApi {
       });
     },
     getMarkdown: () => editor.action(getMarkdown()),
+    setMarkdown: (markdown) => editor.action(replaceAll(markdown)),
+    setMode: syncContent,
   };
 }
 
@@ -67,27 +79,59 @@ function debouncedSaver(workspace: WorkspaceAdapter) {
   return { schedule, flush };
 }
 
-/**
- * Continuous whole-manuscript editor: one Milkdown/Crepe surface over
- * plain markdown, autosaved to a single workspace file.
- *
- * @param props - Workspace adapter, initial markdown, optional ready callback.
- */
-export function ManuscriptEditor({ workspace, defaultValue, onEditorReady }: ManuscriptEditorProps) {
+/** Create the Crepe configuration for the editor. */
+function createCrepeConfig(root: HTMLElement, defaultValue: string, placeholderText: string) {
+  return new Crepe({
+    root,
+    defaultValue,
+    features: {
+      [Crepe.Feature.TopBar]: false,
+      [Crepe.Feature.AI]: false,
+    },
+    featureConfigs: {
+      [Crepe.Feature.Placeholder]: { text: placeholderText, mode: 'block' },
+    },
+  });
+}
+
+/** Hook that creates the content sync callback for mode switching. */
+function useContentSync(
+  editorRef: React.MutableRefObject<Editor | null>,
+  prevModeRef: React.MutableRefObject<'wysiwyg' | 'source'>,
+  sourceMarkdown: string,
+  setSourceMarkdown: (md: string) => void,
+) {
+  return useCallback(
+    (newMode: 'wysiwyg' | 'source') => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      if (newMode === 'wysiwyg' && prevModeRef.current === 'source') {
+        editor.action(replaceAll(sourceMarkdown));
+      } else if (newMode === 'source' && prevModeRef.current === 'wysiwyg') {
+        setSourceMarkdown(editor.action(getMarkdown()));
+      }
+      prevModeRef.current = newMode;
+    },
+    [sourceMarkdown],
+  );
+}
+
+/** Hook that wires up the Crepe editor, autosave, and mode sync. */
+function useManuscriptState(
+  workspace: WorkspaceAdapter,
+  defaultValue: string,
+  mode: 'wysiwyg' | 'source',
+  onEditorReady?: (api: EditorTestApi) => void,
+) {
   const placeholderText = useMemo(pickPlaceholderHint, []);
+  const [sourceMarkdown, setSourceMarkdown] = useState(defaultValue);
+  const sourceEditorRef = useRef<SourceEditorHandle | null>(null);
+  const editorRef = useRef<Editor | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const prevModeRef = useRef<'wysiwyg' | 'source'>(mode);
+
   const { loading, get } = useEditor(
-    (root) =>
-      new Crepe({
-        root,
-        defaultValue,
-        features: {
-          [Crepe.Feature.TopBar]: false,
-          [Crepe.Feature.AI]: false,
-        },
-        featureConfigs: {
-          [Crepe.Feature.Placeholder]: { text: placeholderText, mode: 'block' },
-        },
-      }),
+    (root) => createCrepeConfig(root, defaultValue, placeholderText),
     [defaultValue],
   );
 
@@ -95,28 +139,90 @@ export function ManuscriptEditor({ workspace, defaultValue, onEditorReady }: Man
   if (!saverRef.current) saverRef.current = debouncedSaver(workspace);
   const wiredRef = useRef(false);
 
+  const syncContent = useContentSync(editorRef, prevModeRef, sourceMarkdown, setSourceMarkdown);
+
   useEffect(() => {
     if (wiredRef.current) return;
     const editor = get();
     if (!editor) return;
     wiredRef.current = true;
-
+    editorRef.current = editor;
     const saver = saverRef.current!;
     editor.action((ctx) => {
       const listener = ctx.get(listenerCtx);
       listener.markdownUpdated((_ctx, markdown) => saver.schedule(markdown));
     });
-    onEditorReady?.(createTestApi(editor));
-  }, [loading, get, onEditorReady, workspace]);
+    onEditorReady?.(createTestApi(editor, syncContent));
+  }, [loading, get, onEditorReady, workspace, syncContent]);
 
   useEffect(() => {
     const saver = saverRef.current;
     return () => saver?.flush();
   }, []);
 
+  return { sourceMarkdown, setSourceMarkdown, sourceEditorRef, scrollContainerRef };
+}
+
+interface EditorSurfaceProps {
+  mode: 'wysiwyg' | 'source';
+  sourceMarkdown: string;
+  onSourceChange: (md: string) => void;
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>;
+  sourceEditorRef: React.RefObject<SourceEditorHandle | null>;
+}
+
+/** Renders either the Crepe WYSIWYG surface or the CodeMirror source editor. */
+function EditorSurface({
+  mode,
+  sourceMarkdown,
+  onSourceChange,
+  scrollContainerRef,
+  sourceEditorRef,
+}: EditorSurfaceProps) {
   return (
     <div className="manuscript-editor" data-testid="manuscript-editor">
-      <Milkdown />
+      <div
+        ref={scrollContainerRef}
+        style={{
+          display: mode === 'wysiwyg' ? 'block' : 'none',
+          height: '100%',
+          overflow: 'auto',
+        }}
+      >
+        <Milkdown />
+      </div>
+      {mode === 'source' && (
+        <SourceEditor
+          ref={sourceEditorRef}
+          value={sourceMarkdown}
+          onChange={onSourceChange}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * Continuous whole-manuscript editor: one Milkdown/Crepe surface over
+ * plain markdown, autosaved to a single workspace file.
+ * Supports toggling between WYSIWYG and raw source editing.
+ */
+export function ManuscriptEditor({
+  workspace,
+  defaultValue,
+  onEditorReady,
+  mode = 'wysiwyg',
+}: ManuscriptEditorProps) {
+  const { sourceMarkdown, setSourceMarkdown, sourceEditorRef, scrollContainerRef } =
+    useManuscriptState(workspace, defaultValue, mode, onEditorReady);
+
+  return (
+    <EditorSurface
+      mode={mode}
+      sourceMarkdown={sourceMarkdown}
+      onSourceChange={setSourceMarkdown}
+      scrollContainerRef={scrollContainerRef}
+      sourceEditorRef={sourceEditorRef}
+    />
   );
 }

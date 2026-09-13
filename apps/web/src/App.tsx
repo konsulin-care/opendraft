@@ -1,10 +1,30 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { MilkdownProvider } from '@milkdown/react';
 import { IndexedDBWorkspace } from '@opendraft/workspace';
 import { ManuscriptEditor } from './components/ManuscriptEditor';
 import { CommitDialog } from './components/CommitDialog';
 import { seedWorkspace } from './seed';
 import { loadManuscript } from './persistence';
+
+interface HeaderProps {
+  mode: 'wysiwyg' | 'source';
+  onToggleMode: () => void;
+  onCommit: () => void;
+}
+
+function Header({ mode, onToggleMode, onCommit }: HeaderProps) {
+  return (
+    <header style={{ padding: '1rem', borderBottom: '1px solid #ccc', display: 'flex', justifyContent: 'space-between' }}>
+      <h1>OpenDraft</h1>
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        <button onClick={onToggleMode}>
+          {mode === 'wysiwyg' ? 'Source' : 'Visual'}
+        </button>
+        <button onClick={onCommit}>Commit</button>
+      </div>
+    </header>
+  );
+}
 
 const WORKSPACE_ID = 'opendraft-manuscript';
 
@@ -16,6 +36,10 @@ export function App() {
   const [workspace, setWorkspace] = useState<IndexedDBWorkspace | null>(null);
   const [markdown, setMarkdown] = useState<string | null>(null);
   const [showCommitDialog, setShowCommitDialog] = useState(false);
+  const [mode, setMode] = useState<'wysiwyg' | 'source'>('wysiwyg');
+  const toggleMode = useCallback(() => {
+    setMode((prev) => (prev === 'wysiwyg' ? 'source' : 'wysiwyg'));
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -43,13 +67,10 @@ export function App() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <header style={{ padding: '1rem', borderBottom: '1px solid #ccc', display: 'flex', justifyContent: 'space-between' }}>
-        <h1>OpenDraft</h1>
-        <button onClick={() => setShowCommitDialog(true)}>Commit</button>
-      </header>
+      <Header mode={mode} onToggleMode={toggleMode} onCommit={() => setShowCommitDialog(true)} />
       <main style={{ flex: 1, overflow: 'hidden' }}>
         <MilkdownProvider>
-          <ManuscriptEditor workspace={workspace} defaultValue={markdown} />
+          <ManuscriptEditor workspace={workspace} defaultValue={markdown} mode={mode} />
         </MilkdownProvider>
       </main>
       <CommitDialog
