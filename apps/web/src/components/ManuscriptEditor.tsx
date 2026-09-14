@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { EditorView } from '@codemirror/view';
 import { Crepe } from '@milkdown/crepe';
 import { Milkdown, useEditor } from '@milkdown/react';
 import { editorViewCtx, type Editor } from '@milkdown/kit/core';
@@ -8,6 +9,17 @@ import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { saveManuscript } from '../persistence';
 import { pickPlaceholderHint } from '../placeholder';
 import { SourceEditor, type SourceEditorHandle } from './SourceEditor';
+
+/**
+ * CodeMirror theme for code blocks: light yellow active line and selection
+ * to match the light Crepe palette.
+ */
+const lightCodeBlockTheme = EditorView.theme({
+  '.cm-activeLine': { backgroundColor: '#fef9c3' },
+  '.cm-activeLineGutter': { backgroundColor: '#fef9c3' },
+  '.cm-selectionBackground': { backgroundColor: '#fef9c3' },
+  '.cm-focused .cm-selectionBackground': { backgroundColor: '#fef9c3' },
+});
 
 /** Imperative handle exposed for tests and external tools. */
 export interface EditorTestApi {
@@ -90,6 +102,7 @@ function createCrepeConfig(root: HTMLElement, defaultValue: string, placeholderT
     },
     featureConfigs: {
       [Crepe.Feature.Placeholder]: { text: placeholderText, mode: 'block' },
+      [Crepe.Feature.CodeMirror]: { theme: lightCodeBlockTheme },
     },
   });
 }

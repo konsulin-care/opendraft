@@ -35,3 +35,39 @@ describe('ManuscriptEditor crepe theme integration', () => {
     expect(source).toContain('pickPlaceholderHint');
   });
 });
+
+describe('ManuscriptEditor — light code block theme', () => {
+  it('imports EditorView from @codemirror/view', () => {
+    expect(source).toMatch(/EditorView.*from\s+['"]@codemirror\/view['"]|@codemirror\/view.*EditorView/);
+  });
+
+  it('defines a lightCodeBlockTheme via EditorView.theme()', () => {
+    expect(source).toMatch(/lightCodeBlockTheme\s*=\s*EditorView\.theme\(/);
+  });
+
+  it('sets cm-activeLine background to light yellow (#fef9c3)', () => {
+    expect(source).toContain("'.cm-activeLine'");
+    expect(source).toContain('backgroundColor');
+    expect(source).toContain('#fef9c3');
+  });
+
+  it('sets cm-activeLineGutter background to light yellow (#fef9c3)', () => {
+    expect(source).toContain("'.cm-activeLineGutter'");
+    expect(source).toContain('#fef9c3');
+  });
+
+  it('sets cm-selectionBackground background to light yellow (#fef9c3)', () => {
+    expect(source).toContain("'.cm-selectionBackground'");
+    expect(source).toContain('#fef9c3');
+  });
+
+  it('overrides focused selection background to light yellow (#fef9c3)', () => {
+    expect(source).toContain("'.cm-focused .cm-selectionBackground'");
+    expect(source).toContain('#fef9c3');
+  });
+
+  it('wires the theme into the CodeMirror feature config', () => {
+    expect(source).toContain('Crepe.Feature.CodeMirror');
+    expect(source).toContain('theme: lightCodeBlockTheme');
+  });
+});
