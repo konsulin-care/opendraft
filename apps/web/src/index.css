@@ -89,6 +89,14 @@
   fill: var(--crepe-color-outline);
 }
 
+/* ── Quarto chunk option lines ── */
+/* Lines starting with #| in code blocks are Quarto chunk options.
+   They should be slightly more visible than regular comments (#9ca3af)
+   but still muted. */
+.quarto-chunk-option {
+  color: #6b7280;
+}
+
 /* ── Slash menu: fix padding + prevent horizontal scroll ── */
 .milkdown .milkdown-slash-menu {
   max-width: 320px;

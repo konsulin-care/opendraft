@@ -2,13 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { EditorView } from '@codemirror/view';
 import { Crepe } from '@milkdown/crepe';
 import { Milkdown, useEditor } from '@milkdown/react';
-import { editorViewCtx, prosePluginsCtx, type Editor } from '@milkdown/kit/core';
+import { editorViewCtx, prosePluginsCtx, remarkPluginsCtx, type Editor } from '@milkdown/kit/core';
 import { listenerCtx } from '@milkdown/kit/plugin/listener';
 import { getMarkdown, replaceAll } from '@milkdown/kit/utils';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { saveManuscript } from '../persistence';
 import { PLACEHOLDER_HINT } from '../placeholder';
 import { createBlockGutterPlugin } from '../block-handle-gutter';
+import { quartoRemarkPlugin, quartoInlineCodePlugin, quartoChunkOptionPlugin } from '../quarto-syntax';
 import { SourceEditor, type SourceEditorHandle } from './SourceEditor';
 
 /**
@@ -103,7 +104,10 @@ function createCrepeConfig(root: HTMLElement, defaultValue: string, placeholderT
     },
     featureConfigs: {
       [Crepe.Feature.Placeholder]: { text: placeholderText, mode: 'block' },
-      [Crepe.Feature.CodeMirror]: { theme: lightCodeBlockTheme },
+      [Crepe.Feature.CodeMirror]: {
+        theme: lightCodeBlockTheme,
+        extensions: [quartoChunkOptionPlugin],
+      },
       [Crepe.Feature.BlockEdit]: {
         blockHandle: {
           shouldShow: () => false,
@@ -148,6 +152,13 @@ function wireEditor(
   });
   editor.action((ctx) => {
     ctx.update(prosePluginsCtx, (ps) => [...ps, createBlockGutterPlugin()]);
+  });
+  editor.action((ctx) => {
+    ctx.update(remarkPluginsCtx, (ps) => [
+      quartoRemarkPlugin,
+      quartoInlineCodePlugin,
+      ...ps,
+    ]);
   });
   onEditorReady?.(createTestApi(editor, syncContent));
 }
