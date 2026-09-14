@@ -91,6 +91,7 @@ textarea {
   height: 100%;
   min-height: 0;
   overflow: hidden;
+  background-color: white;
 }
 
 /* scroll viewport — the root wrapper that @milkdown/react renders */

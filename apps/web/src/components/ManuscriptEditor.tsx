@@ -141,6 +141,11 @@ function useManuscriptState(
 
   const syncContent = useContentSync(editorRef, prevModeRef, sourceMarkdown, setSourceMarkdown);
 
+  // Sync content when mode changes
+  useEffect(() => {
+    syncContent(mode);
+  }, [mode, syncContent]);
+
   useEffect(() => {
     if (wiredRef.current) return;
     const editor = get();
@@ -191,13 +196,19 @@ function EditorSurface({
       >
         <Milkdown />
       </div>
-      {mode === 'source' && (
+      <div
+        style={{
+          display: mode === 'source' ? 'block' : 'none',
+          height: '100%',
+          overflow: 'auto',
+        }}
+      >
         <SourceEditor
           ref={sourceEditorRef}
           value={sourceMarkdown}
           onChange={onSourceChange}
         />
-      )}
+      </div>
     </div>
   );
 }
