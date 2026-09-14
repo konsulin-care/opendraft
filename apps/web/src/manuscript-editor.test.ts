@@ -39,8 +39,12 @@ describe('ManuscriptEditor crepe theme integration', () => {
   it('configures block handle at content edge', () => {
     expect(source).toContain('Crepe.Feature.BlockEdit');
     expect(source).toContain('blockHandle');
-    expect(source).toContain('getOffset: () => 0');
-    expect(source).toContain("getPlacement: () => 'left-start'");
+    expect(source).toContain('shouldShow: () => false');
+  });
+
+  it('imports and registers the block-gutter plugin', () => {
+    expect(source).toContain('block-handle-gutter');
+    expect(source).toContain('createBlockGutterPlugin');
   });
 });
 

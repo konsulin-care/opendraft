@@ -2,12 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { EditorView } from '@codemirror/view';
 import { Crepe } from '@milkdown/crepe';
 import { Milkdown, useEditor } from '@milkdown/react';
-import { editorViewCtx, type Editor } from '@milkdown/kit/core';
+import { editorViewCtx, prosePluginsCtx, type Editor } from '@milkdown/kit/core';
 import { listenerCtx } from '@milkdown/kit/plugin/listener';
 import { getMarkdown, replaceAll } from '@milkdown/kit/utils';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { saveManuscript } from '../persistence';
 import { PLACEHOLDER_HINT } from '../placeholder';
+import { createBlockGutterPlugin } from '../block-handle-gutter';
 import { SourceEditor, type SourceEditorHandle } from './SourceEditor';
 
 /**
@@ -105,8 +106,7 @@ function createCrepeConfig(root: HTMLElement, defaultValue: string, placeholderT
       [Crepe.Feature.CodeMirror]: { theme: lightCodeBlockTheme },
       [Crepe.Feature.BlockEdit]: {
         blockHandle: {
-          getOffset: () => 0,
-          getPlacement: () => 'left-start',
+          shouldShow: () => false,
         },
       },
     },
@@ -133,6 +133,23 @@ function useContentSync(
     },
     [sourceMarkdown],
   );
+}
+
+/** Wire autosave listener and custom plugins into the Crepe editor. */
+function wireEditor(
+  editor: Editor,
+  saver: ReturnType<typeof debouncedSaver>,
+  syncContent: (mode: 'wysiwyg' | 'source') => void,
+  onEditorReady?: (api: EditorTestApi) => void,
+): void {
+  editor.action((ctx) => {
+    const listener = ctx.get(listenerCtx);
+    listener.markdownUpdated((_ctx, markdown) => saver.schedule(markdown));
+  });
+  editor.action((ctx) => {
+    ctx.update(prosePluginsCtx, (ps) => [...ps, createBlockGutterPlugin()]);
+  });
+  onEditorReady?.(createTestApi(editor, syncContent));
 }
 
 /** Hook that wires up the Crepe editor, autosave, and mode sync. */
@@ -171,12 +188,7 @@ function useManuscriptState(
     if (!editor) return;
     wiredRef.current = true;
     editorRef.current = editor;
-    const saver = saverRef.current!;
-    editor.action((ctx) => {
-      const listener = ctx.get(listenerCtx);
-      listener.markdownUpdated((_ctx, markdown) => saver.schedule(markdown));
-    });
-    onEditorReady?.(createTestApi(editor, syncContent));
+    wireEditor(editor, saverRef.current!, syncContent, onEditorReady);
   }, [loading, get, onEditorReady, workspace, syncContent]);
 
   useEffect(() => {
