@@ -78,6 +78,11 @@ describe('block-handle-gutter drag and selection', () => {
     expect(source).toContain('pointermove');
   });
 
+  it('only repositions handle when the active block changes', () => {
+    // handlePointerMove should guard on lastActivePos before calling positionHandle
+    expect(source).toMatch(/lastActivePos\s*!==\s*activeBlock\s*\.\s*\$pos\s*\.\s*pos/);
+  });
+
   it('removes gutter and handle elements on destroy', () => {
     expect(source).toContain('destroy');
     expect(source).toContain('remove');

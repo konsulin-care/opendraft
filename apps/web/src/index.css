@@ -50,6 +50,11 @@
   }
 }
 
+/* ── Hide stock Crepe block handle (we use custom gutter handle) ── */
+.milkdown-block-handle {
+  display: none !important;
+}
+
 /* ── Block gutter handle ── */
 /* The gutter container is positioned absolutely within .milkdown, holding the drag handle. */
 .block-gutter-container {

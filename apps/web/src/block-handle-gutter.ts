@@ -115,8 +115,10 @@ function handlePointerMove(
   if (!pos) return false;
   const activeBlock = findBlockAtPos(view, view.state.doc.resolve(pos.inside));
   if (!activeBlock) return false;
-  state.lastActivePos = activeBlock.$pos.pos;
-  positionHandle(handleEl, activeBlock, view.dom);
+  if (state.lastActivePos !== activeBlock.$pos.pos) {
+    state.lastActivePos = activeBlock.$pos.pos;
+    positionHandle(handleEl, activeBlock, view.dom);
+  }
   return false;
 }
 

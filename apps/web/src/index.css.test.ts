@@ -5,9 +5,8 @@ import { resolve } from 'path';
 const CSS_PATH = resolve(__dirname, 'index.css');
 const css = readFileSync(CSS_PATH, 'utf-8');
 
-describe('index.css — block handle styling', () => {
+describe('index.css — imports and layers', () => {
   it('contains zero @layer declarations or wrappers', () => {
-    // Matches @layer at the start of a line (not inside a comment or @import)
     const layerDeclarations = css.match(/^@layer\s+/gm);
     expect(layerDeclarations).toBeNull();
   });
@@ -26,12 +25,20 @@ describe('index.css — block handle styling', () => {
   it('retains @import for Crepe classic.css', () => {
     expect(css).toContain('@import "@milkdown/crepe/theme/classic.css"');
   });
+});
 
+describe('index.css — stock block handle', () => {
   it('does not contain old milkdown-block-handle styles', () => {
     expect(css).not.toContain('.milkdown-block-handle .operation-item:first-child');
     expect(css).not.toContain(".milkdown .milkdown-block-handle[data-show='false']");
   });
 
+  it('hides the stock milkdown-block-handle via display none', () => {
+    expect(css).toMatch(/\.milkdown-block-handle\s*\{[^}]*display:\s*none\s*!important/);
+  });
+});
+
+describe('index.css — custom gutter handle', () => {
   it('styles the block-gutter-container', () => {
     expect(css).toContain('.block-gutter-container');
     expect(css).toContain('position: absolute');
