@@ -50,6 +50,21 @@
   }
 }
 
+/* ── Block handle: hide slash button, always show drag handle ── */
+/* Hide the add-block button (first operation-item) in the block handle.
+   Slash menu is triggered by typing "/" instead. */
+.milkdown-block-handle .operation-item:first-child {
+  display: none;
+}
+
+/* Override Crepe's default hide behavior. When the handle has been
+   positioned (has inline left/top from computePosition), show it.
+   This makes it visible for the active block as a visual indicator. */
+.milkdown .milkdown-block-handle[data-show='false'] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 /* ── Slash menu: fix padding + prevent horizontal scroll ── */
 .milkdown .milkdown-slash-menu {
   max-width: 320px;

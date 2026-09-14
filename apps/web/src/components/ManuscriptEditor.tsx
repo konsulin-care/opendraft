@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { EditorView } from '@codemirror/view';
 import { Crepe } from '@milkdown/crepe';
 import { Milkdown, useEditor } from '@milkdown/react';
@@ -7,7 +7,7 @@ import { listenerCtx } from '@milkdown/kit/plugin/listener';
 import { getMarkdown, replaceAll } from '@milkdown/kit/utils';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { saveManuscript } from '../persistence';
-import { pickPlaceholderHint } from '../placeholder';
+import { PLACEHOLDER_HINT } from '../placeholder';
 import { SourceEditor, type SourceEditorHandle } from './SourceEditor';
 
 /**
@@ -103,6 +103,12 @@ function createCrepeConfig(root: HTMLElement, defaultValue: string, placeholderT
     featureConfigs: {
       [Crepe.Feature.Placeholder]: { text: placeholderText, mode: 'block' },
       [Crepe.Feature.CodeMirror]: { theme: lightCodeBlockTheme },
+      [Crepe.Feature.BlockEdit]: {
+        blockHandle: {
+          getOffset: () => 0,
+          getPlacement: () => 'left-start',
+        },
+      },
     },
   });
 }
@@ -136,7 +142,7 @@ function useManuscriptState(
   mode: 'wysiwyg' | 'source',
   onEditorReady?: (api: EditorTestApi) => void,
 ) {
-  const placeholderText = useMemo(pickPlaceholderHint, []);
+  const placeholderText = PLACEHOLDER_HINT;
   const [sourceMarkdown, setSourceMarkdown] = useState(defaultValue);
   const sourceEditorRef = useRef<SourceEditorHandle | null>(null);
   const editorRef = useRef<Editor | null>(null);

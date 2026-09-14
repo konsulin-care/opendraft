@@ -30,9 +30,17 @@ describe('ManuscriptEditor crepe theme integration', () => {
     expect(css).toContain('@milkdown/crepe/theme/classic.css');
   });
 
-  it('configures a random uplifting placeholder feature', () => {
+  it('configures a static placeholder feature', () => {
     expect(source).toContain('Crepe.Feature.Placeholder');
-    expect(source).toContain('pickPlaceholderHint');
+    expect(source).toContain('PLACEHOLDER_HINT');
+    expect(source).not.toContain('pickPlaceholderHint');
+  });
+
+  it('configures block handle at content edge', () => {
+    expect(source).toContain('Crepe.Feature.BlockEdit');
+    expect(source).toContain('blockHandle');
+    expect(source).toContain('getOffset: () => 0');
+    expect(source).toContain("getPlacement: () => 'left-start'");
   });
 });
 
