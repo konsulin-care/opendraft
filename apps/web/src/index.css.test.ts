@@ -27,14 +27,31 @@ describe('index.css — block handle styling', () => {
     expect(css).toContain('@import "@milkdown/crepe/theme/classic.css"');
   });
 
-  it('hides the slash command button (first operation-item) in block handle', () => {
-    expect(css).toContain('.milkdown-block-handle .operation-item:first-child');
-    expect(css).toContain('display: none');
+  it('does not contain old milkdown-block-handle styles', () => {
+    expect(css).not.toContain('.milkdown-block-handle .operation-item:first-child');
+    expect(css).not.toContain(".milkdown .milkdown-block-handle[data-show='false']");
   });
 
-  it('keeps the drag handle visible when data-show is false', () => {
-    expect(css).toContain(".milkdown .milkdown-block-handle[data-show='false']");
-    expect(css).toContain('opacity: 1');
+  it('styles the block-gutter-container', () => {
+    expect(css).toContain('.block-gutter-container');
+    expect(css).toContain('position: absolute');
+    expect(css).toContain('pointer-events: none');
+  });
+
+  it('styles the block-gutter-handle', () => {
+    expect(css).toContain('.block-gutter-handle');
+    expect(css).toContain('cursor: grab');
     expect(css).toContain('pointer-events: auto');
+    expect(css).toContain('opacity: 0');
+    expect(css).toContain('transition: opacity 0.15s');
+  });
+
+  it('shows the block-gutter-handle when data-show is true', () => {
+    expect(css).toContain('.block-gutter-handle[data-show="true"]');
+    expect(css).toContain('opacity: 1');
+  });
+
+  it('adds left padding to editor for gutter space', () => {
+    expect(css).toContain('padding: 2rem 1rem 4rem 3rem');
   });
 });

@@ -50,19 +50,43 @@
   }
 }
 
-/* ── Block handle: hide slash button, always show drag handle ── */
-/* Hide the add-block button (first operation-item) in the block handle.
-   Slash menu is triggered by typing "/" instead. */
-.milkdown-block-handle .operation-item:first-child {
-  display: none;
+/* ── Block gutter handle ── */
+/* The gutter container is positioned absolutely within .milkdown, holding the drag handle. */
+.block-gutter-container {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 40px;
+  pointer-events: none;
 }
 
-/* Override Crepe's default hide behavior. When the handle has been
-   positioned (has inline left/top from computePosition), show it.
-   This makes it visible for the active block as a visual indicator. */
-.milkdown .milkdown-block-handle[data-show='false'] {
-  opacity: 1;
+/* The draggable six-dot handle, vertically centered on the active block. */
+.block-gutter-handle {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  border-radius: 4px;
   pointer-events: auto;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.block-gutter-handle[data-show="true"] {
+  opacity: 1;
+}
+
+.block-gutter-handle:hover {
+  background: var(--crepe-color-hover);
+}
+
+.block-gutter-handle svg {
+  width: 24px;
+  height: 24px;
+  fill: var(--crepe-color-outline);
 }
 
 /* ── Slash menu: fix padding + prevent horizontal scroll ── */
@@ -128,7 +152,7 @@ textarea {
 .manuscript-editor .editor {
   max-width: 46rem;
   margin-inline: auto;
-  padding: 2rem 1rem 4rem;
+  padding: 2rem 1rem 4rem 3rem;
 }
 
 .manuscript-editor .ProseMirror p {
