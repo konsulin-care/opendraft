@@ -48,6 +48,22 @@ describe('ManuscriptEditor crepe theme integration', () => {
   });
 });
 
+describe('ManuscriptEditor — gutter plugin registration', () => {
+  it('imports $prose from @milkdown/kit/utils', () => {
+    expect(source).toContain('$prose');
+    expect(source).toMatch(/\$prose.*from\s+['"]@milkdown\/kit\/utils['"]|@milkdown\/kit\/utils.*\$prose/);
+  });
+
+  it('registers gutter plugin via crepe.addFeature() before create()', () => {
+    expect(source).toContain('crepe.addFeature');
+    expect(source).toContain('$prose(() => createBlockGutterPlugin())');
+  });
+
+  it('does not import or use prosePluginsCtx (gutter registered via addFeature)', () => {
+    expect(source).not.toContain('prosePluginsCtx');
+  });
+});
+
 describe('ManuscriptEditor — light code block theme', () => {
   it('imports EditorView from @codemirror/view', () => {
     expect(source).toMatch(/EditorView.*from\s+['"]@codemirror\/view['"]|@codemirror\/view.*EditorView/);

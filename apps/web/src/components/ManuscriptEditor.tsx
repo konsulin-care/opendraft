@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { EditorView } from '@codemirror/view';
 import { Crepe } from '@milkdown/crepe';
 import { Milkdown, useEditor } from '@milkdown/react';
-import { editorViewCtx, prosePluginsCtx, remarkPluginsCtx, type Editor } from '@milkdown/kit/core';
+import { editorViewCtx, remarkPluginsCtx, type Editor } from '@milkdown/kit/core';
 import { listenerCtx } from '@milkdown/kit/plugin/listener';
-import { getMarkdown, replaceAll } from '@milkdown/kit/utils';
+import { $prose, getMarkdown, replaceAll } from '@milkdown/kit/utils';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { saveManuscript } from '../persistence';
 import { PLACEHOLDER_HINT } from '../placeholder';
@@ -95,7 +95,7 @@ function debouncedSaver(workspace: WorkspaceAdapter) {
 
 /** Create the Crepe configuration for the editor. */
 function createCrepeConfig(root: HTMLElement, defaultValue: string, placeholderText: string) {
-  return new Crepe({
+  const crepe = new Crepe({
     root,
     defaultValue,
     features: {
@@ -115,6 +115,10 @@ function createCrepeConfig(root: HTMLElement, defaultValue: string, placeholderT
       },
     },
   });
+  crepe.addFeature((editor) => {
+    editor.use($prose(() => createBlockGutterPlugin()));
+  });
+  return crepe;
 }
 
 /** Hook that creates the content sync callback for mode switching. */
@@ -149,9 +153,6 @@ function wireEditor(
   editor.action((ctx) => {
     const listener = ctx.get(listenerCtx);
     listener.markdownUpdated((_ctx, markdown) => saver.schedule(markdown));
-  });
-  editor.action((ctx) => {
-    ctx.update(prosePluginsCtx, (ps) => [...ps, createBlockGutterPlugin()]);
   });
   editor.action((ctx) => {
     ctx.update(remarkPluginsCtx, (ps) => [
