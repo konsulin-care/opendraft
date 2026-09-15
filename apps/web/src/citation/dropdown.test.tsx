@@ -29,40 +29,49 @@ function createOpenState(overrides?: Partial<CitationState>): CitationState {
   };
 }
 
-describe('CitationDropdown', () => {
+describe('CitationDropdown — rendering', () => {
   it('renders when open', () => {
     const dispatch = vi.fn();
     const state = createOpenState();
-
-    render(
-      <CitationDropdown state={state} dispatch={dispatch} />
-    );
-
+    render(<CitationDropdown state={state} dispatch={dispatch} />);
     expect(screen.getByText('doe2024')).toBeDefined();
   });
 
   it('does not render when closed', () => {
     const dispatch = vi.fn();
-    const state: CitationState = {
-      ...createOpenState(),
-      open: false,
-    };
-
-    const { container } = render(
-      <CitationDropdown state={state} dispatch={dispatch} />
-    );
-
+    const state: CitationState = { ...createOpenState(), open: false };
+    const { container } = render(<CitationDropdown state={state} dispatch={dispatch} />);
     expect(container.innerHTML).toBe('');
   });
 
   it('renders Add Citation item', () => {
     const dispatch = vi.fn();
     const state = createOpenState();
-
-    render(
-      <CitationDropdown state={state} dispatch={dispatch} />
-    );
-
+    render(<CitationDropdown state={state} dispatch={dispatch} />);
     expect(screen.getByText(/Add Citation/)).toBeDefined();
+  });
+});
+
+describe('CitationDropdown — empty state', () => {
+  it('shows helpful message when no items and empty query', () => {
+    const dispatch = vi.fn();
+    const state = createOpenState({ items: [], query: '' });
+    render(<CitationDropdown state={state} dispatch={dispatch} />);
+    expect(screen.getByText(/No references yet/)).toBeDefined();
+    expect(screen.getByText(/Add one by DOI/)).toBeDefined();
+  });
+
+  it('still shows Add Citation button when no items', () => {
+    const dispatch = vi.fn();
+    const state = createOpenState({ items: [], query: '' });
+    render(<CitationDropdown state={state} dispatch={dispatch} />);
+    expect(screen.getByText(/\+ Add Citation \(DOI\)/)).toBeDefined();
+  });
+
+  it('shows "No matching citations" when query matches none', () => {
+    const dispatch = vi.fn();
+    const state = createOpenState({ query: 'zzzzz' });
+    render(<CitationDropdown state={state} dispatch={dispatch} />);
+    expect(screen.getByText('No matching citations')).toBeDefined();
   });
 });

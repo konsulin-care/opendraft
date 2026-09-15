@@ -79,6 +79,34 @@ interface CitekeyListProps {
   onAddCitation: () => void;
 }
 
+function EmptyState({ hasItems, hasQuery }: { hasItems: boolean; hasQuery: boolean }) {
+  const message = hasItems || hasQuery
+    ? 'No matching citations'
+    : 'No references yet. Add one by DOI or create references.bib.';
+  return <div className="citation-empty">{message}</div>;
+}
+
+interface CitekeyItemProps {
+  item: CitationState['items'][number];
+  isActive: boolean;
+  onSelect: (citekey: string) => void;
+}
+
+function CitekeyItem({ item, isActive, onSelect }: CitekeyItemProps) {
+  return (
+    <button
+      type="button"
+      className={`citation-item ${isActive ? 'active' : ''}`}
+      onClick={() => onSelect(item.citeKey)}
+    >
+      <span className="citation-key">{item.citeKey}</span>
+      <span className="citation-meta">
+        {item.fields.author?.split(',')[0]} {item.fields.year}
+      </span>
+    </button>
+  );
+}
+
 function CitekeyList({
   items,
   query,
@@ -100,20 +128,15 @@ function CitekeyList({
       />
       <div className="citation-items">
         {filtered.length === 0 ? (
-          <div className="citation-empty">No matching citations</div>
+          <EmptyState hasItems={items.length > 0} hasQuery={!!query} />
         ) : (
           filtered.map((item, index) => (
-            <button
+            <CitekeyItem
               key={item.citeKey}
-              type="button"
-              className={`citation-item ${index === activeIndex ? 'active' : ''}`}
-              onClick={() => onSelect(item.citeKey)}
-            >
-              <span className="citation-key">{item.citeKey}</span>
-              <span className="citation-meta">
-                {item.fields.author?.split(',')[0]} {item.fields.year}
-              </span>
-            </button>
+              item={item}
+              isActive={index === activeIndex}
+              onSelect={onSelect}
+            />
           ))
         )}
       </div>

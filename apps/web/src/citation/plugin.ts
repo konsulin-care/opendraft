@@ -5,6 +5,7 @@ import { parseBibTeX } from '@opendraft/references';
 import { citationReducer, createInitialState } from './state';
 import type { CitationState, CitationAction } from './types';
 import { matchCitationTrigger } from './input-rule';
+import { filterCitekeys } from './citekey-list';
 
 /** PluginKey for the citation plugin. */
 export const citationPluginKey = new PluginKey('citation');
@@ -97,6 +98,22 @@ function handleKeydown(view: EditorView, event: KeyboardEvent): boolean {
   if (event.key === 'ArrowUp') {
     event.preventDefault();
     dispatchAction(view, { type: 'DECREMENT_ACTIVE_INDEX' });
+    return true;
+  }
+
+  if (event.key === 'Enter') {
+    const filtered = filterCitekeys(citationState.items, citationState.query);
+    if (filtered.length > 0 && citationState.activeIndex < filtered.length && citationState.trigger) {
+      const citekey = filtered[citationState.activeIndex].citeKey;
+      // Replace the @ at trigger position with @citekey
+      const { from, bracketed } = citationState.trigger;
+      const insertText = bracketed ? `[@${citekey}]` : `@${citekey}`;
+      const tr = view.state.tr;
+      tr.insertText(insertText, from, from + 1); // Replace the @ character
+      view.dispatch(tr);
+    }
+    event.preventDefault();
+    dispatchAction(view, { type: 'CLOSE_CITATION' });
     return true;
   }
 

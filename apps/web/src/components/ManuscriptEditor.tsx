@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { EditorView } from '@codemirror/view';
 import { Crepe } from '@milkdown/crepe';
-import { Milkdown, useEditor } from '@milkdown/react';
+import { useEditor } from '@milkdown/react';
 import { editorViewCtx, remarkPluginsCtx, type Editor } from '@milkdown/kit/core';
 import { listenerCtx } from '@milkdown/kit/plugin/listener';
 import { $prose, getMarkdown, replaceAll } from '@milkdown/kit/utils';
@@ -9,9 +9,12 @@ import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { saveManuscript } from '../persistence';
 import { PLACEHOLDER_HINT } from '../placeholder';
 import { createBlockGutterPlugin } from '../block-handle-gutter';
-import { createCitationPlugin } from '../citation/plugin';
+import { createCitationPlugin, citationPluginKey } from '../citation/plugin';
+import { useCitationState } from '../citation/use-citation-state';
+import type { CitationState } from '../citation/types';
 import { quartoRemarkPlugin, quartoInlineCodePlugin, quartoChunkOptionPlugin } from '../quarto-syntax';
-import { SourceEditor, type SourceEditorHandle } from './SourceEditor';
+import { EditorSurface } from './EditorSurface';
+import type { SourceEditorHandle } from './SourceEditor';
 
 /**
  * CodeMirror theme for code blocks: light yellow active line and selection
@@ -217,52 +220,7 @@ function useManuscriptState(
     return () => saver?.flush();
   }, []);
 
-  return { sourceMarkdown, setSourceMarkdown, sourceEditorRef, scrollContainerRef };
-}
-
-interface EditorSurfaceProps {
-  mode: 'wysiwyg' | 'source';
-  sourceMarkdown: string;
-  onSourceChange: (md: string) => void;
-  scrollContainerRef: React.RefObject<HTMLDivElement | null>;
-  sourceEditorRef: React.RefObject<SourceEditorHandle | null>;
-}
-
-/** Renders either the Crepe WYSIWYG surface or the CodeMirror source editor. */
-function EditorSurface({
-  mode,
-  sourceMarkdown,
-  onSourceChange,
-  scrollContainerRef,
-  sourceEditorRef,
-}: EditorSurfaceProps) {
-  return (
-    <div className="manuscript-editor" data-testid="manuscript-editor">
-      <div
-        ref={scrollContainerRef}
-        style={{
-          display: mode === 'wysiwyg' ? 'block' : 'none',
-          height: '100%',
-          overflow: 'auto',
-        }}
-      >
-        <Milkdown />
-      </div>
-      <div
-        style={{
-          display: mode === 'source' ? 'block' : 'none',
-          height: '100%',
-          overflow: 'auto',
-        }}
-      >
-        <SourceEditor
-          ref={sourceEditorRef}
-          value={sourceMarkdown}
-          onChange={onSourceChange}
-        />
-      </div>
-    </div>
-  );
+  return { sourceMarkdown, setSourceMarkdown, sourceEditorRef, scrollContainerRef, editorRef };
 }
 
 /**
@@ -276,8 +234,35 @@ export function ManuscriptEditor({
   onEditorReady,
   mode = 'wysiwyg',
 }: ManuscriptEditorProps) {
-  const { sourceMarkdown, setSourceMarkdown, sourceEditorRef, scrollContainerRef } =
+  const { sourceMarkdown, setSourceMarkdown, sourceEditorRef, scrollContainerRef, editorRef } =
     useManuscriptState(workspace, defaultValue, mode, onEditorReady);
+
+  const { citationState, dispatch: citationDispatch } = useCitationState(editorRef);
+
+  const handleSelectCitekey = useCallback(
+    (citekey: string) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      const state = citationPluginKey.getState(
+        editor.action((ctx) => ctx.get(editorViewCtx)).state,
+      ) as CitationState | null;
+      if (!state?.trigger) return;
+
+      // Insert citation using ProseMirror transaction
+      editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const { from, bracketed } = state.trigger!;
+        const insertText = bracketed ? `[@${citekey}]` : `@${citekey}`;
+        const tr = view.state.tr;
+        tr.insertText(insertText, from, from + 1);
+        view.dispatch(tr);
+      });
+
+      citationDispatch({ type: 'CLOSE_CITATION' });
+    },
+    [editorRef, citationDispatch],
+  );
 
   return (
     <EditorSurface
@@ -286,6 +271,9 @@ export function ManuscriptEditor({
       onSourceChange={setSourceMarkdown}
       scrollContainerRef={scrollContainerRef}
       sourceEditorRef={sourceEditorRef}
+      citationState={citationState}
+      onCitationDispatch={citationDispatch}
+      onSelectCitekey={handleSelectCitekey}
     />
   );
 }
