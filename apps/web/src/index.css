@@ -250,3 +250,199 @@ textarea {
 .commit-actions button:disabled {
   @apply cursor-not-allowed opacity-50;
 }
+
+/* ── Citation dropdown ── */
+.milkdown .citation-dropdown {
+  position: absolute;
+  z-index: 100;
+  width: 320px;
+  max-height: 300px;
+  overflow: hidden;
+  background: white;
+  border: 1px solid var(--crepe-color-outline);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.milkdown .citation-search {
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-bottom: 1px solid var(--crepe-color-outline);
+  font-size: 0.875rem;
+  outline: none;
+}
+
+.milkdown .citation-items {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.milkdown .citation-item {
+  display: flex;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.milkdown .citation-item:hover,
+.milkdown .citation-item.active {
+  background: var(--crepe-color-hover);
+}
+
+.milkdown .citation-key {
+  font-family: var(--crepe-font-code);
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+.milkdown .citation-meta {
+  color: var(--crepe-color-on-surface-variant);
+  font-size: 0.75rem;
+}
+
+.milkdown .citation-empty {
+  padding: 12px;
+  color: var(--crepe-color-on-surface-variant);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.milkdown .citation-add-btn {
+  display: flex;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--crepe-color-outline);
+  cursor: pointer;
+}
+
+.milkdown .citation-add-btn:hover {
+  background: var(--crepe-color-hover);
+}
+
+/* ── DOI input ── */
+.milkdown .citation-doi-input {
+  padding: 8px 12px;
+}
+
+.milkdown .citation-doi-field {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--crepe-color-outline);
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-family: var(--crepe-font-code);
+}
+
+.milkdown .citation-doi-field:focus {
+  outline: none;
+  border-color: var(--crepe-color-primary);
+}
+
+/* ── Comparison view ── */
+.milkdown .citation-comparison {
+  width: 480px;
+}
+
+.milkdown .citation-comparison-header {
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  color: var(--crepe-color-on-surface-variant);
+  border-bottom: 1px solid var(--crepe-color-outline);
+}
+
+.milkdown .citation-comparison-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.milkdown .citation-comparison-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.milkdown .citation-comparison-bibtex {
+  font-family: var(--crepe-font-code);
+  font-size: 0.75rem;
+  background: var(--crepe-color-surface-low);
+  padding: 8px;
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.milkdown .citation-comparison-editor {
+  width: 100%;
+  height: 120px;
+  font-family: var(--crepe-font-code);
+  font-size: 0.75rem;
+  padding: 8px;
+  border: 1px solid var(--crepe-color-outline);
+  border-radius: 4px;
+  resize: vertical;
+}
+
+.milkdown .citation-comparison-editor:focus {
+  outline: none;
+  border-color: var(--crepe-color-primary);
+}
+
+.milkdown .citation-comparison-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--crepe-color-outline);
+}
+
+/* ── Buttons ── */
+.milkdown .citation-btn {
+  padding: 6px 12px;
+  font-size: 0.875rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.milkdown .citation-btn-secondary {
+  background: none;
+  border: 1px solid var(--crepe-color-outline);
+  color: var(--crepe-color-on-surface);
+}
+
+.milkdown .citation-btn-secondary:hover {
+  background: var(--crepe-color-hover);
+}
+
+.milkdown .citation-btn-primary {
+  background: var(--crepe-color-primary);
+  border: 1px solid var(--crepe-color-primary);
+  color: var(--crepe-color-on-secondary);
+}
+
+.milkdown .citation-btn-primary:hover {
+  opacity: 0.9;
+}
+
+/* ── Responsive ── */
+@media (max-width: 639px) {
+  .milkdown .citation-dropdown {
+    width: 100%;
+  }
+
+  .milkdown .citation-comparison {
+    width: 100%;
+  }
+
+  .milkdown .citation-comparison-columns {
+    grid-template-columns: 1fr;
+  }
+}
