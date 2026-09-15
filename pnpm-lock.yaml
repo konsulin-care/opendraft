@@ -65,6 +65,9 @@ importers:
       '@opendraft/git':
         specifier: workspace:*
         version: link:../../packages/git
+      '@opendraft/references':
+        specifier: workspace:*
+        version: link:../../packages/references
       '@opendraft/workspace':
         specifier: workspace:*
         version: link:../../packages/workspace

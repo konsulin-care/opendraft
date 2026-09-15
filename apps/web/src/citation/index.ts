@@ -14,3 +14,4 @@ export { appendReference, replaceReference } from './file-write';
 export { filterCitekeys } from './citekey-list';
 export { DoiInput } from './doi-input';
 export { ComparisonView } from './comparison';
+export { createCitationPlugin, citationPluginKey } from './plugin';
