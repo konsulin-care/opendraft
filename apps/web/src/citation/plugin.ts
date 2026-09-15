@@ -1,14 +1,14 @@
-import { Plugin, PluginKey } from '@milkdown/kit/prose/state';
-import type { EditorView } from '@milkdown/kit/prose/view';
-import type { WorkspaceAdapter } from '@opendraft/workspace';
-import { parseBibTeX } from '@opendraft/references';
-import { citationReducer, createInitialState } from './state';
-import type { CitationState, CitationAction } from './types';
-import { matchCitationTrigger } from './input-rule';
-import { filterCitekeys } from './citekey-list';
+import { Plugin, PluginKey } from "@milkdown/kit/prose/state";
+import type { EditorView } from "@milkdown/kit/prose/view";
+import type { WorkspaceAdapter } from "@opendraft/workspace";
+import { parseBibTeX } from "@opendraft/references";
+import { citationReducer, createInitialState } from "./state";
+import type { CitationState, CitationAction } from "./types";
+import { matchCitationTrigger } from "./input-rule";
+import { filterCitekeys } from "./citekey-list";
 
 /** PluginKey for the citation plugin. */
-export const citationPluginKey = new PluginKey('citation');
+export const citationPluginKey = new PluginKey("citation");
 
 /**
  * Create the citation plugin for ProseMirror.
@@ -32,7 +32,7 @@ export function createCitationPlugin(workspace: WorkspaceAdapter): Plugin {
 function createState() {
   return {
     init: () => createInitialState(),
-    apply: (tr: Parameters<NonNullable<Parameters<typeof Plugin>[0]['state']>>['0']['apply'][0], prev: CitationState) => {
+    apply: (tr: Parameters<NonNullable<Parameters<typeof Plugin>[0]["state"]>>["0"]["apply"][0], prev: CitationState) => {
       const meta = tr.getMeta(citationPluginKey);
       if (meta) {
         return citationReducer(prev, meta);
@@ -59,18 +59,21 @@ function handleTextInput(
   _to: number,
   text: string,
 ): boolean {
-  if (text !== '@') return false;
+  if (text !== "@") return false;
 
   const doc = view.state.doc;
-  const textBefore = doc.textBetween(Math.max(0, from - 10), from, '', '\n');
-  const fullText = textBefore + '@';
+  const textBefore = doc.textBetween(Math.max(0, from - 10), from, "", "\n");
+  const fullText = textBefore + "@";
 
   const trigger = matchCitationTrigger(fullText);
   if (!trigger) return false;
 
+  // Get screen coordinates for dropdown positioning
+  const coords = view.coordsAtPos(from);
+
   const action: CitationAction = {
-    type: 'OPEN_CITATION',
-    trigger: { from, bracketed: trigger.bracketed },
+    type: "OPEN_CITATION",
+    trigger: { from, bracketed: trigger.bracketed, top: coords.top, left: coords.left },
   };
 
   const tr = view.state.tr.setMeta(citationPluginKey, action);
@@ -83,37 +86,37 @@ function handleKeydown(view: EditorView, event: KeyboardEvent): boolean {
   const citationState = citationPluginKey.getState(view.state) as CitationState | null;
   if (!citationState?.open) return false;
 
-  if (event.key === 'Escape') {
+  if (event.key === "Escape") {
     event.preventDefault();
-    dispatchAction(view, { type: 'CLOSE_CITATION' });
+    dispatchAction(view, { type: "CLOSE_CITATION" });
     return true;
   }
 
-  if (event.key === 'ArrowDown') {
+  if (event.key === "ArrowDown") {
     event.preventDefault();
-    dispatchAction(view, { type: 'INCREMENT_ACTIVE_INDEX' });
+    dispatchAction(view, { type: "INCREMENT_ACTIVE_INDEX" });
     return true;
   }
 
-  if (event.key === 'ArrowUp') {
+  if (event.key === "ArrowUp") {
     event.preventDefault();
-    dispatchAction(view, { type: 'DECREMENT_ACTIVE_INDEX' });
+    dispatchAction(view, { type: "DECREMENT_ACTIVE_INDEX" });
     return true;
   }
 
-  if (event.key === 'Enter') {
+  if (event.key === "Enter") {
     const filtered = filterCitekeys(citationState.items, citationState.query);
     if (filtered.length > 0 && citationState.activeIndex < filtered.length && citationState.trigger) {
       const citekey = filtered[citationState.activeIndex].citeKey;
       // Replace the @ at trigger position with @citekey
       const { from, bracketed } = citationState.trigger;
-      const insertText = bracketed ? `[@${citekey}]` : `@${citekey}`;
+      const insertText = bracketed ? "[@" + citekey + "]" : "@" + citekey;
       const tr = view.state.tr;
       tr.insertText(insertText, from, from + 1); // Replace the @ character
       view.dispatch(tr);
     }
     event.preventDefault();
-    dispatchAction(view, { type: 'CLOSE_CITATION' });
+    dispatchAction(view, { type: "CLOSE_CITATION" });
     return true;
   }
 
@@ -141,12 +144,12 @@ async function loadReferences(
   workspace: WorkspaceAdapter,
   view: EditorView,
 ): Promise<void> {
-  const content = await workspace.readFile('references.bib');
+  const content = await workspace.readFile("references.bib");
   if (!content) return;
 
   try {
     const refs = parseBibTeX(content);
-    dispatchAction(view, { type: 'SET_ITEMS', items: refs });
+    dispatchAction(view, { type: "SET_ITEMS", items: refs });
   } catch {
     // Ignore parse errors - empty list is fine
   }

@@ -1,16 +1,16 @@
 // @vitest-environment node
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { createCitationPlugin, citationPluginKey } from './plugin';
-import type { WorkspaceAdapter } from '@opendraft/workspace';
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { createCitationPlugin, citationPluginKey } from "./plugin";
+import type { WorkspaceAdapter } from "@opendraft/workspace";
 
 const pluginSource = readFileSync(
-  fileURLToPath(new URL('./plugin.ts', import.meta.url)),
-  'utf8',
+  fileURLToPath(new URL("./plugin.ts", import.meta.url)),
+  "utf8",
 );
 
-describe('createCitationPlugin', () => {
+describe("createCitationPlugin", () => {
   let workspace: WorkspaceAdapter;
 
   beforeEach(() => {
@@ -22,41 +22,73 @@ describe('createCitationPlugin', () => {
     };
   });
 
-  it('creates a plugin', () => {
+  it("creates a plugin", () => {
     const plugin = createCitationPlugin(workspace);
     expect(plugin).toBeDefined();
   });
 
-  it('exports pluginKey', () => {
+  it("exports pluginKey", () => {
     expect(citationPluginKey).toBeDefined();
   });
 
-  it('has handleKeydown that handles Enter for citation insertion', () => {
+  it("has handleKeydown that handles Enter for citation insertion", () => {
     // Verify the plugin has the keydown handler
     const plugin = createCitationPlugin(workspace);
     expect(plugin.props?.handleDOMEvents?.keydown).toBeDefined();
   });
+
+  it("has handleTextInput for @ trigger detection", () => {
+    // Verify the plugin has the text input handler
+    const plugin = createCitationPlugin(workspace);
+    expect(plugin.props?.handleTextInput).toBeDefined();
+  });
 });
 
-describe('citation plugin — Enter key behavior (source)', () => {
-  it('handles Enter key when citation dropdown is open', () => {
+describe("citation plugin — Enter key behavior (source)", () => {
+  it("handles Enter key when citation dropdown is open", () => {
     // The plugin source should check for Enter key and open state
-    expect(pluginSource).toContain("event.key === 'Enter'");
+    expect(pluginSource).toContain("event.key === \"Enter\"");
     expect(pluginSource).toMatch(/citationState\?\.open/);
   });
 
-  it('imports filterCitekeys for filtering active citekey', () => {
-    expect(pluginSource).toContain('filterCitekeys');
+  it("imports filterCitekeys for filtering active citekey", () => {
+    expect(pluginSource).toContain("filterCitekeys");
     expect(pluginSource).toMatch(/filterCitekeys.*from/);
   });
 
-  it('inserts citekey using ProseMirror transaction', () => {
+  it("inserts citekey using ProseMirror transaction", () => {
     // The plugin uses tr.insertText to insert the citation
-    expect(pluginSource).toContain('tr.insertText');
+    expect(pluginSource).toContain("tr.insertText");
   });
 
-  it('dispatches CLOSE_CITATION after inserting', () => {
+  it("dispatches CLOSE_CITATION after inserting", () => {
     // After Enter, the plugin should close the dropdown
-    expect(pluginSource).toContain('CLOSE_CITATION');
+    expect(pluginSource).toContain("CLOSE_CITATION");
+  });
+});
+
+describe("citation plugin — handleTextInput behavior (source)", () => {
+  it("detects @ trigger and dispatches OPEN_CITATION", () => {
+    // The plugin should check for @ character and call matchCitationTrigger
+    expect(pluginSource).toContain("text !== \"@\"");
+    expect(pluginSource).toContain("matchCitationTrigger");
+  });
+
+  it("captures viewport coordinates via coordsAtPos for dropdown positioning", () => {
+    // The plugin should use view.coordsAtPos to get screen coordinates
+    expect(pluginSource).toContain("coordsAtPos");
+    expect(pluginSource).toMatch(/trigger:.*top.*left/);
+  });
+
+  it("includes top and left in OPEN_CITATION trigger payload", () => {
+    // The OPEN_CITATION action should include screen coordinates
+    expect(pluginSource).toMatch(/top:\s*coords\.top/);
+    expect(pluginSource).toMatch(/left:\s*coords\.left/);
+  });
+
+  it("does not consume the @ character (returns false)", () => {
+    // The handler should return false to let ProseMirror insert the @
+    expect(pluginSource).toContain("return false");
+    expect(pluginSource).toContain("Don");
   });
 });

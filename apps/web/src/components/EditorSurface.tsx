@@ -1,11 +1,11 @@
-import { Milkdown } from '@milkdown/react';
-import type { CitationState, CitationAction } from '../citation/types';
-import { CitationDropdown } from '../citation/dropdown';
-import { SourceEditor, type SourceEditorHandle } from './SourceEditor';
+import { Milkdown } from "@milkdown/react";
+import type { CitationState, CitationAction } from "../citation/types";
+import { CitationDropdown } from "../citation/dropdown";
+import { SourceEditor, type SourceEditorHandle } from "./SourceEditor";
 
 interface EditorSurfaceProps {
-  /** Editing mode: 'wysiwyg' or 'source'. */
-  mode: 'wysiwyg' | 'source';
+  /** Editing mode: "wysiwyg" or "source". */
+  mode: "wysiwyg" | "source";
   /** Source markdown for source mode. */
   sourceMarkdown: string;
   /** Callback when source markdown changes. */
@@ -41,10 +41,10 @@ export function EditorSurface({
       <div
         ref={scrollContainerRef}
         style={{
-          display: mode === 'wysiwyg' ? 'block' : 'none',
-          height: '100%',
-          overflow: 'auto',
-          position: 'relative',
+          display: mode === "wysiwyg" ? "block" : "none",
+          height: "100%",
+          overflow: "auto",
+          position: "relative",
         }}
       >
         <Milkdown />
@@ -53,14 +53,15 @@ export function EditorSurface({
             state={citationState}
             dispatch={onCitationDispatch}
             onSelectCitekey={onSelectCitekey}
+            scrollContainerRef={scrollContainerRef}
           />
         )}
       </div>
       <div
         style={{
-          display: mode === 'source' ? 'block' : 'none',
-          height: '100%',
-          overflow: 'auto',
+          display: mode === "source" ? "block" : "none",
+          height: "100%",
+          overflow: "auto",
         }}
       >
         <SourceEditor

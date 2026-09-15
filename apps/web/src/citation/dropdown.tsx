@@ -1,7 +1,8 @@
-import type { CitationState, CitationAction } from './types';
-import { filterCitekeys } from './citekey-list';
-import { DoiInput } from './doi-input';
-import { ComparisonView } from './comparison';
+import { useEffect, useRef } from "react";
+import type { CitationState, CitationAction } from "./types";
+import { filterCitekeys } from "./citekey-list";
+import { DoiInput } from "./doi-input";
+import { ComparisonView } from "./comparison";
 
 interface CitationDropdownProps {
   /** Current citation state. */
@@ -12,6 +13,91 @@ interface CitationDropdownProps {
   onSelectCitekey?: (citekey: string) => void;
   /** Callback when DOI is resolved. */
   onDoiResolved?: (bibtex: string) => void;
+  /** Reference to the scroll container for coordinate conversion. */
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>;
+}
+
+function useDropdownPosition(
+  state: CitationState,
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>,
+  dropdownRef: React.RefObject<HTMLDivElement | null>
+) {
+  useEffect(() => {
+    if (!state.trigger || !scrollContainerRef.current || !dropdownRef.current) return;
+
+    const container = scrollContainerRef.current;
+    const containerRect = container.getBoundingClientRect();
+
+    // Viewport coordinates from trigger
+    const viewportTop = state.trigger.top;
+    const viewportLeft = state.trigger.left;
+
+    // Convert to container-relative coordinates
+    const top = viewportTop - containerRect.top + container.scrollTop;
+    const left = viewportLeft - containerRect.left + container.scrollLeft;
+
+    // Position dropdown below the cursor (add line height ~1.5em)
+    dropdownRef.current.style.top = top + 20 + "px";
+    dropdownRef.current.style.left = left + "px";
+  }, [state.trigger, scrollContainerRef]);
+}
+
+function renderComparisonView(
+  state: CitationState,
+  dispatch: (action: CitationAction) => void,
+  onDoiResolved?: (bibtex: string) => void
+) {
+  return (
+    <ComparisonView
+      comparison={state.comparison!}
+      onBibtexChange={(bibtex) =>
+        dispatch({ type: "SET_COMPARISON", comparison: { ...state.comparison!, editedBibtex: bibtex } })
+      }
+      onDiscard={() => dispatch({ type: "DISCARD_DOI" })}
+      onAction={(action, comparison) => {
+        if (action === "replace") {
+          onDoiResolved?.(comparison.editedBibtex);
+        } else {
+          onDoiResolved?.(comparison.editedBibtex);
+        }
+        dispatch({ type: "CLOSE_CITATION" });
+      }}
+    />
+  );
+}
+
+function renderDoiInput(
+  state: CitationState,
+  dispatch: (action: CitationAction) => void
+) {
+  return (
+    <DoiInput
+      doi={state.doiInput}
+      onDoiChange={(doi) => dispatch({ type: "SET_DOI_INPUT", doi })}
+      onResolve={(_doi) => {
+        dispatch({ type: "SET_DOI_LOADING", loading: true });
+        // TODO: Call DOI resolver and handle response
+      }}
+      onEscape={() => dispatch({ type: "EXIT_DOI_MODE" })}
+    />
+  );
+}
+
+function renderCitekeyList(
+  state: CitationState,
+  dispatch: (action: CitationAction) => void,
+  onSelectCitekey?: (citekey: string) => void
+) {
+  return (
+    <CitekeyList
+      items={state.items}
+      query={state.query}
+      activeIndex={state.activeIndex}
+      onQueryChange={(query) => dispatch({ type: "SET_QUERY", query })}
+      onSelect={(citekey) => onSelectCitekey?.(citekey)}
+      onAddCitation={() => dispatch({ type: "ENTER_DOI_MODE" })}
+    />
+  );
 }
 
 /**
@@ -25,53 +111,28 @@ export function CitationDropdown({
   dispatch,
   onSelectCitekey,
   onDoiResolved,
+  scrollContainerRef,
 }: CitationDropdownProps) {
   if (!state.open) return null;
 
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  useDropdownPosition(state, scrollContainerRef, dropdownRef);
+
   return (
-    <div className="citation-dropdown">
+    <div ref={dropdownRef} className="citation-dropdown" style={{ position: "absolute" }}>
       {state.comparison ? (
-        <ComparisonView
-          comparison={state.comparison}
-          onBibtexChange={(bibtex) =>
-            dispatch({ type: 'SET_COMPARISON', comparison: { ...state.comparison!, editedBibtex: bibtex } })
-          }
-          onDiscard={() => dispatch({ type: 'DISCARD_DOI' })}
-          onAction={(action, comparison) => {
-            if (action === 'replace') {
-              onDoiResolved?.(comparison.editedBibtex);
-            } else {
-              onDoiResolved?.(comparison.editedBibtex);
-            }
-            dispatch({ type: 'CLOSE_CITATION' });
-          }}
-        />
+        renderComparisonView(state, dispatch, onDoiResolved)
       ) : state.doiMode ? (
-        <DoiInput
-          doi={state.doiInput}
-          onDoiChange={(doi) => dispatch({ type: 'SET_DOI_INPUT', doi })}
-          onResolve={(_doi) => {
-            dispatch({ type: 'SET_DOI_LOADING', loading: true });
-            // TODO: Call DOI resolver and handle response
-          }}
-          onEscape={() => dispatch({ type: 'EXIT_DOI_MODE' })}
-        />
+        renderDoiInput(state, dispatch)
       ) : (
-        <CitekeyList
-          items={state.items}
-          query={state.query}
-          activeIndex={state.activeIndex}
-          onQueryChange={(query) => dispatch({ type: 'SET_QUERY', query })}
-          onSelect={(citekey) => onSelectCitekey?.(citekey)}
-          onAddCitation={() => dispatch({ type: 'ENTER_DOI_MODE' })}
-        />
+        renderCitekeyList(state, dispatch, onSelectCitekey)
       )}
     </div>
   );
 }
 
 interface CitekeyListProps {
-  items: CitationState['items'];
+  items: CitationState["items"];
   query: string;
   activeIndex: number;
   onQueryChange: (query: string) => void;
@@ -81,13 +142,13 @@ interface CitekeyListProps {
 
 function EmptyState({ hasItems, hasQuery }: { hasItems: boolean; hasQuery: boolean }) {
   const message = hasItems || hasQuery
-    ? 'No matching citations'
-    : 'No references yet. Add one by DOI or create references.bib.';
+    ? "No matching citations"
+    : "No references yet. Add one by DOI or create references.bib.";
   return <div className="citation-empty">{message}</div>;
 }
 
 interface CitekeyItemProps {
-  item: CitationState['items'][number];
+  item: CitationState["items"][number];
   isActive: boolean;
   onSelect: (citekey: string) => void;
 }
@@ -96,12 +157,12 @@ function CitekeyItem({ item, isActive, onSelect }: CitekeyItemProps) {
   return (
     <button
       type="button"
-      className={`citation-item ${isActive ? 'active' : ''}`}
+      className={"citation-item " + (isActive ? "active" : "")}
       onClick={() => onSelect(item.citeKey)}
     >
       <span className="citation-key">{item.citeKey}</span>
       <span className="citation-meta">
-        {item.fields.author?.split(',')[0]} {item.fields.year}
+        {item.fields.author?.split(",")[0]} {item.fields.year}
       </span>
     </button>
   );

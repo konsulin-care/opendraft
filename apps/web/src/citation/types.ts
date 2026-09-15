@@ -6,6 +6,10 @@ export interface CitationTrigger {
   from: number;
   /** Whether this is bracketed mode [@...]. */
   bracketed: boolean;
+  /** Screen Y coordinate relative to scroll container. */
+  top: number;
+  /** Screen X coordinate relative to scroll container. */
+  left: number;
 }
 
 /** Comparison state for duplicate DOI detection. */

@@ -28,47 +28,69 @@ function Header({ mode, onToggleMode, onCommit }: HeaderProps) {
 
 const WORKSPACE_ID = 'opendraft-manuscript';
 
-/**
- * App shell: header with commit action plus the single continuous
- * manuscript editor filling the viewport.
- */
-export function App() {
+function useWorkspace() {
   const [workspace, setWorkspace] = useState<IndexedDBWorkspace | null>(null);
   const [markdown, setMarkdown] = useState<string | null>(null);
-  const [showCommitDialog, setShowCommitDialog] = useState(false);
-  const [mode, setMode] = useState<'wysiwyg' | 'source'>('wysiwyg');
-  const toggleMode = useCallback(() => {
-    setMode((prev) => (prev === 'wysiwyg' ? 'source' : 'wysiwyg'));
-  }, []);
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
     let active = true;
     const ws = new IndexedDBWorkspace(WORKSPACE_ID);
     (async () => {
-      await seedWorkspace(ws);
-      const md = await loadManuscript(ws);
-      if (active) {
-        setWorkspace(ws);
-        setMarkdown(md);
+      try {
+        await seedWorkspace(ws);
+        const md = await loadManuscript(ws);
+        if (active) {
+          setWorkspace(ws);
+          setMarkdown(md);
+          setInitialized(true);
+        }
+      } catch (err) {
+        console.error('App boot failed:', err);
       }
-    })().catch((err) => {
-      console.error('App boot failed:', err);
-    });
+    })();
 
     return () => {
       active = false;
-      ws.close();
+      if (initialized) {
+        ws.close();
+      }
     };
+  }, [initialized]);
+
+  return { workspace, markdown };
+}
+
+function useMode() {
+  const [mode, setMode] = useState<'wysiwyg' | 'source'>('wysiwyg');
+  const toggleMode = useCallback(() => {
+    setMode((prev) => (prev === 'wysiwyg' ? 'source' : 'wysiwyg'));
   }, []);
+  return { mode, toggleMode };
+}
+
+function useCommitDialog() {
+  const [showCommitDialog, setShowCommitDialog] = useState(false);
+  return { showCommitDialog, setShowCommitDialog };
+}
+
+/**
+ * App shell: header with commit action plus the single continuous
+ * manuscript editor filling the viewport.
+ */
+export function App() {
+  const { workspace, markdown } = useWorkspace();
+  const { mode, toggleMode } = useMode();
+  const { showCommitDialog, setShowCommitDialog } = useCommitDialog();
 
   if (!workspace || markdown === null) {
     return <div>Loading workspace...</div>;
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}> 
       <Header mode={mode} onToggleMode={toggleMode} onCommit={() => setShowCommitDialog(true)} />
-      <main style={{ flex: 1, overflow: 'hidden' }}>
+      <main style={{ flex: 1, overflow: 'hidden' }}> 
         <MilkdownProvider>
           <ManuscriptEditor workspace={workspace} defaultValue={markdown} mode={mode} />
         </MilkdownProvider>
