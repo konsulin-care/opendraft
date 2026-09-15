@@ -11,3 +11,6 @@ export { matchCitationTrigger } from './input-rule';
 export { insertCitation } from './insert';
 export { resolveDoi, cleanupBibtex } from './doi-resolver';
 export { appendReference, replaceReference } from './file-write';
+export { filterCitekeys } from './citekey-list';
+export { DoiInput } from './doi-input';
+export { ComparisonView } from './comparison';
