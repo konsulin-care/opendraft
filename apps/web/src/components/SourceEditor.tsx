@@ -1,9 +1,12 @@
 import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { EditorState } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
+import { EditorView, keymap, drawSelection, dropCursor, highlightActiveLine, highlightActiveLineGutter, highlightSpecialChars, lineNumbers, rectangularSelection, crosshairCursor } from '@codemirror/view';
 import { markdown } from '@codemirror/lang-markdown';
 import { oneDark } from '@codemirror/theme-one-dark';
-import { basicSetup } from 'codemirror';
+import { autocompletion, completionKeymap as autocompleteCompletionKeymap, closeBrackets } from '@codemirror/autocomplete';
+import { searchKeymap as searchSearchKeymap } from '@codemirror/search';
+import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
+import { foldGutter, foldKeymap, indentOnInput, bracketMatching } from '@codemirror/language';
 
 /** Imperative handle for SourceEditor — cursor and scroll preservation. */
 export interface SourceEditorHandle {
@@ -79,7 +82,28 @@ function createState(
   return EditorState.create({
     doc: value,
     extensions: [
-      basicSetup,
+      lineNumbers(),
+      highlightActiveLineGutter(),
+      highlightSpecialChars(),
+      history(),
+      foldGutter(),
+      drawSelection(),
+      dropCursor(),
+      EditorState.allowMultipleSelections.of(true),
+      indentOnInput(),
+      bracketMatching(),
+      closeBrackets(),
+      autocompletion(),
+      rectangularSelection(),
+      crosshairCursor(),
+      highlightActiveLine(),
+      keymap.of([
+        ...defaultKeymap,
+        ...historyKeymap,
+        ...foldKeymap,
+        ...autocompleteCompletionKeymap,
+        ...searchSearchKeymap,
+      ]),
       markdown(),
       oneDark,
       EditorView.updateListener.of((update) => {

@@ -31,7 +31,6 @@ const WORKSPACE_ID = 'opendraft-manuscript';
 function useWorkspace() {
   const [workspace, setWorkspace] = useState<IndexedDBWorkspace | null>(null);
   const [markdown, setMarkdown] = useState<string | null>(null);
-  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -43,7 +42,6 @@ function useWorkspace() {
         if (active) {
           setWorkspace(ws);
           setMarkdown(md);
-          setInitialized(true);
         }
       } catch (err) {
         console.error('App boot failed:', err);
@@ -52,11 +50,9 @@ function useWorkspace() {
 
     return () => {
       active = false;
-      if (initialized) {
-        ws.close();
-      }
+      ws.close();
     };
-  }, [initialized]);
+  }, []);
 
   return { workspace, markdown };
 }
