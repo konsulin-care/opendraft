@@ -53,6 +53,9 @@ importers:
       '@codemirror/view':
         specifier: 6.43.10
         version: 6.43.10
+      '@floating-ui/dom':
+        specifier: ^1.8.0
+        version: 1.8.0
       '@milkdown/crepe':
         specifier: 7.22.1
         version: 7.22.1(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-view@1.42.3)(supports-color@7.2.0)(typescript@6.0.3)
