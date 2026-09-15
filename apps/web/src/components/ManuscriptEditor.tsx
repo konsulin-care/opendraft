@@ -9,6 +9,7 @@ import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { saveManuscript } from '../persistence';
 import { PLACEHOLDER_HINT } from '../placeholder';
 import { createBlockGutterPlugin } from '../block-handle-gutter';
+import { createCitationPlugin } from '../citation/plugin';
 import { quartoRemarkPlugin, quartoInlineCodePlugin, quartoChunkOptionPlugin } from '../quarto-syntax';
 import { SourceEditor, type SourceEditorHandle } from './SourceEditor';
 
@@ -94,7 +95,12 @@ function debouncedSaver(workspace: WorkspaceAdapter) {
 }
 
 /** Create the Crepe configuration for the editor. */
-function createCrepeConfig(root: HTMLElement, defaultValue: string, placeholderText: string) {
+function createCrepeConfig(
+  root: HTMLElement,
+  defaultValue: string,
+  placeholderText: string,
+  workspace: WorkspaceAdapter,
+) {
   const crepe = new Crepe({
     root,
     defaultValue,
@@ -117,6 +123,9 @@ function createCrepeConfig(root: HTMLElement, defaultValue: string, placeholderT
   });
   crepe.addFeature((editor) => {
     editor.use($prose(() => createBlockGutterPlugin()));
+  });
+  crepe.addFeature((editor) => {
+    editor.use($prose(() => createCitationPlugin(workspace)));
   });
   return crepe;
 }
@@ -179,8 +188,8 @@ function useManuscriptState(
   const prevModeRef = useRef<'wysiwyg' | 'source'>(mode);
 
   const { loading, get } = useEditor(
-    (root) => createCrepeConfig(root, defaultValue, placeholderText),
-    [defaultValue],
+    (root) => createCrepeConfig(root, defaultValue, placeholderText, workspace),
+    [defaultValue, workspace],
   );
 
   const saverRef = useRef<ReturnType<typeof debouncedSaver> | null>(null);
