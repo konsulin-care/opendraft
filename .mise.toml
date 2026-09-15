@@ -2,7 +2,7 @@
 node = "lts"
 pnpm = "11.27.0"
 go = "1.27"
-lefthook = "2.1.12"
+lefthook = "2.1.14"
 golangci-lint = "2.13.2"
 "go:golang.org/x/vuln/cmd/govulncheck" = "1.8.0"
 yamllint = "1.38.0"
