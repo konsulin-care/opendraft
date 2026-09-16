@@ -12,6 +12,7 @@ const STORE_NAME = 'files';
  */
 export class IndexedDBWorkspace implements WorkspaceAdapter {
   private dbPromise: Promise<IDBPDatabase>;
+  private readyPromise: Promise<void>;
   private workspaceId: string;
 
   /**
@@ -21,6 +22,7 @@ export class IndexedDBWorkspace implements WorkspaceAdapter {
   constructor(workspaceId: string) {
     this.workspaceId = workspaceId;
     this.dbPromise = this.initDB();
+    this.readyPromise = this.dbPromise.then(() => {});
   }
 
   /** Initialize the IndexedDB database. */
@@ -37,6 +39,15 @@ export class IndexedDBWorkspace implements WorkspaceAdapter {
   /** Get the database instance. */
   private async getDB(): Promise<IDBPDatabase> {
     return this.dbPromise;
+  }
+
+  /**
+   * Wait for the database to be ready.
+   * Resolves when the database connection is established.
+   * Rejects if the database fails to open.
+   */
+  async ready(): Promise<void> {
+    return this.readyPromise;
   }
 
   /** Normalize path by removing leading ./ and ensuring consistent separators. */
