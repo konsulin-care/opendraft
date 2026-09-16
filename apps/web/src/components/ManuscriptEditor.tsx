@@ -52,6 +52,14 @@ interface ManuscriptEditorProps {
 
 const SAVE_DEBOUNCE_MS = 800;
 
+interface CrepeConfigOptions {
+  root: HTMLElement;
+  defaultValue: string;
+  placeholderText: string;
+  workspace: WorkspaceAdapter;
+  onStateChangeRef: React.MutableRefObject<(state: CitationState) => void>;
+}
+
 /** Build the imperative test/external API around a milkdown editor. */
 function createTestApi(
   editor: Editor,
@@ -98,12 +106,8 @@ function debouncedSaver(workspace: WorkspaceAdapter) {
 }
 
 /** Create the Crepe configuration for the editor. */
-function createCrepeConfig(
-  root: HTMLElement,
-  defaultValue: string,
-  placeholderText: string,
-  workspace: WorkspaceAdapter,
-) {
+function createCrepeConfig(options: CrepeConfigOptions) {
+  const { root, defaultValue, placeholderText, workspace, onStateChangeRef } = options;
   const crepe = new Crepe({
     root,
     defaultValue,
@@ -128,7 +132,7 @@ function createCrepeConfig(
     editor.use($prose(() => createBlockGutterPlugin()));
   });
   crepe.addFeature((editor) => {
-    editor.use($prose(() => createCitationPlugin(workspace)));
+    editor.use($prose(() => createCitationPlugin(workspace, onStateChangeRef.current)));
   });
   return crepe;
 }
@@ -190,8 +194,10 @@ function useManuscriptState(
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const prevModeRef = useRef<'wysiwyg' | 'source'>(mode);
 
+  const onStateChangeRef = useRef<(state: CitationState) => void>(() => {});
+
   const { loading, get } = useEditor(
-    (root) => createCrepeConfig(root, defaultValue, placeholderText, workspace),
+    (root) => createCrepeConfig({ root, defaultValue, placeholderText, workspace, onStateChangeRef }),
     [defaultValue, workspace],
   );
 
