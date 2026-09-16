@@ -139,3 +139,21 @@ describe('ManuscriptEditor — citation dropdown mounting', () => {
     expect(editorSurfaceSource).toContain('onSelectCitekey');
   });
 });
+
+describe('ManuscriptEditor — @ trigger integration', () => {
+  it('imports useCitationState hook', () => {
+    expect(manuscriptSource).toContain('useCitationState');
+    expect(manuscriptSource).toMatch(/useCitationState.*from.*['"].*citation/);
+  });
+
+  it('uses onStateChangeRef to wire citation plugin', () => {
+    expect(manuscriptSource).toContain('onStateChangeRef');
+    expect(manuscriptSource).toContain('createCitationPlugin');
+    expect(manuscriptSource).toContain('onStateChangeRef.current');
+  });
+
+  it('imports editorViewCtx for citation trigger detection', () => {
+    expect(manuscriptSource).toContain('editorViewCtx');
+    expect(manuscriptSource).toMatch(/editorViewCtx.*from.*['"]@milkdown\/kit\/core['"]/);
+  });
+});
