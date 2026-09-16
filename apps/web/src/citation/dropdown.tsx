@@ -4,6 +4,36 @@ import { filterCitekeys } from "./citekey-list";
 import { DoiInput } from "./doi-input";
 import { ComparisonView } from "./comparison";
 
+function handleDropdownKeyDown(
+  event: React.KeyboardEvent<HTMLDivElement>,
+  state: CitationState,
+  dispatch: (action: CitationAction) => void,
+  onSelectCitekey?: (citekey: string) => void
+) {
+  switch (event.key) {
+    case "ArrowDown":
+      event.preventDefault();
+      dispatch({ type: "INCREMENT_ACTIVE_INDEX" });
+      break;
+    case "ArrowUp":
+      event.preventDefault();
+      dispatch({ type: "DECREMENT_ACTIVE_INDEX" });
+      break;
+    case "Enter":
+      event.preventDefault();
+      if (state.items.length > 0 && state.activeIndex < state.items.length) {
+        const citekey = state.items[state.activeIndex].citeKey;
+        onSelectCitekey?.(citekey);
+      }
+      dispatch({ type: "CLOSE_CITATION" });
+      break;
+    case "Escape":
+      event.preventDefault();
+      dispatch({ type: "CLOSE_CITATION" });
+      break;
+  }
+}
+
 interface CitationDropdownProps {
   /** Current citation state. */
   state: CitationState;
@@ -118,8 +148,23 @@ export function CitationDropdown({
   const dropdownRef = useRef<HTMLDivElement>(null);
   useDropdownPosition(state, scrollContainerRef, dropdownRef);
 
+  // Auto-focus on mount for keyboard navigation
+  useEffect(() => {
+    dropdownRef.current?.focus();
+  }, []);
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) =>
+    handleDropdownKeyDown(event, state, dispatch, onSelectCitekey);
+
   return (
-    <div ref={dropdownRef} className="citation-dropdown" style={{ position: "absolute" }}>
+    <div
+      ref={dropdownRef}
+      data-testid="citation-dropdown"
+      className="citation-dropdown"
+      style={{ position: "absolute" }}
+      tabIndex={-1}
+      onKeyDown={handleKeyDown}
+    >
       {state.comparison ? (
         renderComparisonView(state, dispatch, onDoiResolved)
       ) : state.doiMode ? (

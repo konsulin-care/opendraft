@@ -9,7 +9,7 @@ import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { saveManuscript } from '../persistence';
 import { PLACEHOLDER_HINT } from '../placeholder';
 import { createBlockGutterPlugin } from '../block-handle-gutter';
-import { createCitationPlugin, citationPluginKey } from '../citation/plugin';
+import { createCitationPlugin, citationPluginKey, type CitationSelectHandler } from '../citation/plugin';
 import { useCitationState } from '../citation/use-citation-state';
 import type { CitationState } from '../citation/types';
 import { quartoRemarkPlugin, quartoInlineCodePlugin, quartoChunkOptionPlugin } from '../quarto-syntax';
@@ -50,21 +50,26 @@ interface ManuscriptEditorProps {
   mode?: 'wysiwyg' | 'source';
 }
 
-const SAVE_DEBOUNCE_MS = 800;
+interface UseManuscriptStateOptions {
+  workspace: WorkspaceAdapter;
+  defaultValue: string;
+  mode: 'wysiwyg' | 'source';
+  onEditorReady?: (api: EditorTestApi) => void;
+  onSelectCitekey?: CitationSelectHandler;
+}
 
+const SAVE_DEBOUNCE_MS = 800;
 interface CrepeConfigOptions {
   root: HTMLElement;
   defaultValue: string;
   placeholderText: string;
   workspace: WorkspaceAdapter;
   onStateChangeRef: React.MutableRefObject<(state: CitationState) => void>;
+  onSelectCitekey?: CitationSelectHandler;
 }
 
 /** Build the imperative test/external API around a milkdown editor. */
-function createTestApi(
-  editor: Editor,
-  syncContent: (mode: 'wysiwyg' | 'source') => void,
-): EditorTestApi {
+function createTestApi(editor: Editor, syncContent: (mode: 'wysiwyg' | 'source') => void): EditorTestApi {
   return {
     insertText: (text) => {
       editor.action((ctx) => {
@@ -104,10 +109,9 @@ function debouncedSaver(workspace: WorkspaceAdapter) {
 
   return { schedule, flush };
 }
-
 /** Create the Crepe configuration for the editor. */
 function createCrepeConfig(options: CrepeConfigOptions) {
-  const { root, defaultValue, placeholderText, workspace, onStateChangeRef } = options;
+  const { root, defaultValue, placeholderText, workspace, onStateChangeRef, onSelectCitekey } = options;
   const crepe = new Crepe({
     root,
     defaultValue,
@@ -132,7 +136,7 @@ function createCrepeConfig(options: CrepeConfigOptions) {
     editor.use($prose(() => createBlockGutterPlugin()));
   });
   crepe.addFeature((editor) => {
-    editor.use($prose(() => createCitationPlugin(workspace, onStateChangeRef.current)));
+    editor.use($prose(() => createCitationPlugin(workspace, onStateChangeRef.current, onSelectCitekey)));
   });
   return crepe;
 }
@@ -181,12 +185,8 @@ function wireEditor(
 }
 
 /** Hook that wires up the Crepe editor, autosave, and mode sync. */
-function useManuscriptState(
-  workspace: WorkspaceAdapter,
-  defaultValue: string,
-  mode: 'wysiwyg' | 'source',
-  onEditorReady?: (api: EditorTestApi) => void,
-) {
+function useManuscriptState(options: UseManuscriptStateOptions) {
+  const { workspace, defaultValue, mode, onEditorReady, onSelectCitekey } = options;
   const placeholderText = PLACEHOLDER_HINT;
   const [sourceMarkdown, setSourceMarkdown] = useState(defaultValue);
   const sourceEditorRef = useRef<SourceEditorHandle | null>(null);
@@ -196,16 +196,16 @@ function useManuscriptState(
 
   const onStateChangeRef = useRef<(state: CitationState) => void>(() => {});
 
+  const syncContent = useContentSync(editorRef, prevModeRef, sourceMarkdown, setSourceMarkdown);
+
   const { loading, get } = useEditor(
-    (root) => createCrepeConfig({ root, defaultValue, placeholderText, workspace, onStateChangeRef }),
-    [defaultValue, workspace],
+    (root) => createCrepeConfig({ root, defaultValue, placeholderText, workspace, onStateChangeRef, onSelectCitekey }),
+    [defaultValue, workspace, onSelectCitekey],
   );
 
   const saverRef = useRef<ReturnType<typeof debouncedSaver> | null>(null);
   if (!saverRef.current) saverRef.current = debouncedSaver(workspace);
   const wiredRef = useRef(false);
-
-  const syncContent = useContentSync(editorRef, prevModeRef, sourceMarkdown, setSourceMarkdown);
 
   // Sync content when mode changes
   useEffect(() => {
@@ -229,6 +229,33 @@ function useManuscriptState(
   return { sourceMarkdown, setSourceMarkdown, sourceEditorRef, scrollContainerRef, editorRef };
 }
 
+/** Creates the citekey selection handler. */
+function createSelectCitekeyHandler(
+  editorRef: React.MutableRefObject<Editor | null>,
+  citationDispatchRef: React.MutableRefObject<((action: import('../citation/types').CitationAction) => void) | null>
+): CitationSelectHandler {
+  return (citekey: string) => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const state = citationPluginKey.getState(
+      editor.action((ctx) => ctx.get(editorViewCtx)).state,
+    ) as CitationState | null;
+    if (!state?.trigger) return;
+
+    editor.action((ctx) => {
+      const view = ctx.get(editorViewCtx);
+      const { from, bracketed } = state.trigger!;
+      const insertText = bracketed ? `[@${citekey}]` : `@${citekey}`;
+      const tr = view.state.tr;
+      tr.insertText(insertText, from, from + 1);
+      view.dispatch(tr);
+    });
+
+    citationDispatchRef.current?.({ type: 'CLOSE_CITATION' });
+  };
+}
+
 /**
  * Continuous whole-manuscript editor: one Milkdown/Crepe surface over
  * plain markdown, autosaved to a single workspace file.
@@ -240,35 +267,26 @@ export function ManuscriptEditor({
   onEditorReady,
   mode = 'wysiwyg',
 }: ManuscriptEditorProps) {
-  const { sourceMarkdown, setSourceMarkdown, sourceEditorRef, scrollContainerRef, editorRef } =
-    useManuscriptState(workspace, defaultValue, mode, onEditorReady);
+  const editorRef = useRef<Editor | null>(null);
+  const citationDispatchRef = useRef<((action: import('../citation/types').CitationAction) => void) | null>(null);
 
-  const { citationState, dispatch: citationDispatch } = useCitationState(editorRef);
+  const handleSelectCitekey = createSelectCitekeyHandler(editorRef, citationDispatchRef);
 
-  const handleSelectCitekey = useCallback(
-    (citekey: string) => {
-      const editor = editorRef.current;
-      if (!editor) return;
+  const { sourceMarkdown, setSourceMarkdown, sourceEditorRef, scrollContainerRef, editorRef: hookEditorRef } =
+    useManuscriptState({ workspace, defaultValue, mode, onEditorReady, onSelectCitekey: handleSelectCitekey });
 
-      const state = citationPluginKey.getState(
-        editor.action((ctx) => ctx.get(editorViewCtx)).state,
-      ) as CitationState | null;
-      if (!state?.trigger) return;
+  // Update editorRef when hookEditorRef.current changes
+  useEffect(() => {
+    if (hookEditorRef.current) {
+      editorRef.current = hookEditorRef.current;
+    }
+  }, [hookEditorRef]);
 
-      // Insert citation using ProseMirror transaction
-      editor.action((ctx) => {
-        const view = ctx.get(editorViewCtx);
-        const { from, bracketed } = state.trigger!;
-        const insertText = bracketed ? `[@${citekey}]` : `@${citekey}`;
-        const tr = view.state.tr;
-        tr.insertText(insertText, from, from + 1);
-        view.dispatch(tr);
-      });
-
-      citationDispatch({ type: 'CLOSE_CITATION' });
-    },
-    [editorRef, citationDispatch],
-  );
+  // Get citation dispatch from the editor
+  const { dispatch: citationDispatch } = useCitationState(editorRef);
+  useEffect(() => {
+    citationDispatchRef.current = citationDispatch;
+  }, [citationDispatch]);
 
   return (
     <EditorSurface
@@ -277,9 +295,6 @@ export function ManuscriptEditor({
       onSourceChange={setSourceMarkdown}
       scrollContainerRef={scrollContainerRef}
       sourceEditorRef={sourceEditorRef}
-      citationState={citationState}
-      onCitationDispatch={citationDispatch}
-      onSelectCitekey={handleSelectCitekey}
     />
   );
 }

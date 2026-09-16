@@ -1,6 +1,4 @@
 import { Milkdown } from "@milkdown/react";
-import type { CitationState, CitationAction } from "../citation/types";
-import { CitationDropdown } from "../citation/dropdown";
 import { SourceEditor, type SourceEditorHandle } from "./SourceEditor";
 
 interface EditorSurfaceProps {
@@ -14,12 +12,6 @@ interface EditorSurfaceProps {
   scrollContainerRef: React.RefObject<HTMLDivElement | null>;
   /** Ref to source editor handle. */
   sourceEditorRef: React.RefObject<SourceEditorHandle | null>;
-  /** Citation plugin state. */
-  citationState: CitationState | null;
-  /** Dispatch function for citation actions. */
-  onCitationDispatch: (action: CitationAction) => void;
-  /** Callback when citekey is selected. */
-  onSelectCitekey: (citekey: string) => void;
 }
 
 /**
@@ -32,9 +24,6 @@ export function EditorSurface({
   onSourceChange,
   scrollContainerRef,
   sourceEditorRef,
-  citationState,
-  onCitationDispatch,
-  onSelectCitekey,
 }: EditorSurfaceProps) {
   return (
     <div className="manuscript-editor" data-testid="manuscript-editor">
@@ -48,14 +37,6 @@ export function EditorSurface({
         }}
       >
         <Milkdown />
-        {citationState && (
-          <CitationDropdown
-            state={citationState}
-            dispatch={onCitationDispatch}
-            onSelectCitekey={onSelectCitekey}
-            scrollContainerRef={scrollContainerRef}
-          />
-        )}
       </div>
       <div
         style={{

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { CitationDropdown } from "./dropdown";
 import type { CitationState } from "./types";
 import type { Reference } from "@opendraft/references";
@@ -79,5 +79,53 @@ describe("CitationDropdown — empty state", () => {
     const scrollContainerRef = { current: document.createElement("div") };
     render(<CitationDropdown state={state} dispatch={dispatch} scrollContainerRef={scrollContainerRef} />);
     expect(screen.getByText("No matching citations")).toBeDefined();
+  });
+});
+
+describe("CitationDropdown — keyboard navigation", () => {
+  function renderAndFocus(state: CitationState, dispatch: ReturnType<typeof vi.fn>, onSelectCitekey?: ReturnType<typeof vi.fn>) {
+    const scrollContainerRef = { current: document.createElement("div") };
+    render(<CitationDropdown state={state} dispatch={dispatch} onSelectCitekey={onSelectCitekey} scrollContainerRef={scrollContainerRef} />);
+    const dropdown = screen.getByTestId("citation-dropdown");
+    dropdown.focus();
+    return dropdown;
+  }
+
+  it("renders dropdown with tabIndex for focus", () => {
+    const dispatch = vi.fn();
+    const state = createOpenState();
+    const scrollContainerRef = { current: document.createElement("div") };
+    render(<CitationDropdown state={state} dispatch={dispatch} scrollContainerRef={scrollContainerRef} />);
+    expect(screen.getByTestId("citation-dropdown").getAttribute("tabIndex")).toBe("-1");
+  });
+
+  it("handles ArrowDown to increment activeIndex", () => {
+    const dispatch = vi.fn();
+    const dropdown = renderAndFocus(createOpenState({ activeIndex: 0 }), dispatch);
+    fireEvent.keyDown(dropdown, { key: "ArrowDown" });
+    expect(dispatch).toHaveBeenCalledWith({ type: "INCREMENT_ACTIVE_INDEX" });
+  });
+
+  it("handles ArrowUp to decrement activeIndex", () => {
+    const dispatch = vi.fn();
+    const dropdown = renderAndFocus(createOpenState({ activeIndex: 1 }), dispatch);
+    fireEvent.keyDown(dropdown, { key: "ArrowUp" });
+    expect(dispatch).toHaveBeenCalledWith({ type: "DECREMENT_ACTIVE_INDEX" });
+  });
+
+  it("handles Enter to select citekey and close dropdown", () => {
+    const dispatch = vi.fn();
+    const onSelectCitekey = vi.fn();
+    const dropdown = renderAndFocus(createOpenState({ activeIndex: 0 }), dispatch, onSelectCitekey);
+    fireEvent.keyDown(dropdown, { key: "Enter" });
+    expect(onSelectCitekey).toHaveBeenCalledWith("doe2024");
+    expect(dispatch).toHaveBeenCalledWith({ type: "CLOSE_CITATION" });
+  });
+
+  it("handles Escape to close dropdown", () => {
+    const dispatch = vi.fn();
+    const dropdown = renderAndFocus(createOpenState(), dispatch);
+    fireEvent.keyDown(dropdown, { key: "Escape" });
+    expect(dispatch).toHaveBeenCalledWith({ type: "CLOSE_CITATION" });
   });
 });

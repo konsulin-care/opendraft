@@ -31,65 +31,71 @@ describe("createCitationPlugin", () => {
     expect(citationPluginKey).toBeDefined();
   });
 
-  it("has handleKeydown that handles Enter for citation insertion", () => {
-    // Verify the plugin has the keydown handler
+  it("does not have handleKeydown (uses SlashProvider)", () => {
     const plugin = createCitationPlugin(workspace);
-    expect(plugin.props?.handleDOMEvents?.keydown).toBeDefined();
+    expect(plugin.props?.handleDOMEvents?.keydown).toBeUndefined();
   });
 
-  it("has handleTextInput for @ trigger detection", () => {
-    // Verify the plugin has the text input handler
+  it("does not have handleTextInput (uses SlashProvider)", () => {
     const plugin = createCitationPlugin(workspace);
-    expect(plugin.props?.handleTextInput).toBeDefined();
+    expect(plugin.props?.handleTextInput).toBeUndefined();
   });
 });
 
-describe("citation plugin — Enter key behavior (source)", () => {
-  it("handles Enter key when citation dropdown is open", () => {
-    // The plugin source should check for Enter key and open state
-    expect(pluginSource).toContain("event.key === \"Enter\"");
-    expect(pluginSource).toMatch(/citationState\?\.open/);
+describe("citation plugin — no longer handles keyboard (delegated to dropdown)", () => {
+  it("does not contain handleKeydown logic", () => {
+    expect(pluginSource).not.toContain("event.key === \"Enter\"");
+    expect(pluginSource).not.toContain("ArrowDown");
+    expect(pluginSource).not.toContain("ArrowUp");
+    expect(pluginSource).not.toContain("Escape");
   });
 
-  it("imports filterCitekeys for filtering active citekey", () => {
-    expect(pluginSource).toContain("filterCitekeys");
-    expect(pluginSource).toMatch(/filterCitekeys.*from/);
+  it("does not use filterCitekeys in plugin", () => {
+    // filterCitekeys is now used in dropdown component
+    expect(pluginSource).not.toContain("filterCitekeys");
   });
 
-  it("inserts citekey using ProseMirror transaction", () => {
-    // The plugin uses tr.insertText to insert the citation
-    expect(pluginSource).toContain("tr.insertText");
+  it("does not insert citekey in plugin", () => {
+    // Insertion is handled in ManuscriptEditor.handleSelectCitekey
+    expect(pluginSource).not.toContain("tr.insertText");
+  });
+});
+
+describe("citation plugin — SlashProvider behavior (source)", () => {
+  it("imports SlashProvider from @milkdown/plugin-slash", () => {
+    expect(pluginSource).toContain("@milkdown/plugin-slash");
+    expect(pluginSource).toContain("SlashProvider");
   });
 
-  it("dispatches CLOSE_CITATION after inserting", () => {
-    // After Enter, the plugin should close the dropdown
+  it("creates SlashProvider with trigger '@'", () => {
+    expect(pluginSource).toMatch(/trigger:\s*["']@["']/);
+  });
+
+  it("uses custom shouldShow for word-boundary detection", () => {
+    expect(pluginSource).toContain("shouldShow");
+  });
+
+  it("provides content element with React-rendered CitationDropdown", () => {
+    expect(pluginSource).toContain("content");
+    expect(pluginSource).toContain("CitationDropdown");
+  });
+
+  it("has onShow callback dispatching OPEN_CITATION", () => {
+    expect(pluginSource).toContain("onShow");
+    expect(pluginSource).toContain("OPEN_CITATION");
+  });
+
+  it("has onHide callback dispatching CLOSE_CITATION", () => {
+    expect(pluginSource).toContain("onHide");
     expect(pluginSource).toContain("CLOSE_CITATION");
   });
-});
 
-describe("citation plugin — handleTextInput behavior (source)", () => {
-  it("detects @ trigger and dispatches OPEN_CITATION", () => {
-    // The plugin should check for @ character and call matchCitationTrigger
-    expect(pluginSource).toContain("text !== \"@\"");
-    expect(pluginSource).toContain("matchCitationTrigger");
+  it("calls provider.update in plugin view update", () => {
+    expect(pluginSource).toContain("provider.update");
   });
 
-  it("captures viewport coordinates via coordsAtPos for dropdown positioning", () => {
-    // The plugin should use view.coordsAtPos to get screen coordinates
-    expect(pluginSource).toContain("coordsAtPos");
-    expect(pluginSource).toMatch(/trigger:.*top.*left/);
-  });
-
-  it("includes top and left in OPEN_CITATION trigger payload", () => {
-    // The OPEN_CITATION action should include screen coordinates
-    expect(pluginSource).toMatch(/top:\s*coords\.top/);
-    expect(pluginSource).toMatch(/left:\s*coords\.left/);
-  });
-
-  it("does not consume the @ character (returns false)", () => {
-    // The handler should return false to let ProseMirror insert the @
-    expect(pluginSource).toContain("return false");
-    expect(pluginSource).toContain("Don");
+  it("calls provider.destroy in plugin view destroy", () => {
+    expect(pluginSource).toContain("provider.destroy");
   });
 });
 
