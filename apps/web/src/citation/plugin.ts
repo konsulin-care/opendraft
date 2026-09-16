@@ -17,27 +17,33 @@ export const citationPluginKey = new PluginKey("citation");
  * and keyboard navigation for the citation dropdown.
  *
  * @param workspace - Workspace adapter for reading references.bib.
+ * @param onStateChange - Optional callback fired on every state transition.
  * @returns ProseMirror Plugin instance.
  */
-export function createCitationPlugin(workspace: WorkspaceAdapter): Plugin {
+export function createCitationPlugin(
+  workspace: WorkspaceAdapter,
+  onStateChange?: (state: CitationState) => void
+): Plugin {
   return new Plugin({
     key: citationPluginKey,
-    state: createState(),
+    state: createState(onStateChange),
     props: createProps(),
     view: createView(workspace),
   });
 }
 
 /** Create the plugin state spec. */
-function createState() {
+function createState(onStateChange?: (state: CitationState) => void) {
   return {
     init: () => createInitialState(),
-    apply: (tr: Parameters<NonNullable<Parameters<typeof Plugin>[0]["state"]>>["0"]["apply"][0], prev: CitationState) => {
+    apply: (
+      tr: Parameters<NonNullable<Parameters<typeof Plugin>[0]["state"]>>["0"]["apply"][0],
+      prev: CitationState
+    ) => {
       const meta = tr.getMeta(citationPluginKey);
-      if (meta) {
-        return citationReducer(prev, meta);
-      }
-      return prev;
+      const next = meta ? citationReducer(prev, meta) : prev;
+      onStateChange?.(next);
+      return next;
     },
   };
 }
