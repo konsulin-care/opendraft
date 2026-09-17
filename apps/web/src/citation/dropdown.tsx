@@ -1,38 +1,7 @@
-import { useEffect, useRef } from "react";
 import type { CitationState, CitationAction } from "./types";
 import { filterCitekeys } from "./citekey-list";
 import { DoiInput } from "./doi-input";
 import { ComparisonView } from "./comparison";
-
-function handleDropdownKeyDown(
-  event: React.KeyboardEvent<HTMLDivElement>,
-  state: CitationState,
-  dispatch: (action: CitationAction) => void,
-  onSelectCitekey?: (citekey: string) => void
-) {
-  switch (event.key) {
-    case "ArrowDown":
-      event.preventDefault();
-      dispatch({ type: "INCREMENT_ACTIVE_INDEX" });
-      break;
-    case "ArrowUp":
-      event.preventDefault();
-      dispatch({ type: "DECREMENT_ACTIVE_INDEX" });
-      break;
-    case "Enter":
-      event.preventDefault();
-      if (state.items.length > 0 && state.activeIndex < state.items.length) {
-        const citekey = state.items[state.activeIndex].citeKey;
-        onSelectCitekey?.(citekey);
-      }
-      dispatch({ type: "CLOSE_CITATION" });
-      break;
-    case "Escape":
-      event.preventDefault();
-      dispatch({ type: "CLOSE_CITATION" });
-      break;
-  }
-}
 
 interface CitationDropdownProps {
   /** Current citation state. */
@@ -43,33 +12,6 @@ interface CitationDropdownProps {
   onSelectCitekey?: (citekey: string) => void;
   /** Callback when DOI is resolved. */
   onDoiResolved?: (bibtex: string) => void;
-  /** Reference to the scroll container for coordinate conversion. */
-  scrollContainerRef: React.RefObject<HTMLDivElement | null>;
-}
-
-function useDropdownPosition(
-  state: CitationState,
-  scrollContainerRef: React.RefObject<HTMLDivElement | null>,
-  dropdownRef: React.RefObject<HTMLDivElement | null>
-) {
-  useEffect(() => {
-    if (!state.trigger || !scrollContainerRef.current || !dropdownRef.current) return;
-
-    const container = scrollContainerRef.current;
-    const containerRect = container.getBoundingClientRect();
-
-    // Viewport coordinates from trigger
-    const viewportTop = state.trigger.top;
-    const viewportLeft = state.trigger.left;
-
-    // Convert to container-relative coordinates
-    const top = viewportTop - containerRect.top + container.scrollTop;
-    const left = viewportLeft - containerRect.left + container.scrollLeft;
-
-    // Position dropdown below the cursor (add line height ~1.5em)
-    dropdownRef.current.style.top = top + 20 + "px";
-    dropdownRef.current.style.left = left + "px";
-  }, [state.trigger, scrollContainerRef]);
 }
 
 function renderComparisonView(
@@ -141,29 +83,13 @@ export function CitationDropdown({
   dispatch,
   onSelectCitekey,
   onDoiResolved,
-  scrollContainerRef,
 }: CitationDropdownProps) {
   if (!state.open) return null;
 
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  useDropdownPosition(state, scrollContainerRef, dropdownRef);
-
-  // Auto-focus on mount for keyboard navigation
-  useEffect(() => {
-    dropdownRef.current?.focus();
-  }, []);
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) =>
-    handleDropdownKeyDown(event, state, dispatch, onSelectCitekey);
-
   return (
     <div
-      ref={dropdownRef}
       data-testid="citation-dropdown"
       className="citation-dropdown"
-      style={{ position: "absolute" }}
-      tabIndex={-1}
-      onKeyDown={handleKeyDown}
     >
       {state.comparison ? (
         renderComparisonView(state, dispatch, onDoiResolved)

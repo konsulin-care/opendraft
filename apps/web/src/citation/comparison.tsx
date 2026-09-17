@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import type { ComparisonState, Reference } from './types';
+import type { ComparisonState } from './types';
+import type { Reference } from '@opendraft/references';
 
 interface ComparisonViewProps {
   /** Comparison state with current and incoming entries. */

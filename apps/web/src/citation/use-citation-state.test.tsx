@@ -69,7 +69,7 @@ describe('useCitationState — dispatch', () => {
     const { result } = renderHook(() => useCitationState(editorRef));
 
     act(() => {
-      result.current.dispatch({ type: 'OPEN_CITATION', trigger: { from: 0, bracketed: false, top: 100, left: 50 } });
+      result.current.dispatch({ type: 'OPEN_CITATION', trigger: { from: 0, bracketed: false } });
     });
 
     expect(mockEditor.view.state.tr.setMeta).toHaveBeenCalledWith(citationPluginKey, expect.any(Object));

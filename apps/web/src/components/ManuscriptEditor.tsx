@@ -141,7 +141,6 @@ function createCrepeConfig(options: CrepeConfigOptions) {
   return crepe;
 }
 
-/** Hook that creates the content sync callback for mode switching. */
 function useContentSync(
   editorRef: React.MutableRefObject<Editor | null>,
   prevModeRef: React.MutableRefObject<'wysiwyg' | 'source'>,
@@ -219,6 +218,10 @@ function useManuscriptState(options: UseManuscriptStateOptions) {
     wiredRef.current = true;
     editorRef.current = editor;
     wireEditor(editor, saverRef.current!, syncContent, onEditorReady);
+
+    return () => {
+      wiredRef.current = false;
+    };
   }, [loading, get, onEditorReady, workspace, syncContent]);
 
   useEffect(() => {
@@ -229,7 +232,6 @@ function useManuscriptState(options: UseManuscriptStateOptions) {
   return { sourceMarkdown, setSourceMarkdown, sourceEditorRef, scrollContainerRef, editorRef };
 }
 
-/** Creates the citekey selection handler. */
 function createSelectCitekeyHandler(
   editorRef: React.MutableRefObject<Editor | null>,
   citationDispatchRef: React.MutableRefObject<((action: import('../citation/types').CitationAction) => void) | null>
@@ -237,12 +239,10 @@ function createSelectCitekeyHandler(
   return (citekey: string) => {
     const editor = editorRef.current;
     if (!editor) return;
-
     const state = citationPluginKey.getState(
       editor.action((ctx) => ctx.get(editorViewCtx)).state,
     ) as CitationState | null;
     if (!state?.trigger) return;
-
     editor.action((ctx) => {
       const view = ctx.get(editorViewCtx);
       const { from, bracketed } = state.trigger!;
@@ -251,7 +251,6 @@ function createSelectCitekeyHandler(
       tr.insertText(insertText, from, from + 1);
       view.dispatch(tr);
     });
-
     citationDispatchRef.current?.({ type: 'CLOSE_CITATION' });
   };
 }
@@ -270,17 +269,18 @@ export function ManuscriptEditor({
   const editorRef = useRef<Editor | null>(null);
   const citationDispatchRef = useRef<((action: import('../citation/types').CitationAction) => void) | null>(null);
 
-  const handleSelectCitekey = createSelectCitekeyHandler(editorRef, citationDispatchRef);
+  const handleSelectCitekey = useCallback(
+    createSelectCitekeyHandler(editorRef, citationDispatchRef),
+    [editorRef, citationDispatchRef],
+  );
 
   const { sourceMarkdown, setSourceMarkdown, sourceEditorRef, scrollContainerRef, editorRef: hookEditorRef } =
     useManuscriptState({ workspace, defaultValue, mode, onEditorReady, onSelectCitekey: handleSelectCitekey });
 
   // Update editorRef when hookEditorRef.current changes
   useEffect(() => {
-    if (hookEditorRef.current) {
-      editorRef.current = hookEditorRef.current;
-    }
-  }, [hookEditorRef]);
+    editorRef.current = hookEditorRef.current;
+  }, [hookEditorRef.current]);
 
   // Get citation dispatch from the editor
   const { dispatch: citationDispatch } = useCitationState(editorRef);

@@ -32,7 +32,7 @@ export function createCitationPlugin(
   return new Plugin({
     key: citationPluginKey,
     state: createState(onStateChange),
-    props: createProps(),
+    props: createProps(onSelectCitekey),
     view: createView(workspace, onSelectCitekey),
   });
 }
@@ -42,7 +42,7 @@ function createState(onStateChange?: (state: CitationState) => void) {
   return {
     init: () => createInitialState(),
     apply: (
-      tr: Parameters<NonNullable<Parameters<typeof Plugin>[0]["state"]>>["0"]["apply"][0],
+      tr: import("@milkdown/kit/prose/state").Transaction,
       prev: CitationState
     ) => {
       const meta = tr.getMeta(citationPluginKey);
@@ -53,9 +53,38 @@ function createState(onStateChange?: (state: CitationState) => void) {
   };
 }
 
-/** Create the plugin props spec (no custom handlers needed). */
-function createProps() {
-  return {};
+/** Create the plugin props spec (handles keyboard navigation). */
+function createProps(onSelectCitekey?: CitationSelectHandler) {
+  return {
+    handleKeyDown(view: EditorView, event: KeyboardEvent) {
+      const state = citationPluginKey.getState(view.state) as CitationState;
+      if (!state?.open) return false;
+
+      switch (event.key) {
+        case "ArrowDown":
+          event.preventDefault();
+          view.dispatch(view.state.tr.setMeta(citationPluginKey, { type: "INCREMENT_ACTIVE_INDEX" }));
+          return true;
+        case "ArrowUp":
+          event.preventDefault();
+          view.dispatch(view.state.tr.setMeta(citationPluginKey, { type: "DECREMENT_ACTIVE_INDEX" }));
+          return true;
+        case "Enter":
+          event.preventDefault();
+          if (state.items.length > 0 && state.activeIndex < state.items.length) {
+            const citekey = state.items[state.activeIndex].citeKey;
+            onSelectCitekey?.(citekey);
+          }
+          view.dispatch(view.state.tr.setMeta(citationPluginKey, { type: "CLOSE_CITATION" }));
+          return true;
+        case "Escape":
+          event.preventDefault();
+          view.dispatch(view.state.tr.setMeta(citationPluginKey, { type: "CLOSE_CITATION" }));
+          return true;
+      }
+      return false;
+    }
+  };
 }
 
 /** Create dispatch function for citation actions. */
@@ -77,6 +106,10 @@ function createSlashProviderConfig(
   const provider = new SlashProvider({
     trigger: "@",
     content: container,
+    debounce: 0,
+    floatingUIOptions: {
+      placement: "bottom-start",
+    },
     shouldShow: (editorView) => {
       const content = provider.getContent(editorView);
       if (!content) return false;
@@ -90,22 +123,24 @@ function createSlashProviderConfig(
       const charBefore = content[atPos - 1];
       return charBefore === "[" || /\s/.test(charBefore);
     },
-    onShow: () => {
-      const state = view.state;
-      const { selection } = state;
-      const from = selection.$from.pos - 1;
-      const textBefore = state.doc.textBetween(Math.max(0, from - 1), from);
-      const bracketed = textBefore === "[";
-
-      dispatch({
-        type: "OPEN_CITATION",
-        trigger: { from, bracketed, top: 0, left: 0 },
-      });
-    },
-    onHide: () => {
-      dispatch({ type: "CLOSE_CITATION" });
-    },
   });
+
+  provider.onShow = () => {
+    const state = view.state;
+    const { selection } = state;
+    const from = selection.$from.pos - 1;
+    const textBefore = state.doc.textBetween(Math.max(0, from - 1), from);
+    const bracketed = textBefore === "[";
+
+    dispatch({
+      type: "OPEN_CITATION",
+      trigger: { from, bracketed },
+    });
+  };
+
+  provider.onHide = () => {
+    dispatch({ type: "CLOSE_CITATION" });
+  };
 
   return { provider, container, root };
 }
@@ -114,7 +149,6 @@ function createSlashProviderConfig(
 function createUpdateDropdown(
   root: ReturnType<typeof createRoot>,
   dispatch: (action: CitationAction) => void,
-  view: EditorView,
   onSelectCitekey?: CitationSelectHandler
 ) {
   return (state: CitationState) => {
@@ -123,7 +157,6 @@ function createUpdateDropdown(
         state,
         dispatch,
         onSelectCitekey,
-        scrollContainerRef: { current: view.dom.parentElement },
       })
     );
   };
@@ -136,7 +169,7 @@ function createView(workspace: WorkspaceAdapter, onSelectCitekey?: CitationSelec
 
     const dispatch = createDispatch(view);
     const { provider, root } = createSlashProviderConfig(dispatch, view);
-    const updateDropdown = createUpdateDropdown(root, dispatch, view, onSelectCitekey);
+    const updateDropdown = createUpdateDropdown(root, dispatch, onSelectCitekey);
 
     return {
       update(editorView: EditorView, prevState: import("@milkdown/kit/prose/state").EditorState) {
@@ -159,14 +192,22 @@ async function loadReferences(
   workspace: WorkspaceAdapter,
   view: EditorView
 ): Promise<void> {
-  const content = await workspace.readFile("references.bib");
-  if (!content) return;
-
   try {
-    const refs = parseBibTeX(content);
-    const tr = view.state.tr.setMeta(citationPluginKey, { type: "SET_ITEMS", items: refs });
-    view.dispatch(tr);
-  } catch {
-    // Ignore parse errors - empty list is fine
+    const content = await workspace.readFile("references.bib");
+    if (!content) return;
+
+    try {
+      const refs = parseBibTeX(content);
+      const tr = view.state.tr.setMeta(citationPluginKey, { type: "SET_ITEMS", items: refs });
+      view.dispatch(tr);
+    } catch {
+      // Ignore parse errors - empty list is fine
+    }
+  } catch (err) {
+    // Ignore errors from closed database during Strict Mode cleanup
+    if (err instanceof DOMException && err.name === "InvalidStateError") {
+      return;
+    }
+    throw err;
   }
 }

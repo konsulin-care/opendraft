@@ -31,9 +31,9 @@ describe("createCitationPlugin", () => {
     expect(citationPluginKey).toBeDefined();
   });
 
-  it("does not have handleKeydown (uses SlashProvider)", () => {
+  it("handles keydown when dropdown is open", () => {
     const plugin = createCitationPlugin(workspace);
-    expect(plugin.props?.handleDOMEvents?.keydown).toBeUndefined();
+    expect(plugin.props?.handleKeyDown).toBeDefined();
   });
 
   it("does not have handleTextInput (uses SlashProvider)", () => {
@@ -42,12 +42,12 @@ describe("createCitationPlugin", () => {
   });
 });
 
-describe("citation plugin — no longer handles keyboard (delegated to dropdown)", () => {
-  it("does not contain handleKeydown logic", () => {
-    expect(pluginSource).not.toContain("event.key === \"Enter\"");
-    expect(pluginSource).not.toContain("ArrowDown");
-    expect(pluginSource).not.toContain("ArrowUp");
-    expect(pluginSource).not.toContain("Escape");
+describe("citation plugin — handles keyboard navigation via handleKeyDown", () => {
+  it("contains handleKeyDown logic", () => {
+    expect(pluginSource).toContain("handleKeyDown(");
+    expect(pluginSource).toContain("ArrowDown");
+    expect(pluginSource).toContain("ArrowUp");
+    expect(pluginSource).toContain("Escape");
   });
 
   it("does not use filterCitekeys in plugin", () => {
@@ -71,6 +71,20 @@ describe("citation plugin — SlashProvider behavior (source)", () => {
     expect(pluginSource).toMatch(/trigger:\s*["']@["']/);
   });
 
+  it("sets debounce to 0 for immediate trigger response", () => {
+    expect(pluginSource).toContain("debounce: 0");
+  });
+
+  it("passes floatingUIOptions with bottom-start placement", () => {
+    expect(pluginSource).toContain("floatingUIOptions");
+    expect(pluginSource).toContain("bottom-start");
+  });
+
+  it("onShow does not dispatch top/left coordinates", () => {
+    expect(pluginSource).not.toContain("top: 0");
+    expect(pluginSource).not.toContain("left: 0");
+  });
+
   it("uses custom shouldShow for word-boundary detection", () => {
     expect(pluginSource).toContain("shouldShow");
   });
@@ -80,21 +94,15 @@ describe("citation plugin — SlashProvider behavior (source)", () => {
     expect(pluginSource).toContain("CitationDropdown");
   });
 
-  it("has onShow callback dispatching OPEN_CITATION", () => {
+  it("has onShow and onHide lifecycle callbacks", () => {
     expect(pluginSource).toContain("onShow");
     expect(pluginSource).toContain("OPEN_CITATION");
-  });
-
-  it("has onHide callback dispatching CLOSE_CITATION", () => {
     expect(pluginSource).toContain("onHide");
     expect(pluginSource).toContain("CLOSE_CITATION");
   });
 
-  it("calls provider.update in plugin view update", () => {
+  it("calls provider.update and provider.destroy in plugin view", () => {
     expect(pluginSource).toContain("provider.update");
-  });
-
-  it("calls provider.destroy in plugin view destroy", () => {
     expect(pluginSource).toContain("provider.destroy");
   });
 });

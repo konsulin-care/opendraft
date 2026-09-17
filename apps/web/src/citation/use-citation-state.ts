@@ -25,7 +25,7 @@ export function useCitationState(editorRef: React.MutableRefObject<Editor | null
     const editor = editorRef.current;
     if (!editor) return;
 
-    let view: { state: { getMeta: (key: typeof citationPluginKey) => CitationAction | undefined } } | null = null;
+    let view: import('@milkdown/kit/prose/view').EditorView | null = null;
     editor.action((ctx) => {
       view = ctx.get(editorViewCtx);
     });
