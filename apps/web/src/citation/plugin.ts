@@ -127,7 +127,7 @@ function createSlashProviderConfig(
 
   // Floating UI sets left/top but the wrapper needs position:absolute
   // for those values to take effect (same as .milkdown-slash-menu).
-  provider.container.style.position = "absolute";
+  provider.element.style.position = "absolute";
 
   provider.onShow = () => {
     const state = view.state;
