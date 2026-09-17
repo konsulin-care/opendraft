@@ -1,9 +1,19 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { CitationDropdown } from "./dropdown";
 import type { CitationState } from "./types";
 import type { Reference } from "@opendraft/references";
+
+const { mockResolveDoi, mockNormalizeDoi } = vi.hoisted(() => ({
+  mockResolveDoi: vi.fn(),
+  mockNormalizeDoi: vi.fn(),
+}));
+
+vi.mock("./doi-resolver", () => ({
+  resolveDoi: (...args: unknown[]) => mockResolveDoi(...args),
+  normalizeDoi: (...args: unknown[]) => mockNormalizeDoi(...args),
+}));
 
 const mockReferences: Reference[] = [
   {
@@ -73,6 +83,43 @@ describe("CitationDropdown — empty state", () => {
     const state = createOpenState({ query: "zzzzz" });
     render(<CitationDropdown state={state} dispatch={dispatch} />);
     expect(screen.getByText("No matching citations")).toBeDefined();
+  });
+});
+
+describe("CitationDropdown — DOI resolution", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("calls resolveDoi when Enter is pressed in DOI mode", async () => {
+    mockNormalizeDoi.mockReturnValue("10.1234/test");
+    mockResolveDoi.mockResolvedValue("@article{test, title={Test}}");
+
+    const dispatch = vi.fn();
+    const state = createOpenState({ doiMode: true, doiInput: "10.1234/test" });
+    render(<CitationDropdown state={state} dispatch={dispatch} />);
+
+    fireEvent.keyDown(screen.getByPlaceholderText(/Enter DOI/), { key: "Enter" });
+
+    await vi.waitFor(() => {
+      expect(dispatch).toHaveBeenCalled();
+    });
+    const types = dispatch.mock.calls.map((c) => c[0].type);
+    expect(types).toContain("SET_DOI_LOADING");
+  });
+
+  it("dispatches SET_ERROR for invalid DOI format", async () => {
+    mockNormalizeDoi.mockReturnValue(null);
+
+    const dispatch = vi.fn();
+    const state = createOpenState({ doiMode: true, doiInput: "not a doi" });
+    render(<CitationDropdown state={state} dispatch={dispatch} />);
+
+    fireEvent.keyDown(screen.getByPlaceholderText(/Enter DOI/), { key: "Enter" });
+
+    await vi.waitFor(() => {
+      expect(dispatch).toHaveBeenCalledWith({ type: "SET_ERROR", error: { message: "Invalid DOI format" } });
+    });
   });
 });
 

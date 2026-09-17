@@ -3,6 +3,36 @@
  */
 
 /**
+ * Normalize user input to a bare DOI string.
+ *
+ * Accepts raw DOIs, doi.org URLs, and arbitrary URLs containing a DOI.
+ * Returns null if no DOI pattern can be extracted.
+ *
+ * @param input - User-entered DOI string.
+ * @returns Bare DOI or null.
+ */
+export function normalizeDoi(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  // 1. Bare DOI: starts with 10.XXXX/
+  const bareMatch = trimmed.match(/^(10\.\d{4,}\/.+?)\/?$/);
+  if (bareMatch) return bareMatch[1];
+
+  // 2. doi.org URL: extract everything after doi.org/, strip query/hash/trailing slash
+  const doiOrgMatch = trimmed.match(/doi\.org\/([^\s?#]+)/i);
+  if (doiOrgMatch) {
+    return doiOrgMatch[1].replace(/\/$/, '') || null;
+  }
+
+  // 3. Arbitrary URL: find a DOI pattern (10.XXXX/...) anywhere, stopping at query/hash/whitespace
+  const anywhereMatch = trimmed.match(/(10\.\d{4,}\/[^\s?#]+)/);
+  if (anywhereMatch) return anywhereMatch[1];
+
+  return null;
+}
+
+/**
  * Clean up BibTeX entry fetched from DOI.
  *
  * Fixes:

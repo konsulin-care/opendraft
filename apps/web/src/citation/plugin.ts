@@ -70,6 +70,7 @@ function createProps(onSelectCitekey?: CitationSelectHandler) {
           view.dispatch(view.state.tr.setMeta(citationPluginKey, { type: "DECREMENT_ACTIVE_INDEX" }));
           return true;
         case "Enter":
+          if (state.doiMode) return false; // let React handle it
           event.preventDefault();
           if (state.items.length > 0 && state.activeIndex < state.items.length) {
             const citekey = state.items[state.activeIndex].citeKey;

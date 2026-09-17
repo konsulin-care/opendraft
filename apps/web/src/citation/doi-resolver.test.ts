@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { resolveDoi, cleanupBibtex } from './doi-resolver';
+import { resolveDoi, cleanupBibtex, normalizeDoi } from './doi-resolver';
 
 describe('cleanupBibtex', () => {
   it('replaces en dashes with -- in pages field', () => {
@@ -40,6 +40,44 @@ describe('cleanupBibtex', () => {
     // Should not double-escape
     expect(result).toContain('title={A \\& B}');
     expect(result).not.toContain('title={A \\\\& B}');
+  });
+});
+
+describe('normalizeDoi', () => {
+  it('returns bare DOI as-is', () => {
+    expect(normalizeDoi('10.1177/16094069231205789')).toBe('10.1177/16094069231205789');
+  });
+
+  it('extracts DOI from https://doi.org/ URL', () => {
+    expect(normalizeDoi('https://doi.org/10.1177/16094069231205789')).toBe('10.1177/16094069231205789');
+  });
+
+  it('extracts DOI from http://doi.org/ URL', () => {
+    expect(normalizeDoi('http://doi.org/10.1177/16094069231205789')).toBe('10.1177/16094069231205789');
+  });
+
+  it('extracts DOI from arbitrary URL containing DOI', () => {
+    expect(normalizeDoi('https://example.com/doi/full/10.1177/16094069231205789')).toBe('10.1177/16094069231205789');
+  });
+
+  it('strips trailing slash', () => {
+    expect(normalizeDoi('10.1177/16094069231205789/')).toBe('10.1177/16094069231205789');
+  });
+
+  it('strips query parameters', () => {
+    expect(normalizeDoi('https://doi.org/10.1177/16094069231205789?foo=bar')).toBe('10.1177/16094069231205789');
+  });
+
+  it('trims whitespace', () => {
+    expect(normalizeDoi('  10.1177/16094069231205789  ')).toBe('10.1177/16094069231205789');
+  });
+
+  it('returns null for invalid input', () => {
+    expect(normalizeDoi('not a doi')).toBeNull();
+  });
+
+  it('returns null for empty string', () => {
+    expect(normalizeDoi('')).toBeNull();
   });
 });
 

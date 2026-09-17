@@ -2,6 +2,7 @@ import type { CitationState, CitationAction } from "./types";
 import { filterCitekeys } from "./citekey-list";
 import { DoiInput } from "./doi-input";
 import { ComparisonView } from "./comparison";
+import { resolveDoi, normalizeDoi } from "./doi-resolver";
 
 interface CitationDropdownProps {
   /** Current citation state. */
@@ -46,9 +47,22 @@ function renderDoiInput(
     <DoiInput
       doi={state.doiInput}
       onDoiChange={(doi) => dispatch({ type: "SET_DOI_INPUT", doi })}
-      onResolve={(_doi) => {
+      onResolve={async (doi) => {
+        const normalized = normalizeDoi(doi);
+        if (!normalized) {
+          dispatch({ type: "SET_ERROR", error: { message: "Invalid DOI format" } });
+          return;
+        }
         dispatch({ type: "SET_DOI_LOADING", loading: true });
-        // TODO: Call DOI resolver and handle response
+        try {
+          const bibtex = await resolveDoi(normalized);
+          const emptyRef = { citeKey: "", entryType: "", fields: {} as Record<string, string> };
+          dispatch({ type: "SET_COMPARISON", comparison: { current: emptyRef, incoming: emptyRef, editedBibtex: bibtex, originalCitekey: "" } });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "DOI resolution failed";
+          dispatch({ type: "SET_ERROR", error: { message } });
+          dispatch({ type: "SET_DOI_LOADING", loading: false });
+        }
       }}
       onEscape={() => dispatch({ type: "EXIT_DOI_MODE" })}
     />
