@@ -95,6 +95,17 @@ function createDispatch(view: EditorView) {
   };
 }
 
+/** Check whether the @ trigger is at a valid position in the text. */
+function shouldShowCitation(content: string): boolean {
+  if (!content) return false;
+  const lastChar = content[content.length - 1];
+  if (lastChar !== "@") return false;
+  const atPos = content.length - 1;
+  if (atPos === 0) return true;
+  const charBefore = content[atPos - 1];
+  return charBefore === "[" || /\s/.test(charBefore);
+}
+
 /** Create SlashProvider configuration. */
 function createSlashProviderConfig(
   dispatch: (action: CitationAction) => void,
@@ -110,20 +121,13 @@ function createSlashProviderConfig(
     floatingUIOptions: {
       placement: "bottom-start",
     },
-    shouldShow: (editorView) => {
-      const content = provider.getContent(editorView);
-      if (!content) return false;
-
-      const lastChar = content[content.length - 1];
-      if (lastChar !== "@") return false;
-
-      const atPos = content.length - 1;
-      if (atPos === 0) return true;
-
-      const charBefore = content[atPos - 1];
-      return charBefore === "[" || /\s/.test(charBefore);
-    },
+    shouldShow: (editorView) =>
+      shouldShowCitation(provider.getContent(editorView)),
   });
+
+  // Floating UI sets left/top but the wrapper needs position:absolute
+  // for those values to take effect (same as .milkdown-slash-menu).
+  provider.container.style.position = "absolute";
 
   provider.onShow = () => {
     const state = view.state;
