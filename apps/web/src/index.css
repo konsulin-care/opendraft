@@ -50,6 +50,58 @@
   }
 }
 
+/* ── Hide stock Crepe block handle (we use custom gutter handle) ── */
+.milkdown-block-handle {
+  display: none !important;
+}
+
+/* ── Block gutter handle ── */
+/* The gutter container is positioned absolutely within .milkdown, holding the drag handle. */
+.block-gutter-container {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 40px;
+  pointer-events: none;
+}
+
+/* The draggable six-dot handle, vertically centered on the active block. */
+.block-gutter-handle {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  border-radius: 4px;
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.block-gutter-handle[data-show="true"] {
+  opacity: 1;
+}
+
+.block-gutter-handle:hover {
+  background: var(--crepe-color-hover);
+}
+
+.block-gutter-handle svg {
+  width: 24px;
+  height: 24px;
+  fill: var(--crepe-color-outline);
+}
+
+/* ── Quarto chunk option lines ── */
+/* Lines starting with #| in code blocks are Quarto chunk options.
+   They should be slightly more visible than regular comments (#9ca3af)
+   but still muted. */
+.quarto-chunk-option {
+  color: #6b7280;
+}
+
 /* ── Slash menu: fix padding + prevent horizontal scroll ── */
 .milkdown .milkdown-slash-menu {
   max-width: 320px;
@@ -91,6 +143,7 @@ textarea {
   height: 100%;
   min-height: 0;
   overflow: hidden;
+  background-color: white;
 }
 
 /* scroll viewport — the root wrapper that @milkdown/react renders */
@@ -112,7 +165,7 @@ textarea {
 .manuscript-editor .editor {
   max-width: 46rem;
   margin-inline: auto;
-  padding: 2rem 1rem 4rem;
+  padding: 2rem 1rem 4rem 3rem;
 }
 
 .manuscript-editor .ProseMirror p {
@@ -196,4 +249,203 @@ textarea {
 
 .commit-actions button:disabled {
   @apply cursor-not-allowed opacity-50;
+}
+
+/* ── Citation dropdown ── */
+.milkdown .citation-dropdown {
+  position: absolute;
+  z-index: 100;
+  width: 320px;
+  background: white;
+  border: 1px solid var(--crepe-color-outline);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Comparison view needs more space than the citekey list */
+.milkdown .citation-dropdown:has(.citation-comparison) {
+  width: 480px;
+}
+
+.milkdown .citation-search {
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-bottom: 1px solid var(--crepe-color-outline);
+  font-size: 0.875rem;
+  outline: none;
+}
+
+.milkdown .citation-items {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.milkdown .citation-item {
+  display: flex;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.milkdown .citation-item:hover,
+.milkdown .citation-item.active {
+  background: var(--crepe-color-hover);
+}
+
+.milkdown .citation-key {
+  font-family: var(--crepe-font-code);
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+.milkdown .citation-meta {
+  color: var(--crepe-color-on-surface-variant);
+  font-size: 0.75rem;
+}
+
+.milkdown .citation-empty {
+  padding: 12px;
+  color: var(--crepe-color-on-surface-variant);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.milkdown .citation-add-btn {
+  display: flex;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--crepe-color-outline);
+  cursor: pointer;
+}
+
+.milkdown .citation-add-btn:hover {
+  background: var(--crepe-color-hover);
+}
+
+/* ── DOI input ── */
+.milkdown .citation-doi-input {
+  padding: 8px 12px;
+}
+
+.milkdown .citation-doi-field {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--crepe-color-outline);
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-family: var(--crepe-font-code);
+}
+
+.milkdown .citation-doi-field:focus {
+  outline: none;
+  border-color: var(--crepe-color-primary);
+}
+
+/* ── Comparison view ── */
+.milkdown .citation-comparison {
+  width: 480px;
+}
+
+.milkdown .citation-comparison-header {
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  color: var(--crepe-color-on-surface-variant);
+  border-bottom: 1px solid var(--crepe-color-outline);
+}
+
+.milkdown .citation-comparison-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.milkdown .citation-comparison-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.milkdown .citation-comparison-bibtex {
+  font-family: var(--crepe-font-code);
+  font-size: 0.75rem;
+  background: var(--crepe-color-surface-low);
+  padding: 8px;
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.milkdown .citation-comparison-editor {
+  width: 100%;
+  height: 120px;
+  font-family: var(--crepe-font-code);
+  font-size: 0.75rem;
+  padding: 8px;
+  border: 1px solid var(--crepe-color-outline);
+  border-radius: 4px;
+  resize: vertical;
+}
+
+.milkdown .citation-comparison-editor:focus {
+  outline: none;
+  border-color: var(--crepe-color-primary);
+}
+
+.milkdown .citation-comparison-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--crepe-color-outline);
+}
+
+/* ── Buttons ── */
+.milkdown .citation-btn {
+  padding: 6px 12px;
+  font-size: 0.875rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.milkdown .citation-btn-secondary {
+  background: none;
+  border: 1px solid var(--crepe-color-outline);
+  color: var(--crepe-color-on-surface);
+}
+
+.milkdown .citation-btn-secondary:hover {
+  background: var(--crepe-color-hover);
+}
+
+.milkdown .citation-btn-primary {
+  background: var(--crepe-color-primary);
+  border: 1px solid var(--crepe-color-primary);
+  color: var(--crepe-color-on-secondary);
+}
+
+.milkdown .citation-btn-primary:hover {
+  opacity: 0.9;
+}
+
+/* ── Responsive ── */
+@media (max-width: 639px) {
+  .milkdown .citation-dropdown {
+    width: 100%;
+  }
+
+  .milkdown .citation-comparison {
+    width: 100%;
+  }
+
+  .milkdown .citation-comparison-columns {
+    grid-template-columns: 1fr;
+  }
 }

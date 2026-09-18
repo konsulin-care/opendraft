@@ -1,9 +1,12 @@
 import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { EditorState } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
+import { EditorView, keymap, drawSelection, dropCursor, highlightActiveLine, highlightActiveLineGutter, highlightSpecialChars, lineNumbers, rectangularSelection, crosshairCursor } from '@codemirror/view';
 import { markdown } from '@codemirror/lang-markdown';
 import { oneDark } from '@codemirror/theme-one-dark';
-import { basicSetup } from 'codemirror';
+import { autocompletion, completionKeymap as autocompleteCompletionKeymap, closeBrackets } from '@codemirror/autocomplete';
+import { searchKeymap as searchSearchKeymap } from '@codemirror/search';
+import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
+import { foldGutter, foldKeymap, indentOnInput, bracketMatching } from '@codemirror/language';
 
 /** Imperative handle for SourceEditor — cursor and scroll preservation. */
 export interface SourceEditorHandle {
@@ -48,6 +51,71 @@ function makeImperativeHandle(
   };
 }
 
+/** Sync external prop changes into a CodeMirror view, skipping user edits. */
+function useExternalValueSync(
+  viewRef: React.MutableRefObject<EditorView | null>,
+  isInternalChangeRef: React.MutableRefObject<boolean>,
+  value: string,
+) {
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    if (isInternalChangeRef.current) {
+      isInternalChangeRef.current = false;
+      return;
+    }
+    const currentDoc = view.state.doc.toString();
+    if (value !== currentDoc) {
+      view.dispatch({
+        changes: { from: 0, to: currentDoc.length, insert: value },
+      });
+    }
+  }, [value]);
+}
+
+/** Create a CodeMirror EditorState with markdown support and change tracking. */
+function createState(
+  value: string,
+  isInternalChangeRef: React.MutableRefObject<boolean>,
+  onChange: (value: string) => void,
+) {
+  return EditorState.create({
+    doc: value,
+    extensions: [
+      lineNumbers(),
+      highlightActiveLineGutter(),
+      highlightSpecialChars(),
+      history(),
+      foldGutter(),
+      drawSelection(),
+      dropCursor(),
+      EditorState.allowMultipleSelections.of(true),
+      indentOnInput(),
+      bracketMatching(),
+      closeBrackets(),
+      autocompletion(),
+      rectangularSelection(),
+      crosshairCursor(),
+      highlightActiveLine(),
+      keymap.of([
+        ...defaultKeymap,
+        ...historyKeymap,
+        ...foldKeymap,
+        ...autocompleteCompletionKeymap,
+        ...searchSearchKeymap,
+      ]),
+      markdown(),
+      oneDark,
+      EditorView.updateListener.of((update) => {
+        if (update.docChanged) {
+          isInternalChangeRef.current = true;
+          onChange(update.state.doc.toString());
+        }
+      }),
+    ],
+  });
+}
+
 /**
  * Raw markdown editor backed by CodeMirror 6 with markdown syntax
  * highlighting and the oneDark theme. Used for the "source" mode
@@ -57,38 +125,21 @@ export const SourceEditor = forwardRef<SourceEditorHandle, SourceEditorProps>(
   function SourceEditor({ value, onChange, className }, ref) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const viewRef = useRef<EditorView | null>(null);
+    const isInternalChangeRef = useRef(false);
 
     // Mount CodeMirror on first render.
     useEffect(() => {
       if (!containerRef.current) return;
-
-      const state = EditorState.create({
-        doc: value,
-        extensions: [
-          basicSetup,
-          markdown(),
-          oneDark,
-          EditorView.updateListener.of((update) => {
-            if (update.docChanged) {
-              onChange(update.state.doc.toString());
-            }
-          }),
-        ],
-      });
-
       const view = new EditorView({
-        state,
+        state: createState(value, isInternalChangeRef, onChange),
         parent: containerRef.current,
       });
-
       viewRef.current = view;
-
-      return () => {
-        view.destroy();
-        viewRef.current = null;
-      };
-      // Only mount once — value is the initial doc, onChange is stable.
+      return () => { view.destroy(); viewRef.current = null; };
     }, []);
+
+    // Sync external value changes into CodeMirror.
+    useExternalValueSync(viewRef, isInternalChangeRef, value);
 
     // Expose imperative methods for cursor/scroll preservation.
     useImperativeHandle(ref, () => makeImperativeHandle(viewRef));

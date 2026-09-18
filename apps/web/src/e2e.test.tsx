@@ -120,3 +120,40 @@ describe('Source/visual mode switching', () => {
     await waitForMarkdown(api!, '# Original');
   }, 20000);
 });
+
+describe('Mode switch content sync', () => {
+  let workspace: MemoryWorkspace;
+  let api: EditorTestApi | null;
+
+  beforeEach(() => {
+    workspace = new MemoryWorkspace();
+    api = null;
+  });
+
+  it('syncs WYSIWYG edits to source editor on mode switch', async () => {
+    const result = mountEditor(workspace, '# Initial', (ready) => (api = ready), 'wysiwyg');
+    await waitFor(() => expect(api).not.toBeNull(), { timeout: 10000 });
+    api!.setMarkdown('# Initial\n\nTyped in visual mode.');
+    await waitFor(() => {
+      expect(api!.getMarkdown()).toContain('Typed in visual mode.');
+    }, { timeout: 10000 });
+    rerenderMode(result, workspace, '# Initial', 'source');
+    await waitForSourceEditor();
+    const cmContent = document.querySelector('.cm-content');
+    expect(cmContent).not.toBeNull();
+    expect(cmContent!.textContent).toContain('Typed in visual mode.');
+  }, 20000);
+
+  it('syncs source edits back to WYSIWYG on mode switch', async () => {
+    const sourceContent = '# Initial\n\nTyped in source.';
+    const result = mountEditor(workspace, sourceContent, (ready) => (api = ready), 'source');
+    await waitFor(() => expect(api).not.toBeNull(), { timeout: 10000 });
+    await waitForSourceEditor();
+    const cmContent = document.querySelector('.cm-content');
+    expect(cmContent).not.toBeNull();
+    expect(cmContent!.textContent).toContain('Typed in source.');
+    rerenderMode(result, workspace, sourceContent, 'wysiwyg');
+    await waitForMarkdown(api!, 'Typed in source.');
+    expect(api!.getMarkdown()).toContain('Typed in source.');
+  }, 20000);
+});

@@ -5,9 +5,8 @@ import { resolve } from 'path';
 const CSS_PATH = resolve(__dirname, 'index.css');
 const css = readFileSync(CSS_PATH, 'utf-8');
 
-describe('index.css — no CSS cascade layers', () => {
+describe('index.css — imports and layers', () => {
   it('contains zero @layer declarations or wrappers', () => {
-    // Matches @layer at the start of a line (not inside a comment or @import)
     const layerDeclarations = css.match(/^@layer\s+/gm);
     expect(layerDeclarations).toBeNull();
   });
@@ -25,5 +24,41 @@ describe('index.css — no CSS cascade layers', () => {
 
   it('retains @import for Crepe classic.css', () => {
     expect(css).toContain('@import "@milkdown/crepe/theme/classic.css"');
+  });
+});
+
+describe('index.css — stock block handle', () => {
+  it('does not contain old milkdown-block-handle styles', () => {
+    expect(css).not.toContain('.milkdown-block-handle .operation-item:first-child');
+    expect(css).not.toContain(".milkdown .milkdown-block-handle[data-show='false']");
+  });
+
+  it('hides the stock milkdown-block-handle via display none', () => {
+    expect(css).toMatch(/\.milkdown-block-handle\s*\{[^}]*display:\s*none\s*!important/);
+  });
+});
+
+describe('index.css — custom gutter handle', () => {
+  it('styles the block-gutter-container', () => {
+    expect(css).toContain('.block-gutter-container');
+    expect(css).toContain('position: absolute');
+    expect(css).toContain('pointer-events: none');
+  });
+
+  it('styles the block-gutter-handle', () => {
+    expect(css).toContain('.block-gutter-handle');
+    expect(css).toContain('cursor: grab');
+    expect(css).toContain('pointer-events: auto');
+    expect(css).toContain('opacity: 0');
+    expect(css).toContain('transition: opacity 0.15s');
+  });
+
+  it('shows the block-gutter-handle when data-show is true', () => {
+    expect(css).toContain('.block-gutter-handle[data-show="true"]');
+    expect(css).toContain('opacity: 1');
+  });
+
+  it('adds left padding to editor for gutter space', () => {
+    expect(css).toContain('padding: 2rem 1rem 4rem 3rem');
   });
 });

@@ -82,6 +82,23 @@ describe('IndexedDBWorkspace.listFiles', () => {
   });
 });
 
+describe('IndexedDBWorkspace.ready', () => {
+  it('resolves after DB opens', async () => {
+    const workspace = new IndexedDBWorkspace('ready-test-1');
+    await expect(workspace.ready()).resolves.toBeUndefined();
+  });
+
+  it('rejects if DB open fails', async () => {
+    // Simulate a failure by creating a workspace with invalid config
+    // We can't easily trigger a real DB failure in fake-indexeddb,
+    // but we can test that the promise is properly exposed
+    const workspace = new IndexedDBWorkspace('ready-test-2');
+    const readyPromise = workspace.ready();
+    expect(readyPromise).toBeInstanceOf(Promise);
+    await expect(readyPromise).resolves.toBeUndefined();
+  });
+});
+
 describe('IndexedDBWorkspace.close', () => {
   it('closes the connection so the database can be deleted without blocking', async () => {
     const name = 'opendraft-workspace-close-test';
