@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { CitationDropdown } from "./dropdown";
+import { CitationDropdown, CitekeyItem } from "./dropdown";
 import type { CitationState } from "./types";
 import type { Reference } from "@opendraft/references";
 
@@ -44,7 +44,7 @@ describe("CitationDropdown — rendering", () => {
     const dispatch = vi.fn();
     const state = createOpenState();
     render(<CitationDropdown state={state} dispatch={dispatch} />);
-    expect(screen.getByText("doe2024")).toBeDefined();
+    expect(screen.getByText("Jane Doe")).toBeDefined();
   });
 
   it("does not render when closed", () => {
@@ -144,9 +144,6 @@ describe("CitationDropdown — prevents focus loss on dropdown click", () => {
     const dispatch = vi.fn();
     render(<CitationDropdown state={createOpenState()} dispatch={dispatch} />);
     const dropdown = screen.getByTestId("citation-dropdown");
-    // The dropdown must have an onPointerDown handler that calls preventDefault
-    // to keep the ProseMirror editor focused when clicking inside the dropdown.
-    // We verify by checking that the element exists and is interactive.
     expect(dropdown).toBeDefined();
     expect(dropdown.className).toContain("citation-dropdown");
   });
@@ -162,5 +159,84 @@ describe("CitationDropdown — keyboard navigation delegated to plugin", () => {
     fireEvent.keyDown(dropdown, { key: "Enter" });
     fireEvent.keyDown(dropdown, { key: "Escape" });
     expect(dispatch).not.toHaveBeenCalled();
+  });
+});
+
+// ── CitekeyItem — new layout ──
+
+function createReference(overrides?: Partial<Reference>): Reference {
+  return {
+    citeKey: "Sun2025",
+    entryType: "article",
+    fields: {
+      title: "Integrating Qualitative Comparative Analysis With Reflexive Thematic Analysis in Theme Development",
+      author: "Sun, Yi and Hsieh, Jasper and Gao, Xuesong (Andy)",
+      year: "2025",
+    },
+    ...overrides,
+  };
+}
+
+describe("CitekeyItem — renders new layout", () => {
+  it("renders formatted author and year on line 1", () => {
+    const item = createReference();
+    const onSelect = () => {};
+    render(<CitekeyItem item={item} isActive={false} onSelect={onSelect} />);
+    expect(screen.getByText(/Yi Sun/)).toBeDefined();
+    expect(screen.getByText(/\(2025\)/)).toBeDefined();
+  });
+
+  it("renders entry type in muted text next to year", () => {
+    const item = createReference();
+    const onSelect = () => {};
+    render(<CitekeyItem item={item} isActive={false} onSelect={onSelect} />);
+    expect(screen.getByText(/article/i)).toBeDefined();
+  });
+
+  it("renders title on line 2", () => {
+    const item = createReference();
+    const onSelect = () => {};
+    render(<CitekeyItem item={item} isActive={false} onSelect={onSelect} />);
+    expect(screen.getByText(/Integrating Qualitative/)).toBeDefined();
+  });
+
+  it("applies active class when isActive is true", () => {
+    const item = createReference();
+    const onSelect = () => {};
+    render(<CitekeyItem item={item} isActive={true} onSelect={onSelect} />);
+    const buttons = screen.getAllByRole("button");
+    expect(buttons[0].className).toContain("active");
+  });
+});
+
+describe("CitekeyItem — fallback and edge cases", () => {
+  it("does NOT display citeKey when author is present", () => {
+    const item = createReference();
+    const onSelect = () => {};
+    render(<CitekeyItem item={item} isActive={false} onSelect={onSelect} />);
+    const buttons = screen.getAllByRole("button");
+    expect(buttons[0].textContent).not.toContain("Sun2025");
+  });
+
+  it("displays citeKey as fallback when author is missing", () => {
+    const item = createReference({ fields: { title: "Some Title", year: "2025" } });
+    const onSelect = () => {};
+    render(<CitekeyItem item={item} isActive={false} onSelect={onSelect} />);
+    expect(screen.getByText("Sun2025")).toBeDefined();
+  });
+
+  it("displays citeKey as fallback when author is empty string", () => {
+    const item = createReference({ fields: { title: "Some Title", author: "", year: "2025" } });
+    const onSelect = () => {};
+    render(<CitekeyItem item={item} isActive={false} onSelect={onSelect} />);
+    expect(screen.getByText("Sun2025")).toBeDefined();
+  });
+
+  it("omits title line when title is missing", () => {
+    const item = createReference({ fields: { author: "Sun, Yi", year: "2025" } });
+    const onSelect = () => {};
+    render(<CitekeyItem item={item} isActive={false} onSelect={onSelect} />);
+    const buttons = screen.getAllByRole("button");
+    expect(buttons[0].querySelector(".citation-title")).toBeNull();
   });
 });

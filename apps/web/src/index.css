@@ -283,8 +283,9 @@ textarea {
 
 .milkdown .citation-item {
   display: flex;
+  flex-direction: column;
   width: 100%;
-  padding: 8px 12px;
+  padding: 10px 12px;
   text-align: left;
   background: none;
   border: none;
@@ -296,15 +297,34 @@ textarea {
   background: var(--crepe-color-hover);
 }
 
-.milkdown .citation-key {
-  font-family: var(--crepe-font-code);
-  font-weight: 600;
-  margin-right: 8px;
+.milkdown .citation-line-1 {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
 }
 
-.milkdown .citation-meta {
+.milkdown .citation-author {
+  font-weight: 600;
+}
+
+.milkdown .citation-year {
+  font-weight: normal;
+}
+
+.milkdown .citation-type {
   color: var(--crepe-color-on-surface-variant);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
+}
+
+.milkdown .citation-title {
+  color: var(--crepe-color-on-surface-variant);
+  font-size: 0.8rem;
+  line-height: 1.3;
+  margin-top: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .milkdown .citation-empty {

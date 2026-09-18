@@ -4,6 +4,41 @@ import { DoiInput } from "./doi-input";
 import { ComparisonView, extractCitekey } from "./comparison";
 import { resolveDoi, normalizeDoi } from "./doi-resolver";
 
+/**
+ * Extract first author from BibTeX `author` field.
+ *
+ * BibTeX stores authors as `"Last, First"` or `"Last, First and Last, First"`.
+ * Returns `"First Last"` for the first author, or `null` if unavailable.
+ *
+ * @param author - Raw BibTeX author string.
+ * @returns Formatted first author name, or null.
+ */
+export function formatAuthor(author: string | undefined): string | null {
+  if (!author || !author.trim()) return null;
+
+  const firstAuthor = author.split(' and ')[0].trim();
+  const parts = firstAuthor.split(',').map((p) => p.trim());
+
+  if (parts.length >= 2) {
+    // "Last, First" -> "First Last"
+    return `${parts[1]} ${parts[0]}`;
+  }
+
+  // Already in "First Last" or single-name format
+  return firstAuthor;
+}
+
+/**
+ * Capitalize first letter of entry type.
+ *
+ * @param entryType - BibTeX entry type (e.g. "article").
+ * @returns Capitalized entry type (e.g. "Article").
+ */
+export function formatEntryType(entryType: string): string {
+  if (!entryType) return '';
+  return entryType.charAt(0).toUpperCase() + entryType.slice(1);
+}
+
 interface CitationDropdownProps {
   /** Current citation state. */
   state: CitationState;
@@ -140,13 +175,19 @@ interface CitekeyListProps {
   onAddCitation: () => void;
 }
 
-interface CitekeyItemProps {
+export interface CitekeyItemProps {
   item: CitationState["items"][number];
   isActive: boolean;
   onSelect: (citekey: string) => void;
 }
 
-function CitekeyItem({ item, isActive, onSelect }: CitekeyItemProps) {
+export function CitekeyItem({ item, isActive, onSelect }: CitekeyItemProps) {
+  const author = formatAuthor(item.fields.author);
+  const displayName = author ?? item.citeKey;
+  const year = item.fields.year;
+  const entryType = item.entryType;
+  const title = item.fields.title;
+
   return (
     <button
       type="button"
@@ -154,10 +195,12 @@ function CitekeyItem({ item, isActive, onSelect }: CitekeyItemProps) {
       onPointerDown={(e) => e.preventDefault()}
       onClick={() => onSelect(item.citeKey)}
     >
-      <span className="citation-key">{item.citeKey}</span>
-      <span className="citation-meta">
-        {item.fields.author?.split(",")[0]} {item.fields.year}
-      </span>
+      <div className="citation-line-1">
+        <span className="citation-author">{displayName}</span>
+        {year && <span className="citation-year"> ({year})</span>}
+        {entryType && <span className="citation-type"> · {formatEntryType(entryType)}</span>}
+      </div>
+      {title && <div className="citation-title">{title}</div>}
     </button>
   );
 }

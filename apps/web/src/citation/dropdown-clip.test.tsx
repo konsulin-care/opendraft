@@ -114,7 +114,6 @@ describe("CitationDropdown — citekey list still scrolls", () => {
     );
     const itemsContainer = container.querySelector(".citation-items");
     expect(itemsContainer).not.toBeNull();
-    expect(screen.getByText("ref0")).toBeDefined();
-    expect(screen.getByText("ref9")).toBeDefined();
+    expect(screen.getAllByText("Author").length).toBeGreaterThanOrEqual(10);
   });
 });
