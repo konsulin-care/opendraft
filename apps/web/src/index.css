@@ -256,12 +256,15 @@ textarea {
   position: absolute;
   z-index: 100;
   width: 320px;
-  max-height: 300px;
-  overflow: hidden;
   background: white;
   border: 1px solid var(--crepe-color-outline);
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Comparison view needs more space than the citekey list */
+.milkdown .citation-dropdown:has(.citation-comparison) {
+  width: 480px;
 }
 
 .milkdown .citation-search {

@@ -17,7 +17,7 @@ interface ComparisonViewProps {
  * Extract citekey from a BibTeX string.
  * Matches @type{citekey, or @type{ citekey,
  */
-function extractCitekey(bibtex: string): string | null {
+export function extractCitekey(bibtex: string): string | null {
   const match = bibtex.match(/@[a-zA-Z]+\s*\{\s*([^,\s]+)/);
   return match?.[1] ?? null;
 }

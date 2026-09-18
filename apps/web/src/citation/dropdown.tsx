@@ -1,7 +1,7 @@
 import type { CitationState, CitationAction } from "./types";
 import { filterCitekeys } from "./citekey-list";
 import { DoiInput } from "./doi-input";
-import { ComparisonView } from "./comparison";
+import { ComparisonView, extractCitekey } from "./comparison";
 import { resolveDoi, normalizeDoi } from "./doi-resolver";
 
 interface CitationDropdownProps {
@@ -27,12 +27,8 @@ function renderComparisonView(
         dispatch({ type: "SET_COMPARISON", comparison: { ...state.comparison!, editedBibtex: bibtex } })
       }
       onDiscard={() => dispatch({ type: "DISCARD_DOI" })}
-      onAction={(action, comparison) => {
-        if (action === "replace") {
-          onDoiResolved?.(comparison.editedBibtex);
-        } else {
-          onDoiResolved?.(comparison.editedBibtex);
-        }
+      onAction={async (action, comparison) => {
+        await onDoiResolved?.(comparison.editedBibtex);
         dispatch({ type: "CLOSE_CITATION" });
       }}
     />
@@ -41,7 +37,8 @@ function renderComparisonView(
 
 function renderDoiInput(
   state: CitationState,
-  dispatch: (action: CitationAction) => void
+  dispatch: (action: CitationAction) => void,
+  onDoiResolved?: (bibtex: string) => void
 ) {
   return (
     <DoiInput
@@ -56,8 +53,27 @@ function renderDoiInput(
         dispatch({ type: "SET_DOI_LOADING", loading: true });
         try {
           const bibtex = await resolveDoi(normalized);
-          const emptyRef = { citeKey: "", entryType: "", fields: {} as Record<string, string> };
-          dispatch({ type: "SET_COMPARISON", comparison: { current: emptyRef, incoming: emptyRef, editedBibtex: bibtex, originalCitekey: "" } });
+          const citekey = extractCitekey(bibtex);
+          const existing = citekey
+            ? state.items.find((item) => item.citeKey === citekey)
+            : undefined;
+
+          if (existing) {
+            // Duplicate: show comparison view with real current entry
+            dispatch({
+              type: "SET_COMPARISON",
+              comparison: {
+                current: existing,
+                incoming: existing,
+                editedBibtex: bibtex,
+                originalCitekey: existing.citeKey,
+              },
+            });
+          } else {
+            // New DOI: save directly and close
+            await onDoiResolved?.(bibtex);
+            dispatch({ type: "CLOSE_CITATION" });
+          }
         } catch (err) {
           const message = err instanceof Error ? err.message : "DOI resolution failed";
           dispatch({ type: "SET_ERROR", error: { message } });
@@ -79,7 +95,6 @@ function renderCitekeyList(
       items={state.items}
       query={state.query}
       activeIndex={state.activeIndex}
-      onQueryChange={(query) => dispatch({ type: "SET_QUERY", query })}
       onSelect={(citekey) => onSelectCitekey?.(citekey)}
       onAddCitation={() => dispatch({ type: "ENTER_DOI_MODE" })}
     />
@@ -104,11 +119,12 @@ export function CitationDropdown({
     <div
       data-testid="citation-dropdown"
       className="citation-dropdown"
+      onPointerDown={(e) => e.preventDefault()}
     >
       {state.comparison ? (
         renderComparisonView(state, dispatch, onDoiResolved)
       ) : state.doiMode ? (
-        renderDoiInput(state, dispatch)
+        renderDoiInput(state, dispatch, onDoiResolved)
       ) : (
         renderCitekeyList(state, dispatch, onSelectCitekey)
       )}
@@ -120,16 +136,8 @@ interface CitekeyListProps {
   items: CitationState["items"];
   query: string;
   activeIndex: number;
-  onQueryChange: (query: string) => void;
   onSelect: (citekey: string) => void;
   onAddCitation: () => void;
-}
-
-function EmptyState({ hasItems, hasQuery }: { hasItems: boolean; hasQuery: boolean }) {
-  const message = hasItems || hasQuery
-    ? "No matching citations"
-    : "No references yet. Add one by DOI or create references.bib.";
-  return <div className="citation-empty">{message}</div>;
 }
 
 interface CitekeyItemProps {
@@ -143,6 +151,7 @@ function CitekeyItem({ item, isActive, onSelect }: CitekeyItemProps) {
     <button
       type="button"
       className={"citation-item " + (isActive ? "active" : "")}
+      onPointerDown={(e) => e.preventDefault()}
       onClick={() => onSelect(item.citeKey)}
     >
       <span className="citation-key">{item.citeKey}</span>
@@ -157,7 +166,6 @@ function CitekeyList({
   items,
   query,
   activeIndex,
-  onQueryChange,
   onSelect,
   onAddCitation,
 }: CitekeyListProps) {
@@ -165,16 +173,13 @@ function CitekeyList({
 
   return (
     <div className="citation-list">
-      <input
-        type="text"
-        className="citation-search"
-        placeholder="Search citations..."
-        value={query}
-        onChange={(e) => onQueryChange(e.target.value)}
-      />
       <div className="citation-items">
         {filtered.length === 0 ? (
-          <EmptyState hasItems={items.length > 0} hasQuery={!!query} />
+          <div className="citation-empty">
+            {items.length > 0
+              ? "No matching citations"
+              : "No references yet. Add one by DOI or create references.bib."}
+          </div>
         ) : (
           filtered.map((item, index) => (
             <CitekeyItem
@@ -189,6 +194,7 @@ function CitekeyList({
       <button
         type="button"
         className="citation-add-btn"
+        onPointerDown={(e) => e.preventDefault()}
         onClick={onAddCitation}
       >
         + Add Citation (DOI)

@@ -31,9 +31,10 @@ describe("createCitationPlugin", () => {
     expect(citationPluginKey).toBeDefined();
   });
 
-  it("handles keydown when dropdown is open", () => {
+  it("uses global capture-phase keyboard handler instead of props.handleKeyDown", () => {
     const plugin = createCitationPlugin(workspace);
-    expect(plugin.props?.handleKeyDown).toBeDefined();
+    // handleKeyDown is no longer on props; keyboard is handled via window listener
+    expect(plugin.props?.handleKeyDown).toBeUndefined();
   });
 
   it("does not have handleTextInput (uses SlashProvider)", () => {
@@ -42,12 +43,19 @@ describe("createCitationPlugin", () => {
   });
 });
 
-describe("citation plugin — handles keyboard navigation via handleKeyDown", () => {
-  it("contains handleKeyDown logic", () => {
-    expect(pluginSource).toContain("handleKeyDown(");
-    expect(pluginSource).toContain("ArrowDown");
-    expect(pluginSource).toContain("ArrowUp");
-    expect(pluginSource).toContain("Escape");
+describe("citation plugin — global keyboard handler (capture phase)", () => {
+  it("registers window keydown listener with capture: true", () => {
+    expect(pluginSource).toContain("window.addEventListener");
+    expect(pluginSource).toContain("keydown");
+    expect(pluginSource).toContain("capture: true");
+  });
+
+  it("removes listener on close or destroy", () => {
+    expect(pluginSource).toContain("window.removeEventListener");
+  });
+
+  it("does not use handleKeyDown in props (replaced by global listener)", () => {
+    expect(pluginSource).not.toMatch(/handleKeyDown\(/);
   });
 
   it("does not use filterCitekeys in plugin", () => {
@@ -58,6 +66,33 @@ describe("citation plugin — handles keyboard navigation via handleKeyDown", ()
   it("does not insert citekey in plugin", () => {
     // Insertion is handled in ManuscriptEditor.handleSelectCitekey
     expect(pluginSource).not.toContain("tr.insertText");
+  });
+});
+
+describe("citation plugin — shouldShowCitation supports post-trigger text", () => {
+  it("shouldShow checks if text starts with @ (not just last char)", () => {
+    // The shouldShow logic must check startsWith("@") to support @smith
+    expect(pluginSource).toContain("startsWith");
+  });
+
+  it("shouldShow checks cursor is at end of node", () => {
+    // Must verify cursor position to close dropdown when cursor moves mid-text
+    expect(pluginSource).toContain("isSelectionAtEndOfNode");
+  });
+
+  it("shouldShow supports bracketed [@ trigger", () => {
+    expect(pluginSource).toContain("[@");
+  });
+});
+
+describe("citation plugin — syncs query from editor text", () => {
+  it("dispatches SET_QUERY when dropdown is open", () => {
+    expect(pluginSource).toContain("SET_QUERY");
+  });
+
+  it("reads text between trigger position and cursor for query", () => {
+    // The query extraction logic reads from trigger.from + 1 to cursor
+    expect(pluginSource).toContain("trigger.from");
   });
 });
 
