@@ -4,6 +4,7 @@ import { SlashProvider } from "@milkdown/plugin-slash";
 import type { WorkspaceAdapter } from "@opendraft/workspace";
 import { parseBibTeX } from "@opendraft/references";
 import { citationReducer, createInitialState } from "./state";
+import { matchCitationTrigger } from "./input-rule";
 import type { CitationState, CitationAction } from "./types";
 import { createRoot } from "react-dom/client";
 import React from "react";
@@ -34,7 +35,7 @@ export function createCitationPlugin(
   return new Plugin({
     key: citationPluginKey,
     state: createState(onStateChange),
-    props: createProps(),
+    props: {},
     view: createView(workspace, onSelectCitekey),
   });
 }
@@ -55,11 +56,6 @@ function createState(onStateChange?: (state: CitationState) => void) {
   };
 }
 
-/** Create the plugin props spec. */
-function createProps() {
-  return {};
-}
-
 /** Create dispatch function for citation actions. */
 function createDispatch(view: EditorView) {
   return (action: CitationAction) => {
@@ -73,9 +69,7 @@ function isSelectionAtEndOfNode(state: import("@milkdown/kit/prose/state").Edito
   const { selection } = state;
   if (!(selection instanceof TextSelection)) return false;
   const { $head } = selection;
-  const parent = $head.parent;
-  const offset = $head.parentOffset;
-  return offset === parent.content.size;
+  return $head.parentOffset === $head.parent.content.size;
 }
 
 /** Check whether the citation dropdown should be shown. */
@@ -84,8 +78,9 @@ function shouldShowCitation(
   state: import("@milkdown/kit/prose/state").EditorState
 ): boolean {
   if (!content) return false;
-  // Must start with @ (or [@ for bracketed mode)
-  if (!content.startsWith("@") && !content.startsWith("[@")) return false;
+  // Use matchCitationTrigger for word-boundary detection:
+  // matches @ at start, after whitespace, after bracket; rejects email@, test@
+  if (!matchCitationTrigger(content)) return false;
   // Cursor must be at end of paragraph
   if (!isSelectionAtEndOfNode(state)) return false;
   return true;
@@ -117,13 +112,18 @@ function createSlashProviderConfig(
   provider.onShow = () => {
     const state = view.state;
     const { selection } = state;
-    const from = selection.$from.pos - 1;
-    const textBefore = state.doc.textBetween(Math.max(0, from - 1), from);
-    const bracketed = textBefore === "[";
+    const $from = selection.$from;
+    // Read paragraph text up to cursor to find the @ position
+    const paragraphText = $from.parent.textBetween(0, $from.parentOffset, undefined, "\uFFFD");
+    const trigger = matchCitationTrigger(paragraphText);
+    if (!trigger) return;
+
+    // Convert local offset to absolute document position
+    const absoluteFrom = $from.start() + trigger.from;
 
     dispatch({
       type: "OPEN_CITATION",
-      trigger: { from, bracketed },
+      trigger: { from: absoluteFrom, bracketed: trigger.bracketed },
     });
   };
 

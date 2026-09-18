@@ -15,9 +15,7 @@ import type { CitationState } from '../citation/types';
 import { quartoRemarkPlugin, quartoInlineCodePlugin, quartoChunkOptionPlugin } from '../quarto-syntax';
 import { EditorSurface } from './EditorSurface';
 import type { SourceEditorHandle } from './SourceEditor';
-
-/**
- * CodeMirror theme for code blocks: light yellow active line and selection
+/** CodeMirror theme for code blocks: light yellow active line and selection
  * to match the light Crepe palette.
  */
 const lightCodeBlockTheme = EditorView.theme({
@@ -247,8 +245,9 @@ function createSelectCitekeyHandler(
       const view = ctx.get(editorViewCtx);
       const { from, bracketed } = state.trigger!;
       const insertText = bracketed ? `[@${citekey}]` : `@${citekey}`;
+      const cursorPos = view.state.selection.$from.pos;
       const tr = view.state.tr;
-      tr.insertText(insertText, from, from + 1);
+      tr.insertText(insertText, from, cursorPos);
       view.dispatch(tr);
     });
     citationDispatchRef.current?.({ type: 'CLOSE_CITATION' });

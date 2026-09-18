@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { citationReducer, createInitialState } from './state';
-import type { CitationState, CitationAction } from './types';
+import type { CitationState } from './types';
 import type { Reference } from '@opendraft/references';
 
 const mockReference: Reference = {
@@ -16,12 +16,10 @@ const mockReference: Reference = {
 describe('citationReducer - open', () => {
   it('opens dropdown with trigger', () => {
     const state = createInitialState();
-    const action: CitationAction = {
+    const result = citationReducer(state, {
       type: 'OPEN_CITATION',
       trigger: { from: 5, bracketed: false },
-    };
-    const result = citationReducer(state, action);
-
+    });
     expect(result.open).toBe(true);
     expect(result.trigger).toEqual({ from: 5, bracketed: false });
     expect(result.query).toBe('');
@@ -29,25 +27,39 @@ describe('citationReducer - open', () => {
     expect(result.doiMode).toBe(false);
   });
 
-  it('resets state on open', () => {
+  it('resets state on fresh open (closed -> open)', () => {
     const state: CitationState = {
-      ...createInitialState(),
-      query: 'old query',
-      activeIndex: 5,
-      doiMode: true,
-      doiInput: 'old doi',
+      ...createInitialState(), open: false,
+      query: 'old', activeIndex: 5, doiMode: true, doiInput: 'old doi',
     };
-    const action: CitationAction = {
-      type: 'OPEN_CITATION',
-      trigger: { from: 0, bracketed: true },
-    };
-    const result = citationReducer(state, action);
-
+    const result = citationReducer(state, {
+      type: 'OPEN_CITATION', trigger: { from: 0, bracketed: true },
+    });
     expect(result.query).toBe('');
     expect(result.activeIndex).toBe(0);
     expect(result.doiMode).toBe(false);
     expect(result.doiInput).toBe('');
     expect(result.trigger?.bracketed).toBe(true);
+  });
+
+  it('preserves activeIndex on re-dispatch while already open', () => {
+    const state: CitationState = {
+      ...createInitialState(), open: true,
+      trigger: { from: 0, bracketed: false }, activeIndex: 3,
+    };
+    const result = citationReducer(state, {
+      type: 'OPEN_CITATION', trigger: { from: 0, bracketed: false },
+    });
+    expect(result.open).toBe(true);
+    expect(result.activeIndex).toBe(3);
+  });
+
+  it('resets activeIndex on fresh open after close', () => {
+    const state: CitationState = { ...createInitialState(), open: false, activeIndex: 3 };
+    const result = citationReducer(state, {
+      type: 'OPEN_CITATION', trigger: { from: 0, bracketed: false },
+    });
+    expect(result.activeIndex).toBe(0);
   });
 });
 

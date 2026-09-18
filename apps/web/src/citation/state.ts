@@ -19,12 +19,15 @@ export function createInitialState(): CitationState {
 /** Handle open/close actions. */
 function handleOpenClose(state: CitationState, action: CitationAction): CitationState | null {
   if (action.type === 'OPEN_CITATION') {
+    // Preserve activeIndex when re-dispatched while already open (provider reposition).
+    // Only reset on fresh open (closed -> open).
+    const preserveIndex = state.open;
     return {
       ...state,
       open: true,
       trigger: action.trigger,
-      query: '',
-      activeIndex: 0,
+      query: preserveIndex ? state.query : '',
+      activeIndex: preserveIndex ? state.activeIndex : 0,
       doiMode: false,
       doiInput: '',
       doiLoading: false,

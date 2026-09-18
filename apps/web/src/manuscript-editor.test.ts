@@ -155,9 +155,11 @@ describe("ManuscriptEditor — citekey insertion", () => {
     expect(manuscriptSource).toMatch(/@\$\{citekey\}/);
   });
 
-  it("replaces @ at trigger position (from, from + 1)", () => {
+  it("replaces from @ position through cursor (not just @ char)", () => {
+    // Must replace trigger.from to cursor, not from+1, so query text is also removed
     expect(manuscriptSource).toContain("insertText");
-    expect(manuscriptSource).toMatch(/from\s*,\s*from\s*\+\s*1/);
+    expect(manuscriptSource).not.toMatch(/from\s*,\s*from\s*\+\s*1/);
+    expect(manuscriptSource).toContain("cursorPos");
   });
 
   it("closes citation dropdown after insertion", () => {

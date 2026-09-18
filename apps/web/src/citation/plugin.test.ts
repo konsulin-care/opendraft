@@ -70,9 +70,10 @@ describe("citation plugin — global keyboard handler (capture phase)", () => {
 });
 
 describe("citation plugin — shouldShowCitation supports post-trigger text", () => {
-  it("shouldShow checks if text starts with @ (not just last char)", () => {
-    // The shouldShow logic must check startsWith("@") to support @smith
-    expect(pluginSource).toContain("startsWith");
+  it("uses matchCitationTrigger for word-boundary detection (not startsWith)", () => {
+    // shouldShowCitation must use matchCitationTrigger to support @ anywhere
+    expect(pluginSource).toContain("matchCitationTrigger");
+    expect(pluginSource).not.toMatch(/content\.startsWith\(["']@['"]\)/);
   });
 
   it("shouldShow checks cursor is at end of node", () => {
@@ -80,8 +81,23 @@ describe("citation plugin — shouldShowCitation supports post-trigger text", ()
     expect(pluginSource).toContain("isSelectionAtEndOfNode");
   });
 
-  it("shouldShow supports bracketed [@ trigger", () => {
-    expect(pluginSource).toContain("[@");
+  it("shouldShow supports bracketed [@ trigger via matchCitationTrigger", () => {
+    // matchCitationTrigger handles [@ detection internally
+    expect(pluginSource).toContain("matchCitationTrigger");
+  });
+});
+
+describe("citation plugin — onShow uses matchCitationTrigger for trigger.from", () => {
+  it("onShow reads paragraph text and uses matchCitationTrigger (not pos - 1)", () => {
+    // onShow must find the @ position via matchCitationTrigger, not assume cursor - 1
+    expect(pluginSource).toContain("matchCitationTrigger");
+    // The old code used selection.$from.pos - 1 directly; the new code must not
+    expect(pluginSource).not.toMatch(/from\s*=\s*selection\s*\.\s*\$from\.pos\s*-\s*1/);
+  });
+
+  it("onShow extracts paragraph text to find @ position", () => {
+    // Must read paragraph text to pass to matchCitationTrigger
+    expect(pluginSource).toContain("parent.textBetween");
   });
 });
 
