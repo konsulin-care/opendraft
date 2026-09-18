@@ -29,13 +29,13 @@ describe("createCitationPlugin — onDoiResolved wiring", () => {
     expect(pluginSource).toContain("loadReferences");
   });
 
-  it("onDoiResolved handler calls onSelectCitekey to insert into editor", () => {
-    // Source-level: the onDoiResolved handler must call onSelectCitekey
-    expect(pluginSource).toContain("onSelectCitekey");
+  it("onDoiResolved handler does not call onSelectCitekey (insertion moved to plugin)", () => {
+    // Source-level: onSelectCitekey removed; insertion handled by global key handler
+    expect(pluginSource).not.toContain("onSelectCitekey");
   });
 
-  it("onDoiResolved handler extracts citekey from bibtex", () => {
-    // Source-level: the handler must extract citekey to pass to onSelectCitekey
-    expect(pluginSource).toContain("extractCitekey");
+  it("onDoiResolved handler does not extract citekey (no longer needed)", () => {
+    // Source-level: extractCitekey removed from DOI handler
+    expect(pluginSource).not.toContain("extractCitekey");
   });
 });

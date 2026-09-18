@@ -63,9 +63,22 @@ describe("citation plugin — global keyboard handler (capture phase)", () => {
     expect(pluginSource).not.toContain("filterCitekeys");
   });
 
-  it("does not insert citekey in plugin", () => {
-    // Insertion is handled in ManuscriptEditor.handleSelectCitekey
-    expect(pluginSource).not.toContain("tr.insertText");
+  it("inserts citekey via direct view.dispatch in global handler", () => {
+    // Insertion moved into plugin to avoid stale editor.action() dispatch
+    expect(pluginSource).toContain("tr.insertText");
+    expect(pluginSource).toContain("view.dispatch(tr)");
+  });
+
+  it("reads trigger from citation state for insert range", () => {
+    // Must use state.trigger.from to compute replacement range
+    expect(pluginSource).toContain("state.trigger");
+    expect(pluginSource).toContain("state.trigger.from");
+  });
+
+  it("supports bracketed [@citekey] insert mode", () => {
+    // Must check trigger.bracketed to choose insert format
+    expect(pluginSource).toContain("trigger.bracketed");
+    expect(pluginSource).toContain('[@${citekey}]');
   });
 });
 
@@ -155,6 +168,26 @@ describe("citation plugin — SlashProvider behavior (source)", () => {
   it("calls provider.update and provider.destroy in plugin view", () => {
     expect(pluginSource).toContain("provider.update");
     expect(pluginSource).toContain("provider.destroy");
+  });
+});
+
+describe("citation plugin — onSelectCitekey removed from signatures", () => {
+  it("createCitationPlugin does not accept onSelectCitekey parameter", () => {
+    // onSelectCitekey removed; insertion handled directly in plugin
+    expect(pluginSource).not.toMatch(/function createCitationPlugin[\s\S]*?onSelectCitekey/);
+  });
+
+  it("createGlobalKeyHandler does not accept onSelectCitekey parameter", () => {
+    expect(pluginSource).not.toMatch(/function createGlobalKeyHandler[\s\S]*?onSelectCitekey/);
+  });
+
+  it("createView does not accept onSelectCitekey parameter", () => {
+    expect(pluginSource).not.toMatch(/function createView[\s\S]*?onSelectCitekey/);
+  });
+
+  it("CitationSelectHandler type is not exported", () => {
+    // No longer needed since insertion is in the plugin
+    expect(pluginSource).not.toContain("export type CitationSelectHandler");
   });
 });
 

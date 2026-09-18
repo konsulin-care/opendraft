@@ -104,9 +104,8 @@ describe("ManuscriptEditor — light code block theme", () => {
 });
 
 describe("ManuscriptEditor — citation dropdown mounting", () => {
-  it("imports citationPluginKey from citation plugin", () => {
-    expect(manuscriptSource).toContain("citationPluginKey");
-    expect(manuscriptSource).toMatch(/citationPluginKey.*from.*['"].*citation/);
+  it("does not import citationPluginKey (insertion moved to plugin)", () => {
+    expect(manuscriptSource).not.toContain("citationPluginKey");
   });
 
   it("registers citation plugin via crepe.addFeature()", () => {
@@ -123,9 +122,8 @@ describe("ManuscriptEditor — citation dropdown mounting", () => {
 });
 
 describe("ManuscriptEditor — @ trigger integration", () => {
-  it("imports useCitationState hook", () => {
-    expect(manuscriptSource).toContain("useCitationState");
-    expect(manuscriptSource).toMatch(/useCitationState.*from.*['"].*citation/);
+  it("does not import useCitationState (citation dispatch removed)", () => {
+    expect(manuscriptSource).not.toContain("useCitationState");
   });
 
   it("uses onStateChangeRef to wire citation plugin", () => {
@@ -134,35 +132,34 @@ describe("ManuscriptEditor — @ trigger integration", () => {
     expect(manuscriptSource).toContain("onStateChangeRef.current");
   });
 
-  it("imports editorViewCtx for citation trigger detection", () => {
+  it("imports editorViewCtx for test API (not citation trigger)", () => {
     expect(manuscriptSource).toContain("editorViewCtx");
     expect(manuscriptSource).toMatch(/editorViewCtx.*from.*['"]@milkdown\/kit\/core['"]/);
   });
 });
 
-describe("ManuscriptEditor — citekey insertion", () => {
-  it("gets trigger from citationPluginKey state", () => {
-    expect(manuscriptSource).toContain("citationPluginKey.getState");
-    expect(manuscriptSource).toContain("state.trigger");
+describe("ManuscriptEditor — citekey insertion removed (now in plugin)", () => {
+  it("does not contain createSelectCitekeyHandler function", () => {
+    expect(manuscriptSource).not.toContain("createSelectCitekeyHandler");
   });
 
-  it("inserts bracketed citation [@citekey] when trigger.bracketed is true", () => {
-    expect(manuscriptSource).toContain("bracketed");
-    expect(manuscriptSource).toMatch(/\[@\$\{citekey\}\]/);
+  it("does not contain citationDispatchRef", () => {
+    expect(manuscriptSource).not.toContain("citationDispatchRef");
   });
 
-  it("inserts inline citation @citekey when trigger.bracketed is false", () => {
-    expect(manuscriptSource).toMatch(/@\$\{citekey\}/);
+  it("does not contain handleSelectCitekey", () => {
+    expect(manuscriptSource).not.toContain("handleSelectCitekey");
   });
 
-  it("replaces from @ position through cursor (not just @ char)", () => {
-    // Must replace trigger.from to cursor, not from+1, so query text is also removed
-    expect(manuscriptSource).toContain("insertText");
-    expect(manuscriptSource).not.toMatch(/from\s*,\s*from\s*\+\s*1/);
-    expect(manuscriptSource).toContain("cursorPos");
+  it("does not import useCitationState", () => {
+    expect(manuscriptSource).not.toContain("useCitationState");
   });
 
-  it("closes citation dropdown after insertion", () => {
-    expect(manuscriptSource).toContain("CLOSE_CITATION");
+  it("does not pass onSelectCitekey to createCitationPlugin", () => {
+    expect(manuscriptSource).not.toContain("onSelectCitekey");
+  });
+
+  it("does not import CitationSelectHandler type", () => {
+    expect(manuscriptSource).not.toContain("CitationSelectHandler");
   });
 });

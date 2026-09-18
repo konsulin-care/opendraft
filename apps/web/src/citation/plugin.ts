@@ -10,9 +10,6 @@ import { createRoot } from "react-dom/client";
 import React from "react";
 import { CitationDropdown } from "./dropdown";
 import { appendReference } from "./file-write";
-import { extractCitekey } from "./comparison";
-
-export type CitationSelectHandler = (citekey: string) => void;
 
 /** PluginKey for the citation plugin. */
 export const citationPluginKey = new PluginKey("citation");
@@ -24,19 +21,17 @@ export const citationPluginKey = new PluginKey("citation");
  *
  * @param workspace - Workspace adapter for reading references.bib.
  * @param onStateChange - Optional callback fired on every state transition.
- * @param onSelectCitekey - Optional callback when a citekey is selected.
  * @returns ProseMirror Plugin instance.
  */
 export function createCitationPlugin(
   workspace: WorkspaceAdapter,
-  onStateChange?: (state: CitationState) => void,
-  onSelectCitekey?: CitationSelectHandler
+  onStateChange?: (state: CitationState) => void
 ): Plugin {
   return new Plugin({
     key: citationPluginKey,
     state: createState(onStateChange),
     props: {},
-    view: createView(workspace, onSelectCitekey),
+    view: createView(workspace),
   });
 }
 
@@ -138,7 +133,6 @@ function createSlashProviderConfig(
 function createUpdateDropdown(
   root: ReturnType<typeof createRoot>,
   dispatch: (action: CitationAction) => void,
-  onSelectCitekey?: CitationSelectHandler,
   onDoiResolved?: (bibtex: string) => void
 ) {
   return (state: CitationState) => {
@@ -146,7 +140,6 @@ function createUpdateDropdown(
       React.createElement(CitationDropdown, {
         state,
         dispatch,
-        onSelectCitekey,
         onDoiResolved,
       })
     );
@@ -156,8 +149,7 @@ function createUpdateDropdown(
 /** Create the global keyboard handler for the citation dropdown. */
 function createGlobalKeyHandler(
   view: EditorView,
-  dispatch: (action: CitationAction) => void,
-  onSelectCitekey?: CitationSelectHandler
+  dispatch: (action: CitationAction) => void
 ) {
   return (event: KeyboardEvent) => {
     const state = citationPluginKey.getState(view.state) as CitationState;
@@ -169,7 +161,13 @@ function createGlobalKeyHandler(
         event.preventDefault();
         if (state.items.length > 0 && state.activeIndex < state.items.length) {
           const citekey = state.items[state.activeIndex].citeKey;
-          onSelectCitekey?.(citekey);
+          if (state.trigger) {
+            const insertText = state.trigger.bracketed ? `[@${citekey}]` : `@${citekey}`;
+            const cursorPos = view.state.selection.$from.pos;
+            const tr = view.state.tr;
+            tr.insertText(insertText, state.trigger.from, cursorPos);
+            view.dispatch(tr);
+          }
         }
         dispatch({ type: "CLOSE_CITATION" });
         break;
@@ -209,16 +207,11 @@ function extractQueryFromEditor(
 /** Create the onDoiResolved handler for DOI resolution flow. */
 function createDoiResolvedHandler(
   workspace: WorkspaceAdapter,
-  view: EditorView,
-  onSelectCitekey?: CitationSelectHandler,
+  view: EditorView
 ) {
   return async (bibtex: string) => {
     await appendReference(workspace, bibtex);
     await loadReferences(workspace, view);
-    const citekey = extractCitekey(bibtex);
-    if (citekey) {
-      onSelectCitekey?.(citekey);
-    }
   };
 }
 
@@ -233,7 +226,7 @@ function syncQueryFromEditor(editorView: EditorView, dispatch: (action: Citation
 }
 
 /** Create the plugin view spec. */
-function createView(workspace: WorkspaceAdapter, onSelectCitekey?: CitationSelectHandler) {
+function createView(workspace: WorkspaceAdapter) {
   return (view: EditorView) => {
     loadReferences(workspace, view);
     const dispatch = createDispatch(view);
@@ -242,7 +235,7 @@ function createView(workspace: WorkspaceAdapter, onSelectCitekey?: CitationSelec
     let globalKeyHandler: ((event: KeyboardEvent) => void) | null = null;
     const installGlobalKeyHandler = () => {
       if (globalKeyHandler) return;
-      globalKeyHandler = createGlobalKeyHandler(view, dispatch, onSelectCitekey);
+      globalKeyHandler = createGlobalKeyHandler(view, dispatch);
       window.addEventListener("keydown", globalKeyHandler, { capture: true });
     };
     const uninstallGlobalKeyHandler = () => {
@@ -252,8 +245,8 @@ function createView(workspace: WorkspaceAdapter, onSelectCitekey?: CitationSelec
     };
     installGlobalKeyHandler();
 
-    const onDoiResolved = createDoiResolvedHandler(workspace, view, onSelectCitekey);
-    const updateDropdown = createUpdateDropdown(root, dispatch, onSelectCitekey, onDoiResolved);
+    const onDoiResolved = createDoiResolvedHandler(workspace, view);
+    const updateDropdown = createUpdateDropdown(root, dispatch, onDoiResolved);
 
     return {
       update(editorView: EditorView, prevState: import("@milkdown/kit/prose/state").EditorState) {
