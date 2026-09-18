@@ -143,7 +143,7 @@ importers:
     dependencies:
       '@isomorphic-git/lightning-fs':
         specifier: ^4.7.0
-        version: 4.7.0
+        version: 4.8.0
       '@opendraft/metadata':
         specifier: workspace:*
         version: link:../metadata
@@ -877,8 +877,8 @@ packages:
   '@isomorphic-git/idb-keyval@3.3.2':
     resolution: {integrity: sha512-r8/AdpiS0/WJCNR/t/gsgL+M8NMVj/ek7s60uz3LmpCaTF2mEVlZJlB01ZzalgYzRLXwSPC92o+pdzjM7PN/pA==}
 
-  '@isomorphic-git/lightning-fs@4.7.0':
-    resolution: {integrity: sha512-eJg541itXKCOyj3DBAnd0KNY1mNgi29GCpy7FgKWsgatu/ulEKv+dMxxjhUNL68Jh3uPTaGNfeAjdJiHUYEGnw==}
+  '@isomorphic-git/lightning-fs@4.8.0':
+    resolution: {integrity: sha512-GhlX6UofzMw/h6+AUG9rfHB0FPyC1sdopT99TFlYH3NT+hlmYLqU4uf6hLpPtiO6Jv9zDIz8BhPJucYhplNqnA==}
     hasBin: true
 
   '@jridgewell/gen-mapping@0.3.13':
@@ -3723,7 +3723,7 @@ snapshots:
 
   '@isomorphic-git/idb-keyval@3.3.2': {}
 
-  '@isomorphic-git/lightning-fs@4.7.0':
+  '@isomorphic-git/lightning-fs@4.8.0':
     dependencies:
       '@isomorphic-git/idb-keyval': 3.3.2
       isomorphic-textencoder: 1.0.1
