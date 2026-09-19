@@ -140,7 +140,7 @@ function createView(workspace: WorkspaceAdapter) {
         if (state) updateDropdown(state);
         if (editorView.state.doc !== prevState.doc) {
           const citeState = citationPluginKey.getState(editorView.state) as CitationState;
-          if (citeState?.items) rebuildDecorations(editorView, citeState.items);
+          if (citeState?.items) setTimeout(() => rebuildDecorations(editorView, citeState.items), 0);
         }
       },
       destroy() {
