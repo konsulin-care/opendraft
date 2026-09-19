@@ -14,7 +14,7 @@ import React from "react";
 import { CitationDropdown } from "./dropdown";
 import { appendReference } from "./file-write";
 import { buildCitekeyDecorations } from "./citekey-decoration";
-import { handleClickEvent, handleMouseEvent, hideTooltip } from "./citekey-interactions";
+import { handleClickEvent, handleMouseOver, handleMouseOut, hideTooltip } from "./citekey-interactions";
 
 /** PluginKey for the citation plugin. */
 export const citationPluginKey = new PluginKey("citation");
@@ -43,8 +43,6 @@ export function createCitationPlugin(
       decorations: (state) => decoStateKey.getState(state) || DecorationSet.empty,
       handleDOMEvents: {
         click: (view, event) => handleClickEvent(view, event),
-        mouseenter: (view, event) => handleMouseEvent(view, event, true),
-        mouseleave: (view, event) => handleMouseEvent(view, event, false),
       },
     },
     view: createView(workspace),
@@ -100,20 +98,35 @@ function rebuildDecorations(view: EditorView, references: Reference[]) {
   view.dispatch(tr);
 }
 
+
+
+/** Set up tooltip event delegation on editor container. */
+function setupTooltipHandlers(view: EditorView) {
+  const { dom } = view;
+  const onMouseOver = (e: MouseEvent) => handleMouseOver(view, e);
+  const onMouseOut = (e: MouseEvent) => handleMouseOut(view, e);
+  dom.addEventListener("mouseover", onMouseOver);
+  dom.addEventListener("mouseout", onMouseOut);
+  return {
+    destroy() {
+      dom.removeEventListener("mouseover", onMouseOver);
+      dom.removeEventListener("mouseout", onMouseOut);
+    },
+  };
+}
+
 /** Create the plugin view spec. */
 function createView(workspace: WorkspaceAdapter) {
   return (view: EditorView) => {
     loadReferences(workspace, view);
     const dispatch = createDispatch(view);
     const { provider, root } = createSlashProviderConfig(dispatch, view);
-
     const globalKeyHandler = createGlobalKeyHandler(view, dispatch);
     window.addEventListener("keydown", globalKeyHandler, { capture: true });
-
+    const tooltipHandlers = setupTooltipHandlers(view);
     const onDoiResolved = createDoiResolvedHandler(workspace, view);
     const updateDropdown = createUpdateDropdown(root, dispatch, onDoiResolved);
 
-    // Initialize decorations after a short delay
     setTimeout(() => {
       const state = citationPluginKey.getState(view.state) as CitationState;
       if (state?.items) rebuildDecorations(view, state.items);
@@ -123,11 +136,8 @@ function createView(workspace: WorkspaceAdapter) {
       update(editorView: EditorView, prevState: import("@milkdown/kit/prose/state").EditorState) {
         provider.update(editorView, prevState);
         syncQueryFromEditor(editorView, dispatch);
-
         const state = citationPluginKey.getState(editorView.state) as CitationState | null;
         if (state) updateDropdown(state);
-
-        // Rebuild decorations when document changes
         if (editorView.state.doc !== prevState.doc) {
           const citeState = citationPluginKey.getState(editorView.state) as CitationState;
           if (citeState?.items) rebuildDecorations(editorView, citeState.items);
@@ -135,6 +145,7 @@ function createView(workspace: WorkspaceAdapter) {
       },
       destroy() {
         window.removeEventListener("keydown", globalKeyHandler, { capture: true });
+        tooltipHandlers.destroy();
         provider.destroy();
         root.unmount();
         hideTooltip();

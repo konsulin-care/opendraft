@@ -35,6 +35,28 @@ export function handleClickEvent(view: EditorView, event: Event): boolean {
   return true;
 }
 
+/** Look up reference by citekey from editor state. */
+function findRefByCitekey(view: EditorView, citekey: string): Reference | null {
+  const citationState = citationPluginKey.getState(view.state) as CitationState;
+  return citationState?.items?.find((r) => r.citeKey === citekey) ?? null;
+}
+
+/** Handle mouseover for tooltip via event delegation. */
+export function handleMouseOver(view: EditorView, event: MouseEvent) {
+  const target = event.target as HTMLElement;
+  if (!target.classList.contains('citekey-link')) return;
+  const citekey = target.getAttribute('data-citekey');
+  if (!citekey) return;
+  const ref = findRefByCitekey(view, citekey);
+  if (ref) showTooltip(ref, target);
+}
+
+/** Handle mouseout for tooltip via event delegation. */
+export function handleMouseOut(_view: EditorView, event: MouseEvent) {
+  const target = event.target as HTMLElement;
+  if (target.classList.contains('citekey-link')) hideTooltip();
+}
+
 /**
  * Handle mouseenter/mouseleave for tooltip.
  *

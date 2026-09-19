@@ -43,10 +43,10 @@ describe('citation plugin decorations', () => {
     expect(pluginSource).toContain('handleDOMEvents');
   });
 
-  it('plugin handles mouseenter/mouseleave for tooltip', () => {
+  it('plugin handles tooltip via event delegation', () => {
     const pluginSource = readFileSync(join(__dirname, 'plugin.ts'), 'utf-8');
-    // Check that mouseenter and mouseleave are handled
-    expect(pluginSource).toContain('mouseenter');
-    expect(pluginSource).toContain('mouseleave');
+    // Check that tooltip is handled via event delegation
+    expect(pluginSource).toContain('mouseover');
+    expect(pluginSource).toContain('mouseout');
   });
 });
