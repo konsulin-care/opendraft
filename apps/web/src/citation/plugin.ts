@@ -41,9 +41,6 @@ export function createCitationPlugin(
     state: createState(onStateChange),
     props: {
       decorations: (state) => decoStateKey.getState(state) || DecorationSet.empty,
-      handleDOMEvents: {
-        click: (view, event) => handleClickEvent(view, event),
-      },
     },
     view: createView(workspace),
   });
@@ -100,15 +97,18 @@ function rebuildDecorations(view: EditorView, references: Reference[]) {
 
 
 
-/** Set up tooltip event delegation on editor container. */
-function setupTooltipHandlers(view: EditorView) {
+/** Set up DOM event delegation on editor container (click + tooltips). */
+function setupDOMHandlers(view: EditorView) {
   const { dom } = view;
+  const onClick = (e: Event) => handleClickEvent(view, e);
   const onMouseOver = (e: MouseEvent) => handleMouseOver(view, e);
   const onMouseOut = (e: MouseEvent) => handleMouseOut(view, e);
+  dom.addEventListener("click", onClick);
   dom.addEventListener("mouseover", onMouseOver);
   dom.addEventListener("mouseout", onMouseOut);
   return {
     destroy() {
+      dom.removeEventListener("click", onClick);
       dom.removeEventListener("mouseover", onMouseOver);
       dom.removeEventListener("mouseout", onMouseOut);
     },
@@ -123,7 +123,7 @@ function createView(workspace: WorkspaceAdapter) {
     const { provider, root } = createSlashProviderConfig(dispatch, view);
     const globalKeyHandler = createGlobalKeyHandler(view, dispatch);
     window.addEventListener("keydown", globalKeyHandler, { capture: true });
-    const tooltipHandlers = setupTooltipHandlers(view);
+    const domHandlers = setupDOMHandlers(view);
     const onDoiResolved = createDoiResolvedHandler(workspace, view);
     const updateDropdown = createUpdateDropdown(root, dispatch, onDoiResolved);
 
@@ -145,7 +145,7 @@ function createView(workspace: WorkspaceAdapter) {
       },
       destroy() {
         window.removeEventListener("keydown", globalKeyHandler, { capture: true });
-        tooltipHandlers.destroy();
+        domHandlers.destroy();
         provider.destroy();
         root.unmount();
         hideTooltip();

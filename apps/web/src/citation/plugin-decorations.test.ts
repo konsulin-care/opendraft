@@ -39,8 +39,8 @@ describe('citation plugin decorations', () => {
 
   it('plugin handles click events for citekeys', () => {
     const pluginSource = readFileSync(join(__dirname, 'plugin.ts'), 'utf-8');
-    // Check that handleDOMEvents is used for click handling
-    expect(pluginSource).toContain('handleDOMEvents');
+    // Click handling moved from handleDOMEvents to direct DOM event delegation
+    expect(pluginSource).toContain('dom.addEventListener("click"');
   });
 
   it('plugin handles tooltip via event delegation', () => {
