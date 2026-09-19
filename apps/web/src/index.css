@@ -487,34 +487,17 @@ textarea {
 
 /* ── Citekey hover tooltip ── */
 .citekey-tooltip {
-  position: absolute;
+  position: fixed;
   z-index: 200;
   max-width: 380px;
   padding: 10px 14px;
-  background: #1e293b;
-  color: #f8fafc;
-  border-radius: 6px;
+  background: #ffffff;
+  color: #212529;
+  border: 1px solid #adb5bd;
+  border-radius: 8px;
   font-size: 0.8125rem;
   line-height: 1.5;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   pointer-events: none;
   font-family: var(--crepe-font-default);
-}
-
-.citekey-tooltip::after {
-  content: '';
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 5px solid transparent;
-  border-top-color: #1e293b;
-}
-
-/* Tooltip positioned above */
-.citekey-tooltip[data-placement^='top']::after {
-  top: auto;
-  bottom: 100%;
-  border-top-color: transparent;
-  border-bottom-color: #1e293b;
 }
