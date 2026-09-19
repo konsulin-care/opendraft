@@ -58,9 +58,9 @@ describe("citation plugin — global keyboard handler (capture phase)", () => {
     expect(pluginSource).not.toMatch(/handleKeyDown\(/);
   });
 
-  it("does not use filterCitekeys in plugin", () => {
-    // filterCitekeys is now used in dropdown component
-    expect(pluginSource).not.toContain("filterCitekeys");
+  it("uses filterCitekeys in Enter handler to resolve filtered index", () => {
+    // Enter handler must read from filtered list, not raw state.items
+    expect(pluginSource).toContain("filterCitekeys");
   });
 
   it("inserts citekey via direct view.dispatch in global handler", () => {

@@ -5,6 +5,7 @@ import type { WorkspaceAdapter } from "@opendraft/workspace";
 import { parseBibTeX } from "@opendraft/references";
 import { citationReducer, createInitialState } from "./state";
 import { matchCitationTrigger } from "./input-rule";
+import { filterCitekeys } from "./citekey-list";
 import type { CitationState, CitationAction } from "./types";
 import { createRoot } from "react-dom/client";
 import React from "react";
@@ -156,11 +157,12 @@ function createGlobalKeyHandler(
     if (!state?.open) return;
 
     switch (event.key) {
-      case "Enter":
+      case "Enter": {
         if (state.doiMode) return; // let React handle it
         event.preventDefault();
-        if (state.items.length > 0 && state.activeIndex < state.items.length) {
-          const citekey = state.items[state.activeIndex].citeKey;
+        const filtered = filterCitekeys(state.items, state.query);
+        if (filtered.length > 0 && state.activeIndex < filtered.length) {
+          const citekey = filtered[state.activeIndex].citeKey;
           if (state.trigger) {
             const insertText = state.trigger.bracketed ? `[@${citekey}]` : `@${citekey}`;
             const cursorPos = view.state.selection.$from.pos;
@@ -171,6 +173,7 @@ function createGlobalKeyHandler(
         }
         dispatch({ type: "CLOSE_CITATION" });
         break;
+      }
       case "ArrowDown":
         event.preventDefault();
         dispatch({ type: "INCREMENT_ACTIVE_INDEX" });
