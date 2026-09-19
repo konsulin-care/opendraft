@@ -469,3 +469,52 @@ textarea {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Citekey inline decorations ── */
+.citekey-link {
+  color: #2563eb;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.citekey-link:hover {
+  color: #1d4ed8;
+  text-decoration-style: solid;
+}
+
+/* ── Citekey hover tooltip ── */
+.citekey-tooltip {
+  position: absolute;
+  z-index: 200;
+  max-width: 380px;
+  padding: 10px 14px;
+  background: #1e293b;
+  color: #f8fafc;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  font-family: var(--crepe-font-default);
+}
+
+.citekey-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #1e293b;
+}
+
+/* Tooltip positioned above */
+.citekey-tooltip[data-placement^='top']::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: #1e293b;
+}
