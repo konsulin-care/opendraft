@@ -80,6 +80,14 @@ describe("citation plugin — global keyboard handler (capture phase)", () => {
     expect(pluginSource).toContain("trigger.bracketed");
     expect(pluginSource).toContain('[@${citekey}]');
   });
+
+  it("uses trigger.from - 1 as replacement start when bracketed", () => {
+    // When trigger.bracketed is true, the [ before @ must be consumed.
+    // The insert text is [@citekey] which includes [, so the range must
+    // start at trigger.from - 1 to avoid duplicating the bracket.
+    expect(pluginSource).toContain("trigger.from - 1");
+    expect(pluginSource).toContain("state.trigger.bracketed");
+  });
 });
 
 describe("citation plugin — shouldShowCitation supports post-trigger text", () => {

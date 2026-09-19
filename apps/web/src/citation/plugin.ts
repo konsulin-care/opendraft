@@ -225,8 +225,11 @@ function createGlobalKeyHandler(
           if (state.trigger) {
             const insertText = state.trigger.bracketed ? `[@${citekey}]` : `@${citekey}`;
             const cursorPos = view.state.selection.$from.pos;
+            const from = state.trigger.bracketed
+              ? state.trigger.from - 1
+              : state.trigger.from;
             const tr = view.state.tr;
-            tr.insertText(insertText, state.trigger.from, cursorPos);
+            tr.insertText(insertText, from, cursorPos);
             view.dispatch(tr);
           }
         }
