@@ -141,6 +141,8 @@ function renderCitekeyList(
  *
  * Renders citekey list, DOI input, comparison view,
  * or error display based on current state.
+ *
+ * Uses the same CSS classes as the slash menu for consistent styling.
  */
 export function CitationDropdown({
   state,
@@ -153,7 +155,8 @@ export function CitationDropdown({
   return (
     <div
       data-testid="citation-dropdown"
-      className="citation-dropdown"
+      className="milkdown-slash-menu"
+      data-show="true"
       onPointerDown={(e) => e.preventDefault()}
     >
       {state.comparison ? (
@@ -189,11 +192,10 @@ export function CitekeyItem({ item, isActive, onSelect }: CitekeyItemProps) {
   const title = item.fields.title;
 
   return (
-    <button
-      type="button"
-      className={"citation-item " + (isActive ? "active" : "")}
+    <li
+      className={isActive ? "hover" : ""}
       onPointerDown={(e) => e.preventDefault()}
-      onClick={() => onSelect(item.citeKey)}
+      onPointerUp={() => onSelect(item.citeKey)}
     >
       <div className="citation-line-1">
         <span className="citation-author">{displayName}</span>
@@ -201,7 +203,7 @@ export function CitekeyItem({ item, isActive, onSelect }: CitekeyItemProps) {
         {entryType && <span className="citation-type"> · {formatEntryType(entryType)}</span>}
       </div>
       {title && <div className="citation-title">{title}</div>}
-    </button>
+    </li>
   );
 }
 
@@ -215,33 +217,34 @@ function CitekeyList({
   const filtered = filterCitekeys(items, query);
 
   return (
-    <div className="citation-list">
-      <div className="citation-items">
-        {filtered.length === 0 ? (
-          <div className="citation-empty">
-            {items.length > 0
-              ? "No matching citations"
-              : "No references yet. Add one by DOI or create references.bib."}
-          </div>
-        ) : (
-          filtered.map((item, index) => (
-            <CitekeyItem
-              key={item.citeKey}
-              item={item}
-              isActive={index === activeIndex}
-              onSelect={onSelect}
-            />
-          ))
-        )}
+    <div className="menu-groups">
+      <div className="menu-group">
+        <ul>
+          {filtered.length === 0 ? (
+            <li className="citation-empty">
+              {items.length > 0
+                ? "No matching citations"
+                : "No references yet. Add one by DOI or create references.bib."}
+            </li>
+          ) : (
+            filtered.map((item, index) => (
+              <CitekeyItem
+                key={item.citeKey}
+                item={item}
+                isActive={index === activeIndex}
+                onSelect={onSelect}
+              />
+            ))
+          )}
+        </ul>
       </div>
-      <button
-        type="button"
+      <li
         className="citation-add-btn"
         onPointerDown={(e) => e.preventDefault()}
-        onClick={onAddCitation}
+        onPointerUp={onAddCitation}
       >
         + Add Citation (DOI)
-      </button>
+      </li>
     </div>
   );
 }

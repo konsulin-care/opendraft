@@ -145,7 +145,7 @@ describe("CitationDropdown — prevents focus loss on dropdown click", () => {
     render(<CitationDropdown state={createOpenState()} dispatch={dispatch} />);
     const dropdown = screen.getByTestId("citation-dropdown");
     expect(dropdown).toBeDefined();
-    expect(dropdown.className).toContain("citation-dropdown");
+    expect(dropdown.className).toContain("milkdown-slash-menu");
   });
 });
 
@@ -200,12 +200,12 @@ describe("CitekeyItem — renders new layout", () => {
     expect(screen.getByText(/Integrating Qualitative/)).toBeDefined();
   });
 
-  it("applies active class when isActive is true", () => {
+  it("applies hover class when isActive is true", () => {
     const item = createReference();
     const onSelect = () => {};
     render(<CitekeyItem item={item} isActive={true} onSelect={onSelect} />);
-    const buttons = screen.getAllByRole("button");
-    expect(buttons[0].className).toContain("active");
+    const items = screen.getAllByRole("listitem");
+    expect(items[0].className).toContain("hover");
   });
 });
 
@@ -214,8 +214,8 @@ describe("CitekeyItem — fallback and edge cases", () => {
     const item = createReference();
     const onSelect = () => {};
     render(<CitekeyItem item={item} isActive={false} onSelect={onSelect} />);
-    const buttons = screen.getAllByRole("button");
-    expect(buttons[0].textContent).not.toContain("Sun2025");
+    const items = screen.getAllByRole("listitem");
+    expect(items[0].textContent).not.toContain("Sun2025");
   });
 
   it("displays citeKey as fallback when author is missing", () => {
@@ -236,7 +236,7 @@ describe("CitekeyItem — fallback and edge cases", () => {
     const item = createReference({ fields: { author: "Sun, Yi", year: "2025" } });
     const onSelect = () => {};
     render(<CitekeyItem item={item} isActive={false} onSelect={onSelect} />);
-    const buttons = screen.getAllByRole("button");
-    expect(buttons[0].querySelector(".citation-title")).toBeNull();
+    const items = screen.getAllByRole("listitem");
+    expect(items[0].querySelector(".citation-title")).toBeNull();
   });
 });

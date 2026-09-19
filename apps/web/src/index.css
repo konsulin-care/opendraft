@@ -252,49 +252,11 @@ textarea {
 }
 
 /* ── Citation dropdown ── */
-.milkdown .citation-dropdown {
-  position: absolute;
-  z-index: 100;
-  width: 320px;
-  background: white;
-  border: 1px solid var(--crepe-color-outline);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
+/* Uses slash menu classes (milkdown-slash-menu, menu-groups, etc.) for consistent styling.
+   Only citation-specific content styles are defined here. */
 
-/* Comparison view needs more space than the citekey list */
-.milkdown .citation-dropdown:has(.citation-comparison) {
-  width: 480px;
-}
-
-.milkdown .citation-search {
-  width: 100%;
-  padding: 8px 12px;
-  border: none;
-  border-bottom: 1px solid var(--crepe-color-outline);
-  font-size: 0.875rem;
-  outline: none;
-}
-
-.milkdown .citation-items {
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.milkdown .citation-item {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  padding: 10px 12px;
-  text-align: left;
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-.milkdown .citation-item:hover,
-.milkdown .citation-item.active {
-  background: var(--crepe-color-hover);
+.milkdown .milkdown-slash-menu[data-show='false'] {
+  display: none;
 }
 
 .milkdown .citation-line-1 {
@@ -335,18 +297,9 @@ textarea {
 }
 
 .milkdown .citation-add-btn {
-  display: flex;
-  width: 100%;
   padding: 8px 12px;
-  text-align: left;
-  background: none;
-  border: none;
-  border-top: 1px solid var(--crepe-color-outline);
+  font-size: calc(var(--crepe-base-font-size, 16px) * 0.875);
   cursor: pointer;
-}
-
-.milkdown .citation-add-btn:hover {
-  background: var(--crepe-color-hover);
 }
 
 /* ── DOI input ── */
@@ -457,10 +410,6 @@ textarea {
 
 /* ── Responsive ── */
 @media (max-width: 639px) {
-  .milkdown .citation-dropdown {
-    width: 100%;
-  }
-
   .milkdown .citation-comparison {
     width: 100%;
   }

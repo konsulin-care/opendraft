@@ -45,36 +45,31 @@ const cssSource = readFileSync(
   "utf8",
 );
 
-describe("CitationDropdown — comparison view is not clipped (CSS)", () => {
-  it("citation-dropdown has no max-height or overflow:hidden", () => {
-    // Find the .citation-dropdown rule block
-    const dropdownRule = cssSource.match(
-      /\.citation-dropdown\s*\{[^}]+\}/,
-    );
-    expect(dropdownRule).not.toBeNull();
-    const rule = dropdownRule![0];
-    // Must not constrain height
-    expect(rule).not.toMatch(/max-height\s*:/);
-    expect(rule).not.toMatch(/overflow\s*:\s*hidden/);
+describe("CitationDropdown — uses slash menu classes", () => {
+  it("renders with milkdown-slash-menu class", () => {
+    const state = createOpenState();
+    render(<CitationDropdown state={state} dispatch={vi.fn()} />);
+    const dropdown = screen.getByTestId("citation-dropdown");
+    expect(dropdown.className).toBe("milkdown-slash-menu");
   });
 
-  it("citation-dropdown widens when comparison view is present", () => {
-    // There must be a :has(.citation-comparison) rule or a modifier class
-    // that makes the dropdown wider (>=480px) for comparison view
-    const hasComparisonRule = cssSource.includes(":has(.citation-comparison)")
-      || cssSource.includes(".citation-dropdown.comparison")
-      || cssSource.includes(".citation-comparison-active");
-    expect(hasComparisonRule).toBe(true);
+  it("has data-show attribute", () => {
+    const state = createOpenState();
+    render(<CitationDropdown state={state} dispatch={vi.fn()} />);
+    const dropdown = screen.getByTestId("citation-dropdown");
+    expect(dropdown.getAttribute("data-show")).toBe("true");
   });
 
-  it("citation-items still has bounded height for scrolling", () => {
-    const itemsRule = cssSource.match(
-      /\.citation-items\s*\{[^}]+\}/,
-    );
-    expect(itemsRule).not.toBeNull();
-    const rule = itemsRule![0];
-    expect(rule).toMatch(/max-height\s*:\s*200px/);
-    expect(rule).toMatch(/overflow-y\s*:\s*auto/);
+  it("citation-dropdown CSS rule is removed (uses slash menu styles)", () => {
+    // The .citation-dropdown rule block should no longer exist
+    const hasDropdownRule = cssSource.includes(".citation-dropdown {")
+      || cssSource.match(/\.citation-dropdown\s*\{/);
+    expect(hasDropdownRule).toBeFalsy();
+  });
+
+  it("data-show=false visibility rule exists", () => {
+    expect(cssSource).toContain("[data-show='false']");
+    expect(cssSource).toContain("display: none");
   });
 });
 
@@ -93,15 +88,14 @@ describe("CitationDropdown — comparison view renders correctly", () => {
     const discardBtn = screen.getByText("Discard");
     expect(replaceBtn.tagName).toBe("BUTTON");
     expect(discardBtn.tagName).toBe("BUTTON");
-    // Buttons must be in the actions container
     const actionsContainer = replaceBtn.closest(".citation-comparison-actions");
     expect(actionsContainer).not.toBeNull();
     expect(actionsContainer?.contains(discardBtn)).toBe(true);
   });
 });
 
-describe("CitationDropdown — citekey list still scrolls", () => {
-  it("renders citation-items container", () => {
+describe("CitationDropdown — citekey list renders", () => {
+  it("renders menu-groups container with items", () => {
     const state = createOpenState({
       items: Array.from({ length: 10 }, (_, i) => ({
         citeKey: `ref${i}`,
@@ -112,8 +106,8 @@ describe("CitationDropdown — citekey list still scrolls", () => {
     const { container } = render(
       <CitationDropdown state={state} dispatch={vi.fn()} />
     );
-    const itemsContainer = container.querySelector(".citation-items");
-    expect(itemsContainer).not.toBeNull();
+    const menuGroups = container.querySelector(".menu-groups");
+    expect(menuGroups).not.toBeNull();
     expect(screen.getAllByText("Author").length).toBeGreaterThanOrEqual(10);
   });
 });
