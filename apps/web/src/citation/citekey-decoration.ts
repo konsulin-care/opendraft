@@ -82,7 +82,7 @@ export function buildCitekeyDecorations(
   const decorations = allMatches.map(({ from, to, citekey }) =>
     Decoration.inline(from, to, {
       class: 'citekey-link',
-      attributes: { 'data-citekey': citekey },
+      'data-citekey': citekey,
     })
   );
 
