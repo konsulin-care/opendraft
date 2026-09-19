@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { editorViewCtx, type Editor } from '@milkdown/kit/core';
-import { citationPluginKey } from './plugin';
+import { citationPluginKey, getCitationState } from './plugin';
 import type { CitationState, CitationAction } from './types';
 
 /**
@@ -32,7 +32,7 @@ export function useCitationState(editorRef: React.MutableRefObject<Editor | null
     if (!view) return;
 
     // Sync initial state
-    const initialState = citationPluginKey.getState(view.state) as CitationState | null;
+    const initialState = getCitationState(citationPluginKey.getState(view.state));
     if (initialState) setCitationState(initialState);
   }, [editorRef]);
 

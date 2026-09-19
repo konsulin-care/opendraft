@@ -4,8 +4,8 @@ import { createRoot } from 'react-dom/client';
 import React from 'react';
 import { handleCitekeyClick } from './citekey-click';
 import { CitekeyTooltip } from './citekey-tooltip';
-import { citationPluginKey } from './plugin';
-import type { CitationState } from './types';
+import { citationPluginKey, getCitationState } from './plugin';
+
 
 /** Active tooltip state. */
 let tooltipRoot: ReturnType<typeof createRoot> | null = null;
@@ -25,7 +25,7 @@ export function handleClickEvent(view: EditorView, event: Event): boolean {
   const citekey = target.getAttribute('data-citekey');
   if (!citekey) return false;
 
-  const citationState = citationPluginKey.getState(view.state) as CitationState;
+  const citationState = getCitationState(citationPluginKey.getState(view.state));
   if (!citationState?.items) return false;
 
   const ref = citationState.items.find((r) => r.citeKey === citekey);
@@ -37,7 +37,7 @@ export function handleClickEvent(view: EditorView, event: Event): boolean {
 
 /** Look up reference by citekey from editor state. */
 function findRefByCitekey(view: EditorView, citekey: string): Reference | null {
-  const citationState = citationPluginKey.getState(view.state) as CitationState;
+  const citationState = getCitationState(citationPluginKey.getState(view.state));
   return citationState?.items?.find((r) => r.citeKey === citekey) ?? null;
 }
 
@@ -76,7 +76,7 @@ export function handleMouseEvent(
   const citekey = target.getAttribute('data-citekey');
   if (!citekey) return false;
 
-  const citationState = citationPluginKey.getState(view.state) as CitationState;
+  const citationState = getCitationState(citationPluginKey.getState(view.state));
   if (!citationState?.items) return false;
 
   const ref = citationState.items.find((r) => r.citeKey === citekey);

@@ -19,11 +19,21 @@ import { handleClickEvent, handleMouseOver, handleMouseOut, hideTooltip } from "
 /** PluginKey for the citation plugin. */
 export const citationPluginKey = new PluginKey("citation");
 
-/** Decoration state key for managing citekey decorations. */
-const decoStateKey = new PluginKey("citation-decorations");
-
 /** Citekey map for tracking position -> citekey mappings. */
 const citekeyMap = new Map<number, string>();
+
+/** Combined plugin state: citation UI state + inline decorations. */
+export interface CitationPluginState {
+  citation: CitationState;
+  decorations: DecorationSet;
+}
+
+/** Extract citation state from the plugin state. */
+export function getCitationState(
+  pluginState: CitationPluginState | null | undefined,
+): CitationState | null {
+  return pluginState?.citation ?? null;
+}
 
 /**
  * Create the citation plugin for ProseMirror.
@@ -40,7 +50,10 @@ export function createCitationPlugin(
     key: citationPluginKey,
     state: createState(onStateChange),
     props: {
-      decorations: (state) => decoStateKey.getState(state) || DecorationSet.empty,
+      decorations: (state) => {
+        const ps = citationPluginKey.getState(state) as CitationPluginState | null;
+        return ps?.decorations ?? DecorationSet.empty;
+      },
     },
     view: createView(workspace),
   });
@@ -49,15 +62,21 @@ export function createCitationPlugin(
 /** Create the plugin state spec. */
 function createState(onStateChange?: (state: CitationState) => void) {
   return {
-    init: () => createInitialState(),
+    init: (): CitationPluginState => ({
+      citation: createInitialState(),
+      decorations: DecorationSet.empty,
+    }),
     apply: (
       tr: import("@milkdown/kit/prose/state").Transaction,
-      prev: CitationState
-    ) => {
+      prev: CitationPluginState,
+    ): CitationPluginState => {
       const meta = tr.getMeta(citationPluginKey);
-      const next = meta ? citationReducer(prev, meta) : prev;
-      onStateChange?.(next);
-      return next;
+      if (meta?.type === "SET_DECORATIONS") {
+        return { ...prev, decorations: meta.decorations };
+      }
+      const nextCitation = meta ? citationReducer(prev.citation, meta) : prev.citation;
+      onStateChange?.(nextCitation);
+      return { ...prev, citation: nextCitation };
     },
   };
 }
@@ -91,11 +110,12 @@ function shouldShowCitation(
 function rebuildDecorations(view: EditorView, references: Reference[]) {
   citekeyMap.clear();
   const decoSet = buildCitekeyDecorations(view.state.doc, references, citekeyMap);
-  const tr = view.state.tr.setMeta(decoStateKey, { decorations: decoSet });
+  const tr = view.state.tr.setMeta(citationPluginKey, {
+    type: "SET_DECORATIONS",
+    decorations: decoSet,
+  });
   view.dispatch(tr);
 }
-
-
 
 /** Set up DOM event delegation on editor container (click + tooltips). */
 function setupDOMHandlers(view: EditorView) {
@@ -128,19 +148,19 @@ function createView(workspace: WorkspaceAdapter) {
     const updateDropdown = createUpdateDropdown(root, dispatch, onDoiResolved);
 
     setTimeout(() => {
-      const state = citationPluginKey.getState(view.state) as CitationState;
-      if (state?.items) rebuildDecorations(view, state.items);
+      const ps = citationPluginKey.getState(view.state) as CitationPluginState | null;
+      if (ps?.citation.items) rebuildDecorations(view, ps.citation.items);
     }, 0);
 
     return {
       update(editorView: EditorView, prevState: import("@milkdown/kit/prose/state").EditorState) {
         provider.update(editorView, prevState);
         syncQueryFromEditor(editorView, dispatch);
-        const state = citationPluginKey.getState(editorView.state) as CitationState | null;
-        if (state) updateDropdown(state);
+        const ps = citationPluginKey.getState(editorView.state) as CitationPluginState | null;
+        if (ps) updateDropdown(ps.citation);
         if (editorView.state.doc !== prevState.doc) {
-          const citeState = citationPluginKey.getState(editorView.state) as CitationState;
-          if (citeState?.items) setTimeout(() => rebuildDecorations(editorView, citeState.items), 0);
+          const citePs = citationPluginKey.getState(editorView.state) as CitationPluginState | null;
+          if (citePs?.citation.items) setTimeout(() => rebuildDecorations(editorView, citePs.citation.items), 0);
         }
       },
       destroy() {
@@ -156,52 +176,32 @@ function createView(workspace: WorkspaceAdapter) {
 }
 
 /** Create SlashProvider configuration. */
-function createSlashProviderConfig(
-  dispatch: (action: CitationAction) => void,
-  view: EditorView
-) {
+function createSlashProviderConfig(dispatch: (action: CitationAction) => void, view: EditorView) {
   const container = document.createElement("div");
   const root = createRoot(container);
-
   const provider = new SlashProvider({
     trigger: "@",
     content: container,
     debounce: 0,
     floatingUIOptions: { placement: "bottom-start" },
-    shouldShow: (editorView): boolean =>
-      shouldShowCitation(provider.getContent(editorView), editorView.state),
+    shouldShow: (ev): boolean => shouldShowCitation(provider.getContent(ev), ev.state),
   });
-
   provider.element.style.position = "absolute";
-
   provider.onShow = () => {
-    const { selection } = view.state;
-    const $from = selection.$from;
+    const { $from } = view.state.selection;
     const paragraphText = $from.parent.textBetween(0, $from.parentOffset, undefined, "\uFFFD");
     const trigger = matchCitationTrigger(paragraphText);
     if (!trigger) return;
-
-    dispatch({
-      type: "OPEN_CITATION",
-      trigger: { from: $from.start() + trigger.from, bracketed: trigger.bracketed },
-    });
+    dispatch({ type: "OPEN_CITATION", trigger: { from: $from.start() + trigger.from, bracketed: trigger.bracketed } });
   };
-
   provider.onHide = () => dispatch({ type: "CLOSE_CITATION" });
-
   return { provider, container, root };
 }
 
 /** Create dropdown update function. */
-function createUpdateDropdown(
-  root: ReturnType<typeof createRoot>,
-  dispatch: (action: CitationAction) => void,
-  onDoiResolved?: (bibtex: string) => void
-) {
+function createUpdateDropdown(root: ReturnType<typeof createRoot>, dispatch: (action: CitationAction) => void, onDoiResolved?: (bibtex: string) => void) {
   return (state: CitationState) => {
-    root.render(
-      React.createElement(CitationDropdown, { state, dispatch, onDoiResolved })
-    );
+    root.render(React.createElement(CitationDropdown, { state, dispatch, onDoiResolved }));
   };
 }
 
@@ -211,7 +211,8 @@ function createGlobalKeyHandler(
   dispatch: (action: CitationAction) => void
 ) {
   return (event: KeyboardEvent) => {
-    const state = citationPluginKey.getState(view.state) as CitationState;
+    const ps = citationPluginKey.getState(view.state) as CitationPluginState | null;
+    const state = ps?.citation;
     if (!state?.open) return;
 
     switch (event.key) {
@@ -251,12 +252,7 @@ function createGlobalKeyHandler(
 /** Extract query text from editor content after the @ trigger. */
 function extractQueryFromEditor(view: EditorView, triggerFrom: number): string {
   const { $from } = view.state.selection;
-  return view.state.doc.textBetween(
-    Math.min(triggerFrom + 1, $from.pos),
-    $from.pos,
-    undefined,
-    "\uFFFD"
-  );
+  return view.state.doc.textBetween(Math.min(triggerFrom + 1, $from.pos), $from.pos, undefined, "\uFFFD");
 }
 
 /** Create the onDoiResolved handler for DOI resolution flow. */
@@ -269,7 +265,8 @@ function createDoiResolvedHandler(workspace: WorkspaceAdapter, view: EditorView)
 
 /** Sync query from editor text when dropdown is open. */
 function syncQueryFromEditor(editorView: EditorView, dispatch: (action: CitationAction) => void) {
-  const state = citationPluginKey.getState(editorView.state) as CitationState | null;
+  const ps = citationPluginKey.getState(editorView.state) as CitationPluginState | null;
+  const state = ps?.citation ?? null;
   if (!state?.open || !state.trigger) return;
   const query = extractQueryFromEditor(editorView, state.trigger.from);
   if (query !== state.query) dispatch({ type: "SET_QUERY", query });
