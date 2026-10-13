@@ -197,12 +197,19 @@ export function CitekeyItem({ item, isActive, onSelect }: CitekeyItemProps) {
       onPointerDown={(e) => e.preventDefault()}
       onPointerUp={() => onSelect(item.citeKey)}
     >
-      <div className="citation-line-1">
-        <span className="citation-author">{displayName}</span>
-        {year && <span className="citation-year"> ({year})</span>}
-        {entryType && <span className="citation-type"> · {formatEntryType(entryType)}</span>}
+      <div className="citation-item-body">
+        <div className="citation-line-1">
+          <span className="citation-author">{displayName}</span>
+          {year && <span className="citation-year"> ({year})</span>}
+          {entryType && (
+            <span className="citation-type">{formatEntryType(entryType)}</span>
+          )}
+        </div>
+        <div className="citation-line-2">
+          {title && <span className="citation-title">{title}</span>}
+          <span className="citation-key">{item.citeKey}</span>
+        </div>
       </div>
-      {title && <div className="citation-title">{title}</div>}
     </li>
   );
 }

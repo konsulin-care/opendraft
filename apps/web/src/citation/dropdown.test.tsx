@@ -210,26 +210,28 @@ describe("CitekeyItem — renders new layout", () => {
 });
 
 describe("CitekeyItem — fallback and edge cases", () => {
-  it("does NOT display citeKey when author is present", () => {
+  it("shows formatted author (not citekey) in .citation-author when author is present", () => {
+    // Superseded: the citekey is now always displayed, but in the row-2
+    // .citation-key element — the author slot keeps the formatted author.
     const item = createReference();
     const onSelect = () => {};
     render(<CitekeyItem item={item} isActive={false} onSelect={onSelect} />);
-    const items = screen.getAllByRole("listitem");
-    expect(items[0].textContent).not.toContain("Sun2025");
+    expect(document.querySelector(".citation-author")?.textContent).toBe("Yi Sun");
+    expect(document.querySelector(".citation-key")?.textContent).toBe("Sun2025");
   });
 
   it("displays citeKey as fallback when author is missing", () => {
     const item = createReference({ fields: { title: "Some Title", year: "2025" } });
     const onSelect = () => {};
     render(<CitekeyItem item={item} isActive={false} onSelect={onSelect} />);
-    expect(screen.getByText("Sun2025")).toBeDefined();
+    expect(document.querySelector(".citation-author")?.textContent).toBe("Sun2025");
   });
 
   it("displays citeKey as fallback when author is empty string", () => {
     const item = createReference({ fields: { title: "Some Title", author: "", year: "2025" } });
     const onSelect = () => {};
     render(<CitekeyItem item={item} isActive={false} onSelect={onSelect} />);
-    expect(screen.getByText("Sun2025")).toBeDefined();
+    expect(document.querySelector(".citation-author")?.textContent).toBe("Sun2025");
   });
 
   it("omits title line when title is missing", () => {
@@ -238,5 +240,59 @@ describe("CitekeyItem — fallback and edge cases", () => {
     render(<CitekeyItem item={item} isActive={false} onSelect={onSelect} />);
     const items = screen.getAllByRole("listitem");
     expect(items[0].querySelector(".citation-title")).toBeNull();
+  });
+});
+
+describe("CitekeyItem — body wrapper and two rows", () => {
+  it("renders exactly one .citation-item-body child inside the li", () => {
+    const item = createReference();
+    render(<CitekeyItem item={item} isActive={false} onSelect={() => {}} />);
+    const li = screen.getByRole("listitem");
+    expect(li.children.length).toBe(1);
+    expect(li.children[0].className).toContain("citation-item-body");
+  });
+
+  it("row 1 has author, year and capitalized entry-type badge", () => {
+    const item = createReference();
+    render(<CitekeyItem item={item} isActive={false} onSelect={() => {}} />);
+    const body = document.querySelector(".citation-item-body");
+    const line1 = body?.children[0];
+    expect(line1?.querySelector(".citation-author")?.textContent).toBe("Yi Sun");
+    expect(line1?.querySelector(".citation-year")?.textContent?.trim()).toBe("(2025)");
+    expect(line1?.querySelector(".citation-type")?.textContent).toBe("Article");
+  });
+
+  it("row 2 has the title and a .citation-key element with the citekey", () => {
+    const item = createReference();
+    render(<CitekeyItem item={item} isActive={false} onSelect={() => {}} />);
+    const body = document.querySelector(".citation-item-body");
+    const line2 = body?.children[1];
+    expect(line2?.querySelector(".citation-title")?.textContent).toContain("Integrating Qualitative");
+    expect(line2?.querySelector(".citation-key")?.textContent).toBe("Sun2025");
+  });
+
+  it("row 2 keeps .citation-key but omits .citation-title when the entry has no title", () => {
+    const item = createReference({ fields: { author: "Sun, Yi", year: "2025" } });
+    render(<CitekeyItem item={item} isActive={false} onSelect={() => {}} />);
+    const body = document.querySelector(".citation-item-body");
+    const line2 = body?.children[1];
+    expect(line2?.querySelector(".citation-title")).toBeNull();
+    expect(line2?.querySelector(".citation-key")?.textContent).toBe("Sun2025");
+  });
+});
+
+describe("CitekeyItem — selection behavior", () => {
+  it("calls onSelect with the citekey on pointerUp", () => {
+    const item = createReference();
+    const onSelect = vi.fn();
+    render(<CitekeyItem item={item} isActive={false} onSelect={onSelect} />);
+    fireEvent.pointerUp(screen.getByRole("listitem"));
+    expect(onSelect).toHaveBeenCalledWith("Sun2025");
+  });
+
+  it("marks the active item with class 'hover'", () => {
+    const item = createReference();
+    render(<CitekeyItem item={item} isActive={true} onSelect={() => {}} />);
+    expect(screen.getByRole("listitem").className).toContain("hover");
   });
 });

@@ -94,6 +94,31 @@ describe("CitationDropdown — comparison view renders correctly", () => {
   });
 });
 
+describe("CitationDropdown — item body wrapper markup", () => {
+  it("wraps item rows in a single .citation-item-body child of the li", () => {
+    const state = createOpenState();
+    const { container } = render(
+      <CitationDropdown state={state} dispatch={vi.fn()} />
+    );
+    const author = container.querySelector(".citation-author");
+    expect(author).not.toBeNull();
+    const li = author?.closest("li");
+    expect(li).not.toBeNull();
+    expect(li?.children.length).toBe(1);
+    expect(li?.children[0].classList.contains("citation-item-body")).toBe(true);
+  });
+
+  it("shows the citekey in a row-2 .citation-key element", () => {
+    const state = createOpenState();
+    const { container } = render(
+      <CitationDropdown state={state} dispatch={vi.fn()} />
+    );
+    const key = container.querySelector(".citation-key");
+    expect(key?.textContent).toBe("doe2024");
+    expect(key?.closest(".citation-item-body")).not.toBeNull();
+  });
+});
+
 describe("CitationDropdown — citekey list renders", () => {
   it("renders menu-groups container with items", () => {
     const state = createOpenState({
