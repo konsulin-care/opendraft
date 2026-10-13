@@ -206,7 +206,11 @@ export function CitekeyItem({ item, isActive, onSelect }: CitekeyItemProps) {
           )}
         </div>
         <div className="citation-line-2">
-          {title && <span className="citation-title">{title}</span>}
+          {title && (
+            <span className="citation-title" title={title}>
+              {title}
+            </span>
+          )}
           <span className="citation-key">{item.citeKey}</span>
         </div>
       </div>

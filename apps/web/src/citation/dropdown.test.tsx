@@ -267,7 +267,9 @@ describe("CitekeyItem — body wrapper and two rows", () => {
     render(<CitekeyItem item={item} isActive={false} onSelect={() => {}} />);
     const body = document.querySelector(".citation-item-body");
     const line2 = body?.children[1];
-    expect(line2?.querySelector(".citation-title")?.textContent).toContain("Integrating Qualitative");
+    const titleEl = line2?.querySelector(".citation-title");
+    expect(titleEl?.textContent).toContain("Integrating Qualitative");
+    expect(titleEl?.getAttribute("title")).toBe(createReference().fields.title);
     expect(line2?.querySelector(".citation-key")?.textContent).toBe("Sun2025");
   });
 
