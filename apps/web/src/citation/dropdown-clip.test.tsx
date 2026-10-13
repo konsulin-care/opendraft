@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { CitationDropdown } from "./dropdown";
@@ -119,7 +119,68 @@ describe("CitationDropdown — item body wrapper markup", () => {
   });
 });
 
+describe("CitationDropdown — Add Citation group", () => {
+  it("renders .citation-add-btn inside its own .menu-group > ul after the citekey group", () => {
+    const state = createOpenState();
+    const { container } = render(
+      <CitationDropdown state={state} dispatch={vi.fn()} />
+    );
+    const btn = container.querySelector(".citation-add-btn");
+    expect(btn).not.toBeNull();
+    expect(btn?.parentElement?.tagName).toBe("UL");
+    const group = btn?.closest(".menu-group");
+    expect(group?.parentElement).toBe(container.querySelector(".menu-groups"));
+  });
+
+  it("dispatches ENTER_DOI_MODE on pointerUp of the add button", () => {
+    const state = createOpenState();
+    const dispatch = vi.fn();
+    const { container } = render(
+      <CitationDropdown state={state} dispatch={dispatch} />
+    );
+    fireEvent.pointerUp(container.querySelector(".citation-add-btn")!);
+    expect(dispatch).toHaveBeenCalledWith({ type: "ENTER_DOI_MODE" });
+  });
+
+  it("still shows the add-citation group when there are no items", () => {
+    const state = createOpenState({ items: [], query: "" });
+    const { container } = render(
+      <CitationDropdown state={state} dispatch={vi.fn()} />
+    );
+    const groups = container.querySelectorAll(".menu-groups > .menu-group");
+    expect(groups.length).toBe(2);
+    expect(groups[1].querySelector(".citation-add-btn")).not.toBeNull();
+    expect(screen.getByText(/No references yet/)).toBeDefined();
+  });
+});
+
 describe("CitationDropdown — citekey list renders", () => {
+  it("has no li as a direct child of .menu-groups (add button lives in its own group)", () => {
+    const state = createOpenState();
+    const { container } = render(
+      <CitationDropdown state={state} dispatch={vi.fn()} />
+    );
+    const menuGroups = container.querySelector(".menu-groups");
+    expect(menuGroups).not.toBeNull();
+    const bareLis = Array.from(menuGroups?.children ?? []).filter(
+      (el) => el.tagName === "LI"
+    );
+    expect(bareLis).toHaveLength(0);
+    const addBtn = container.querySelector(".citation-add-btn");
+    expect(addBtn?.closest(".menu-group > ul")).not.toBeNull();
+  });
+
+  it("renders the add-citation menu group after the citekey list group", () => {
+    const state = createOpenState();
+    const { container } = render(
+      <CitationDropdown state={state} dispatch={vi.fn()} />
+    );
+    const groups = container.querySelectorAll(".menu-groups > .menu-group");
+    expect(groups.length).toBe(2);
+    expect(groups[0].querySelector(".citation-item-body")).not.toBeNull();
+    expect(groups[1].querySelector(".citation-add-btn")).not.toBeNull();
+  });
+
   it("renders menu-groups container with items", () => {
     const state = createOpenState({
       items: Array.from({ length: 10 }, (_, i) => ({

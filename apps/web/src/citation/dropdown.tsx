@@ -245,13 +245,17 @@ function CitekeyList({
           )}
         </ul>
       </div>
-      <li
-        className="citation-add-btn"
-        onPointerDown={(e) => e.preventDefault()}
-        onPointerUp={onAddCitation}
-      >
-        + Add Citation (DOI)
-      </li>
+      <div className="menu-group">
+        <ul>
+          <li
+            className="citation-add-btn"
+            onPointerDown={(e) => e.preventDefault()}
+            onPointerUp={onAddCitation}
+          >
+            + Add Citation (DOI)
+          </li>
+        </ul>
+      </div>
     </div>
   );
 }
