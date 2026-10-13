@@ -104,7 +104,7 @@
 
 /* ── Slash menu: fix padding + prevent horizontal scroll ── */
 .milkdown .milkdown-slash-menu {
-  max-width: 320px;
+  max-width: 380px;
 }
 
 .milkdown .milkdown-slash-menu .tab-group {
@@ -259,34 +259,66 @@ textarea {
   display: none;
 }
 
+/* Single column body per item; min-width 0 lets rows ellipsize
+   instead of stretching the menu wider than its max-width. */
+.milkdown .citation-item-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+/* Row 1: author, year, and a type badge pushed right. */
 .milkdown .citation-line-1 {
   display: flex;
-  align-items: baseline;
-  gap: 0;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .milkdown .citation-author {
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .milkdown .citation-year {
   font-weight: normal;
+  flex-shrink: 0;
 }
 
 .milkdown .citation-type {
   color: var(--crepe-color-on-surface-variant);
   font-size: 0.7rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Row 2: title (single-line ellipsis) + citekey. */
+.milkdown .citation-line-2 {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 2px;
 }
 
 .milkdown .citation-title {
   color: var(--crepe-color-on-surface-variant);
   font-size: 0.8rem;
   line-height: 1.3;
-  margin-top: 2px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.milkdown .citation-key {
+  color: var(--crepe-color-on-surface-variant);
+  font-family: var(--crepe-font-code);
+  font-size: 0.75rem;
+  flex-shrink: 0;
 }
 
 .milkdown .citation-empty {
@@ -419,19 +451,19 @@ textarea {
   }
 }
 
-/* ── Citekey inline decorations ── */
+/* ── Citekey inline decorations (subtle pill) ── */
 .citekey-link {
   color: #2563eb;
-  text-decoration: underline;
-  text-decoration-style: dotted;
-  text-underline-offset: 2px;
+  background: rgba(37, 99, 235, 0.1);
+  border-radius: 4px;
+  padding: 0 4px;
+  text-decoration: none;
   cursor: pointer;
-  transition: color 0.15s;
+  transition: background 0.15s;
 }
 
 .citekey-link:hover {
-  color: #1d4ed8;
-  text-decoration-style: solid;
+  background: rgba(37, 99, 235, 0.18);
 }
 
 /* ── Citekey hover tooltip ── */

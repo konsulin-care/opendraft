@@ -5,7 +5,7 @@ import { resolve } from 'path';
 const CSS_PATH = resolve(__dirname, 'index.css');
 const css = readFileSync(CSS_PATH, 'utf-8');
 
-describe('index.css — citation dropdown new layout', () => {
+describe('index.css — preserved citation styles', () => {
   it('has .citation-author with font-weight 600', () => {
     expect(css).toMatch(/\.citation-author\s*\{[^}]*font-weight:\s*600/);
   });
@@ -25,20 +25,62 @@ describe('index.css — citation dropdown new layout', () => {
   it('has .citation-title with muted color', () => {
     expect(css).toMatch(/\.citation-title\s*\{[^}]*color:\s*var\(--crepe-color-on-surface-variant\)/);
   });
+});
 
-  it('has .citation-title with line-clamp 2', () => {
-    expect(css).toMatch(/\.citation-title\s*\{[^}]*-webkit-line-clamp:\s*2/);
+describe('index.css — citation dropdown new layout', () => {
+  it('has .citation-item-body with flex-direction column', () => {
+    expect(css).toMatch(/\.citation-item-body\s*\{[^}]*flex-direction:\s*column/);
   });
 
-  it('has .citation-title with display -webkit-box', () => {
-    expect(css).toMatch(/\.citation-title\s*\{[^}]*display:\s*-webkit-box/);
+  it('has .citation-item-body with min-width 0', () => {
+    expect(css).toMatch(/\.citation-item-body\s*\{[^}]*min-width:\s*0/);
   });
 
-  it('does NOT contain old .citation-key rule', () => {
-    expect(css).not.toMatch(/\.citation-key\s*\{/);
+  it('has .citation-title with white-space nowrap', () => {
+    expect(css).toMatch(/\.citation-title\s*\{[^}]*white-space:\s*nowrap/);
+  });
+
+  it('has .citation-title with text-overflow ellipsis', () => {
+    expect(css).toMatch(/\.citation-title\s*\{[^}]*text-overflow:\s*ellipsis/);
+  });
+
+  it('has no line-clamp on .citation-title (single line now)', () => {
+    expect(css).not.toMatch(/\.citation-title\s*\{[^}]*-webkit-line-clamp/);
+    expect(css).not.toMatch(/\.citation-title\s*\{[^}]*display:\s*-webkit-box/);
+  });
+
+  it('widens .milkdown-slash-menu to about 380px', () => {
+    expect(css).toMatch(/\.milkdown-slash-menu\s*\{[^}]*max-width:\s*380px/);
+  });
+
+  it('keeps item li min-width 0 so rows do not force overflow', () => {
+    expect(css).toMatch(/\.menu-groups\s+\.menu-group\s+li\s*\{[^}]*min-width:\s*0/);
   });
 
   it('does NOT contain old .citation-meta rule', () => {
     expect(css).not.toMatch(/\.citation-meta\s*\{/);
+  });
+});
+
+describe('index.css — citekey pill styling', () => {
+  it('has .citekey-link with a background color', () => {
+    expect(css).toMatch(/\.citekey-link\s*\{[^}]*background(-color)?:\s*[^;]+/);
+  });
+
+  it('has .citekey-link with border-radius', () => {
+    expect(css).toMatch(/\.citekey-link\s*\{[^}]*border-radius:\s*[^;]+/);
+  });
+
+  it('has .citekey-link with text-decoration none', () => {
+    expect(css).toMatch(/\.citekey-link\s*\{[^}]*text-decoration:\s*none/);
+  });
+
+  it('has .citekey-link with accent color', () => {
+    expect(css).toMatch(/\.citekey-link\s*\{[^}]*color:\s*#2563eb/);
+  });
+
+  it('has .citation-key styled as muted monospace', () => {
+    expect(css).toMatch(/\.citation-key\s*\{[^}]*color:\s*var\(--crepe-color-on-surface-variant\)/);
+    expect(css).toMatch(/\.citation-key\s*\{[^}]*font-family:\s*var\(--crepe-font-code\)/);
   });
 });
