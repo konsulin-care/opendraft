@@ -21,7 +21,7 @@
     "@codemirror/view": "6.43.13",
     "@milkdown/crepe": "7.22.2",
     "@milkdown/kit": "7.22.2",
-    "@milkdown/plugin-slash": "^7.22.1",
+    "@milkdown/plugin-slash": "^7.22.3",
     "@milkdown/react": "7.22.2",
     "@opendraft/git": "workspace:*",
     "@opendraft/references": "workspace:*",
@@ -43,7 +43,7 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
     "unified": "^11.0.5",
-    "vite": "^6.4.3",
-    "vitest": "^5.0.1"
+    "vite": "^6.4.4",
+    "vitest": "^5.0.4"
   }
 }
