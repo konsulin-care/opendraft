@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { MilkdownProvider } from '@milkdown/react';
 import { AppHeader } from './components/AppHeader';
-import type { EditorMode } from './components/AppHeader';
+import type { EditorMode, SaveStatus } from './components/AppHeader';
 import { ManuscriptEditor } from './components/ManuscriptEditor';
 import { CommitDialog } from './components/CommitDialog';
 import { useWorkspace } from './hooks/useWorkspace';
@@ -28,6 +28,7 @@ export function App() {
   const { workspace, markdown, loading, error } = useWorkspace(WORKSPACE_ID);
   const { mode, setMode } = useMode();
   const { showCommitDialog, setShowCommitDialog } = useCommitDialog();
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   const { formattingToolbar, toggleFormattingToolbar } = useToolbarPreference();
 
   if (loading) {
@@ -48,13 +49,19 @@ export function App() {
         fileName={MANUSCRIPT_PATH}
         mode={mode}
         onSelectMode={setMode}
+        saveStatus={saveStatus}
         formattingToolbar={formattingToolbar}
         onToggleFormattingToolbar={toggleFormattingToolbar}
         onCommit={() => setShowCommitDialog(true)}
       />
       <main style={{ flex: 1, overflow: 'hidden' }}>
         <MilkdownProvider>
-          <ManuscriptEditor workspace={workspace} defaultValue={markdown} mode={mode} />
+          <ManuscriptEditor
+            workspace={workspace}
+            defaultValue={markdown}
+            mode={mode}
+            onSaveStatusChange={setSaveStatus}
+          />
         </MilkdownProvider>
       </main>
       <CommitDialog

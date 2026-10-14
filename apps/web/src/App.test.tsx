@@ -69,3 +69,18 @@ describe('App mode and commit', () => {
     expect(screen.getByText('Commit Changes')).toBeDefined();
   });
 });
+
+describe('App save status', () => {
+  it('shows Saving then Saved after an edit triggers an autosave', async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
+    const paragraph = await waitFor(() => {
+      const el = document.querySelector('.ProseMirror p');
+      if (!el) throw new Error('editor not ready');
+      return el;
+    });
+    paragraph.appendChild(document.createTextNode('Edited manuscript text'));
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Saving'), { timeout: 3000 });
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Saved'), { timeout: 5000 });
+  });
+});

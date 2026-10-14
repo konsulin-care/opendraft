@@ -9,6 +9,7 @@ const BASE_PROPS: AppHeaderProps = {
   fileName: 'manuscript.md',
   mode: 'wysiwyg',
   onSelectMode: vi.fn(),
+  saveStatus: 'saved',
   formattingToolbar: true,
   onToggleFormattingToolbar: vi.fn(),
   onCommit: vi.fn(),
@@ -26,6 +27,23 @@ function renderHeader(overrides: Partial<AppHeaderProps> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+describe('AppHeader save status', () => {
+  it('shows Saving with a live status region while a save is pending', () => {
+    renderHeader({ saveStatus: 'saving' });
+    expect(screen.getByRole('status').textContent).toBe('Saving');
+  });
+
+  it('shows Saved once the save resolves', () => {
+    renderHeader({ saveStatus: 'saved' });
+    expect(screen.getByRole('status').textContent).toBe('Saved');
+  });
+
+  it('shows Save failed when the save rejects', () => {
+    renderHeader({ saveStatus: 'error' });
+    expect(screen.getByRole('status').textContent).toBe('Save failed');
+  });
 });
 
 describe('AppHeader identity', () => {

@@ -15,6 +15,7 @@ import { quartoRemarkPlugin, quartoInlineCodePlugin, quartoChunkOptionPlugin } f
 import { citationRemarkPlugin } from '../citation/citation-remark-plugin';
 import { EditorSurface } from './EditorSurface';
 import type { SourceEditorHandle } from './SourceEditor';
+import type { SaveStatus } from './AppHeader';
 /** CodeMirror theme for code blocks: light yellow active line and selection
  * to match the light Crepe palette.
  */
@@ -46,6 +47,8 @@ interface ManuscriptEditorProps {
   onEditorReady?: (api: EditorTestApi) => void;
   /** Editing mode: 'wysiwyg' (default) or 'source' (raw markdown). */
   mode?: 'wysiwyg' | 'source';
+  /** Reports autosave progress: saving, saved, or error. */
+  onSaveStatusChange?: (status: SaveStatus) => void;
 }
 
 interface UseManuscriptStateOptions {
@@ -53,6 +56,7 @@ interface UseManuscriptStateOptions {
   defaultValue: string;
   mode: 'wysiwyg' | 'source';
   onEditorReady?: (api: EditorTestApi) => void;
+  onSaveStatusChange?: (status: SaveStatus) => void;
 }
 
 const SAVE_DEBOUNCE_MS = 800;
@@ -81,17 +85,24 @@ function createTestApi(editor: Editor, syncContent: (mode: 'wysiwyg' | 'source')
 }
 
 /** Debounced autosave writing the single manuscript markdown file. */
-function debouncedSaver(workspace: WorkspaceAdapter) {
+function debouncedSaver(workspace: WorkspaceAdapter, onStatus: (status: SaveStatus) => void) {
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   const save = (markdown: string): void => {
-    void saveManuscript(workspace, markdown).catch((error) =>
-      console.error('manuscript autosave failed:', error),
+    void saveManuscript(workspace, markdown).then(
+      () => {
+        if (!timer) onStatus('saved');
+      },
+      (error: unknown) => {
+        console.error('manuscript autosave failed:', error);
+        onStatus('error');
+      },
     );
   };
 
   const schedule = (markdown: string): void => {
     if (timer) clearTimeout(timer);
+    onStatus('saving');
     timer = setTimeout(() => {
       timer = undefined;
       save(markdown);
@@ -182,7 +193,7 @@ function wireEditor(
 
 /** Hook that wires up the Crepe editor, autosave, and mode sync. */
 function useManuscriptState(options: UseManuscriptStateOptions) {
-  const { workspace, defaultValue, mode, onEditorReady } = options;
+  const { workspace, defaultValue, mode, onEditorReady, onSaveStatusChange } = options;
   const placeholderText = PLACEHOLDER_HINT;
   const [sourceMarkdown, setSourceMarkdown] = useState(defaultValue);
   const sourceEditorRef = useRef<SourceEditorHandle | null>(null);
@@ -199,8 +210,10 @@ function useManuscriptState(options: UseManuscriptStateOptions) {
     [defaultValue, workspace],
   );
 
+  const statusRef = useRef(onSaveStatusChange);
+  statusRef.current = onSaveStatusChange;
   const saverRef = useRef<ReturnType<typeof debouncedSaver> | null>(null);
-  if (!saverRef.current) saverRef.current = debouncedSaver(workspace);
+  if (!saverRef.current) saverRef.current = debouncedSaver(workspace, (s) => statusRef.current?.(s));
   const wiredRef = useRef(false);
 
   // Sync content when mode changes
@@ -239,11 +252,12 @@ export function ManuscriptEditor({
   defaultValue,
   onEditorReady,
   mode = 'wysiwyg',
+  onSaveStatusChange,
 }: ManuscriptEditorProps) {
   const editorRef = useRef<Editor | null>(null);
 
   const { sourceMarkdown, setSourceMarkdown, sourceEditorRef, scrollContainerRef, editorRef: hookEditorRef } =
-    useManuscriptState({ workspace, defaultValue, mode, onEditorReady });
+    useManuscriptState({ workspace, defaultValue, mode, onEditorReady, onSaveStatusChange });
 
   // Update editorRef when hookEditorRef.current changes
   useEffect(() => {
