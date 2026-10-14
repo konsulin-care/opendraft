@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { resolveDoi, cleanupBibtex, normalizeDoi } from './doi-resolver';
 
-describe('cleanupBibtex', () => {
+describe('cleanupBibtex — formatting', () => {
   it('replaces en dashes with -- in pages field', () => {
     const input = '@article{test, pages={11\u201312}}';
     const result = cleanupBibtex(input);
@@ -14,6 +14,21 @@ describe('cleanupBibtex', () => {
     expect(result).toContain('title={A \\& B}');
   });
 
+  it('handles multiple ampersands', () => {
+    const input = '@article{test, publisher={A & B & C}}';
+    const result = cleanupBibtex(input);
+    expect(result).toContain('publisher={A \\& B \\& C}');
+  });
+
+  it('does not escape already escaped ampersands', () => {
+    const input = '@article{test, title={A \\& B}}';
+    const result = cleanupBibtex(input);
+    expect(result).toContain('title={A \\& B}');
+    expect(result).not.toContain('title={A \\\\& B}');
+  });
+});
+
+describe('cleanupBibtex — field removal', () => {
   it('removes url field', () => {
     const input = '@article{test, title={Test}, url={http://example.com}}';
     const result = cleanupBibtex(input);
@@ -27,19 +42,26 @@ describe('cleanupBibtex', () => {
     expect(result).not.toContain('ISSN=');
     expect(result).toContain('title={Test}');
   });
+});
 
-  it('handles multiple ampersands', () => {
-    const input = '@article{test, publisher={A & B & C}}';
+describe('cleanupBibtex — citekey underscores', () => {
+  it('strips underscores from citekeys', () => {
+    const input = '@article{naeem_2023, title={Test}}';
     const result = cleanupBibtex(input);
-    expect(result).toContain('publisher={A \\& B \\& C}');
+    expect(result).toContain('@article{naeem2023,');
+    expect(result).not.toContain('naeem_2023');
   });
 
-  it('does not escape already escaped ampersands', () => {
-    const input = '@article{test, title={A \\& B}}';
+  it('strips underscores from citekeys with multiple underscores', () => {
+    const input = '@article{smith_jones_2024, title={Test}}';
     const result = cleanupBibtex(input);
-    // Should not double-escape
-    expect(result).toContain('title={A \\& B}');
-    expect(result).not.toContain('title={A \\\\& B}');
+    expect(result).toContain('@article{smithjones2024,');
+  });
+
+  it('does not strip underscores from field values', () => {
+    const input = '@article{test, title={Some_thing}}';
+    const result = cleanupBibtex(input);
+    expect(result).toContain('title={Some_thing}');
   });
 });
 
@@ -87,14 +109,14 @@ describe('resolveDoi', () => {
   });
 
   it('fetches BibTeX from doi.org', async () => {
-    const mockBibtex = '@article{Test_2024, title={Test Article}, year={2024}}';
+    const inputBibtex = '@article{Test_2024, title={Test Article}, year={2024}}';
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
-      text: () => Promise.resolve(mockBibtex),
+      text: () => Promise.resolve(inputBibtex),
     }));
 
     const result = await resolveDoi('10.1234/test');
-    expect(result).toBe(mockBibtex);
+    expect(result).toBe('@article{Test2024, title={Test Article}, year={2024}}');
     expect(fetch).toHaveBeenCalledWith('https://doi.org/10.1234/test', {
       headers: { 'Accept': 'application/x-bibtex' },
     });

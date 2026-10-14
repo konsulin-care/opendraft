@@ -12,6 +12,7 @@ import { createBlockGutterPlugin } from '../block-handle-gutter';
 import { createCitationPlugin } from '../citation/plugin';
 import type { CitationState } from '../citation/types';
 import { quartoRemarkPlugin, quartoInlineCodePlugin, quartoChunkOptionPlugin } from '../quarto-syntax';
+import { citationRemarkPlugin } from '../citation/citation-remark-plugin';
 import { EditorSurface } from './EditorSurface';
 import type { SourceEditorHandle } from './SourceEditor';
 /** CodeMirror theme for code blocks: light yellow active line and selection
@@ -172,6 +173,7 @@ function wireEditor(
     ctx.update(remarkPluginsCtx, (ps) => [
       quartoRemarkPlugin,
       quartoInlineCodePlugin,
+      citationRemarkPlugin,
       ...ps,
     ]);
   });

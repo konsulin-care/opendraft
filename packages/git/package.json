@@ -14,15 +14,15 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@isomorphic-git/lightning-fs": "^4.7.0",
+    "@isomorphic-git/lightning-fs": "^4.10.3",
     "@opendraft/metadata": "workspace:*",
     "@opendraft/schema": "workspace:*",
     "@opendraft/workspace": "workspace:*",
-    "isomorphic-git": "^1.41.9"
+    "isomorphic-git": "^1.44.2"
   },
   "devDependencies": {
     "fake-indexeddb": "^6.2.5",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.4"
   }
 }

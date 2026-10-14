@@ -104,7 +104,7 @@
 
 /* ── Slash menu: fix padding + prevent horizontal scroll ── */
 .milkdown .milkdown-slash-menu {
-  max-width: 320px;
+  max-width: 380px;
 }
 
 .milkdown .milkdown-slash-menu .tab-group {
@@ -252,59 +252,65 @@ textarea {
 }
 
 /* ── Citation dropdown ── */
-.milkdown .citation-dropdown {
-  position: absolute;
-  z-index: 100;
-  width: 320px;
-  background: white;
-  border: 1px solid var(--crepe-color-outline);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+/* Uses slash menu classes (milkdown-slash-menu, menu-groups, etc.) for consistent styling.
+   Only citation-specific content styles are defined here. */
+
+.milkdown .milkdown-slash-menu[data-show='false'] {
+  display: none;
 }
 
-/* Comparison view needs more space than the citekey list */
-.milkdown .citation-dropdown:has(.citation-comparison) {
-  width: 480px;
-}
-
-.milkdown .citation-search {
-  width: 100%;
-  padding: 8px 12px;
-  border: none;
-  border-bottom: 1px solid var(--crepe-color-outline);
-  font-size: 0.875rem;
-  outline: none;
-}
-
-.milkdown .citation-items {
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.milkdown .citation-item {
+/* Single column body per item; min-width 0 lets rows ellipsize
+   instead of stretching the menu wider than its max-width. */
+.milkdown .citation-item-body {
   display: flex;
-  width: 100%;
-  padding: 8px 12px;
-  text-align: left;
-  background: none;
-  border: none;
-  cursor: pointer;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
 }
 
-.milkdown .citation-item:hover,
-.milkdown .citation-item.active {
-  background: var(--crepe-color-hover);
+/* Row 1: author, year, and a type badge pushed right. */
+.milkdown .citation-line-1 {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  white-space: nowrap;
 }
 
-.milkdown .citation-key {
-  font-family: var(--crepe-font-code);
+.milkdown .citation-author {
   font-weight: 600;
-  margin-right: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.milkdown .citation-meta {
+.milkdown .citation-year {
+  font-weight: normal;
+  flex-shrink: 0;
+}
+
+.milkdown .citation-type {
   color: var(--crepe-color-on-surface-variant);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Row 2: title (full, wraps to multiple lines) + citekey. */
+.milkdown .citation-line-2 {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 2px;
+}
+
+.milkdown .citation-title {
+  color: var(--crepe-color-on-surface-variant);
+  font-size: 0.8rem;
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .milkdown .citation-empty {
@@ -315,26 +321,26 @@ textarea {
 }
 
 .milkdown .citation-add-btn {
-  display: flex;
-  width: 100%;
   padding: 8px 12px;
-  text-align: left;
-  background: none;
-  border: none;
-  border-top: 1px solid var(--crepe-color-outline);
+  font-size: calc(var(--crepe-base-font-size, 16px) * 0.875);
   cursor: pointer;
 }
 
-.milkdown .citation-add-btn:hover {
-  background: var(--crepe-color-hover);
+/* ── DOI input ── */
+/* Pin the citation dropdown (citekey list and DOI mode) to exactly
+   380px so the DOI field matches the menu width. */
+.milkdown .citation-dropdown {
+  min-width: 380px;
+  max-width: 380px;
 }
 
-/* ── DOI input ── */
 .milkdown .citation-doi-input {
-  padding: 8px 12px;
+  width: 100%;
+  padding: 8px 0;
 }
 
 .milkdown .citation-doi-field {
+  box-sizing: border-box;
   width: 100%;
   padding: 8px;
   border: 1px solid var(--crepe-color-outline);
@@ -437,10 +443,6 @@ textarea {
 
 /* ── Responsive ── */
 @media (max-width: 639px) {
-  .milkdown .citation-dropdown {
-    width: 100%;
-  }
-
   .milkdown .citation-comparison {
     width: 100%;
   }
@@ -448,4 +450,36 @@ textarea {
   .milkdown .citation-comparison-columns {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── Citekey inline decorations (subtle pill) ── */
+.citekey-link {
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.1);
+  border-radius: 4px;
+  padding: 0 4px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.citekey-link:hover {
+  background: rgba(37, 99, 235, 0.18);
+}
+
+/* ── Citekey hover tooltip ── */
+.citekey-tooltip {
+  position: fixed;
+  z-index: 200;
+  max-width: 380px;
+  padding: 10px 14px;
+  background: #ffffff;
+  color: #212529;
+  border: 1px solid #adb5bd;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  pointer-events: none;
+  font-family: var(--crepe-font-default);
 }

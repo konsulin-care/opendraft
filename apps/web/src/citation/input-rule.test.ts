@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { matchCitationTrigger } from './input-rule';
+import { insertCitation } from './insert';
+
+/** Count occurrences of a character in a string. */
+function countChar(text: string, char: string): number {
+  return text.split(char).length - 1;
+}
 
 describe('matchCitationTrigger - positive cases', () => {
   it('matches @ at start of line', () => {
@@ -35,6 +41,52 @@ describe('matchCitationTrigger - positive cases', () => {
   it('matches @ after punctuation', () => {
     const result = matchCitationTrigger('.@');
     expect(result).toEqual({ from: 1, bracketed: false });
+  });
+});
+
+describe('matchCitationTrigger - multiple citations in one bracket group', () => {
+  it('treats the second @ in "[@a; @" as bracketed', () => {
+    const result = matchCitationTrigger('[@a; @');
+    expect(result).toEqual({ from: 5, bracketed: true });
+  });
+
+  it('treats @ in "[@a;  @" (extra space) as bracketed', () => {
+    const result = matchCitationTrigger('[@a;  @');
+    expect(result).toEqual({ from: 6, bracketed: true });
+  });
+
+  it('does NOT treat @ as bracketed after the group is closed', () => {
+    const result = matchCitationTrigger('[@a] @');
+    expect(result).toEqual({ from: 5, bracketed: false });
+  });
+
+  it('picking b in "[@a; @b]" (] after cursor) yields exactly one ]', () => {
+    const trigger = matchCitationTrigger('[@a; @');
+    expect(trigger).not.toBeNull();
+    const result = insertCitation('[@a; @]', 'b', trigger!, 6);
+
+    expect(result).toBe('[@a; @b]');
+    expect(countChar(result, ']')).toBe(1);
+    expect(countChar(result, '[')).toBe(1);
+  });
+
+  it('picking b in unclosed "[@a; @" adds exactly one ]', () => {
+    const trigger = matchCitationTrigger('[@a; @');
+    expect(trigger).not.toBeNull();
+    const result = insertCitation('[@a; @', 'b', trigger!, 6);
+
+    expect(result).toBe('[@a; @b]');
+    expect(countChar(result, ']')).toBe(1);
+  });
+
+  it('picking b in "[@a; @ ]" keeps the existing ] without duplicating', () => {
+    const trigger = matchCitationTrigger('[@a; @');
+    expect(trigger).not.toBeNull();
+    const result = insertCitation('[@a; @ ]', 'b', trigger!, 6);
+
+    expect(result).toBe('[@a; @b ]');
+    expect(countChar(result, ']')).toBe(1);
+    expect(countChar(result, '[')).toBe(1);
   });
 });
 

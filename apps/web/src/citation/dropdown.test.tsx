@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { CitationDropdown } from "./dropdown";
+import { CitationDropdown, CitekeyItem } from "./dropdown";
 import type { CitationState } from "./types";
 import type { Reference } from "@opendraft/references";
 
@@ -44,7 +44,7 @@ describe("CitationDropdown — rendering", () => {
     const dispatch = vi.fn();
     const state = createOpenState();
     render(<CitationDropdown state={state} dispatch={dispatch} />);
-    expect(screen.getByText("doe2024")).toBeDefined();
+    expect(screen.getByText("Jane Doe")).toBeDefined();
   });
 
   it("does not render when closed", () => {
@@ -83,6 +83,13 @@ describe("CitationDropdown — empty state", () => {
     const state = createOpenState({ query: "zzzzz" });
     render(<CitationDropdown state={state} dispatch={dispatch} />);
     expect(screen.getByText("No matching citations")).toBeDefined();
+  });
+
+  it("filters by citekey query", () => {
+    const dispatch = vi.fn();
+    const state = createOpenState({ query: "doe" });
+    render(<CitationDropdown state={state} dispatch={dispatch} />);
+    expect(screen.getByText("Jane Doe")).toBeDefined();
   });
 });
 
@@ -144,11 +151,8 @@ describe("CitationDropdown — prevents focus loss on dropdown click", () => {
     const dispatch = vi.fn();
     render(<CitationDropdown state={createOpenState()} dispatch={dispatch} />);
     const dropdown = screen.getByTestId("citation-dropdown");
-    // The dropdown must have an onPointerDown handler that calls preventDefault
-    // to keep the ProseMirror editor focused when clicking inside the dropdown.
-    // We verify by checking that the element exists and is interactive.
     expect(dropdown).toBeDefined();
-    expect(dropdown.className).toContain("citation-dropdown");
+    expect(dropdown.className).toContain("milkdown-slash-menu");
   });
 });
 
@@ -162,5 +166,124 @@ describe("CitationDropdown — keyboard navigation delegated to plugin", () => {
     fireEvent.keyDown(dropdown, { key: "Enter" });
     fireEvent.keyDown(dropdown, { key: "Escape" });
     expect(dispatch).not.toHaveBeenCalled();
+  });
+});
+
+// ── CitekeyItem — new layout ──
+
+function createReference(overrides?: Partial<Reference>): Reference {
+  return {
+    citeKey: "Sun2025",
+    entryType: "article",
+    fields: {
+      title: "Integrating Qualitative Comparative Analysis With Reflexive Thematic Analysis in Theme Development",
+      author: "Sun, Yi and Hsieh, Jasper and Gao, Xuesong (Andy)",
+      year: "2025",
+    },
+    ...overrides,
+  };
+}
+
+function renderItem(overrides?: Partial<Reference>, isActive = false) {
+  const onSelect = vi.fn();
+  render(<CitekeyItem item={createReference(overrides)} isActive={isActive} onSelect={onSelect} />);
+  return onSelect;
+}
+
+describe("CitekeyItem — renders new layout", () => {
+  it("renders formatted author and year on line 1", () => {
+    renderItem();
+    expect(screen.getByText(/Yi Sun/)).toBeDefined();
+    expect(screen.getByText(/\(2025\)/)).toBeDefined();
+  });
+
+  it("renders entry type in muted text next to year", () => {
+    renderItem();
+    expect(screen.getByText(/article/i)).toBeDefined();
+  });
+
+  it("renders title on line 2", () => {
+    renderItem();
+    expect(screen.getByText(/Integrating Qualitative/)).toBeDefined();
+  });
+
+  it("applies hover class when isActive is true", () => {
+    renderItem(undefined, true);
+    const items = screen.getAllByRole("listitem");
+    expect(items[0].className).toContain("hover");
+  });
+});
+
+describe("CitekeyItem — fallback and edge cases", () => {
+  it("shows formatted author (not citekey) in .citation-author when author is present", () => {
+    renderItem();
+    expect(document.querySelector(".citation-author")?.textContent).toBe("Yi Sun");
+    expect(document.querySelector(".citation-key")).toBeNull();
+  });
+
+  it("displays citeKey as fallback when author is missing", () => {
+    renderItem({ fields: { title: "Some Title", year: "2025" } });
+    expect(document.querySelector(".citation-author")?.textContent).toBe("Sun2025");
+  });
+
+  it("displays citeKey as fallback when author is empty string", () => {
+    renderItem({ fields: { title: "Some Title", author: "", year: "2025" } });
+    expect(document.querySelector(".citation-author")?.textContent).toBe("Sun2025");
+  });
+
+  it("omits title line when title is missing", () => {
+    renderItem({ fields: { author: "Sun, Yi", year: "2025" } });
+    const items = screen.getAllByRole("listitem");
+    expect(items[0].querySelector(".citation-title")).toBeNull();
+  });
+});
+
+describe("CitekeyItem — body wrapper and two rows", () => {
+  it("renders exactly one .citation-item-body child inside the li", () => {
+    renderItem();
+    const li = screen.getByRole("listitem");
+    expect(li.children.length).toBe(1);
+    expect(li.children[0].className).toContain("citation-item-body");
+  });
+
+  it("row 1 has author, year and capitalized entry-type badge", () => {
+    renderItem();
+    const body = document.querySelector(".citation-item-body");
+    const line1 = body?.children[0];
+    expect(line1?.querySelector(".citation-author")?.textContent).toBe("Yi Sun");
+    expect(line1?.querySelector(".citation-year")?.textContent?.trim()).toBe("(2025)");
+    expect(line1?.querySelector(".citation-type")?.textContent).toBe("Article");
+  });
+
+  it("row 2 has the title only, with no .citation-key element", () => {
+    renderItem();
+    const body = document.querySelector(".citation-item-body");
+    const line2 = body?.children[1];
+    const titleEl = line2?.querySelector(".citation-title");
+    expect(titleEl?.textContent).toContain("Integrating Qualitative");
+    expect(titleEl?.getAttribute("title")).toBe(createReference().fields.title);
+    expect(line2?.querySelector(".citation-key")).toBeNull();
+    expect(document.querySelector(".citation-key")).toBeNull();
+  });
+
+  it("row 2 omits both .citation-title and .citation-key when the entry has no title", () => {
+    renderItem({ fields: { author: "Sun, Yi", year: "2025" } });
+    const body = document.querySelector(".citation-item-body");
+    const line2 = body?.children[1];
+    expect(line2?.querySelector(".citation-title")).toBeNull();
+    expect(line2?.querySelector(".citation-key")).toBeNull();
+  });
+});
+
+describe("CitekeyItem — selection behavior", () => {
+  it("calls onSelect with the citekey on pointerUp", () => {
+    const onSelect = renderItem();
+    fireEvent.pointerUp(screen.getByRole("listitem"));
+    expect(onSelect).toHaveBeenCalledWith("Sun2025");
+  });
+
+  it("marks the active item with class 'hover'", () => {
+    renderItem(undefined, true);
+    expect(screen.getByRole("listitem").className).toContain("hover");
   });
 });

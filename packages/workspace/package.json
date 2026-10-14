@@ -14,11 +14,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "idb": "^8.0.3"
+    "idb": "^8.0.4"
   },
   "devDependencies": {
     "fake-indexeddb": "^6.2.5",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.4"
   }
 }

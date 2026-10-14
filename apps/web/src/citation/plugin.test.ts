@@ -2,8 +2,34 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { createCitationPlugin, citationPluginKey } from "./plugin";
+import { createCitationPlugin, citationPluginKey, shouldShowCitation } from "./plugin";
 import type { WorkspaceAdapter } from "@opendraft/workspace";
+import { EditorState, TextSelection } from "@milkdown/kit/prose/state";
+import { Schema } from "@milkdown/kit/prose/model";
+
+/** Build a single-paragraph EditorState with the cursor at the given doc position. */
+function createEditorState(text: string, cursorPos: number): EditorState {
+  const schema = new Schema({
+    nodes: {
+      doc: { content: "block+" },
+      paragraph: { group: "block", content: "inline*" },
+      text: { group: "inline" },
+    },
+  });
+  const doc = schema.nodes.doc.create(null, [
+    schema.nodes.paragraph.create(null, schema.text(text)),
+  ]);
+  return EditorState.create({
+    doc,
+    selection: TextSelection.create(doc, cursorPos),
+  });
+}
+
+/** Paragraph text before the cursor, as SlashProvider.getContent computes it. */
+function textBeforeCursor(state: EditorState): string {
+  const { $from } = state.selection;
+  return $from.parent.textBetween(0, $from.parentOffset);
+}
 
 const pluginSource = readFileSync(
   fileURLToPath(new URL("./plugin.ts", import.meta.url)),
@@ -58,9 +84,9 @@ describe("citation plugin — global keyboard handler (capture phase)", () => {
     expect(pluginSource).not.toMatch(/handleKeyDown\(/);
   });
 
-  it("does not use filterCitekeys in plugin", () => {
-    // filterCitekeys is now used in dropdown component
-    expect(pluginSource).not.toContain("filterCitekeys");
+  it("uses filterCitekeys in Enter handler to resolve filtered index", () => {
+    // Enter handler must read from filtered list, not raw state.items
+    expect(pluginSource).toContain("filterCitekeys");
   });
 
   it("inserts citekey via direct view.dispatch in global handler", () => {
@@ -70,15 +96,34 @@ describe("citation plugin — global keyboard handler (capture phase)", () => {
   });
 
   it("reads trigger from citation state for insert range", () => {
-    // Must use state.trigger.from to compute replacement range
+    // Insertion range is planned from the citation-state trigger
     expect(pluginSource).toContain("state.trigger");
-    expect(pluginSource).toContain("state.trigger.from");
+    expect(pluginSource).toContain("planCitationInsertion");
   });
 
-  it("supports bracketed [@citekey] insert mode", () => {
-    // Must check trigger.bracketed to choose insert format
-    expect(pluginSource).toContain("trigger.bracketed");
-    expect(pluginSource).toContain('[@${citekey}]');
+  it("delegates bracket handling to planCitationInsertion", () => {
+    // Bracket format ([@citekey] vs @citekey) and ] dedup live in insert.ts
+    expect(pluginSource).toContain("planCitationInsertion");
+    expect(pluginSource).toContain("insertion.text");
+  });
+
+});
+
+describe("citation plugin — insert range and cursor placement", () => {
+  it("replaces only the @query, never consuming the [", () => {
+    // T3: the replacement starts at the @ (trigger.from), not at the [.
+    // A ] is appended by planCitationInsertion only when the group lacks one.
+    expect(pluginSource).not.toContain("trigger.from - 1");
+    expect(pluginSource).toContain("planCitationInsertion");
+  });
+
+  it("places the cursor just before the closing ] after insert", () => {
+    // T4: after the first pick in [@key] the cursor must sit at the offset
+    // just before the closing ] (insertion.from + "@citekey".length) so the
+    // user can type "; @" to add another citation to the same group.
+    expect(pluginSource).toMatch(
+      /insertText\([\s\S]*?setSelection\(\s*TextSelection\.create\(tr\.doc, insertion\.from \+ citekey\.length \+ 1\)\s*,?\s*\)[\s\S]*?view\.dispatch\(tr\)/,
+    );
   });
 });
 
@@ -89,14 +134,40 @@ describe("citation plugin — shouldShowCitation supports post-trigger text", ()
     expect(pluginSource).not.toMatch(/content\.startsWith\(["']@['"]\)/);
   });
 
-  it("shouldShow checks cursor is at end of node", () => {
-    // Must verify cursor position to close dropdown when cursor moves mid-text
-    expect(pluginSource).toContain("isSelectionAtEndOfNode");
-  });
-
   it("shouldShow supports bracketed [@ trigger via matchCitationTrigger", () => {
     // matchCitationTrigger handles [@ detection internally
     expect(pluginSource).toContain("matchCitationTrigger");
+  });
+});
+
+describe("citation plugin — shouldShowCitation opens picker before trailing text", () => {
+  it("returns true for [@a; @ with a ] after the cursor", () => {
+    // "[@a; @]" with the cursor between @ and ]: the ] follows the cursor,
+    // so the picker must still open (doc position 7 = between @ and ]).
+    const state = createEditorState("[@a; @]", 7);
+    const content = textBeforeCursor(state);
+    expect(content).toBe("[@a; @");
+    expect(shouldShowCitation(content)).toBe(true);
+  });
+
+  it("returns true when @ is at the end of the paragraph", () => {
+    const state = createEditorState("See @", 6);
+    expect(shouldShowCitation(textBeforeCursor(state))).toBe(true);
+  });
+
+  it("does not require the cursor to be at the end of the node", () => {
+    // No end-of-paragraph requirement: text after the cursor is fine
+    expect(pluginSource).not.toContain("isSelectionAtEndOfNode");
+  });
+
+  it("returns false when @ sits inside a word", () => {
+    const state = createEditorState("email@", 7);
+    expect(shouldShowCitation(textBeforeCursor(state))).toBe(false);
+  });
+
+  it("returns false for empty or missing content", () => {
+    expect(shouldShowCitation(undefined)).toBe(false);
+    expect(shouldShowCitation("")).toBe(false);
   });
 });
 

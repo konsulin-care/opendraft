@@ -66,4 +66,5 @@ export type CitationAction =
   | { type: 'SET_COMPARISON'; comparison: ComparisonState }
   | { type: 'DISCARD_DOI' }
   | { type: 'SET_ERROR'; error: CitationError }
-  | { type: 'CLEAR_ERROR' };
+  | { type: 'CLEAR_ERROR' }
+  | { type: 'SET_DECORATIONS'; decorations: unknown };

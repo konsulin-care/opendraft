@@ -54,6 +54,11 @@ export function cleanupBibtex(bibtex: string): string {
   // Match & not preceded by backslash
   result = result.replace(/([^\\])&/g, '$1\\&');
 
+  // Strip underscores from citekeys to avoid remark-stringify escaping
+  result = result.replace(/@(\w+)\{([^,}]+)/g, (_match, type, citekey) => {
+    return `@${type}{${citekey.replace(/_/g, '')}`;
+  });
+
   // Remove url field (handles inline and line-by-line)
   result = result.replace(/,?\s*url\s*=\s*\{[^}]*\}/g, '');
 

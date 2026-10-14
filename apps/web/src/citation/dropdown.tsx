@@ -4,6 +4,41 @@ import { DoiInput } from "./doi-input";
 import { ComparisonView, extractCitekey } from "./comparison";
 import { resolveDoi, normalizeDoi } from "./doi-resolver";
 
+/**
+ * Extract first author from BibTeX `author` field.
+ *
+ * BibTeX stores authors as `"Last, First"` or `"Last, First and Last, First"`.
+ * Returns `"First Last"` for the first author, or `null` if unavailable.
+ *
+ * @param author - Raw BibTeX author string.
+ * @returns Formatted first author name, or null.
+ */
+export function formatAuthor(author: string | undefined): string | null {
+  if (!author || !author.trim()) return null;
+
+  const firstAuthor = author.split(' and ')[0].trim();
+  const parts = firstAuthor.split(',').map((p) => p.trim());
+
+  if (parts.length >= 2) {
+    // "Last, First" -> "First Last"
+    return `${parts[1]} ${parts[0]}`;
+  }
+
+  // Already in "First Last" or single-name format
+  return firstAuthor;
+}
+
+/**
+ * Capitalize first letter of entry type.
+ *
+ * @param entryType - BibTeX entry type (e.g. "article").
+ * @returns Capitalized entry type (e.g. "Article").
+ */
+export function formatEntryType(entryType: string): string {
+  if (!entryType) return '';
+  return entryType.charAt(0).toUpperCase() + entryType.slice(1);
+}
+
 interface CitationDropdownProps {
   /** Current citation state. */
   state: CitationState;
@@ -106,6 +141,8 @@ function renderCitekeyList(
  *
  * Renders citekey list, DOI input, comparison view,
  * or error display based on current state.
+ *
+ * Uses the same CSS classes as the slash menu for consistent styling.
  */
 export function CitationDropdown({
   state,
@@ -118,7 +155,8 @@ export function CitationDropdown({
   return (
     <div
       data-testid="citation-dropdown"
-      className="citation-dropdown"
+      className="milkdown-slash-menu citation-dropdown"
+      data-show="true"
       onPointerDown={(e) => e.preventDefault()}
     >
       {state.comparison ? (
@@ -140,25 +178,42 @@ interface CitekeyListProps {
   onAddCitation: () => void;
 }
 
-interface CitekeyItemProps {
+export interface CitekeyItemProps {
   item: CitationState["items"][number];
   isActive: boolean;
   onSelect: (citekey: string) => void;
 }
 
-function CitekeyItem({ item, isActive, onSelect }: CitekeyItemProps) {
+export function CitekeyItem({ item, isActive, onSelect }: CitekeyItemProps) {
+  const author = formatAuthor(item.fields.author);
+  const displayName = author ?? item.citeKey;
+  const year = item.fields.year;
+  const entryType = item.entryType;
+  const title = item.fields.title;
+
   return (
-    <button
-      type="button"
-      className={"citation-item " + (isActive ? "active" : "")}
+    <li
+      className={isActive ? "hover" : ""}
       onPointerDown={(e) => e.preventDefault()}
-      onClick={() => onSelect(item.citeKey)}
+      onPointerUp={() => onSelect(item.citeKey)}
     >
-      <span className="citation-key">{item.citeKey}</span>
-      <span className="citation-meta">
-        {item.fields.author?.split(",")[0]} {item.fields.year}
-      </span>
-    </button>
+      <div className="citation-item-body">
+        <div className="citation-line-1">
+          <span className="citation-author">{displayName}</span>
+          {year && <span className="citation-year"> ({year})</span>}
+          {entryType && (
+            <span className="citation-type">{formatEntryType(entryType)}</span>
+          )}
+        </div>
+        <div className="citation-line-2">
+          {title && (
+            <span className="citation-title" title={title}>
+              {title}
+            </span>
+          )}
+        </div>
+      </div>
+    </li>
   );
 }
 
@@ -172,33 +227,38 @@ function CitekeyList({
   const filtered = filterCitekeys(items, query);
 
   return (
-    <div className="citation-list">
-      <div className="citation-items">
-        {filtered.length === 0 ? (
-          <div className="citation-empty">
-            {items.length > 0
-              ? "No matching citations"
-              : "No references yet. Add one by DOI or create references.bib."}
-          </div>
-        ) : (
-          filtered.map((item, index) => (
-            <CitekeyItem
-              key={item.citeKey}
-              item={item}
-              isActive={index === activeIndex}
-              onSelect={onSelect}
-            />
-          ))
-        )}
+    <div className="menu-groups">
+      <div className="menu-group">
+        <ul>
+          {filtered.length === 0 ? (
+            <li className="citation-empty">
+              {items.length > 0
+                ? "No matching citations"
+                : "No references yet. Add one by DOI or create references.bib."}
+            </li>
+          ) : (
+            filtered.map((item, index) => (
+              <CitekeyItem
+                key={item.citeKey}
+                item={item}
+                isActive={index === activeIndex}
+                onSelect={onSelect}
+              />
+            ))
+          )}
+        </ul>
       </div>
-      <button
-        type="button"
-        className="citation-add-btn"
-        onPointerDown={(e) => e.preventDefault()}
-        onClick={onAddCitation}
-      >
-        + Add Citation (DOI)
-      </button>
+      <div className="menu-group">
+        <ul>
+          <li
+            className="citation-add-btn"
+            onPointerDown={(e) => e.preventDefault()}
+            onPointerUp={onAddCitation}
+          >
+            + Add Citation (DOI)
+          </li>
+        </ul>
+      </div>
     </div>
   );
 }

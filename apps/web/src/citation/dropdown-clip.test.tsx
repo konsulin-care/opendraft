@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { CitationDropdown } from "./dropdown";
@@ -45,36 +45,32 @@ const cssSource = readFileSync(
   "utf8",
 );
 
-describe("CitationDropdown — comparison view is not clipped (CSS)", () => {
-  it("citation-dropdown has no max-height or overflow:hidden", () => {
-    // Find the .citation-dropdown rule block
-    const dropdownRule = cssSource.match(
-      /\.citation-dropdown\s*\{[^}]+\}/,
-    );
-    expect(dropdownRule).not.toBeNull();
-    const rule = dropdownRule![0];
-    // Must not constrain height
-    expect(rule).not.toMatch(/max-height\s*:/);
-    expect(rule).not.toMatch(/overflow\s*:\s*hidden/);
+describe("CitationDropdown — uses slash menu classes", () => {
+  it("renders with milkdown-slash-menu and citation-dropdown classes", () => {
+    const state = createOpenState();
+    render(<CitationDropdown state={state} dispatch={vi.fn()} />);
+    const dropdown = screen.getByTestId("citation-dropdown");
+    expect(dropdown.className).toContain("milkdown-slash-menu");
+    expect(dropdown.className).toContain("citation-dropdown");
   });
 
-  it("citation-dropdown widens when comparison view is present", () => {
-    // There must be a :has(.citation-comparison) rule or a modifier class
-    // that makes the dropdown wider (>=480px) for comparison view
-    const hasComparisonRule = cssSource.includes(":has(.citation-comparison)")
-      || cssSource.includes(".citation-dropdown.comparison")
-      || cssSource.includes(".citation-comparison-active");
-    expect(hasComparisonRule).toBe(true);
+  it("has data-show attribute", () => {
+    const state = createOpenState();
+    render(<CitationDropdown state={state} dispatch={vi.fn()} />);
+    const dropdown = screen.getByTestId("citation-dropdown");
+    expect(dropdown.getAttribute("data-show")).toBe("true");
   });
 
-  it("citation-items still has bounded height for scrolling", () => {
-    const itemsRule = cssSource.match(
-      /\.citation-items\s*\{[^}]+\}/,
-    );
-    expect(itemsRule).not.toBeNull();
-    const rule = itemsRule![0];
-    expect(rule).toMatch(/max-height\s*:\s*200px/);
-    expect(rule).toMatch(/overflow-y\s*:\s*auto/);
+  it("citation-dropdown CSS rule only fixes the width (min/max 380px)", () => {
+    // Width is pinned via a .citation-dropdown rule; other slash menu styling is untouched.
+    expect(cssSource).toMatch(/\.milkdown \.citation-dropdown\s*\{/);
+    expect(cssSource).toMatch(/\.citation-dropdown\s*\{[^}]*min-width:\s*380px/);
+    expect(cssSource).toMatch(/\.citation-dropdown\s*\{[^}]*max-width:\s*380px/);
+  });
+
+  it("data-show=false visibility rule exists", () => {
+    expect(cssSource).toContain("[data-show='false']");
+    expect(cssSource).toContain("display: none");
   });
 });
 
@@ -93,15 +89,99 @@ describe("CitationDropdown — comparison view renders correctly", () => {
     const discardBtn = screen.getByText("Discard");
     expect(replaceBtn.tagName).toBe("BUTTON");
     expect(discardBtn.tagName).toBe("BUTTON");
-    // Buttons must be in the actions container
     const actionsContainer = replaceBtn.closest(".citation-comparison-actions");
     expect(actionsContainer).not.toBeNull();
     expect(actionsContainer?.contains(discardBtn)).toBe(true);
   });
 });
 
-describe("CitationDropdown — citekey list still scrolls", () => {
-  it("renders citation-items container", () => {
+describe("CitationDropdown — item body wrapper markup", () => {
+  it("wraps item rows in a single .citation-item-body child of the li", () => {
+    const state = createOpenState();
+    const { container } = render(
+      <CitationDropdown state={state} dispatch={vi.fn()} />
+    );
+    const author = container.querySelector(".citation-author");
+    expect(author).not.toBeNull();
+    const li = author?.closest("li");
+    expect(li).not.toBeNull();
+    expect(li?.children.length).toBe(1);
+    expect(li?.children[0].classList.contains("citation-item-body")).toBe(true);
+  });
+
+  it("renders no .citation-key element in rows", () => {
+    const state = createOpenState();
+    const { container } = render(
+      <CitationDropdown state={state} dispatch={vi.fn()} />
+    );
+    expect(container.querySelector(".citation-key")).toBeNull();
+    expect(container.querySelector(".citation-title")).not.toBeNull();
+  });
+});
+
+describe("CitationDropdown — Add Citation group", () => {
+  it("renders .citation-add-btn inside its own .menu-group > ul after the citekey group", () => {
+    const state = createOpenState();
+    const { container } = render(
+      <CitationDropdown state={state} dispatch={vi.fn()} />
+    );
+    const btn = container.querySelector(".citation-add-btn");
+    expect(btn).not.toBeNull();
+    expect(btn?.parentElement?.tagName).toBe("UL");
+    const group = btn?.closest(".menu-group");
+    expect(group?.parentElement).toBe(container.querySelector(".menu-groups"));
+  });
+
+  it("dispatches ENTER_DOI_MODE on pointerUp of the add button", () => {
+    const state = createOpenState();
+    const dispatch = vi.fn();
+    const { container } = render(
+      <CitationDropdown state={state} dispatch={dispatch} />
+    );
+    fireEvent.pointerUp(container.querySelector(".citation-add-btn")!);
+    expect(dispatch).toHaveBeenCalledWith({ type: "ENTER_DOI_MODE" });
+  });
+
+  it("still shows the add-citation group when there are no items", () => {
+    const state = createOpenState({ items: [], query: "" });
+    const { container } = render(
+      <CitationDropdown state={state} dispatch={vi.fn()} />
+    );
+    const groups = container.querySelectorAll(".menu-groups > .menu-group");
+    expect(groups.length).toBe(2);
+    expect(groups[1].querySelector(".citation-add-btn")).not.toBeNull();
+    expect(screen.getByText(/No references yet/)).toBeDefined();
+  });
+});
+
+describe("CitationDropdown — citekey list renders", () => {
+  it("has no li as a direct child of .menu-groups (add button lives in its own group)", () => {
+    const state = createOpenState();
+    const { container } = render(
+      <CitationDropdown state={state} dispatch={vi.fn()} />
+    );
+    const menuGroups = container.querySelector(".menu-groups");
+    expect(menuGroups).not.toBeNull();
+    const bareLis = Array.from(menuGroups?.children ?? []).filter(
+      (el) => el.tagName === "LI"
+    );
+    expect(bareLis).toHaveLength(0);
+    const addBtn = container.querySelector(".citation-add-btn");
+    expect(addBtn?.closest(".menu-group > ul")).not.toBeNull();
+  });
+
+  it("renders the add-citation menu group after the citekey list group", () => {
+    const state = createOpenState();
+    const { container } = render(
+      <CitationDropdown state={state} dispatch={vi.fn()} />
+    );
+    const groups = container.querySelectorAll(".menu-groups > .menu-group");
+    expect(groups.length).toBe(2);
+    expect(groups[0].querySelector(".citation-item-body")).not.toBeNull();
+    expect(groups[1].querySelector(".citation-add-btn")).not.toBeNull();
+  });
+
+  it("renders menu-groups container with items", () => {
     const state = createOpenState({
       items: Array.from({ length: 10 }, (_, i) => ({
         citeKey: `ref${i}`,
@@ -112,9 +192,8 @@ describe("CitationDropdown — citekey list still scrolls", () => {
     const { container } = render(
       <CitationDropdown state={state} dispatch={vi.fn()} />
     );
-    const itemsContainer = container.querySelector(".citation-items");
-    expect(itemsContainer).not.toBeNull();
-    expect(screen.getByText("ref0")).toBeDefined();
-    expect(screen.getByText("ref9")).toBeDefined();
+    const menuGroups = container.querySelector(".menu-groups");
+    expect(menuGroups).not.toBeNull();
+    expect(screen.getAllByText("Author").length).toBeGreaterThanOrEqual(10);
   });
 });
