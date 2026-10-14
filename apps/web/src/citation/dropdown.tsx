@@ -211,7 +211,6 @@ export function CitekeyItem({ item, isActive, onSelect }: CitekeyItemProps) {
               {title}
             </span>
           )}
-          <span className="citation-key">{item.citeKey}</span>
         </div>
       </div>
     </li>

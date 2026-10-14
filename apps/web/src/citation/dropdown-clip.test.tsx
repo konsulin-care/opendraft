@@ -108,14 +108,13 @@ describe("CitationDropdown — item body wrapper markup", () => {
     expect(li?.children[0].classList.contains("citation-item-body")).toBe(true);
   });
 
-  it("shows the citekey in a row-2 .citation-key element", () => {
+  it("renders no .citation-key element in rows", () => {
     const state = createOpenState();
     const { container } = render(
       <CitationDropdown state={state} dispatch={vi.fn()} />
     );
-    const key = container.querySelector(".citation-key");
-    expect(key?.textContent).toBe("doe2024");
-    expect(key?.closest(".citation-item-body")).not.toBeNull();
+    expect(container.querySelector(".citation-key")).toBeNull();
+    expect(container.querySelector(".citation-title")).not.toBeNull();
   });
 });
 

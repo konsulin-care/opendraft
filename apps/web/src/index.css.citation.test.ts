@@ -89,8 +89,7 @@ describe('index.css — citekey pill styling', () => {
     expect(css).toMatch(/\.citekey-link\s*\{[^}]*color:\s*#2563eb/);
   });
 
-  it('has .citation-key styled as muted monospace', () => {
-    expect(css).toMatch(/\.citation-key\s*\{[^}]*color:\s*var\(--crepe-color-on-surface-variant\)/);
-    expect(css).toMatch(/\.citation-key\s*\{[^}]*font-family:\s*var\(--crepe-font-code\)/);
+  it('has no .citation-key rule (citekey hidden from dropdown rows)', () => {
+    expect(css).not.toMatch(/\.citation-key\s*\{/);
   });
 });
