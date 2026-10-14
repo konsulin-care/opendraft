@@ -22,7 +22,7 @@
     "@milkdown/crepe": "7.22.3",
     "@milkdown/kit": "7.22.3",
     "@milkdown/plugin-slash": "^7.22.3",
-    "@milkdown/react": "7.22.2",
+    "@milkdown/react": "7.22.3",
     "@opendraft/git": "workspace:*",
     "@opendraft/references": "workspace:*",
     "@opendraft/workspace": "workspace:*",
