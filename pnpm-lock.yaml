@@ -72,8 +72,8 @@ importers:
         specifier: 7.22.2
         version: 7.22.2(@codemirror/language@6.12.4)(@codemirror/state@6.7.6)(@codemirror/view@6.43.13)(typescript@6.0.3)
       '@milkdown/plugin-slash':
-        specifier: ^7.22.3
-        version: 7.22.3
+        specifier: 7.22.2
+        version: 7.22.2
       '@milkdown/react':
         specifier: 7.22.2
         version: 7.22.2(@codemirror/language@6.12.4)(@codemirror/state@6.7.6)(@codemirror/view@6.43.13)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-view@1.42.6)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
@@ -86,6 +86,9 @@ importers:
       '@opendraft/workspace':
         specifier: workspace:*
         version: link:../../packages/workspace
+      lucide-react:
+        specifier: ^1.57.0
+        version: 1.57.0(@types/react@19.3.0)(react@19.3.0)
       react:
         specifier: ^19.3.0
         version: 19.3.0
@@ -973,23 +976,14 @@ packages:
   '@milkdown/core@7.22.2':
     resolution: {integrity: sha512-grJ0enYKFwfV9Ur2GLiDtzOi7kzSqhCueBudqgfmmlx3HVGXwg78/CXsYDhn8cNFqpPSA0TMhdxIpBFKxXOMKA==}
 
-  '@milkdown/core@7.22.3':
-    resolution: {integrity: sha512-0ahBhgTWkXefr2yDZyXGtr5CnzFxoduQyYG44pcTfG2CDyfgJnzF3KNgcchyI7Z2rlGD/RTLzCCh/59rIovEvQ==}
-
   '@milkdown/crepe@7.22.2':
     resolution: {integrity: sha512-izn9AcNXk3ooJrc6tA0qTnUfmvuFdhGZxAamxifz4wuj5DAKwtwj5m0c3HSqQNHXZOgzC0DW7+hdd08Z2VJPCw==}
 
   '@milkdown/ctx@7.22.2':
     resolution: {integrity: sha512-w2kkMfBIxTpXtnjqltxIiMhflfZzyPN+q31ZwLtwUZjgTpiPCHS/ROUOH1U891mKNUKcD10lOFfOQSS959yIqg==}
 
-  '@milkdown/ctx@7.22.3':
-    resolution: {integrity: sha512-46FYHmTYCd9bSfYpcRlq8NLNp5gVekDE1I6z4M+Z4a+xY6IaTWvaSFiJpkcpuWm1hwt5WVye9sGmOP0IVKokeg==}
-
   '@milkdown/exception@7.22.2':
     resolution: {integrity: sha512-uS4Gx6xE/iTSKslverVWIWQ8RN5B+NXxP8BLSATnlwDKiYlgBYZYLbvSx632VM9j5Qsd5YuKRGt9k3dXe54EWw==}
-
-  '@milkdown/exception@7.22.3':
-    resolution: {integrity: sha512-iVRobQxa/PUiCNy8WSfpw5PIxdF4oUTEEYQgJYNt/aFXGVPPf7ZqonwBrKpe+iDr/sBz2B8wNhaS5GM2sBZzvg==}
 
   '@milkdown/kit@7.22.2':
     resolution: {integrity: sha512-omjaInj/xiuVnSchr9vm7Kv+ORgFtmdmk0xUbeCEj7ptpCl0aS71vTFjuuc/FKSpTxcJ2ptHa52mrR6MvK8Bhw==}
@@ -1018,9 +1012,6 @@ packages:
   '@milkdown/plugin-slash@7.22.2':
     resolution: {integrity: sha512-4hL/dj6fCs3MOFKGHpXIXAAvu/Hm9fxG2tv2XOZ6Z3ps63z9q8xMSTyuFx1cV9U0z+3J64LnKaQ1lgwzviwD9A==}
 
-  '@milkdown/plugin-slash@7.22.3':
-    resolution: {integrity: sha512-5iSdXrqqcnaFzLrVmUwE8WE4o1MXwbEvmcxIemwEY+9Ti41bzEX4toh9QG5cDxAm1kKaKp8vTHLINFeQukfxCQ==}
-
   '@milkdown/plugin-streaming@7.22.2':
     resolution: {integrity: sha512-fxB2veftnm490aE1TPCJuTftiZSfTR7CZ2JEVmgMQHGy4HApIqJ9MqOyMevR23GSX/Qef9rWsZJNQRgI+9VazA==}
 
@@ -1042,9 +1033,6 @@ packages:
   '@milkdown/prose@7.22.2':
     resolution: {integrity: sha512-sh23B62WiA9+rRwDV1OhC34bpOPRGKbDWDdYxkJkMn+YGUj5HXhNb6hJmqDSqTdPcB2WQTF+WNVbrtde/jkVPg==}
 
-  '@milkdown/prose@7.22.3':
-    resolution: {integrity: sha512-6dtt0pk5vafTtu/tnr8m7hc7TJYR7y2hNATup5RCmmkSm2G7n+zjXNEgbGp+3TsK8zKICW7c9HLcdd/MDwT9Hw==}
-
   '@milkdown/react@7.22.2':
     resolution: {integrity: sha512-b19DqNCbGqhNkeSoV2XmUa/Q1gak1mKWQE9qLoLTNXRoxYaPZh2wi1C8q+cfTz1MROiph2swd8bxwKVk9PQ7Ww==}
     peerDependencies:
@@ -1054,14 +1042,8 @@ packages:
   '@milkdown/transformer@7.22.2':
     resolution: {integrity: sha512-RP2NkKFKHwzUidPvi7V9le7o68KwCuMdFCxkvwX5eaxaxHEmH6v4p5GKoCnjU3+SWUc4XOPKXA15/b6Byg7TuA==}
 
-  '@milkdown/transformer@7.22.3':
-    resolution: {integrity: sha512-/DflV86ihszWWdLPu1rIBS+PwRgOv4zFfml9PPXMQOGa/8npZcyrCKNjks1oIoSVE/PsMPfhvLC4Ntb/Yig4Uw==}
-
   '@milkdown/utils@7.22.2':
     resolution: {integrity: sha512-lRKIaX+kFZycqHxc2xtIwgPdp5BWlSKJKCljZ8Uiih98uaNWQvFlpfzc5Bp4+XJS6BEq2K3ZVILUKa5eWJofWw==}
-
-  '@milkdown/utils@7.22.3':
-    resolution: {integrity: sha512-6IqfEw0rK2onIJL0503Eo3TQke9Exm3MhWce3SP6WkXzJ9mGOLg++KYHQzCMrcMRrN8hCo9n0uCgW60NEKF7Ng==}
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     resolution: {integrity: sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ==}
@@ -2251,6 +2233,15 @@ packages:
 
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
+
+  lucide-react@1.57.0:
+    resolution: {integrity: sha512-bXFZEucYhAzLD62Jse76AbTR6LiSLTn3Tqir2f1n8rZrWAdLodYy7jnRZSPIT89dRLk/IseMOUWG82wJtTyTTw==}
+    peerDependencies:
+      '@types/react': '*'
+      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
 
   lz-string@1.5.0:
     resolution: {integrity: sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ==}
@@ -3827,18 +3818,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@milkdown/core@7.22.3':
-    dependencies:
-      '@milkdown/ctx': 7.22.3
-      '@milkdown/exception': 7.22.3
-      '@milkdown/prose': 7.22.3
-      '@milkdown/transformer': 7.22.3
-      remark-parse: 11.0.0
-      remark-stringify: 11.0.0
-      unified: 11.0.5
-    transitivePeerDependencies:
-      - supports-color
-
   '@milkdown/crepe@7.22.2(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-view@1.42.6)(typescript@6.0.3)':
     dependencies:
       '@codemirror/commands': 6.11.1
@@ -3869,13 +3848,7 @@ snapshots:
     dependencies:
       '@milkdown/exception': 7.22.2
 
-  '@milkdown/ctx@7.22.3':
-    dependencies:
-      '@milkdown/exception': 7.22.3
-
   '@milkdown/exception@7.22.2': {}
-
-  '@milkdown/exception@7.22.3': {}
 
   '@milkdown/kit@7.22.2(@codemirror/language@6.12.4)(@codemirror/state@6.7.6)(@codemirror/view@6.43.13)(typescript@6.0.3)':
     dependencies:
@@ -3985,17 +3958,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@milkdown/plugin-slash@7.22.3':
-    dependencies:
-      '@floating-ui/dom': 1.8.0
-      '@milkdown/ctx': 7.22.3
-      '@milkdown/prose': 7.22.3
-      '@milkdown/utils': 7.22.3
-      '@types/lodash-es': 4.17.12
-      lodash-es: 4.18.1
-    transitivePeerDependencies:
-      - supports-color
-
   '@milkdown/plugin-streaming@7.22.2':
     dependencies:
       '@milkdown/core': 7.22.2
@@ -4080,23 +4042,6 @@ snapshots:
       prosemirror-transform: 1.12.2
       prosemirror-view: 1.42.6
 
-  '@milkdown/prose@7.22.3':
-    dependencies:
-      '@milkdown/exception': 7.22.3
-      prosemirror-changeset: 2.4.4
-      prosemirror-commands: 1.7.2
-      prosemirror-dropcursor: 1.8.4
-      prosemirror-gapcursor: 1.4.1
-      prosemirror-history: 1.5.1
-      prosemirror-inputrules: 1.5.1
-      prosemirror-keymap: 1.2.3
-      prosemirror-model: 1.25.12
-      prosemirror-schema-list: 1.5.1
-      prosemirror-state: 1.4.4
-      prosemirror-tables: 1.8.5
-      prosemirror-transform: 1.12.2
-      prosemirror-view: 1.42.6
-
   '@milkdown/react@7.22.2(@codemirror/language@6.12.4)(@codemirror/state@6.7.6)(@codemirror/view@6.43.13)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-view@1.42.6)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)':
     dependencies:
       '@milkdown/crepe': 7.22.2(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-view@1.42.6)(typescript@6.0.3)
@@ -4122,15 +4067,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@milkdown/transformer@7.22.3':
-    dependencies:
-      '@milkdown/exception': 7.22.3
-      '@milkdown/prose': 7.22.3
-      remark: 15.0.1
-      unified: 11.0.5
-    transitivePeerDependencies:
-      - supports-color
-
   '@milkdown/utils@7.22.2':
     dependencies:
       '@milkdown/core': 7.22.2
@@ -4138,17 +4074,6 @@ snapshots:
       '@milkdown/exception': 7.22.2
       '@milkdown/prose': 7.22.2
       '@milkdown/transformer': 7.22.2
-      nanoid: 6.0.2
-    transitivePeerDependencies:
-      - supports-color
-
-  '@milkdown/utils@7.22.3':
-    dependencies:
-      '@milkdown/core': 7.22.3
-      '@milkdown/ctx': 7.22.3
-      '@milkdown/exception': 7.22.3
-      '@milkdown/prose': 7.22.3
-      '@milkdown/transformer': 7.22.3
       nanoid: 6.0.2
     transitivePeerDependencies:
       - supports-color
@@ -5341,6 +5266,12 @@ snapshots:
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
+
+  lucide-react@1.57.0(@types/react@19.3.0)(react@19.3.0):
+    dependencies:
+      react: 19.3.0
+    optionalDependencies:
+      '@types/react': 19.3.0
 
   lz-string@1.5.0: {}
 
