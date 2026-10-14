@@ -1,4 +1,4 @@
-import { Plugin, PluginKey, TextSelection } from "@milkdown/kit/prose/state";
+import { Plugin, PluginKey } from "@milkdown/kit/prose/state";
 import type { EditorView } from "@milkdown/kit/prose/view";
 import { DecorationSet } from "@milkdown/kit/prose/view";
 import { SlashProvider } from "@milkdown/plugin-slash";
@@ -89,21 +89,19 @@ function createDispatch(view: EditorView) {
   };
 }
 
-/** Check if the selection is at the end of the current node. */
-function isSelectionAtEndOfNode(state: import("@milkdown/kit/prose/state").EditorState): boolean {
-  const { selection } = state;
-  if (!(selection instanceof TextSelection)) return false;
-  return selection.$head.parentOffset === selection.$head.parent.content.size;
-}
-
-/** Check whether the citation dropdown should be shown. */
-function shouldShowCitation(
-  content: string | undefined,
-  state: import("@milkdown/kit/prose/state").EditorState
-): boolean {
+/**
+ * Check whether the citation dropdown should be shown.
+ *
+ * True when the text before the cursor ends with an @ trigger that follows
+ * whitespace, an opening bracket, a semicolon, or the start of the text.
+ * Text after the cursor (e.g. a closing ]) does not prevent the picker.
+ *
+ * @param content - Paragraph text before the cursor, if any.
+ * @returns True when the @ trigger rule matches.
+ */
+export function shouldShowCitation(content: string | undefined): boolean {
   if (!content) return false;
-  if (!matchCitationTrigger(content)) return false;
-  return isSelectionAtEndOfNode(state);
+  return matchCitationTrigger(content) !== null;
 }
 
 /** Rebuild decorations based on current document and references. */
@@ -184,7 +182,7 @@ function createSlashProviderConfig(dispatch: (action: CitationAction) => void, v
     content: container,
     debounce: 0,
     floatingUIOptions: { placement: "bottom-start" },
-    shouldShow: (ev): boolean => shouldShowCitation(provider.getContent(ev), ev.state),
+    shouldShow: (ev): boolean => shouldShowCitation(provider.getContent(ev)),
   });
   provider.element.style.position = "absolute";
   provider.onShow = () => {
