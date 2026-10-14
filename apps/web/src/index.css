@@ -335,6 +335,7 @@ textarea {
 
 /* ── DOI input ── */
 .milkdown .citation-doi-input {
+  width: 380px;
   padding: 8px 12px;
 }
 

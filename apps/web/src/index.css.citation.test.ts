@@ -59,6 +59,14 @@ describe('index.css — citation dropdown new layout', () => {
     expect(css).toMatch(/\.menu-groups\s+\.menu-group\s+li\s*\{[^}]*min-width:\s*0/);
   });
 
+  it('gives .citation-doi-input a fixed usable width of 380px', () => {
+    expect(css).toMatch(/\.citation-doi-input\s*\{[^}]*width:\s*380px/);
+  });
+
+  it('lets the DOI field fill its panel (width 100%)', () => {
+    expect(css).toMatch(/\.citation-doi-field\s*\{[^}]*width:\s*100%/);
+  });
+
   it('does NOT contain old .citation-meta rule', () => {
     expect(css).not.toMatch(/\.citation-meta\s*\{/);
   });
