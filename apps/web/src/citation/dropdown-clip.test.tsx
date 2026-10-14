@@ -46,11 +46,12 @@ const cssSource = readFileSync(
 );
 
 describe("CitationDropdown — uses slash menu classes", () => {
-  it("renders with milkdown-slash-menu class", () => {
+  it("renders with milkdown-slash-menu and citation-dropdown classes", () => {
     const state = createOpenState();
     render(<CitationDropdown state={state} dispatch={vi.fn()} />);
     const dropdown = screen.getByTestId("citation-dropdown");
-    expect(dropdown.className).toBe("milkdown-slash-menu");
+    expect(dropdown.className).toContain("milkdown-slash-menu");
+    expect(dropdown.className).toContain("citation-dropdown");
   });
 
   it("has data-show attribute", () => {
@@ -60,11 +61,11 @@ describe("CitationDropdown — uses slash menu classes", () => {
     expect(dropdown.getAttribute("data-show")).toBe("true");
   });
 
-  it("citation-dropdown CSS rule is removed (uses slash menu styles)", () => {
-    // The .citation-dropdown rule block should no longer exist
-    const hasDropdownRule = cssSource.includes(".citation-dropdown {")
-      || cssSource.match(/\.citation-dropdown\s*\{/);
-    expect(hasDropdownRule).toBeFalsy();
+  it("citation-dropdown CSS rule only fixes the width (min/max 380px)", () => {
+    // Width is pinned via a .citation-dropdown rule; other slash menu styling is untouched.
+    expect(cssSource).toMatch(/\.milkdown \.citation-dropdown\s*\{/);
+    expect(cssSource).toMatch(/\.citation-dropdown\s*\{[^}]*min-width:\s*380px/);
+    expect(cssSource).toMatch(/\.citation-dropdown\s*\{[^}]*max-width:\s*380px/);
   });
 
   it("data-show=false visibility rule exists", () => {

@@ -59,8 +59,14 @@ describe('index.css — citation dropdown new layout', () => {
     expect(css).toMatch(/\.menu-groups\s+\.menu-group\s+li\s*\{[^}]*min-width:\s*0/);
   });
 
-  it('gives .citation-doi-input a fixed usable width of 380px', () => {
-    expect(css).toMatch(/\.citation-doi-input\s*\{[^}]*width:\s*380px/);
+  it('has .citation-dropdown with fixed min/max width of 380px', () => {
+    expect(css).toMatch(/\.citation-dropdown\s*\{[^}]*min-width:\s*380px/);
+    expect(css).toMatch(/\.citation-dropdown\s*\{[^}]*max-width:\s*380px/);
+  });
+
+  it('gives .citation-doi-input width 100% with no horizontal padding', () => {
+    expect(css).toMatch(/\.citation-doi-input\s*\{[^}]*width:\s*100%/);
+    expect(css).toMatch(/\.citation-doi-input\s*\{[^}]*padding:\s*\d*px?\s+0(px)?\s*;/);
   });
 
   it('lets the DOI field fill its panel (width 100%)', () => {

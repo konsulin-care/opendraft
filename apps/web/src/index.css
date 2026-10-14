@@ -327,12 +327,20 @@ textarea {
 }
 
 /* ── DOI input ── */
+/* Pin the citation dropdown (citekey list and DOI mode) to exactly
+   380px so the DOI field matches the menu width. */
+.milkdown .citation-dropdown {
+  min-width: 380px;
+  max-width: 380px;
+}
+
 .milkdown .citation-doi-input {
-  width: 380px;
-  padding: 8px 12px;
+  width: 100%;
+  padding: 8px 0;
 }
 
 .milkdown .citation-doi-field {
+  box-sizing: border-box;
   width: 100%;
   padding: 8px;
   border: 1px solid var(--crepe-color-outline);

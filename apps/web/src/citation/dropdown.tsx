@@ -155,7 +155,7 @@ export function CitationDropdown({
   return (
     <div
       data-testid="citation-dropdown"
-      className="milkdown-slash-menu"
+      className="milkdown-slash-menu citation-dropdown"
       data-show="true"
       onPointerDown={(e) => e.preventDefault()}
     >
