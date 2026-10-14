@@ -36,15 +36,17 @@ describe('index.css — citation dropdown new layout', () => {
     expect(css).toMatch(/\.citation-item-body\s*\{[^}]*min-width:\s*0/);
   });
 
-  it('has .citation-title with white-space nowrap', () => {
-    expect(css).toMatch(/\.citation-title\s*\{[^}]*white-space:\s*nowrap/);
+  it('lets .citation-title wrap (white-space normal, no nowrap)', () => {
+    expect(css).toMatch(/\.citation-title\s*\{[^}]*white-space:\s*normal/);
+    expect(css).not.toMatch(/\.citation-title\s*\{[^}]*white-space:\s*nowrap/);
   });
 
-  it('has .citation-title with text-overflow ellipsis', () => {
-    expect(css).toMatch(/\.citation-title\s*\{[^}]*text-overflow:\s*ellipsis/);
+  it('has no ellipsis truncation on .citation-title (full title shown)', () => {
+    expect(css).not.toMatch(/\.citation-title\s*\{[^}]*text-overflow:\s*ellipsis/);
+    expect(css).not.toMatch(/\.citation-title\s*\{[^}]*overflow:\s*hidden/);
   });
 
-  it('has no line-clamp on .citation-title (single line now)', () => {
+  it('has no line-clamp on .citation-title (full title shown)', () => {
     expect(css).not.toMatch(/\.citation-title\s*\{[^}]*-webkit-line-clamp/);
     expect(css).not.toMatch(/\.citation-title\s*\{[^}]*display:\s*-webkit-box/);
   });
