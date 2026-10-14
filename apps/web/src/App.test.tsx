@@ -14,32 +14,58 @@ describe('App', () => {
     );
   });
 
-  it('shows the header with commit action', async () => {
+});
+
+describe('App header', () => {
+  it('shows the icon header with the OpenDraft button and file name', async () => {
     render(<App />);
-    await waitFor(() => expect(screen.getByText('OpenDraft')).toBeDefined());
-    expect(screen.getByText('Commit')).toBeDefined();
+    await waitFor(() => expect(screen.getByTestId('app-header')).toBeDefined());
+    const logo = screen.getByRole('button', { name: 'OpenDraft' });
+    expect(logo.getAttribute('title')).toBe('OpenDraft');
+    expect(screen.queryByText('OpenDraft')).toBeNull();
+    expect(screen.getByTitle('manuscript.md').textContent).toBe('manuscript.md');
   });
 
-  it('shows a Source toggle button in the header', async () => {
+  it('shows a Visual/Source segmented control reflecting the current mode', async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
-    expect(screen.getByText('Source')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Visual' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Source' }).getAttribute('aria-pressed')).toBe('false');
   });
 
-  it('toggles to Visual mode and back when the button is clicked', async () => {
+});
+
+describe('App mode and commit', () => {
+  it('switches to source mode and back via the segmented control', async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
 
-    // Initial state: button reads 'Source' (to switch TO source)
-    const toggle = screen.getByRole('button', { name: /source/i });
+    fireEvent.click(screen.getByRole('button', { name: 'Source' }));
+    expect(screen.getByRole('button', { name: 'Source' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Visual' }).getAttribute('aria-pressed')).toBe('false');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Visual' }));
+    expect(screen.getByRole('button', { name: 'Visual' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Source' }).getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('toggles the formatting toolbar preference from the header', async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByTestId('app-header')).toBeDefined());
+    const toggle = screen.getByRole('button', { name: 'Formatting toolbar' });
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+
     fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
 
-    // After click: button reads 'Visual' (to switch back to wysiwyg)
-    expect(screen.getByText('Visual')).toBeDefined();
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+  });
 
-    fireEvent.click(screen.getByRole('button', { name: /visual/i }));
-
-    // After second click: button reads 'Source' again
-    expect(screen.getByText('Source')).toBeDefined();
+  it('opens the commit dialog from the header Commit button', async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByTestId('app-header')).toBeDefined());
+    fireEvent.click(screen.getByRole('button', { name: 'Commit' }));
+    expect(screen.getByText('Commit Changes')).toBeDefined();
   });
 });
