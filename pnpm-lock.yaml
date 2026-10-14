@@ -65,6 +65,9 @@ importers:
       '@codemirror/view':
         specifier: 6.43.13
         version: 6.43.13
+      '@floating-ui/dom':
+        specifier: ^1.8.0
+        version: 1.8.0
       '@milkdown/crepe':
         specifier: 7.22.2
         version: 7.22.2(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-view@1.42.6)(typescript@6.0.3)
@@ -87,7 +90,7 @@ importers:
         specifier: workspace:*
         version: link:../../packages/workspace
       lucide-react:
-        specifier: ^1.57.0
+        specifier: 1.57.0
         version: 1.57.0(@types/react@19.3.0)(react@19.3.0)
       react:
         specifier: ^19.3.0
