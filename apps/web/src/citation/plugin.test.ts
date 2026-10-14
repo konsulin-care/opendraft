@@ -96,23 +96,22 @@ describe("citation plugin — global keyboard handler (capture phase)", () => {
   });
 
   it("reads trigger from citation state for insert range", () => {
-    // Must use state.trigger.from to compute replacement range
+    // Insertion range is planned from the citation-state trigger
     expect(pluginSource).toContain("state.trigger");
-    expect(pluginSource).toContain("state.trigger.from");
+    expect(pluginSource).toContain("planCitationInsertion");
   });
 
-  it("supports bracketed [@citekey] insert mode", () => {
-    // Must check trigger.bracketed to choose insert format
-    expect(pluginSource).toContain("trigger.bracketed");
-    expect(pluginSource).toContain('[@${citekey}]');
+  it("delegates bracket handling to planCitationInsertion", () => {
+    // Bracket format ([@citekey] vs @citekey) and ] dedup live in insert.ts
+    expect(pluginSource).toContain("planCitationInsertion");
+    expect(pluginSource).toContain("insertion.text");
   });
 
-  it("uses trigger.from - 1 as replacement start when bracketed", () => {
-    // When trigger.bracketed is true, the [ before @ must be consumed.
-    // The insert text is [@citekey] which includes [, so the range must
-    // start at trigger.from - 1 to avoid duplicating the bracket.
-    expect(pluginSource).toContain("trigger.from - 1");
-    expect(pluginSource).toContain("state.trigger.bracketed");
+  it("replaces only the @query, never consuming the [", () => {
+    // T3: the replacement starts at the @ (trigger.from), not at the [.
+    // A ] is appended by planCitationInsertion only when the group lacks one.
+    expect(pluginSource).not.toContain("trigger.from - 1");
+    expect(pluginSource).toContain("planCitationInsertion");
   });
 });
 

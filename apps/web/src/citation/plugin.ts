@@ -8,6 +8,7 @@ import type { Reference } from "@opendraft/references";
 import { citationReducer, createInitialState } from "./state";
 import { matchCitationTrigger } from "./input-rule";
 import { filterCitekeys } from "./citekey-list";
+import { planCitationInsertion } from "./insert";
 import type { CitationState, CitationAction } from "./types";
 import { createRoot } from "react-dom/client";
 import React from "react";
@@ -221,13 +222,12 @@ function createGlobalKeyHandler(
         if (filtered.length > 0 && state.activeIndex < filtered.length) {
           const citekey = filtered[state.activeIndex].citeKey;
           if (state.trigger) {
-            const insertText = state.trigger.bracketed ? `[@${citekey}]` : `@${citekey}`;
-            const cursorPos = view.state.selection.$from.pos;
-            const from = state.trigger.bracketed
-              ? state.trigger.from - 1
-              : state.trigger.from;
+            const { $from } = view.state.selection;
+            const cursorPos = $from.pos;
+            const textAfter = view.state.doc.textBetween(cursorPos, $from.end(), undefined, "\uFFFD");
+            const insertion = planCitationInsertion(cursorPos, citekey, state.trigger, textAfter);
             const tr = view.state.tr;
-            tr.insertText(insertText, from, cursorPos);
+            tr.insertText(insertion.text, insertion.from, insertion.to);
             view.dispatch(tr);
           }
         }
