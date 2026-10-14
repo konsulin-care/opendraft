@@ -107,11 +107,23 @@ describe("citation plugin — global keyboard handler (capture phase)", () => {
     expect(pluginSource).toContain("insertion.text");
   });
 
+});
+
+describe("citation plugin — insert range and cursor placement", () => {
   it("replaces only the @query, never consuming the [", () => {
     // T3: the replacement starts at the @ (trigger.from), not at the [.
     // A ] is appended by planCitationInsertion only when the group lacks one.
     expect(pluginSource).not.toContain("trigger.from - 1");
     expect(pluginSource).toContain("planCitationInsertion");
+  });
+
+  it("places the cursor just before the closing ] after insert", () => {
+    // T4: after the first pick in [@key] the cursor must sit at the offset
+    // just before the closing ] (insertion.from + "@citekey".length) so the
+    // user can type "; @" to add another citation to the same group.
+    expect(pluginSource).toMatch(
+      /insertText\([\s\S]*?setSelection\(\s*TextSelection\.create\(tr\.doc, insertion\.from \+ citekey\.length \+ 1\)\s*,?\s*\)[\s\S]*?view\.dispatch\(tr\)/,
+    );
   });
 });
 
