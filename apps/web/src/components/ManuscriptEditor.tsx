@@ -199,19 +199,16 @@ function wireEditor(
 /** Hook that wires up the Crepe editor, autosave, and mode sync. */
 function useManuscriptState(options: UseManuscriptStateOptions) {
   const { workspace, defaultValue, mode, onEditorReady, onSaveStatusChange } = options;
-  const placeholderText = PLACEHOLDER_HINT;
   const [sourceMarkdown, setSourceMarkdown] = useState(defaultValue);
   const sourceEditorRef = useRef<SourceEditorHandle | null>(null);
   const editorRef = useRef<Editor | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const prevModeRef = useRef<'wysiwyg' | 'source'>(mode);
-
   const onStateChangeRef = useRef<(state: CitationState) => void>(() => {});
-
   const syncContent = useContentSync(editorRef, prevModeRef, sourceMarkdown, setSourceMarkdown);
 
   const { loading, get } = useEditor(
-    (root) => createCrepeConfig({ root, defaultValue, placeholderText, workspace, onStateChangeRef }),
+    (root) => createCrepeConfig({ root, defaultValue, placeholderText: PLACEHOLDER_HINT, workspace, onStateChangeRef }),
     [defaultValue, workspace],
   );
 
@@ -221,7 +218,12 @@ function useManuscriptState(options: UseManuscriptStateOptions) {
   if (!saverRef.current) saverRef.current = debouncedSaver(workspace, (s) => statusRef.current?.(s));
   const wiredRef = useRef(false);
 
-  // Sync content when mode changes
+  // Source edits schedule the same debounced autosave as visual edits.
+  const handleSourceChange = useCallback((md: string) => {
+    setSourceMarkdown(md);
+    saverRef.current?.schedule(md);
+  }, []);
+
   useEffect(() => {
     syncContent(mode);
   }, [mode, syncContent]);
@@ -233,18 +235,14 @@ function useManuscriptState(options: UseManuscriptStateOptions) {
     wiredRef.current = true;
     editorRef.current = editor;
     wireEditor(editor, saverRef.current!, syncContent, onEditorReady);
-
     return () => {
       wiredRef.current = false;
     };
   }, [loading, get, onEditorReady, workspace, syncContent]);
 
-  useEffect(() => {
-    const saver = saverRef.current;
-    return () => saver?.flush();
-  }, []);
+  useEffect(() => () => saverRef.current?.flush(), []);
 
-  return { sourceMarkdown, setSourceMarkdown, sourceEditorRef, scrollContainerRef, editorRef };
+  return { sourceMarkdown, handleSourceChange, sourceEditorRef, scrollContainerRef, editorRef };
 }
 
 /**
@@ -262,7 +260,7 @@ export function ManuscriptEditor({
 }: ManuscriptEditorProps) {
   const editorRef = useRef<Editor | null>(null);
 
-  const { sourceMarkdown, setSourceMarkdown, sourceEditorRef, scrollContainerRef, editorRef: hookEditorRef } =
+  const { sourceMarkdown, handleSourceChange, sourceEditorRef, scrollContainerRef, editorRef: hookEditorRef } =
     useManuscriptState({ workspace, defaultValue, mode, onEditorReady, onSaveStatusChange });
 
   // Update editorRef when hookEditorRef.current changes
@@ -286,7 +284,7 @@ export function ManuscriptEditor({
         <EditorSurface
           mode={mode}
           sourceMarkdown={sourceMarkdown}
-          onSourceChange={setSourceMarkdown}
+          onSourceChange={handleSourceChange}
           scrollContainerRef={scrollContainerRef}
           sourceEditorRef={sourceEditorRef}
         />

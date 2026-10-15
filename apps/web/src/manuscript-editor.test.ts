@@ -1,8 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createElement } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { MemoryWorkspace } from "@opendraft/workspace";
 import { MilkdownProvider } from "@milkdown/react";
+import { EditorView } from "@codemirror/view";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { ManuscriptEditor } from "./components/ManuscriptEditor";
@@ -10,6 +11,12 @@ import { EditorToolbars } from "./components/EditorToolbars";
 import { INACTIVE_STATE } from "./editor-commands/types";
 import type { EditorCommands } from "./editor-commands/types";
 import { readPreferences, writePreferences } from "./preferences";
+import { saveManuscript } from "./persistence";
+
+vi.mock("./persistence", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./persistence")>();
+  return { ...actual, saveManuscript: vi.fn().mockResolvedValue(undefined) };
+});
 
 const manuscriptSource = readFileSync(
   resolve(__dirname, "./components/ManuscriptEditor.tsx"),
@@ -45,12 +52,7 @@ const stubCommands: EditorCommands = {
   activeState: () => INACTIVE_STATE,
 };
 
-/**
- * Render {@link EditorToolbars} with stub commands and an open keyboard.
- *
- * @param mode - Editing mode passed to the toolbars.
- * @returns The render result.
- */
+/** Render {@link EditorToolbars} with stub commands and an open keyboard. */
 function renderToolbars(mode: "wysiwyg" | "source") {
   return render(
     createElement(EditorToolbars, {
@@ -160,39 +162,23 @@ describe("ManuscriptEditor — effective formatting toolbar visibility", () => {
       formattingToolbar: readPreferences().formattingToolbar,
     };
     const result = render(
-      createElement(
-        MilkdownProvider,
-        null,
-        createElement(ManuscriptEditor, { ...props, mode: "source" }),
-      ),
+      createElement(MilkdownProvider, null, createElement(ManuscriptEditor, { ...props, mode: "source" })),
     );
 
     // Source mode: the effective toolbar is hidden even though the
     // stored preference is true.
-    await waitFor(() =>
-      expect(document.querySelector(".editor-toolbar-collapse")).not.toBeNull(),
-    );
-    expect(
-      document.querySelector(".editor-toolbar-collapse")!.className,
-    ).toContain("is-closed");
+    await waitFor(() => expect(document.querySelector(".editor-toolbar-collapse")).not.toBeNull());
+    expect(document.querySelector(".editor-toolbar-collapse")!.className).toContain("is-closed");
     expect(screen.queryByRole("toolbar", { name: "Formatting" })).toBeNull();
     expect(readPreferences().formattingToolbar).toBe(true);
 
     // Switching back to wysiwyg shows the toolbar again; the mode switch
     // must not rewrite the stored preference.
     result.rerender(
-      createElement(
-        MilkdownProvider,
-        null,
-        createElement(ManuscriptEditor, { ...props, mode: "wysiwyg" }),
-      ),
+      createElement(MilkdownProvider, null, createElement(ManuscriptEditor, { ...props, mode: "wysiwyg" })),
     );
-    await waitFor(() =>
-      expect(screen.queryByRole("toolbar", { name: "Formatting" })).not.toBeNull(),
-    );
-    expect(
-      document.querySelector(".editor-toolbar-collapse")!.className,
-    ).toContain("is-open");
+    await waitFor(() => expect(screen.queryByRole("toolbar", { name: "Formatting" })).not.toBeNull());
+    expect(document.querySelector(".editor-toolbar-collapse")!.className).toContain("is-open");
     expect(readPreferences().formattingToolbar).toBe(true);
   }, 20000);
 });
@@ -210,6 +196,38 @@ describe("EditorToolbars — mobile keyboard bar and source mode", () => {
       screen.queryByRole("toolbar", { name: "Keyboard bar" }),
     ).not.toBeNull();
   });
+});
+
+describe("ManuscriptEditor — source editor autosave", () => {
+  it("schedules the debounced save with the new source markdown on source edits", async () => {
+    vi.mocked(saveManuscript).mockClear();
+    const workspace = new MemoryWorkspace();
+    render(
+      createElement(MilkdownProvider, null, createElement(ManuscriptEditor, {
+        workspace,
+        defaultValue: "# Title\n\nSome text.",
+        mode: "source",
+      })),
+    );
+
+    const cmEditor = document.querySelector(".source-editor .cm-editor") as HTMLElement;
+    expect(cmEditor).not.toBeNull();
+    const view = EditorView.findFromDOM(cmEditor);
+    expect(view).not.toBeNull();
+
+    const newMarkdown = "# Title\n\nEdited in source.";
+    act(() => {
+      view!.dispatch({
+        changes: { from: 0, to: view!.state.doc.length, insert: newMarkdown },
+      });
+    });
+
+    // The save is debounced; after the window it must persist the new text.
+    await waitFor(
+      () => expect(saveManuscript).toHaveBeenCalledWith(workspace, newMarkdown),
+      { timeout: 3000 },
+    );
+  }, 20000);
 });
 
 describe("ManuscriptEditor — citation dropdown mounting", () => {
