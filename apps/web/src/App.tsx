@@ -1,19 +1,15 @@
 import { useState } from 'react';
 import { MilkdownProvider } from '@milkdown/react';
 import { AppHeader } from './components/AppHeader';
-import type { EditorMode, SaveStatus } from './components/AppHeader';
+import type { SaveStatus } from './components/AppHeader';
 import { ManuscriptEditor } from './components/ManuscriptEditor';
 import { CommitDialog } from './components/CommitDialog';
 import { useWorkspace } from './hooks/useWorkspace';
 import { useToolbarPreference } from './hooks/useToolbarPreference';
+import { useEditorMode } from './hooks/useEditorMode';
 import { MANUSCRIPT_PATH } from './persistence';
 
 const WORKSPACE_ID = 'opendraft-manuscript';
-
-function useMode() {
-  const [mode, setMode] = useState<EditorMode>('wysiwyg');
-  return { mode, setMode };
-}
 
 function useCommitDialog() {
   const [showCommitDialog, setShowCommitDialog] = useState(false);
@@ -26,7 +22,7 @@ function useCommitDialog() {
  */
 export function App() {
   const { workspace, markdown, loading, error } = useWorkspace(WORKSPACE_ID);
-  const { mode, setMode } = useMode();
+  const { mode, setMode } = useEditorMode();
   const { showCommitDialog, setShowCommitDialog } = useCommitDialog();
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   const { formattingToolbar, toggleFormattingToolbar } = useToolbarPreference();

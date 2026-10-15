@@ -1,9 +1,25 @@
 import 'fake-indexeddb/auto';
-import { describe, it, expect } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { render, renderHook, act, screen, waitFor, fireEvent } from '@testing-library/react';
 import { App } from './App';
+import { useEditorMode } from './hooks/useEditorMode';
+import {
+  PREFERENCES_STORAGE_KEY,
+  readPreferences,
+  writePreferences,
+} from './preferences';
 
 // @vitest-environment jsdom
+
+// jsdom localStorage is shared across tests in this file; clear it so a
+// persisted editor mode (or toolbar preference) does not leak between tests.
+beforeEach(() => {
+  localStorage.clear();
+});
+
+afterEach(() => {
+  localStorage.clear();
+});
 
 describe('App', () => {
   it('boots into the single manuscript editor', async () => {
@@ -67,6 +83,59 @@ describe('App mode and commit', () => {
     await waitFor(() => expect(screen.getByTestId('app-header')).toBeDefined());
     fireEvent.click(screen.getByRole('button', { name: 'Commit' }));
     expect(screen.getByText('Commit Changes')).toBeDefined();
+  });
+});
+
+describe('App persisted editor mode', () => {
+  it('restores a persisted source mode on a fresh mount', async () => {
+    writePreferences({ formattingToolbar: true, editorMode: 'source' });
+    render(<App />);
+    await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
+    expect(screen.getByRole('button', { name: 'Source' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Visual' }).getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('persists a mode switch to opendraft:prefs', async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Source' }));
+    expect(readPreferences().editorMode).toBe('source');
+    expect(
+      JSON.parse(localStorage.getItem(PREFERENCES_STORAGE_KEY) as string),
+    ).toMatchObject({ v: 2, editorMode: 'source' });
+  });
+});
+
+describe('useEditorMode persistence', () => {
+  it('setMode("source") writes editorMode "source" to opendraft:prefs', () => {
+    const { result } = renderHook(() => useEditorMode());
+    expect(result.current.mode).toBe('wysiwyg');
+
+    act(() => {
+      result.current.setMode('source');
+    });
+    expect(result.current.mode).toBe('source');
+    expect(readPreferences().editorMode).toBe('source');
+    expect(
+      JSON.parse(localStorage.getItem(PREFERENCES_STORAGE_KEY) as string),
+    ).toMatchObject({ v: 2, editorMode: 'source' });
+  });
+
+  it('a fresh hook mount returns the persisted mode', () => {
+    const first = renderHook(() => useEditorMode());
+    act(() => {
+      first.result.current.setMode('source');
+    });
+    first.unmount();
+
+    const second = renderHook(() => useEditorMode());
+    expect(second.result.current.mode).toBe('source');
+  });
+
+  it('defaults to wysiwyg when nothing is stored', () => {
+    const { result } = renderHook(() => useEditorMode());
+    expect(result.current.mode).toBe('wysiwyg');
   });
 });
 
