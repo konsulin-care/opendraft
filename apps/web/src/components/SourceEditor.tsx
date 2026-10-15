@@ -11,6 +11,8 @@ import { foldGutter, foldKeymap, indentOnInput, bracketMatching, syntaxHighlight
 export interface SourceEditorHandle {
   getCursor(): number;
   setCursor(pos: number): void;
+  /** Replace the whole document and place the caret in one transaction. */
+  setContent(markdown: string, cursor: number): void;
   getScrollTop(): number;
   setScrollTop(pos: number): void;
   undo(): void;
@@ -23,6 +25,21 @@ interface SourceEditorProps {
   onChange: (value: string) => void;
   /** Additional class for the outer container (e.g. column layout). */
   className?: string;
+}
+
+/**
+ * Scroll the source viewport so the line at offset is visible. Uses the line
+ * block geometry only, avoiding CodeMirror's DOM measurement.
+ *
+ * @param view - CodeMirror view to scroll.
+ * @param offset - Character offset to reveal.
+ */
+function revealOffset(view: EditorView, offset: number): void {
+  const block = view.lineBlockAt(offset);
+  const { scrollDOM } = view;
+  const visibleBottom = scrollDOM.scrollTop + scrollDOM.clientHeight;
+  if (block.top >= scrollDOM.scrollTop && block.bottom <= visibleBottom) return;
+  scrollDOM.scrollTop = Math.max(0, block.top - scrollDOM.clientHeight / 3);
 }
 
 /** Create the imperative handle methods for cursor/scroll preservation. */
@@ -40,6 +57,17 @@ function makeImperativeHandle(
       view.dispatch({
         selection: { anchor: Math.min(pos, view.state.doc.length) },
       });
+    },
+    setContent(markdown: string, cursor: number) {
+      const view = viewRef.current;
+      if (!view) return;
+      const current = view.state.doc.toString();
+      const target = Math.min(cursor, markdown.length);
+      view.dispatch({
+        ...(current === markdown ? {} : { changes: { from: 0, to: current.length, insert: markdown } }),
+        selection: { anchor: target },
+      });
+      revealOffset(view, target);
     },
     getScrollTop() {
       const view = viewRef.current;

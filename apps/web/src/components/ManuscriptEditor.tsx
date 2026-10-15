@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EditorView } from '@codemirror/view';
 import { Crepe } from '@milkdown/crepe';
 import { useEditor } from '@milkdown/react';
@@ -17,6 +17,7 @@ import { EditorSurface } from './EditorSurface';
 import { EditorToolbars } from './EditorToolbars';
 import { useEditorCommands } from '../hooks/useEditorCommands';
 import { useVirtualKeyboard } from '../hooks/useVirtualKeyboard';
+import { createModeSwitcher, placeVisualCaret, useInitialCaret } from '../caret-mode-switch';
 import type { SourceEditorHandle } from './SourceEditor';
 import type { SaveStatus } from './AppHeader';
 /** Code blocks: light yellow active line/selection matching the Crepe light palette. */
@@ -37,6 +38,10 @@ export interface EditorTestApi {
   setMarkdown(markdown: string): void;
   /** Switch between wysiwyg and source mode. */
   setMode(mode: 'wysiwyg' | 'source'): void;
+  /** Current visual (ProseMirror) selection position. */
+  getCaret(): number;
+  /** Place the visual caret; values past the end clamp to the document end. */
+  setCaret(pos: number): void;
 }
 
 interface ManuscriptEditorProps {
@@ -84,6 +89,8 @@ function createTestApi(editor: Editor, syncContent: (mode: 'wysiwyg' | 'source')
     getMarkdown: () => editor.action(getMarkdown()),
     setMarkdown: (markdown) => editor.action(replaceAll(markdown)),
     setMode: syncContent,
+    getCaret: () => editor.action((ctx) => ctx.get(editorViewCtx).state.selection.from),
+    setCaret: (pos) => editor.action((ctx) => placeVisualCaret(ctx.get(editorViewCtx), pos)),
   };
 }
 
@@ -159,27 +166,6 @@ function createCrepeConfig(options: CrepeConfigOptions) {
   return crepe;
 }
 
-function useContentSync(
-  editorRef: React.MutableRefObject<Editor | null>,
-  prevModeRef: React.MutableRefObject<'wysiwyg' | 'source'>,
-  sourceMarkdown: string,
-  setSourceMarkdown: (md: string) => void,
-) {
-  return useCallback(
-    (newMode: 'wysiwyg' | 'source') => {
-      const editor = editorRef.current;
-      if (!editor) return;
-      if (newMode === 'wysiwyg' && prevModeRef.current === 'source') {
-        editor.action(replaceAll(sourceMarkdown));
-      } else if (newMode === 'source' && prevModeRef.current === 'wysiwyg') {
-        setSourceMarkdown(editor.action(getMarkdown()));
-      }
-      prevModeRef.current = newMode;
-    },
-    [sourceMarkdown],
-  );
-}
-
 /** Wire autosave listener and custom plugins into the Crepe editor. */
 function wireEditor(
   editor: Editor,
@@ -211,7 +197,7 @@ function useManuscriptState(options: UseManuscriptStateOptions) {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const prevModeRef = useRef<'wysiwyg' | 'source'>(mode);
   const onStateChangeRef = useRef<(state: CitationState) => void>(() => {});
-  const syncContent = useContentSync(editorRef, prevModeRef, sourceMarkdown, setSourceMarkdown);
+  const syncContent = useMemo(() => createModeSwitcher(editorRef, sourceEditorRef, prevModeRef, setSourceMarkdown), []);
 
   const { loading, get } = useEditor(
     (root) => createCrepeConfig({ root, defaultValue, placeholderText: PLACEHOLDER_HINT, workspace, onStateChangeRef }),
@@ -245,6 +231,8 @@ function useManuscriptState(options: UseManuscriptStateOptions) {
       wiredRef.current = false;
     };
   }, [loading, get, onEditorReady, workspace, syncContent]);
+
+  useInitialCaret(loading, get);
 
   useEffect(() => () => saverRef.current?.flush(), []);
 
