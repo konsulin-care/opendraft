@@ -198,35 +198,43 @@ describe("EditorToolbars — mobile keyboard bar and source mode", () => {
   });
 });
 
+/** Render {@link ManuscriptEditor} in source mode; return workspace and view. */
+function renderSourceEditor(defaultValue: string) {
+  const workspace = new MemoryWorkspace();
+  const rendered = render(
+    createElement(MilkdownProvider, null, createElement(ManuscriptEditor, {
+      workspace,
+      defaultValue,
+      mode: "source",
+    })),
+  );
+  const cmEditor = document.querySelector(".source-editor .cm-editor") as HTMLElement;
+  expect(cmEditor).not.toBeNull();
+  const view = EditorView.findFromDOM(cmEditor);
+  expect(view).not.toBeNull();
+  return { ...rendered, workspace, view: view! };
+}
+
 describe("ManuscriptEditor — source editor autosave", () => {
   it("schedules the debounced save with the new source markdown on source edits", async () => {
     vi.mocked(saveManuscript).mockClear();
-    const workspace = new MemoryWorkspace();
-    render(
-      createElement(MilkdownProvider, null, createElement(ManuscriptEditor, {
-        workspace,
-        defaultValue: "# Title\n\nSome text.",
-        mode: "source",
-      })),
-    );
-
-    const cmEditor = document.querySelector(".source-editor .cm-editor") as HTMLElement;
-    expect(cmEditor).not.toBeNull();
-    const view = EditorView.findFromDOM(cmEditor);
-    expect(view).not.toBeNull();
-
+    const { workspace, view } = renderSourceEditor("# Title\n\nSome text.");
     const newMarkdown = "# Title\n\nEdited in source.";
-    act(() => {
-      view!.dispatch({
-        changes: { from: 0, to: view!.state.doc.length, insert: newMarkdown },
-      });
-    });
+    act(() => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: newMarkdown } }));
 
     // The save is debounced; after the window it must persist the new text.
-    await waitFor(
-      () => expect(saveManuscript).toHaveBeenCalledWith(workspace, newMarkdown),
-      { timeout: 3000 },
-    );
+    await waitFor(() => expect(saveManuscript).toHaveBeenCalledWith(workspace, newMarkdown), { timeout: 3000 });
+  }, 20000);
+
+  it("saves the pending markdown on flush (unmount) instead of discarding it", async () => {
+    vi.mocked(saveManuscript).mockClear();
+    const { unmount, workspace, view } = renderSourceEditor("# Title\n\nSome text.");
+    const pendingMarkdown = "# Title\n\nEdited right before unmount.";
+    act(() => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: pendingMarkdown } }));
+
+    // Unmount while the debounce is still pending: flush must save, not drop.
+    unmount();
+    await waitFor(() => expect(saveManuscript).toHaveBeenCalledWith(workspace, pendingMarkdown));
   }, 20000);
 });
 

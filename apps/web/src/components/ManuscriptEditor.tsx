@@ -19,9 +19,7 @@ import { useEditorCommands } from '../hooks/useEditorCommands';
 import { useVirtualKeyboard } from '../hooks/useVirtualKeyboard';
 import type { SourceEditorHandle } from './SourceEditor';
 import type { SaveStatus } from './AppHeader';
-/** CodeMirror theme for code blocks: light yellow active line and selection
- * to match the light Crepe palette.
- */
+/** Code blocks: light yellow active line/selection matching the Crepe light palette. */
 const lightCodeBlockTheme = EditorView.theme({
   '.cm-activeLine': { backgroundColor: '#fef9c3' },
   '.cm-activeLineGutter': { backgroundColor: '#fef9c3' },
@@ -92,6 +90,7 @@ function createTestApi(editor: Editor, syncContent: (mode: 'wysiwyg' | 'source')
 /** Debounced autosave writing the single manuscript markdown file. */
 function debouncedSaver(workspace: WorkspaceAdapter, onStatus: (status: SaveStatus) => void) {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let pending: string | undefined;
 
   const save = (markdown: string): void => {
     void saveManuscript(workspace, markdown).then(
@@ -108,15 +107,22 @@ function debouncedSaver(workspace: WorkspaceAdapter, onStatus: (status: SaveStat
   const schedule = (markdown: string): void => {
     if (timer) clearTimeout(timer);
     onStatus('saving');
+    pending = markdown;
     timer = setTimeout(() => {
       timer = undefined;
+      pending = undefined;
       save(markdown);
     }, SAVE_DEBOUNCE_MS);
   };
 
+  /** Save pending content (if any) synchronously, then clear the timer. */
   const flush = (): void => {
     if (timer) clearTimeout(timer);
     timer = undefined;
+    if (pending !== undefined) {
+      save(pending);
+      pending = undefined;
+    }
   };
 
   return { schedule, flush };
