@@ -16,6 +16,7 @@ import { citationRemarkPlugin } from '../citation/citation-remark-plugin';
 import { EditorSurface } from './EditorSurface';
 import { EditorToolbars } from './EditorToolbars';
 import { useEditorCommands } from '../hooks/useEditorCommands';
+import { useVirtualKeyboard } from '../hooks/useVirtualKeyboard';
 import type { SourceEditorHandle } from './SourceEditor';
 import type { SaveStatus } from './AppHeader';
 /** CodeMirror theme for code blocks: light yellow active line and selection
@@ -270,10 +271,16 @@ export function ManuscriptEditor({
   }, [hookEditorRef.current]);
 
   const commands = useEditorCommands(mode, () => sourceEditorRef.current?.getView() ?? null);
+  const { open: keyboardOpen, bottomOffset } = useVirtualKeyboard();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <EditorToolbars commands={commands} formattingToolbar={formattingToolbar} />
+      <EditorToolbars
+        commands={commands}
+        formattingToolbar={formattingToolbar}
+        open={keyboardOpen}
+        bottomOffset={bottomOffset}
+      />
       <div style={{ flex: 1, minHeight: 0 }}>
         <EditorSurface
           mode={mode}

@@ -70,7 +70,7 @@ function Divider() {
  * @param onSelect - Runs `setHeading` with the chosen level.
  * @returns Menu items with the current one marked checked.
  */
-function headingItems(heading: BlockLevel, onSelect: (level: BlockLevel) => void): ToolbarMenuItem[] {
+export function headingItems(heading: BlockLevel, onSelect: (level: BlockLevel) => void): ToolbarMenuItem[] {
   return HEADINGS.map(([level, label, icon]) => ({
     label,
     icon,
@@ -182,7 +182,7 @@ function ListGroup({ commands, active, disabled, run }: GroupProps) {
  * @param run - Runs a command, then refreshes the active state.
  * @returns Menu items for the Insert dropdown.
  */
-function insertItems(
+export function insertItems(
   commands: EditorCommands,
   run: (action: () => void) => void,
 ): ToolbarMenuItem[] {
