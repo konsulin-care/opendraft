@@ -2,11 +2,10 @@ import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { EditorState } from '@codemirror/state';
 import { EditorView, keymap, drawSelection, dropCursor, highlightActiveLine, highlightActiveLineGutter, highlightSpecialChars, lineNumbers, rectangularSelection, crosshairCursor } from '@codemirror/view';
 import { markdown } from '@codemirror/lang-markdown';
-import { oneDark } from '@codemirror/theme-one-dark';
 import { autocompletion, completionKeymap as autocompleteCompletionKeymap, closeBrackets } from '@codemirror/autocomplete';
 import { searchKeymap as searchSearchKeymap } from '@codemirror/search';
 import { history, defaultKeymap, historyKeymap, undo as cmUndo, redo as cmRedo } from '@codemirror/commands';
-import { foldGutter, foldKeymap, indentOnInput, bracketMatching } from '@codemirror/language';
+import { foldGutter, foldKeymap, indentOnInput, bracketMatching, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
 
 /** Imperative handle for SourceEditor — cursor, scroll, history, and view access. */
 export interface SourceEditorHandle {
@@ -88,6 +87,25 @@ function useExternalValueSync(
   }, [value]);
 }
 
+/**
+ * Light theme for the source editor: white background, dark foreground and a
+ * neutral gray active line, matching the .manuscript-editor reading surface.
+ */
+const lightEditorTheme = EditorView.theme({
+  '&': { color: '#212529', backgroundColor: '#ffffff' },
+  '.cm-content': { caretColor: '#212529' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: '#212529' },
+  '.cm-selectionBackground, .cm-content ::selection': { backgroundColor: '#d0d7de' },
+  '&.cm-focused .cm-selectionBackground': { backgroundColor: '#d0d7de' },
+  '.cm-activeLine': { backgroundColor: '#f2f2f2' },
+  '.cm-activeLineGutter': { backgroundColor: '#f2f2f2' },
+  '.cm-gutters': {
+    color: '#6c757d',
+    backgroundColor: '#f7f7f7',
+    borderRight: '1px solid #dee2e6',
+  },
+}, { dark: false });
+
 /** Create a CodeMirror EditorState with markdown support and change tracking. */
 function createState(
   value: string,
@@ -120,7 +138,8 @@ function createState(
         ...searchSearchKeymap,
       ]),
       markdown(),
-      oneDark,
+      lightEditorTheme,
+      syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       EditorView.updateListener.of((update) => {
         if (update.docChanged) {
           isInternalChangeRef.current = true;
@@ -133,7 +152,8 @@ function createState(
 
 /**
  * Raw markdown editor backed by CodeMirror 6 with markdown syntax
- * highlighting and the oneDark theme. Used for the "source" mode
+ * highlighting and a light theme matching the visual surface. Used for the
+ * "source" mode
  * toggle in ManuscriptEditor.
  */
 export const SourceEditor = forwardRef<SourceEditorHandle, SourceEditorProps>(
