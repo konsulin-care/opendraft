@@ -61,6 +61,7 @@ export function App() {
             defaultValue={markdown}
             mode={mode}
             onSaveStatusChange={setSaveStatus}
+            formattingToolbar={formattingToolbar}
           />
         </MilkdownProvider>
       </main>

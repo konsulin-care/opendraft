@@ -14,6 +14,8 @@ import type { CitationState } from '../citation/types';
 import { quartoRemarkPlugin, quartoInlineCodePlugin, quartoChunkOptionPlugin } from '../quarto-syntax';
 import { citationRemarkPlugin } from '../citation/citation-remark-plugin';
 import { EditorSurface } from './EditorSurface';
+import { EditorToolbars } from './EditorToolbars';
+import { useEditorCommands } from '../hooks/useEditorCommands';
 import type { SourceEditorHandle } from './SourceEditor';
 import type { SaveStatus } from './AppHeader';
 /** CodeMirror theme for code blocks: light yellow active line and selection
@@ -49,6 +51,8 @@ interface ManuscriptEditorProps {
   mode?: 'wysiwyg' | 'source';
   /** Reports autosave progress: saving, saved, or error. */
   onSaveStatusChange?: (status: SaveStatus) => void;
+  /** Formatting-toolbar visibility preference, owned by the app shell. */
+  formattingToolbar?: boolean;
 }
 
 interface UseManuscriptStateOptions {
@@ -253,6 +257,7 @@ export function ManuscriptEditor({
   onEditorReady,
   mode = 'wysiwyg',
   onSaveStatusChange,
+  formattingToolbar = true,
 }: ManuscriptEditorProps) {
   const editorRef = useRef<Editor | null>(null);
 
@@ -264,13 +269,20 @@ export function ManuscriptEditor({
     editorRef.current = hookEditorRef.current;
   }, [hookEditorRef.current]);
 
+  const commands = useEditorCommands(mode, () => sourceEditorRef.current?.getView() ?? null);
+
   return (
-    <EditorSurface
-      mode={mode}
-      sourceMarkdown={sourceMarkdown}
-      onSourceChange={setSourceMarkdown}
-      scrollContainerRef={scrollContainerRef}
-      sourceEditorRef={sourceEditorRef}
-    />
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <EditorToolbars commands={commands} formattingToolbar={formattingToolbar} />
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <EditorSurface
+          mode={mode}
+          sourceMarkdown={sourceMarkdown}
+          onSourceChange={setSourceMarkdown}
+          scrollContainerRef={scrollContainerRef}
+          sourceEditorRef={sourceEditorRef}
+        />
+      </div>
+    </div>
   );
 }
