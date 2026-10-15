@@ -278,6 +278,7 @@ export function ManuscriptEditor({
       <EditorToolbars
         commands={commands}
         formattingToolbar={formattingToolbar}
+        mode={mode}
         open={keyboardOpen}
         bottomOffset={bottomOffset}
       />

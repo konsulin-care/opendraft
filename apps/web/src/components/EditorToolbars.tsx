@@ -9,6 +9,8 @@ export interface EditorToolbarsProps {
   commands: EditorCommands;
   /** Formatting-toolbar visibility preference from the app shell. */
   formattingToolbar: boolean;
+  /** Current editing surface; the toolbar only shows in wysiwyg mode. */
+  mode?: 'wysiwyg' | 'source';
   /** True while the on-screen keyboard is open. */
   open?: boolean;
   /** `innerHeight` minus `visualViewport.height`; positions the keyboard bar. */
@@ -32,19 +34,23 @@ const COLLAPSE_MS = 150;
 export function EditorToolbars({
   commands,
   formattingToolbar,
+  mode = 'wysiwyg',
   open = false,
   bottomOffset = 0,
 }: EditorToolbarsProps) {
-  const [mountedToolbar, setMountedToolbar] = useState(formattingToolbar);
+  // Effective visibility: the stored preference is gated on wysiwyg mode.
+  // Mode switches must not rewrite the stored preference itself.
+  const effectiveToolbar = formattingToolbar && mode === 'wysiwyg';
+  const [mountedToolbar, setMountedToolbar] = useState(effectiveToolbar);
 
   useEffect(() => {
-    if (formattingToolbar) {
+    if (effectiveToolbar) {
       setMountedToolbar(true);
       return undefined;
     }
     const timer = setTimeout(() => setMountedToolbar(false), COLLAPSE_MS);
     return () => clearTimeout(timer);
-  }, [formattingToolbar]);
+  }, [effectiveToolbar]);
 
   if (open) {
     return (
@@ -57,7 +63,7 @@ export function EditorToolbars({
     );
   }
   return (
-    <div className={`editor-toolbar-collapse ${formattingToolbar ? 'is-open' : 'is-closed'}`}>
+    <div className={`editor-toolbar-collapse ${effectiveToolbar ? 'is-open' : 'is-closed'}`}>
       {mountedToolbar && <FormattingToolbar commands={commands} />}
     </div>
   );

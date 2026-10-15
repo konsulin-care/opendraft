@@ -1,20 +1,22 @@
-// @vitest-environment node
 import { describe, it, expect } from "vitest";
+import { createElement } from "react";
+import { render, screen, waitFor } from "@testing-library/react";
+import { MemoryWorkspace } from "@opendraft/workspace";
+import { MilkdownProvider } from "@milkdown/react";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
+import { ManuscriptEditor } from "./components/ManuscriptEditor";
+import { readPreferences, writePreferences } from "./preferences";
 
 const manuscriptSource = readFileSync(
-  fileURLToPath(new URL("./components/ManuscriptEditor.tsx", import.meta.url)),
+  resolve(__dirname, "./components/ManuscriptEditor.tsx"),
   "utf8",
 );
 const editorSurfaceSource = readFileSync(
-  fileURLToPath(new URL("./components/EditorSurface.tsx", import.meta.url)),
+  resolve(__dirname, "./components/EditorSurface.tsx"),
   "utf8",
 );
-const css = readFileSync(
-  fileURLToPath(new URL("./index.css", import.meta.url)),
-  "utf8",
-);
+const css = readFileSync(resolve(__dirname, "./index.css"), "utf8");
 
 describe("ManuscriptEditor crepe theme integration", () => {
   it("does not import Crepe theme CSS in the component", () => {
@@ -101,6 +103,53 @@ describe("ManuscriptEditor — light code block theme", () => {
     expect(manuscriptSource).toContain("Crepe.Feature.CodeMirror");
     expect(manuscriptSource).toContain("theme: lightCodeBlockTheme");
   });
+});
+
+describe("ManuscriptEditor — effective formatting toolbar visibility", () => {
+  it("hides the toolbar in source mode without changing the stored preference, and shows it again in wysiwyg", async () => {
+    writePreferences({ formattingToolbar: true, editorMode: "source" });
+    const workspace = new MemoryWorkspace();
+    const props = {
+      workspace,
+      defaultValue: "# Title\n\nSome text.",
+      formattingToolbar: readPreferences().formattingToolbar,
+    };
+    const result = render(
+      createElement(
+        MilkdownProvider,
+        null,
+        createElement(ManuscriptEditor, { ...props, mode: "source" }),
+      ),
+    );
+
+    // Source mode: the effective toolbar is hidden even though the
+    // stored preference is true.
+    await waitFor(() =>
+      expect(document.querySelector(".editor-toolbar-collapse")).not.toBeNull(),
+    );
+    expect(
+      document.querySelector(".editor-toolbar-collapse")!.className,
+    ).toContain("is-closed");
+    expect(screen.queryByRole("toolbar", { name: "Formatting" })).toBeNull();
+    expect(readPreferences().formattingToolbar).toBe(true);
+
+    // Switching back to wysiwyg shows the toolbar again; the mode switch
+    // must not rewrite the stored preference.
+    result.rerender(
+      createElement(
+        MilkdownProvider,
+        null,
+        createElement(ManuscriptEditor, { ...props, mode: "wysiwyg" }),
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("toolbar", { name: "Formatting" })).not.toBeNull(),
+    );
+    expect(
+      document.querySelector(".editor-toolbar-collapse")!.className,
+    ).toContain("is-open");
+    expect(readPreferences().formattingToolbar).toBe(true);
+  }, 20000);
 });
 
 describe("ManuscriptEditor — citation dropdown mounting", () => {
