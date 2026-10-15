@@ -49,6 +49,7 @@ export function EditorSurface({
           ref={sourceEditorRef}
           value={sourceMarkdown}
           onChange={onSourceChange}
+          className="source-editor"
         />
       </div>
     </div>

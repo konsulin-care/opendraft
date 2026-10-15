@@ -176,6 +176,23 @@ textarea {
   padding: 2rem 1rem 4rem 3rem;
 }
 
+/* Formatting toolbar sits in the same centered reading column as the
+   .editor surface, so its left edge lines up with the text column. */
+.editor-toolbar-collapse {
+  max-width: 70ch;
+  margin-inline: auto;
+}
+
+/* Source editor (CodeMirror) uses the same centered column, margin and
+   padding as the visual surface so source text starts at the same x-position. */
+.manuscript-editor .source-editor {
+  max-width: 70ch;
+  margin-inline: auto;
+  padding: 2rem 1rem 4rem 3rem;
+  box-sizing: border-box;
+  background: #ffffff;
+}
+
 /* ── Editor toolbar collapse ── */
 /* Wraps the formatting toolbar; animates the show/hide over 150 ms. */
 .editor-toolbar-collapse {

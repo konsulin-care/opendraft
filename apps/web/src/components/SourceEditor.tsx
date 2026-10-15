@@ -22,6 +22,7 @@ export interface SourceEditorHandle {
 interface SourceEditorProps {
   value: string;
   onChange: (value: string) => void;
+  /** Additional class for the outer container (e.g. column layout). */
   className?: string;
 }
 
