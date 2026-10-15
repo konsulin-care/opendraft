@@ -5,15 +5,18 @@ import { markdown } from '@codemirror/lang-markdown';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { autocompletion, completionKeymap as autocompleteCompletionKeymap, closeBrackets } from '@codemirror/autocomplete';
 import { searchKeymap as searchSearchKeymap } from '@codemirror/search';
-import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
+import { history, defaultKeymap, historyKeymap, undo as cmUndo, redo as cmRedo } from '@codemirror/commands';
 import { foldGutter, foldKeymap, indentOnInput, bracketMatching } from '@codemirror/language';
 
-/** Imperative handle for SourceEditor — cursor and scroll preservation. */
+/** Imperative handle for SourceEditor — cursor, scroll, history, and view access. */
 export interface SourceEditorHandle {
   getCursor(): number;
   setCursor(pos: number): void;
   getScrollTop(): number;
   setScrollTop(pos: number): void;
+  undo(): void;
+  redo(): void;
+  getView(): EditorView | null;
 }
 
 interface SourceEditorProps {
@@ -47,6 +50,17 @@ function makeImperativeHandle(
       const view = viewRef.current;
       if (!view) return;
       view.scrollDOM.scrollTop = pos;
+    },
+    undo() {
+      const view = viewRef.current;
+      if (view) cmUndo(view);
+    },
+    redo() {
+      const view = viewRef.current;
+      if (view) cmRedo(view);
+    },
+    getView() {
+      return viewRef.current;
     },
   };
 }
