@@ -107,6 +107,14 @@
   max-width: 380px;
 }
 
+/* Below the sm breakpoint (e.g. 375px phones) cap the menu at 320px so it
+   never forces horizontal scroll on narrow viewports. */
+@media (max-width: 639px) {
+  .milkdown .milkdown-slash-menu {
+    max-width: 320px;
+  }
+}
+
 .milkdown .milkdown-slash-menu .tab-group {
   padding-left: 16px;
   padding-right: 16px;
@@ -161,11 +169,34 @@ textarea {
   position: relative;
 }
 
-/* reading-width column for prose */
+/* reading-width column for prose; ~70ch keeps lines readable */
 .manuscript-editor .editor {
-  max-width: 46rem;
+  max-width: 70ch;
   margin-inline: auto;
   padding: 2rem 1rem 4rem 3rem;
+}
+
+/* ── Editor toolbar collapse ── */
+/* Wraps the formatting toolbar; animates the show/hide over 150 ms. */
+.editor-toolbar-collapse {
+  overflow: hidden;
+  transition: max-height 150ms ease, opacity 150ms ease;
+}
+
+.editor-toolbar-collapse.is-open {
+  max-height: 4rem;
+  opacity: 1;
+}
+
+.editor-toolbar-collapse.is-closed {
+  max-height: 0;
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-toolbar-collapse {
+    transition: none;
+  }
 }
 
 .manuscript-editor .ProseMirror p {
