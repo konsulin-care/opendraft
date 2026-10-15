@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useToolbarPreference } from './useToolbarPreference';
 import { PREFERENCES_STORAGE_KEY, readPreferences, writePreferences } from '../preferences';
+import type { EditorMode } from '../preferences';
 
 /**
  * Dispatch a keydown event on window.
@@ -31,6 +32,39 @@ function mockPlatform(platform: string): void {
   Object.defineProperty(navigator, 'platform', {
     value: platform,
     configurable: true,
+  });
+}
+
+/**
+ * Press Ctrl+\ twice via the bound shortcut and assert the stored
+ * formattingToolbar flips each time while the stored editorMode is preserved.
+ *
+ * @param mode - Editor mode to pre-store before pressing the shortcut.
+ */
+function expectShortcutFlipsStored(mode: EditorMode): void {
+  mockPlatform('Linux x86_64');
+  writePreferences({ formattingToolbar: true, editorMode: mode });
+  const { result } = renderHook(() => useToolbarPreference());
+  expect(result.current.formattingToolbar).toBe(true);
+
+  act(() => {
+    press('\\', { ctrlKey: true });
+  });
+  expect(result.current.formattingToolbar).toBe(false);
+  expect(readPreferences()).toEqual({
+    v: 2,
+    formattingToolbar: false,
+    editorMode: mode,
+  });
+
+  act(() => {
+    press('\\', { ctrlKey: true });
+  });
+  expect(result.current.formattingToolbar).toBe(true);
+  expect(readPreferences()).toEqual({
+    v: 2,
+    formattingToolbar: true,
+    editorMode: mode,
   });
 }
 
@@ -119,5 +153,15 @@ describe('useToolbarPreference Mod+\\ shortcut', () => {
     });
     expect(result.current.formattingToolbar).toBe(true);
     expect(localStorage.getItem(PREFERENCES_STORAGE_KEY)).toBeNull();
+  });
+});
+
+describe('useToolbarPreference shortcut across editor modes', () => {
+  it('flips the stored preference in wysiwyg mode', () => {
+    expectShortcutFlipsStored('wysiwyg');
+  });
+
+  it('flips the stored preference in source mode and preserves editorMode', () => {
+    expectShortcutFlipsStored('source');
   });
 });
