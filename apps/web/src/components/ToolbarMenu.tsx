@@ -24,6 +24,8 @@ export interface ToolbarMenuProps {
   items: ToolbarMenuItem[];
   /** Disables the trigger, e.g. in source mode. */
   disabled?: boolean;
+  /** Extra classes for the wrapper, e.g. responsive visibility. */
+  wrapClassName?: string;
 }
 
 const TRIGGER_CLASS =
@@ -96,7 +98,7 @@ function MenuPanel({ items, onSelect, menuRef }: MenuPanelProps) {
  * @param props - See {@link ToolbarMenuProps}.
  * @returns The trigger button plus, when open, the menu panel.
  */
-export function ToolbarMenu({ label, icon: Icon, items, disabled }: ToolbarMenuProps) {
+export function ToolbarMenu({ label, icon: Icon, items, disabled, wrapClassName }: ToolbarMenuProps) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -107,7 +109,7 @@ export function ToolbarMenu({ label, icon: Icon, items, disabled }: ToolbarMenuP
   }, [open, items]);
 
   return (
-    <div ref={wrapRef} className="relative shrink-0">
+    <div ref={wrapRef} className={`relative shrink-0 ${wrapClassName ?? ''}`.trim()}>
       <button
         ref={triggerRef}
         type="button"

@@ -2,6 +2,7 @@ import {
   AtSign,
   Bold,
   Code,
+  Ellipsis,
   Heading1,
   Heading2,
   Heading3,
@@ -59,8 +60,8 @@ const HEADINGS: Array<[level: BlockLevel, label: string, icon: LucideIcon]> = [
 ];
 
 /** Visual separator between two toolbar groups. */
-function Divider() {
-  return <div className={DIVIDER_CLASS} aria-hidden="true" />;
+function Divider({ className = '' }: { className?: string }) {
+  return <div className={`${DIVIDER_CLASS} ${className}`.trim()} aria-hidden="true" />;
 }
 
 /**
@@ -89,13 +90,12 @@ function HistoryGroup({ commands, run }: GroupProps) {
   );
 }
 
-/** Inline emphasis group: bold, italic, strikethrough, inline code. */
+/** Inline emphasis group: bold, italic, strikethrough; inline code is lg+. */
 function EmphasisGroup({ commands, active, disabled, run }: GroupProps) {
   const buttons: Array<[label: string, icon: LucideIcon, pressed: boolean, action: () => void]> = [
     ['Bold', Bold, active.bold, commands.toggleBold],
     ['Italic', Italic, active.italic, commands.toggleItalic],
     ['Strikethrough', Strikethrough, active.strike, commands.toggleStrike],
-    ['Inline code', Code, active.inlineCode, commands.toggleInlineCode],
   ];
   return (
     <div className="flex items-center gap-0.5">
@@ -109,14 +109,23 @@ function EmphasisGroup({ commands, active, disabled, run }: GroupProps) {
           onClick={() => run(action)}
         />
       ))}
+      <span className="hidden lg:block">
+        <ToolbarButton
+          label="Inline code"
+          icon={Code}
+          pressed={active.inlineCode}
+          disabled={disabled}
+          onClick={() => run(commands.toggleInlineCode)}
+        />
+      </span>
     </div>
   );
 }
 
-/** Insert-inline group: link, citation, inline math. */
+/** Insert-inline group: link, citation, inline math; lg and up only. */
 function InlineGroup({ commands, active, disabled, run }: GroupProps) {
   return (
-    <div className="flex items-center gap-0.5">
+    <div className="hidden lg:flex items-center gap-0.5">
       <ToolbarButton
         label="Link"
         icon={Link}
@@ -140,10 +149,10 @@ function InlineGroup({ commands, active, disabled, run }: GroupProps) {
   );
 }
 
-/** Block-structure group: bullet, numbered and task lists, quote. */
+/** Block-structure group: bullet, numbered and task lists, quote; lg and up only. */
 function ListGroup({ commands, active, disabled, run }: GroupProps) {
   return (
-    <div className="flex items-center gap-0.5">
+    <div className="hidden lg:flex items-center gap-0.5">
       <ToolbarButton
         label="Bullet list"
         icon={List}
@@ -195,10 +204,40 @@ export function insertItems(
 }
 
 /**
+ * Build the More overflow-menu items shown below the lg breakpoint: the
+ * inline, list, and block-insert actions that the compact toolbar hides.
+ *
+ * @param commands - Command set bound to the active editor surface.
+ * @param run - Runs a command, then refreshes the active state.
+ * @returns Menu items for the More overflow menu.
+ */
+export function moreItems(
+  commands: EditorCommands,
+  run: (action: () => void) => void,
+): ToolbarMenuItem[] {
+  return [
+    { label: 'Link', icon: Link, onSelect: () => run(commands.toggleLink) },
+    { label: 'Citation', icon: AtSign, onSelect: () => run(commands.insertCitation) },
+    { label: 'Inline math', icon: Sigma, onSelect: () => run(commands.inlineMath) },
+    { label: 'Inline code', icon: Code, onSelect: () => run(commands.toggleInlineCode) },
+    { label: 'Bullet list', icon: List, onSelect: () => run(commands.bulletList) },
+    { label: 'Numbered list', icon: ListOrdered, onSelect: () => run(commands.orderedList) },
+    { label: 'Task list', icon: ListTodo, onSelect: () => run(commands.taskList) },
+    { label: 'Quote', icon: TextQuote, onSelect: () => run(commands.blockquote) },
+    { label: 'Code block', icon: SquareCode, onSelect: () => run(commands.codeBlock) },
+    { label: 'Table', icon: Table, onSelect: () => run(commands.table) },
+    { label: 'Image', icon: ImagePlus, onSelect: () => run(commands.image) },
+    { label: 'Rule', icon: Minus, onSelect: () => run(commands.hr) },
+  ];
+}
+
+/**
  * Grouped formatting toolbar wired to an editor-agnostic {@link EditorCommands}
- * set. Hidden below the md breakpoint via `hidden md:flex`. In source mode
- * (`canFormat` false) formatting controls are disabled while Undo and Redo
- * stay enabled. Toggle buttons reflect `activeState()` through `aria-pressed`.
+ * set. Hidden below the md breakpoint via `hidden md:flex`. Below the lg
+ * breakpoint the inline-code button and the inline and list groups collapse
+ * into a More overflow menu. In source mode (`canFormat` false) formatting
+ * controls are disabled while Undo and Redo stay enabled. Toggle buttons
+ * reflect `activeState()` through `aria-pressed`.
  *
  * @param props - See {@link FormattingToolbarProps}.
  * @returns The rendered toolbar element.
@@ -218,6 +257,7 @@ export function FormattingToolbar({ commands }: FormattingToolbarProps) {
     run(() => commands.setHeading(level)),
   );
   const inserts: ToolbarMenuItem[] = insertItems(commands, run);
+  const mores: ToolbarMenuItem[] = moreItems(commands, run);
 
   return (
     <div
@@ -230,12 +270,22 @@ export function FormattingToolbar({ commands }: FormattingToolbarProps) {
       <ToolbarMenu label="Paragraph style" icon={Pilcrow} items={paragraphs} disabled={disabled} />
       <Divider />
       <EmphasisGroup {...groupProps} />
-      <Divider />
+      {/* The two dividers around the lg-only groups vanish below lg so the
+          compact toolbar shows one divider per visible group. */}
+      <Divider className="hidden lg:block" />
       <InlineGroup {...groupProps} />
-      <Divider />
+      <Divider className="hidden lg:block" />
       <ListGroup {...groupProps} />
       <Divider />
       <ToolbarMenu label="Insert" icon={Plus} items={inserts} disabled={disabled} />
+      <Divider className="lg:hidden" />
+      <ToolbarMenu
+        label="More"
+        icon={Ellipsis}
+        items={mores}
+        disabled={disabled}
+        wrapClassName="lg:hidden"
+      />
     </div>
   );
 }

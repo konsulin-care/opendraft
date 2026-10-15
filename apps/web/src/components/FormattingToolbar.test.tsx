@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -7,6 +7,13 @@ import { FormattingToolbar } from './FormattingToolbar';
 import { EditorToolbars } from './EditorToolbars';
 import { INACTIVE_STATE } from '../editor-commands/types';
 import type { ActiveState, EditorCommands } from '../editor-commands/types';
+
+/** Action names on {@link EditorCommands} that get a spy. */
+const ACTIONS = [
+  'undo', 'redo', 'toggleBold', 'toggleItalic', 'toggleStrike', 'toggleInlineCode',
+  'toggleLink', 'insertCitation', 'inlineMath', 'setHeading', 'bulletList', 'orderedList',
+  'taskList', 'blockquote', 'codeBlock', 'table', 'hr', 'image',
+] as const;
 
 /**
  * Build a fake {@link EditorCommands} with a spy per action.
@@ -16,28 +23,8 @@ import type { ActiveState, EditorCommands } from '../editor-commands/types';
  * @returns A command set with vi.fn() spies.
  */
 function fakeCommands(active: ActiveState = INACTIVE_STATE, canFormat = true): EditorCommands {
-  return {
-    canFormat,
-    undo: vi.fn(),
-    redo: vi.fn(),
-    toggleBold: vi.fn(),
-    toggleItalic: vi.fn(),
-    toggleStrike: vi.fn(),
-    toggleInlineCode: vi.fn(),
-    toggleLink: vi.fn(),
-    insertCitation: vi.fn(),
-    inlineMath: vi.fn(),
-    setHeading: vi.fn(),
-    bulletList: vi.fn(),
-    orderedList: vi.fn(),
-    taskList: vi.fn(),
-    blockquote: vi.fn(),
-    codeBlock: vi.fn(),
-    table: vi.fn(),
-    hr: vi.fn(),
-    image: vi.fn(),
-    activeState: () => active,
-  };
+  const spies = Object.fromEntries(ACTIONS.map((name) => [name, vi.fn()]));
+  return { ...spies, canFormat, activeState: () => active } as unknown as EditorCommands;
 }
 
 /** Accessible names of the toolbar buttons, in large-screen order. */
@@ -57,12 +44,12 @@ const LARGE_LAYOUT: Array<[name: string, icon: string]> = [
   ['Task list', 'lucide-list-todo'],
   ['Quote', 'lucide-text-quote'],
   ['Insert', 'lucide-plus'],
+  // The More overflow trigger is lg:hidden but always in the DOM.
+  ['More', 'lucide-ellipsis'],
 ];
 
 /** Formatting buttons disabled in source mode. */
-const FORMATTING_NAMES = LARGE_LAYOUT.map(([name]) => name).filter(
-  (name) => name !== 'Undo' && name !== 'Redo',
-);
+const FORMATTING_NAMES = LARGE_LAYOUT.map(([name]) => name).filter((name) => name !== 'Undo' && name !== 'Redo');
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -84,8 +71,9 @@ describe('FormattingToolbar buttons', () => {
       .getAllByRole('button')
       .map((button) => button.getAttribute('aria-label'));
     expect(names).toEqual(LARGE_LAYOUT.map(([name]) => name));
-    // Six groups separated by five dividers.
-    expect(toolbar.querySelectorAll('.w-px')).toHaveLength(5);
+    // Six in-toolbar groups plus the compact-only More menu, separated by
+    // six dividers; the last divider is hidden at the lg breakpoint and up.
+    expect(toolbar.querySelectorAll('.w-px')).toHaveLength(6);
   });
 
   it('clicking Bold calls toggleBold', () => {
@@ -176,11 +164,130 @@ describe('FormattingToolbar visibility and responsiveness', () => {
   });
 });
 
+describe('FormattingToolbar compact layout (below the lg breakpoint)', () => {
+  it('hides the inline-code button and the inline and list groups below lg', () => {
+    render(<FormattingToolbar commands={fakeCommands()} />);
+    const inlineCode = screen.getByRole('button', { name: 'Inline code' });
+    expect(inlineCode.parentElement?.className).toContain('hidden');
+    expect(inlineCode.parentElement?.className).toContain('lg:block');
+    for (const name of ['Link', 'Citation', 'Inline math', 'Bullet list', 'Numbered list', 'Task list', 'Quote']) {
+      const button = screen.getByRole('button', { name });
+      expect(button.parentElement?.className, name).toContain('hidden');
+      expect(button.parentElement?.className, name).toContain('lg:flex');
+    }
+  });
+
+  it('hides the dividers around the lg-only groups below lg', () => {
+    const { container } = render(<FormattingToolbar commands={fakeCommands()} />);
+    const dividers = Array.from(container.querySelectorAll('.w-px'));
+    // Compact order: after History, after Paragraph style, after Emphasis,
+    // and before More. The two around the hidden groups are lg-only.
+    expect(dividers).toHaveLength(6);
+    expect(dividers[0].className).not.toContain('hidden');
+    expect(dividers[1].className).not.toContain('hidden');
+    expect(dividers[2].className).toContain('hidden');
+    expect(dividers[2].className).toContain('lg:block');
+    expect(dividers[3].className).toContain('hidden');
+    expect(dividers[3].className).toContain('lg:block');
+    expect(dividers[4].className).not.toContain('hidden');
+    expect(dividers[5].className).toContain('lg:hidden');
+  });
+
+});
+
+describe('FormattingToolbar compact More menu', () => {
+  it('shows an Ellipsis More menu below lg holding the hidden actions', () => {
+    const commands = fakeCommands();
+    render(<FormattingToolbar commands={commands} />);
+    const more = screen.getByRole('button', { name: 'More' });
+    expect(more.parentElement?.className).toContain('lg:hidden');
+    fireEvent.click(more);
+    const items = within(screen.getByRole('menu')).getAllByRole('menuitem');
+    expect(items.map((item) => item.getAttribute('aria-label'))).toEqual([
+      'Link',
+      'Citation',
+      'Inline math',
+      'Inline code',
+      'Bullet list',
+      'Numbered list',
+      'Task list',
+      'Quote',
+      'Code block',
+      'Table',
+      'Image',
+      'Rule',
+    ]);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Code block' }));
+    expect(commands.codeBlock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('FormattingToolbar collapse transition', () => {
+  it('wraps the toolbar in the collapse container, open when the preference is on', () => {
+    const { container } = render(<EditorToolbars commands={fakeCommands()} formattingToolbar />);
+    const wrap = container.querySelector('.editor-toolbar-collapse')!;
+    expect(wrap.className).toContain('is-open');
+    expect(wrap.querySelector('[role="toolbar"]')).not.toBeNull();
+  });
+
+  it('collapses over 150 ms: mounted while closing, unmounted after the timer', () => {
+    vi.useFakeTimers();
+    try {
+      const { container, rerender } = render(
+        <EditorToolbars commands={fakeCommands()} formattingToolbar />,
+      );
+      rerender(<EditorToolbars commands={fakeCommands()} formattingToolbar={false} />);
+      const wrap = container.querySelector('.editor-toolbar-collapse')!;
+      expect(wrap.className).toContain('is-closed');
+      // Still mounted so the max-height/opacity transition can run.
+      expect(wrap.querySelector('[role="toolbar"]')).not.toBeNull();
+      act(() => vi.advanceTimersByTime(150));
+      expect(container.querySelector('.editor-toolbar-collapse [role="toolbar"]')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('index.css responsive layout (source scan)', () => {
+  const css = readFileSync(resolve(__dirname, '../index.css'), 'utf-8');
+
+  it('transitions the toolbar collapse on max-height and opacity over 150 ms', () => {
+    expect(css).toMatch(/\.editor-toolbar-collapse\s*\{[^}]*transition:[^}]*max-height 150ms/);
+    expect(css).toMatch(/\.editor-toolbar-collapse\s*\{[^}]*transition:[^}]*opacity 150ms/);
+  });
+
+  it('collapses to zero height and transparent when closed', () => {
+    const closed = css.slice(css.indexOf('.editor-toolbar-collapse.is-closed'));
+    expect(closed).toContain('max-height: 0');
+    expect(closed).toContain('opacity: 0');
+  });
+
+  it('drops the transition under prefers-reduced-motion', () => {
+    const reduced = css.slice(css.indexOf('prefers-reduced-motion'));
+    expect(reduced).toMatch(/\.editor-toolbar-collapse\s*\{[^}]*transition:\s*none/);
+  });
+
+  it('sets the reading column to about 70ch', () => {
+    expect(css).toMatch(/\.manuscript-editor \.editor\s*\{[^}]*max-width:\s*70ch/);
+  });
+});
+
+describe('Responsive header actions (source scan)', () => {
+  const read = (name: string) => readFileSync(resolve(__dirname, name), 'utf-8');
+
+  it('keeps Visual/Source and Commit hidden below md, in the overflow menu instead', () => {
+    const modeSwitch = read('ModeSwitch.tsx');
+    expect(modeSwitch).toMatch(/className="[^"]*\bhidden\b[^"]*\bmd:flex\b/);
+    const appHeader = read('AppHeader.tsx');
+    expect(appHeader).toMatch(/\$\{ICON_BUTTON\} hidden gap-1 md:inline-flex/);
+    const overflow = read('HeaderOverflowMenu.tsx');
+    expect(overflow).toMatch(/className="relative md:hidden"/);
+  });
+});
+
 describe('Crepe selection toolbar stays enabled (source scan)', () => {
-  const manuscriptSource = readFileSync(
-    resolve(__dirname, 'ManuscriptEditor.tsx'),
-    'utf8',
-  );
+  const manuscriptSource = readFileSync(resolve(__dirname, 'ManuscriptEditor.tsx'), 'utf8');
 
   it('ManuscriptEditor.tsx does not disable Crepe.Feature.Toolbar', () => {
     expect(manuscriptSource).not.toMatch(/Crepe\.Feature\.Toolbar[^\n]*false/);
