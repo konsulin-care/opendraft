@@ -1,12 +1,10 @@
-// @vitest-environment node
-import { describe, it, expect } from 'vitest';
+// @vitest-environment jsdom
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
+import { positionHandle, GUTTER_OFFSET } from './block-handle-gutter';
 
-const source = readFileSync(
-  fileURLToPath(new URL('./block-handle-gutter.ts', import.meta.url)),
-  'utf8',
-);
+const source = readFileSync(resolve(__dirname, 'block-handle-gutter.ts'), 'utf8');
 
 describe('block-handle-gutter exports', () => {
   it('exports blockGutterKey as a PluginKey', () => {
@@ -54,9 +52,76 @@ describe('block-handle-gutter positioning', () => {
     expect(source).toContain('top');
   });
 
-  it('sets handle left to 0 for gutter placement', () => {
-    expect(source).toContain('left');
-    expect(source).toContain('0px');
+  it('positions the handle relative to the .editor column, not the viewport', () => {
+    expect(source).toContain("closest('.editor')");
+    expect(source).toContain('GUTTER_OFFSET');
+  });
+});
+
+/** Build a DOMRect-like object from partial coordinates. */
+const rect = (init: { left: number; top: number; width?: number; height?: number }): DOMRect => {
+  const width = init.width ?? 800;
+  const height = init.height ?? 600;
+  return {
+    left: init.left,
+    top: init.top,
+    width,
+    height,
+    right: init.left + width,
+    bottom: init.top + height,
+    x: init.left,
+    y: init.top,
+    toJSON: () => ({}),
+  };
+};
+
+/** Build the .milkdown > .editor DOM skeleton with a gutter, handle and block element. */
+const setupDom = () => {
+  const milkdown = document.createElement('div');
+  milkdown.className = 'milkdown';
+  const column = document.createElement('div');
+  column.className = 'editor';
+  const editorDom = document.createElement('div');
+  column.appendChild(editorDom);
+  milkdown.appendChild(column);
+  const gutter = document.createElement('div');
+  gutter.className = 'block-gutter-container';
+  const handle = document.createElement('div');
+  handle.className = 'block-gutter-handle';
+  gutter.appendChild(handle);
+  milkdown.appendChild(gutter);
+  document.body.appendChild(milkdown);
+  const blockEl = document.createElement('p');
+  return { milkdown, column, editorDom, gutter, handle, blockEl };
+};
+
+/** Mock getBoundingClientRect on an element. */
+const mockRect = (el: Element, init: Parameters<typeof rect>[0]): void => {
+  vi.spyOn(el, 'getBoundingClientRect').mockReturnValue(rect(init));
+};
+
+describe('positionHandle column-relative placement', () => {
+  it('sets handle left to column rect left minus gutter offset on a wide viewport', () => {
+    const { milkdown, column, editorDom, gutter, handle, blockEl } = setupDom();
+
+    // Wide viewport: the 70ch column is centered, far right of the viewport edge.
+    const COLUMN_LEFT = 420;
+    mockRect(column, { left: COLUMN_LEFT, top: 80, width: 700, height: 900 });
+    mockRect(gutter, { left: 0, top: 0, width: 1920, height: 1000 });
+    mockRect(editorDom, { left: COLUMN_LEFT, top: 112, width: 700, height: 868 });
+    mockRect(blockEl, { left: COLUMN_LEFT, top: 160, width: 700, height: 40 });
+
+    positionHandle(
+      handle,
+      { el: blockEl } as Parameters<typeof positionHandle>[1],
+      editorDom,
+    );
+
+    expect(Number.parseInt(handle.style.left, 10)).toBe(COLUMN_LEFT - GUTTER_OFFSET);
+    expect(handle.style.left).not.toBe('0px');
+
+    milkdown.remove();
+    vi.restoreAllMocks();
   });
 });
 

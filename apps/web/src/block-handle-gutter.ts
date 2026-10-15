@@ -42,18 +42,33 @@ function findBlockAtPos(view: EditorView, $pos: ResolvedPos): ActiveBlock | null
   return null;
 }
 
-/** Position the handle element vertically centered on the active block. */
-function positionHandle(
+/** Horizontal gap in px between the reading column's left edge and the handle's left edge. */
+export const GUTTER_OFFSET = 36;
+
+/**
+ * Position the handle relative to the reading column: its left edge sits at
+ * the column's left edge minus the gutter offset, so on wide screens it
+ * tracks the centered .editor column instead of the viewport edge.
+ *
+ * @param handle - The handle element to position.
+ * @param activeBlock - The block the handle centers on vertically (only its element is used).
+ * @param editorDom - The ProseMirror editor DOM, used to locate the column.
+ */
+export function positionHandle(
   handle: HTMLDivElement,
-  activeBlock: ActiveBlock,
+  activeBlock: Pick<ActiveBlock, 'el'>,
   editorDom: HTMLElement,
 ): void {
+  const column = editorDom.closest('.editor') ?? editorDom;
+  const columnRect = column.getBoundingClientRect();
+  const origin = handle.parentElement ?? editorDom;
+  const originRect = origin.getBoundingClientRect();
   const editorRect = editorDom.getBoundingClientRect();
   const blockRect = activeBlock.el.getBoundingClientRect();
   const sc = editorDom.closest('[style*="overflow"]') ?? editorDom.parentElement;
   const scrollTop = sc ? sc.scrollTop : 0;
   const h = 32;
-  handle.style.left = '0px';
+  handle.style.left = `${columnRect.left - originRect.left - GUTTER_OFFSET}px`;
   handle.style.top = `${blockRect.top - editorRect.top + scrollTop + (blockRect.height - h) / 2}px`;
   handle.dataset.show = 'true';
 }
