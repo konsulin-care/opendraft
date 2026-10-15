@@ -22,8 +22,9 @@ const COLLAPSE_MS = 150;
 
 /**
  * Renders the editor toolbars above the editor surface. While the on-screen
- * keyboard is open, only the bottom {@link KeyboardBar} is shown and the top
- * {@link FormattingToolbar} is suppressed. Otherwise the formatting toolbar
+ * keyboard is open in wysiwyg mode, only the bottom {@link KeyboardBar} is
+ * shown and the top {@link FormattingToolbar} is suppressed. In source mode
+ * the keyboard bar is never rendered. Otherwise the formatting toolbar
  * renders inside a `.editor-toolbar-collapse` container that animates closed
  * over 150 ms: the toolbar stays mounted for the transition duration, then
  * unmounts. Under `prefers-reduced-motion` the CSS transition is dropped.
@@ -52,7 +53,7 @@ export function EditorToolbars({
     return () => clearTimeout(timer);
   }, [effectiveToolbar]);
 
-  if (open) {
+  if (open && mode === 'wysiwyg') {
     return (
       <KeyboardBar
         commands={commands}

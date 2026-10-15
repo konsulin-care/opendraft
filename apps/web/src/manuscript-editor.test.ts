@@ -6,6 +6,9 @@ import { MilkdownProvider } from "@milkdown/react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { ManuscriptEditor } from "./components/ManuscriptEditor";
+import { EditorToolbars } from "./components/EditorToolbars";
+import { INACTIVE_STATE } from "./editor-commands/types";
+import type { EditorCommands } from "./editor-commands/types";
 import { readPreferences, writePreferences } from "./preferences";
 
 const manuscriptSource = readFileSync(
@@ -17,6 +20,48 @@ const editorSurfaceSource = readFileSync(
   "utf8",
 );
 const css = readFileSync(resolve(__dirname, "./index.css"), "utf8");
+
+/** No-op {@link EditorCommands} set for toolbar rendering tests. */
+const stubCommands: EditorCommands = {
+  canFormat: false,
+  undo: () => {},
+  redo: () => {},
+  toggleBold: () => {},
+  toggleItalic: () => {},
+  toggleStrike: () => {},
+  toggleInlineCode: () => {},
+  toggleLink: () => {},
+  insertCitation: () => {},
+  inlineMath: () => {},
+  setHeading: () => {},
+  bulletList: () => {},
+  orderedList: () => {},
+  taskList: () => {},
+  blockquote: () => {},
+  codeBlock: () => {},
+  table: () => {},
+  hr: () => {},
+  image: () => {},
+  activeState: () => INACTIVE_STATE,
+};
+
+/**
+ * Render {@link EditorToolbars} with stub commands and an open keyboard.
+ *
+ * @param mode - Editing mode passed to the toolbars.
+ * @returns The render result.
+ */
+function renderToolbars(mode: "wysiwyg" | "source") {
+  return render(
+    createElement(EditorToolbars, {
+      commands: stubCommands,
+      formattingToolbar: true,
+      mode,
+      open: true,
+      bottomOffset: 0,
+    }),
+  );
+}
 
 describe("ManuscriptEditor crepe theme integration", () => {
   it("does not import Crepe theme CSS in the component", () => {
@@ -150,6 +195,21 @@ describe("ManuscriptEditor — effective formatting toolbar visibility", () => {
     ).toContain("is-open");
     expect(readPreferences().formattingToolbar).toBe(true);
   }, 20000);
+});
+
+describe("EditorToolbars — mobile keyboard bar and source mode", () => {
+  it("renders no keyboard bar in source mode even when the keyboard is open", () => {
+    const { container } = renderToolbars("source");
+    expect(screen.queryByRole("toolbar", { name: "Keyboard bar" })).toBeNull();
+    expect(container.querySelector('[aria-label="Keyboard bar"]')).toBeNull();
+  });
+
+  it("renders the keyboard bar in wysiwyg mode when the keyboard is open", () => {
+    renderToolbars("wysiwyg");
+    expect(
+      screen.queryByRole("toolbar", { name: "Keyboard bar" }),
+    ).not.toBeNull();
+  });
 });
 
 describe("ManuscriptEditor — citation dropdown mounting", () => {
