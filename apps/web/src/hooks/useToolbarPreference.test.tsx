@@ -65,7 +65,11 @@ describe('useToolbarPreference preference and toggle', () => {
     expect(readPreferences().formattingToolbar).toBe(false);
     expect(
       JSON.parse(localStorage.getItem(PREFERENCES_STORAGE_KEY) as string),
-    ).toEqual({ v: 1, formattingToolbar: false });
+    ).toEqual({
+      v: 2,
+      formattingToolbar: false,
+      editorMode: 'wysiwyg',
+    });
 
     act(() => {
       result.current.toggleFormattingToolbar();
