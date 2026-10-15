@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { FormattingToolbar } from './FormattingToolbar';
 import { KeyboardBar } from './KeyboardBar';
 import type { EditorCommands } from '../editor-commands/types';
@@ -14,15 +15,19 @@ export interface EditorToolbarsProps {
   bottomOffset?: number;
 }
 
+/** Milliseconds the toolbar stays mounted after closing so it can collapse. */
+const COLLAPSE_MS = 150;
+
 /**
  * Renders the editor toolbars above the editor surface. While the on-screen
  * keyboard is open, only the bottom {@link KeyboardBar} is shown and the top
- * {@link FormattingToolbar} is suppressed. When the keyboard is closed, the
- * formatting toolbar renders if the user preference is on; otherwise nothing
- * is rendered here.
+ * {@link FormattingToolbar} is suppressed. Otherwise the formatting toolbar
+ * renders inside a `.editor-toolbar-collapse` container that animates closed
+ * over 150 ms: the toolbar stays mounted for the transition duration, then
+ * unmounts. Under `prefers-reduced-motion` the CSS transition is dropped.
  *
  * @param props - See {@link EditorToolbarsProps}.
- * @returns The keyboard bar or formatting toolbar, or null.
+ * @returns The keyboard bar, or the collapse container with the toolbar.
  */
 export function EditorToolbars({
   commands,
@@ -30,6 +35,17 @@ export function EditorToolbars({
   open = false,
   bottomOffset = 0,
 }: EditorToolbarsProps) {
+  const [mountedToolbar, setMountedToolbar] = useState(formattingToolbar);
+
+  useEffect(() => {
+    if (formattingToolbar) {
+      setMountedToolbar(true);
+      return undefined;
+    }
+    const timer = setTimeout(() => setMountedToolbar(false), COLLAPSE_MS);
+    return () => clearTimeout(timer);
+  }, [formattingToolbar]);
+
   if (open) {
     return (
       <KeyboardBar
@@ -40,6 +56,9 @@ export function EditorToolbars({
       />
     );
   }
-  if (!formattingToolbar) return null;
-  return <FormattingToolbar commands={commands} />;
+  return (
+    <div className={`editor-toolbar-collapse ${formattingToolbar ? 'is-open' : 'is-closed'}`}>
+      {mountedToolbar && <FormattingToolbar commands={commands} />}
+    </div>
+  );
 }
