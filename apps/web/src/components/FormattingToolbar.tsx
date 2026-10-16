@@ -233,11 +233,14 @@ export function moreItems(
 
 /**
  * Grouped formatting toolbar wired to an editor-agnostic {@link EditorCommands}
- * set. Hidden below the md breakpoint via `hidden md:flex`. Below the lg
- * breakpoint the inline-code button and the inline and list groups collapse
- * into a More overflow menu. In source mode (`canFormat` false) formatting
- * controls are disabled while Undo and Redo stay enabled. Toggle buttons
- * reflect `activeState()` through `aria-pressed`.
+ * set. Spans the full editor width with a frosted-glass background
+ * (translucent white, backdrop blur, saturate) and a 1px stone divider to the
+ * editor below; the button column stays inside the same centered reading
+ * column as the editor surface. Hidden below the md breakpoint via
+ * `hidden md:flex`. Below the lg breakpoint the inline-code button and the
+ * inline and list groups collapse into a More overflow menu. In source mode
+ * (`canFormat` false) formatting controls are disabled while Undo and Redo
+ * stay enabled. Toggle buttons reflect `activeState()` through `aria-pressed`.
  *
  * @param props - See {@link FormattingToolbarProps}.
  * @returns The rendered toolbar element.
@@ -263,29 +266,31 @@ export function FormattingToolbar({ commands }: FormattingToolbarProps) {
     <div
       role="toolbar"
       aria-label="Formatting"
-      className="hidden md:flex items-center gap-0.5 border-b border-gray-200 bg-white px-2 py-1"
+      className="hidden md:flex w-full border-b border-stone-200 bg-white/70 backdrop-blur-md saturate-150"
     >
-      <HistoryGroup {...groupProps} />
-      <Divider />
-      <ToolbarMenu label="Paragraph style" icon={Pilcrow} items={paragraphs} disabled={disabled} />
-      <Divider />
-      <EmphasisGroup {...groupProps} />
-      {/* The two dividers around the lg-only groups vanish below lg so the
-          compact toolbar shows one divider per visible group. */}
-      <Divider className="hidden lg:block" />
-      <InlineGroup {...groupProps} />
-      <Divider className="hidden lg:block" />
-      <ListGroup {...groupProps} />
-      <Divider />
-      <ToolbarMenu label="Insert" icon={Plus} items={inserts} disabled={disabled} />
-      <Divider className="lg:hidden" />
-      <ToolbarMenu
-        label="More"
-        icon={Ellipsis}
-        items={mores}
-        disabled={disabled}
-        wrapClassName="lg:hidden"
-      />
+      <div className="mx-auto flex w-full max-w-[70ch] items-center gap-0.5 px-2 py-1">
+        <HistoryGroup {...groupProps} />
+        <Divider />
+        <ToolbarMenu label="Paragraph style" icon={Pilcrow} items={paragraphs} disabled={disabled} />
+        <Divider />
+        <EmphasisGroup {...groupProps} />
+        {/* The two dividers around the lg-only groups vanish below lg so the
+            compact toolbar shows one divider per visible group. */}
+        <Divider className="hidden lg:block" />
+        <InlineGroup {...groupProps} />
+        <Divider className="hidden lg:block" />
+        <ListGroup {...groupProps} />
+        <Divider />
+        <ToolbarMenu label="Insert" icon={Plus} items={inserts} disabled={disabled} />
+        <Divider className="lg:hidden" />
+        <ToolbarMenu
+          label="More"
+          icon={Ellipsis}
+          items={mores}
+          disabled={disabled}
+          wrapClassName="lg:hidden"
+        />
+      </div>
     </div>
   );
 }

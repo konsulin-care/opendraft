@@ -176,12 +176,9 @@ textarea {
   padding: 2rem 1rem 4rem 3rem;
 }
 
-/* Formatting toolbar sits in the same centered reading column as the
-   .editor surface, so its left edge lines up with the text column. */
-.editor-toolbar-collapse {
-  max-width: 70ch;
-  margin-inline: auto;
-}
+/* The formatting toolbar spans the full editor width — no reading-column cap
+   here, so no grey strip shows beside it. The toolbar keeps its button column
+   aligned to the editor's centered 70ch reading column internally. */
 
 /* Source editor (CodeMirror) uses the same centered column, margin and
    padding as the visual surface so source text starts at the same x-position. */
