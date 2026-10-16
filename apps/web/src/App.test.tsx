@@ -42,27 +42,27 @@ describe('App header', () => {
     expect(screen.getByTitle('manuscript.md').textContent).toBe('manuscript.md');
   });
 
-  it('shows a Visual/Source segmented control reflecting the current mode', async () => {
+  it('shows a single mode toggle naming the target mode', async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
-    expect(screen.getByRole('button', { name: 'Visual' }).getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByRole('button', { name: 'Source' }).getAttribute('aria-pressed')).toBe('false');
+    const toggle = screen.getByRole('button', { name: 'Switch to source' });
+    expect(toggle.getAttribute('title')).toBe('Switch to source');
+    expect(toggle.getAttribute('aria-pressed')).toBeNull();
   });
 
 });
 
 describe('App mode and commit', () => {
-  it('switches to source mode and back via the segmented control', async () => {
+  it('switches to source mode and back via the mode toggle', async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Source' }));
-    expect(screen.getByRole('button', { name: 'Source' }).getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByRole('button', { name: 'Visual' }).getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to source' }));
+    expect(readPreferences().editorMode).toBe('source');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Switch to visual' })).toBeDefined());
 
-    fireEvent.click(screen.getByRole('button', { name: 'Visual' }));
-    expect(screen.getByRole('button', { name: 'Visual' }).getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByRole('button', { name: 'Source' }).getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to visual' }));
+    expect(readPreferences().editorMode).toBe('wysiwyg');
   });
 
   it('toggles the formatting toolbar preference from the header', async () => {
@@ -91,15 +91,14 @@ describe('App persisted editor mode', () => {
     writePreferences({ formattingToolbar: true, editorMode: 'source' });
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
-    expect(screen.getByRole('button', { name: 'Source' }).getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByRole('button', { name: 'Visual' }).getAttribute('aria-pressed')).toBe('false');
+    expect(screen.getByRole('button', { name: 'Switch to visual' })).toBeDefined();
   });
 
   it('persists a mode switch to opendraft:prefs', async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Source' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to source' }));
     expect(readPreferences().editorMode).toBe('source');
     expect(
       JSON.parse(localStorage.getItem(PREFERENCES_STORAGE_KEY) as string),
