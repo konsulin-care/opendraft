@@ -101,6 +101,7 @@ describe("ManuscriptEditor — block gutter removed", () => {
     expect(document.querySelector(".block-gutter-container, .block-gutter-handle")).toBeNull();
   }, 20000);
 });
+
 describe("ManuscriptEditor — light code block theme", () => {
   it("imports EditorView from @codemirror/view", () => {
     expect(manuscriptSource).toMatch(/EditorView.*from\s+['"]@codemirror\/view['"]|@codemirror\/view.*EditorView/);

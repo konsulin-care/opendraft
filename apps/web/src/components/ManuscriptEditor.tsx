@@ -15,6 +15,7 @@ import { citationRemarkPlugin } from '../citation/citation-remark-plugin';
 import { EditorSurface } from './EditorSurface';
 import { EditorToolbars } from './EditorToolbars';
 import { useEditorCommands } from '../hooks/useEditorCommands';
+import { useFocusScrollGuard } from '../hooks/useFocusScrollGuard';
 import { useVirtualKeyboard } from '../hooks/useVirtualKeyboard';
 import { createModeSwitcher, placeVisualCaret, useInitialCaret } from '../caret-mode-switch';
 import type { SourceEditorHandle } from './SourceEditor';
@@ -228,6 +229,8 @@ function useManuscriptState(options: UseManuscriptStateOptions) {
   }, [loading, onEditorReady, workspace, syncContent]);
 
   useInitialCaret(loading, get);
+
+  useFocusScrollGuard(scrollContainerRef);
 
   useEffect(() => () => saverRef.current?.flush(), []);
 
