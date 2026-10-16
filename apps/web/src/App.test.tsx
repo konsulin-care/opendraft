@@ -48,6 +48,8 @@ describe('App header', () => {
     const toggle = screen.getByRole('button', { name: 'Switch to source' });
     expect(toggle.getAttribute('title')).toBe('Switch to source');
     expect(toggle.getAttribute('aria-pressed')).toBeNull();
+    expect(toggle.querySelector('.lucide-file-text')).not.toBeNull();
+    expect(toggle.querySelector('.lucide-file-code')).toBeNull();
   });
 
 });
@@ -60,9 +62,15 @@ describe('App mode and commit', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Switch to source' }));
     expect(readPreferences().editorMode).toBe('source');
     await waitFor(() => expect(screen.getByRole('button', { name: 'Switch to visual' })).toBeDefined());
+    const sourceToggle = screen.getByRole('button', { name: 'Switch to visual' });
+    expect(sourceToggle.querySelector('.lucide-file-code')).not.toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Switch to visual' }));
+    fireEvent.click(sourceToggle);
     expect(readPreferences().editorMode).toBe('wysiwyg');
+    await waitFor(() => {
+      const visualToggle = screen.getByRole('button', { name: 'Switch to source' });
+      expect(visualToggle.querySelector('.lucide-file-text')).not.toBeNull();
+    });
   });
 
   it('toggles the formatting toolbar preference from the header', async () => {
@@ -91,7 +99,8 @@ describe('App persisted editor mode', () => {
     writePreferences({ formattingToolbar: true, editorMode: 'source' });
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
-    expect(screen.getByRole('button', { name: 'Switch to visual' })).toBeDefined();
+    const toggle = screen.getByRole('button', { name: 'Switch to visual' });
+    expect(toggle.querySelector('.lucide-file-code')).not.toBeNull();
   });
 
   it('persists a mode switch to opendraft:prefs', async () => {
