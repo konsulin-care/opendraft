@@ -136,6 +136,8 @@ describe('AppHeader commit and overflow', () => {
     expect(commit.className).toMatch(/\bbg-gray-900\b/);
     expect(commit.className).toMatch(/\btext-white\b/);
     expect(commit.className).toMatch(/hover:bg-gray-800/);
+    expect(commit.className).not.toMatch(/\btext-gray-600\b/);
+    expect(commit.className).not.toMatch(/hover:bg-gray-100/);
     expect(commit.querySelector('.lucide-git-commit-horizontal')).not.toBeNull();
     expect(commit.textContent).toBe('Commit');
   });
