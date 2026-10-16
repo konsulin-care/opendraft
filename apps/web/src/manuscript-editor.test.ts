@@ -85,23 +85,21 @@ describe("ManuscriptEditor crepe theme integration", () => {
     expect(manuscriptSource).toContain("blockHandle");
     expect(manuscriptSource).toContain("shouldShow: () => false");
   });
-  it("imports and registers the block-gutter plugin", () => {
-    expect(manuscriptSource).toContain("block-handle-gutter");
-    expect(manuscriptSource).toContain("createBlockGutterPlugin");
-  });
 });
-describe("ManuscriptEditor — gutter plugin registration", () => {
-  it("imports $prose from @milkdown/kit/utils", () => {
-    expect(manuscriptSource).toContain("$prose");
-    expect(manuscriptSource).toMatch(/\$prose.*from\s+['"]@milkdown\/kit\/utils['"]|@milkdown\/kit\/utils.*\$prose/);
+describe("ManuscriptEditor — block gutter removed", () => {
+  it("does not reference the block-gutter plugin in the component source", () => {
+    expect(manuscriptSource).not.toContain("block-handle-gutter");
+    expect(manuscriptSource).not.toContain("createBlockGutterPlugin");
   });
-  it("registers gutter plugin via crepe.addFeature() before create()", () => {
-    expect(manuscriptSource).toContain("crepe.addFeature");
-    expect(manuscriptSource).toContain("$prose(() => createBlockGutterPlugin())");
-  });
-  it("does not import or use prosePluginsCtx (gutter registered via addFeature)", () => {
-    expect(manuscriptSource).not.toContain("prosePluginsCtx");
-  });
+  it("renders no .block-gutter-container or .block-gutter-handle elements", async () => {
+    const workspace = new MemoryWorkspace();
+    let api: EditorTestApi | null = null;
+    render(createElement(MilkdownProvider, null, createElement(ManuscriptEditor, {
+      workspace, defaultValue: "# Title\n\nSome text.", onEditorReady: (r) => { api = r; }, mode: "wysiwyg" as const,
+    })));
+    await waitFor(() => expect(api).not.toBeNull(), { timeout: 10000 });
+    expect(document.querySelector(".block-gutter-container, .block-gutter-handle")).toBeNull();
+  }, 20000);
 });
 describe("ManuscriptEditor — light code block theme", () => {
   it("imports EditorView from @codemirror/view", () => {
@@ -223,6 +221,7 @@ describe("ManuscriptEditor — citation dropdown mounting", () => {
     expect(manuscriptSource).not.toContain("citationPluginKey");
   });
   it("registers citation plugin via crepe.addFeature()", () => {
+    expect(manuscriptSource).toContain("crepe.addFeature");
     expect(manuscriptSource).toContain("createCitationPlugin");
     expect(manuscriptSource).toMatch(/\$prose.*createCitationPlugin/);
   });

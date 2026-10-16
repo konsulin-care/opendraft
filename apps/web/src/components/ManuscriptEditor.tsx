@@ -8,7 +8,6 @@ import { $prose, getMarkdown, replaceAll } from '@milkdown/kit/utils';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { saveManuscript } from '../persistence';
 import { PLACEHOLDER_HINT } from '../placeholder';
-import { createBlockGutterPlugin } from '../block-handle-gutter';
 import { createCitationPlugin } from '../citation/plugin';
 import type { CitationState } from '../citation/types';
 import { quartoRemarkPlugin, quartoInlineCodePlugin, quartoChunkOptionPlugin } from '../quarto-syntax';
@@ -156,9 +155,6 @@ function createCrepeConfig(options: CrepeConfigOptions) {
         },
       },
     },
-  });
-  crepe.addFeature((editor) => {
-    editor.use($prose(() => createBlockGutterPlugin()));
   });
   crepe.addFeature((editor) => {
     editor.use($prose(() => createCitationPlugin(workspace, onStateChangeRef.current)));

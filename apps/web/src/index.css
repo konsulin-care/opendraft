@@ -50,48 +50,17 @@
   }
 }
 
-/* ── Hide stock Crepe block handle (we use custom gutter handle) ── */
+/* ── Hide stock Crepe block handle (BlockEdit config disables it) ── */
 .milkdown-block-handle {
   display: none !important;
 }
 
-/* ── Block gutter handle ── */
-/* The gutter container is positioned absolutely within .milkdown, holding the drag handle. */
-.block-gutter-container {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 40px;
-  pointer-events: none;
-}
-
-/* The draggable six-dot handle, vertically centered on the active block. */
-.block-gutter-handle {
-  position: absolute;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: grab;
-  border-radius: 4px;
-  pointer-events: auto;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.block-gutter-handle[data-show="true"] {
-  opacity: 1;
-}
-
-.block-gutter-handle:hover {
-  background: var(--crepe-color-hover);
-}
-
-.block-gutter-handle svg {
-  width: 24px;
-  height: 24px;
-  fill: var(--crepe-color-outline);
+/* ── Inactive Crepe table handles ── */
+/* Stock Crepe only fades hidden table handles (opacity: 0), so they keep
+   taking scroll height and can steal focus. Force display:none when hidden;
+   visible row/column drag handles (data-show="true") are unaffected. */
+.milkdown .milkdown-table-block [data-show='false'] {
+  display: none;
 }
 
 /* ── Quarto chunk option lines ── */

@@ -38,27 +38,13 @@ describe('index.css — stock block handle', () => {
   });
 });
 
-describe('index.css — custom gutter handle', () => {
-  it('styles the block-gutter-container', () => {
-    expect(css).toContain('.block-gutter-container');
-    expect(css).toContain('position: absolute');
-    expect(css).toContain('pointer-events: none');
+describe('index.css — block gutter removed', () => {
+  it('contains no .block-gutter-container or .block-gutter-handle rules', () => {
+    expect(css).not.toContain('.block-gutter-container');
+    expect(css).not.toContain('.block-gutter-handle');
   });
 
-  it('styles the block-gutter-handle', () => {
-    expect(css).toContain('.block-gutter-handle');
-    expect(css).toContain('cursor: grab');
-    expect(css).toContain('pointer-events: auto');
-    expect(css).toContain('opacity: 0');
-    expect(css).toContain('transition: opacity 0.15s');
-  });
-
-  it('shows the block-gutter-handle when data-show is true', () => {
-    expect(css).toContain('.block-gutter-handle[data-show="true"]');
-    expect(css).toContain('opacity: 1');
-  });
-
-  it('adds left padding to editor for gutter space', () => {
-    expect(css).toContain('padding: 2rem 1rem 4rem 3rem');
+  it('hides inactive Crepe table handles with display none', () => {
+    expect(css).toMatch(/\.milkdown-table-block \[data-show='false'\]\s*\{[^}]*display:\s*none/);
   });
 });
