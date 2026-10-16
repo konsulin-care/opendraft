@@ -276,13 +276,12 @@ describe('index.css responsive layout (source scan)', () => {
 describe('Responsive header actions (source scan)', () => {
   const read = (name: string) => readFileSync(resolve(__dirname, name), 'utf-8');
 
-  it('keeps Visual/Source and Commit hidden below md, in the overflow menu instead', () => {
-    const modeSwitch = read('ModeSwitch.tsx');
-    expect(modeSwitch).toMatch(/className="[^"]*\bhidden\b[^"]*\bmd:flex\b/);
+  it('keeps the mode toggle and Commit hidden below md, in the overflow menu instead', () => {
+    expect(read('ModeSwitch.tsx')).toMatch(/className="[^"]*\bhidden\b[^"]*\bmd:flex\b/);
     const appHeader = read('AppHeader.tsx');
-    expect(appHeader).toMatch(/\$\{ICON_BUTTON\} hidden gap-1 md:inline-flex/);
-    const overflow = read('HeaderOverflowMenu.tsx');
-    expect(overflow).toMatch(/className="relative md:hidden"/);
+    expect(appHeader).toMatch(/bg-gray-900 text-white hover:bg-gray-800[^\n]*hidden md:inline-flex/);
+    expect(appHeader).toMatch(/className=\{COMMIT_BUTTON\}/);
+    expect(read('HeaderOverflowMenu.tsx')).toMatch(/className="relative md:hidden"/);
   });
 });
 

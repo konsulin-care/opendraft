@@ -130,6 +130,16 @@ describe('AppHeader toolbar preference', () => {
 });
 
 describe('AppHeader commit and overflow', () => {
+  it('styles the header Commit button as a near-black filled button', () => {
+    renderHeader();
+    const commit = screen.getByRole('button', { name: 'Commit' });
+    expect(commit.className).toMatch(/\bbg-gray-900\b/);
+    expect(commit.className).toMatch(/\btext-white\b/);
+    expect(commit.className).toMatch(/hover:bg-gray-800/);
+    expect(commit.querySelector('.lucide-git-commit-horizontal')).not.toBeNull();
+    expect(commit.textContent).toBe('Commit');
+  });
+
   it('calls onCommit when the Commit button is clicked', () => {
     const onCommit = vi.fn();
     renderHeader({ onCommit });
