@@ -1,53 +1,44 @@
 import { FileCode, FileText } from 'lucide-react';
 
-/** Editing mode controlled by the header's segmented control. */
+/** Editing mode controlled by the header's mode toggle. */
 export type EditorMode = 'wysiwyg' | 'source';
 
 /** Props for {@link ModeSwitch}. */
 export interface ModeSwitchProps {
-  /** Current editing mode; the matching segment is pressed. */
+  /** Current editing mode; the toggle shows this mode's icon. */
   mode: EditorMode;
-  /** Called when the user picks an editing mode. */
+  /** Called with the opposite mode when the toggle is activated. */
   onSelectMode: (mode: EditorMode) => void;
 }
 
-const SEGMENT =
-  'inline-flex items-center justify-center p-2 text-gray-600 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-500 first:rounded-l-md last:rounded-r-md';
+const TOGGLE =
+  'inline-flex items-center justify-center rounded-md p-2 text-gray-600 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-500';
 
-const SEGMENT_ACTIVE = 'bg-gray-900 text-white hover:bg-gray-800';
+const MODE_NAME: Record<EditorMode, string> = { wysiwyg: 'visual', source: 'source' };
 
 /**
- * Visual/Source segmented control. Shown from the md breakpoint up; on
- * smaller screens the same actions live in the header overflow menu.
+ * Single icon button that shows the current mode's icon (FileText in visual
+ * mode, FileCode in source mode) and switches to the other mode on click.
+ * The title and aria-label name the target mode. Hidden below the md
+ * breakpoint; on smaller screens the same action lives in the header
+ * overflow menu.
  *
  * @param props - See {@link ModeSwitchProps}.
  */
 export function ModeSwitch({ mode, onSelectMode }: ModeSwitchProps) {
+  const target: EditorMode = mode === 'wysiwyg' ? 'source' : 'wysiwyg';
+  const label = `Switch to ${MODE_NAME[target]}`;
+  const Icon = mode === 'wysiwyg' ? FileText : FileCode;
   return (
-    <div
-      role="group"
-      aria-label="Editor mode"
-      className="hidden items-center rounded-md border border-gray-200 md:flex"
-    >
+    <div className="hidden items-center md:flex">
       <button
         type="button"
-        aria-label="Visual"
-        title="Visual"
-        aria-pressed={mode === 'wysiwyg'}
-        onClick={() => onSelectMode('wysiwyg')}
-        className={`${SEGMENT} ${mode === 'wysiwyg' ? SEGMENT_ACTIVE : ''}`}
+        aria-label={label}
+        title={label}
+        onClick={() => onSelectMode(target)}
+        className={TOGGLE}
       >
-        <FileText className="h-4 w-4" aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        aria-label="Source"
-        title="Source"
-        aria-pressed={mode === 'source'}
-        onClick={() => onSelectMode('source')}
-        className={`${SEGMENT} ${mode === 'source' ? SEGMENT_ACTIVE : ''}`}
-      >
-        <FileCode className="h-4 w-4" aria-hidden="true" />
+        <Icon className="h-4 w-4" aria-hidden="true" />
       </button>
     </div>
   );

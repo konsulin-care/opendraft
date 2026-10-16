@@ -72,23 +72,43 @@ describe('AppHeader identity', () => {
 
 });
 
-describe('AppHeader mode and toolbar', () => {
-  it('marks Visual as pressed in wysiwyg mode and switches to source on click', () => {
+describe('AppHeader mode toggle', () => {
+  it('shows a FileText toggle targeting source in visual mode and switches on click', () => {
     const onSelectMode = vi.fn();
-    renderHeader({ mode: 'wysiwyg', onSelectMode });
-    expect(screen.getByRole('button', { name: 'Visual' }).getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByRole('button', { name: 'Source' }).getAttribute('aria-pressed')).toBe('false');
+    const { container } = renderHeader({ mode: 'wysiwyg', onSelectMode });
+    const toggle = screen.getByRole('button', { name: 'Switch to source' });
+    expect(toggle.getAttribute('title')).toBe('Switch to source');
+    expect(toggle.getAttribute('aria-pressed')).toBeNull();
+    expect(container.querySelector('.lucide-file-text')).not.toBeNull();
+    expect(container.querySelector('.lucide-file-code')).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Source' }));
+    fireEvent.click(toggle);
     expect(onSelectMode).toHaveBeenCalledWith('source');
   });
 
-  it('marks Source as pressed in source mode', () => {
-    renderHeader({ mode: 'source' });
-    expect(screen.getByRole('button', { name: 'Source' }).getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByRole('button', { name: 'Visual' }).getAttribute('aria-pressed')).toBe('false');
+  it('shows a FileCode toggle targeting visual in source mode and switches on click', () => {
+    const onSelectMode = vi.fn();
+    const { container } = renderHeader({ mode: 'source', onSelectMode });
+    const toggle = screen.getByRole('button', { name: 'Switch to visual' });
+    expect(toggle.getAttribute('title')).toBe('Switch to visual');
+    expect(toggle.getAttribute('aria-pressed')).toBeNull();
+    expect(container.querySelector('.lucide-file-code')).not.toBeNull();
+    expect(container.querySelector('.lucide-file-text')).toBeNull();
+
+    fireEvent.click(toggle);
+    expect(onSelectMode).toHaveBeenCalledWith('wysiwyg');
   });
 
+  it('keeps the mode toggle hidden below md', () => {
+    renderHeader();
+    const toggle = screen.getByRole('button', { name: 'Switch to source' });
+    const wrapper = toggle.parentElement;
+    expect(wrapper?.className).toMatch(/\bhidden\b/);
+    expect(wrapper?.className).toMatch(/md:flex/);
+  });
+});
+
+describe('AppHeader toolbar preference', () => {
   it('mirrors the formatting toolbar preference and toggles on click', () => {
     const onToggleFormattingToolbar = vi.fn();
     renderHeader({ formattingToolbar: true, onToggleFormattingToolbar });
