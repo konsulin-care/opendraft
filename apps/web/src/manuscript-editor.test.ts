@@ -7,17 +7,16 @@ import { EditorView } from "@codemirror/view";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { ManuscriptEditor } from "./components/ManuscriptEditor";
+import type { EditorTestApi } from "./components/ManuscriptEditor";
 import { EditorToolbars } from "./components/EditorToolbars";
 import { INACTIVE_STATE } from "./editor-commands/types";
 import type { EditorCommands } from "./editor-commands/types";
 import { readPreferences, writePreferences } from "./preferences";
 import { saveManuscript } from "./persistence";
-
 vi.mock("./persistence", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./persistence")>();
   return { ...actual, saveManuscript: vi.fn().mockResolvedValue(undefined) };
 });
-
 const manuscriptSource = readFileSync(
   resolve(__dirname, "./components/ManuscriptEditor.tsx"),
   "utf8",
@@ -27,7 +26,6 @@ const editorSurfaceSource = readFileSync(
   "utf8",
 );
 const css = readFileSync(resolve(__dirname, "./index.css"), "utf8");
-
 /** No-op {@link EditorCommands} set for toolbar rendering tests. */
 const stubCommands: EditorCommands = {
   canFormat: false,
@@ -51,7 +49,6 @@ const stubCommands: EditorCommands = {
   image: () => {},
   activeState: () => INACTIVE_STATE,
 };
-
 /** Render {@link EditorToolbars} with stub commands and an open keyboard. */
 function renderToolbars(mode: "wysiwyg" | "source") {
   return render(
@@ -64,88 +61,72 @@ function renderToolbars(mode: "wysiwyg" | "source") {
     }),
   );
 }
-
 describe("ManuscriptEditor crepe theme integration", () => {
   it("does not import Crepe theme CSS in the component", () => {
     expect(manuscriptSource).not.toContain("@milkdown/crepe/theme/common/style.css");
     expect(manuscriptSource).not.toContain("@milkdown/crepe/theme/classic.css");
   });
-
   it("does not import the split prosemirror/reset sheets", () => {
     expect(manuscriptSource).not.toContain("@milkdown/crepe/theme/common/prosemirror.css");
     expect(manuscriptSource).not.toContain("@milkdown/crepe/theme/common/reset.css");
   });
-
   it("imports Crepe theme CSS in index.css without a cascade layer", () => {
     expect(css).not.toMatch(/@layer\s+crepe/);
     expect(css).toContain("@milkdown/crepe/theme/common/style.css");
     expect(css).toContain("@milkdown/crepe/theme/classic.css");
   });
-
   it("configures a static placeholder feature", () => {
     expect(manuscriptSource).toContain("Crepe.Feature.Placeholder");
     expect(manuscriptSource).toContain("PLACEHOLDER_HINT");
     expect(manuscriptSource).not.toContain("pickPlaceholderHint");
   });
-
   it("configures block handle at content edge", () => {
     expect(manuscriptSource).toContain("Crepe.Feature.BlockEdit");
     expect(manuscriptSource).toContain("blockHandle");
     expect(manuscriptSource).toContain("shouldShow: () => false");
   });
-
   it("imports and registers the block-gutter plugin", () => {
     expect(manuscriptSource).toContain("block-handle-gutter");
     expect(manuscriptSource).toContain("createBlockGutterPlugin");
   });
 });
-
 describe("ManuscriptEditor — gutter plugin registration", () => {
   it("imports $prose from @milkdown/kit/utils", () => {
     expect(manuscriptSource).toContain("$prose");
     expect(manuscriptSource).toMatch(/\$prose.*from\s+['"]@milkdown\/kit\/utils['"]|@milkdown\/kit\/utils.*\$prose/);
   });
-
   it("registers gutter plugin via crepe.addFeature() before create()", () => {
     expect(manuscriptSource).toContain("crepe.addFeature");
     expect(manuscriptSource).toContain("$prose(() => createBlockGutterPlugin())");
   });
-
   it("does not import or use prosePluginsCtx (gutter registered via addFeature)", () => {
     expect(manuscriptSource).not.toContain("prosePluginsCtx");
   });
 });
-
 describe("ManuscriptEditor — light code block theme", () => {
   it("imports EditorView from @codemirror/view", () => {
     expect(manuscriptSource).toMatch(/EditorView.*from\s+['"]@codemirror\/view['"]|@codemirror\/view.*EditorView/);
   });
-
   it("defines a lightCodeBlockTheme via EditorView.theme()", () => {
     expect(manuscriptSource).toMatch(/lightCodeBlockTheme\s*=\s*EditorView\.theme\(/);
   });
-
   it("sets cm-activeLine background to light yellow (#fef9c3)", () => {
     expect(manuscriptSource).toContain("'.cm-activeLine'");
     expect(manuscriptSource).toContain("backgroundColor");
     expect(manuscriptSource).toContain("#fef9c3");
   });
-
   it("sets cm-activeLineGutter background to light yellow (#fef9c3)", () => {
     expect(manuscriptSource).toContain("'.cm-activeLineGutter'");
     expect(manuscriptSource).toContain("#fef9c3");
   });
-
   it("sets cm-selectionBackground background to light yellow (#fef9c3)", () => {
     expect(manuscriptSource).toContain("'.cm-selectionBackground'");
     expect(manuscriptSource).toContain("#fef9c3");
   });
-
   it("overrides focused selection background to light yellow (#fef9c3)", () => {
     expect(manuscriptSource).toContain("'.cm-focused .cm-selectionBackground'");
     expect(manuscriptSource).toContain("#fef9c3");
   });
-
   it("wires the theme into the CodeMirror feature config", () => {
     expect(manuscriptSource).toContain("Crepe.Feature.CodeMirror");
     expect(manuscriptSource).toContain("theme: lightCodeBlockTheme");
@@ -189,7 +170,6 @@ describe("EditorToolbars — mobile keyboard bar and source mode", () => {
     expect(screen.queryByRole("toolbar", { name: "Keyboard bar" })).toBeNull();
     expect(container.querySelector('[aria-label="Keyboard bar"]')).toBeNull();
   });
-
   it("renders the keyboard bar in wysiwyg mode when the keyboard is open", () => {
     renderToolbars("wysiwyg");
     expect(
@@ -242,12 +222,10 @@ describe("ManuscriptEditor — citation dropdown mounting", () => {
   it("does not import citationPluginKey (insertion moved to plugin)", () => {
     expect(manuscriptSource).not.toContain("citationPluginKey");
   });
-
   it("registers citation plugin via crepe.addFeature()", () => {
     expect(manuscriptSource).toContain("createCitationPlugin");
     expect(manuscriptSource).toMatch(/\$prose.*createCitationPlugin/);
   });
-
   it("no longer renders CitationDropdown in EditorSurface (rendered by plugin)", () => {
     expect(editorSurfaceSource).not.toContain("<CitationDropdown");
     expect(editorSurfaceSource).not.toContain("citationState");
@@ -260,13 +238,11 @@ describe("ManuscriptEditor — @ trigger integration", () => {
   it("does not import useCitationState (citation dispatch removed)", () => {
     expect(manuscriptSource).not.toContain("useCitationState");
   });
-
   it("uses onStateChangeRef to wire citation plugin", () => {
     expect(manuscriptSource).toContain("onStateChangeRef");
     expect(manuscriptSource).toContain("createCitationPlugin");
     expect(manuscriptSource).toContain("onStateChangeRef.current");
   });
-
   it("imports editorViewCtx for test API (not citation trigger)", () => {
     expect(manuscriptSource).toContain("editorViewCtx");
     expect(manuscriptSource).toMatch(/editorViewCtx.*from.*['"]@milkdown\/kit\/core['"]/);
@@ -277,24 +253,47 @@ describe("ManuscriptEditor — citekey insertion removed (now in plugin)", () =>
   it("does not contain createSelectCitekeyHandler function", () => {
     expect(manuscriptSource).not.toContain("createSelectCitekeyHandler");
   });
-
   it("does not contain citationDispatchRef", () => {
     expect(manuscriptSource).not.toContain("citationDispatchRef");
   });
-
   it("does not contain handleSelectCitekey", () => {
     expect(manuscriptSource).not.toContain("handleSelectCitekey");
   });
-
   it("does not import useCitationState", () => {
     expect(manuscriptSource).not.toContain("useCitationState");
   });
-
   it("does not pass onSelectCitekey to createCitationPlugin", () => {
     expect(manuscriptSource).not.toContain("onSelectCitekey");
   });
-
   it("does not import CitationSelectHandler type", () => {
     expect(manuscriptSource).not.toContain("CitationSelectHandler");
   });
+});
+
+describe("ManuscriptEditor — editor wiring happens exactly once", () => {
+  it("wires once across re-renders so one markdown update schedules one autosave", async () => {
+    vi.mocked(saveManuscript).mockClear();
+    const workspace = new MemoryWorkspace();
+    let api: EditorTestApi | null = null;
+    const onReady = vi.fn((ready: EditorTestApi) => { api = ready; });
+    const app = () => createElement(MilkdownProvider, null, createElement(ManuscriptEditor, {
+      workspace, defaultValue: "# Title\n\nSome text.", onEditorReady: onReady, mode: "wysiwyg" as const,
+    }));
+    const result = render(app());
+    await waitFor(() => expect(api).not.toBeNull(), { timeout: 10000 });
+    // Force several re-renders; the wire effect must not stack listeners.
+    for (let i = 0; i < 3; i++) result.rerender(app());
+    expect(onReady).toHaveBeenCalledTimes(1);
+    vi.useFakeTimers();
+    try {
+      act(() => { api!.setMarkdown("# Title\n\nEdited exactly once."); });
+      await act(async () => {});
+      act(() => { vi.advanceTimersByTime(1000); });
+      await act(async () => {});
+      expect(saveManuscript).toHaveBeenCalledTimes(1);
+      expect(saveManuscript).toHaveBeenCalledWith(workspace, expect.stringContaining("Edited exactly once."));
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 20000);
 });

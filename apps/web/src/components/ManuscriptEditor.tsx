@@ -208,7 +208,7 @@ function useManuscriptState(options: UseManuscriptStateOptions) {
   statusRef.current = onSaveStatusChange;
   const saverRef = useRef<ReturnType<typeof debouncedSaver> | null>(null);
   if (!saverRef.current) saverRef.current = debouncedSaver(workspace, (s) => statusRef.current?.(s));
-  const wiredRef = useRef(false);
+  const wiredEditorRef = useRef<Editor | null>(null);
 
   // Source edits schedule the same debounced autosave as visual edits.
   const handleSourceChange = useCallback((md: string) => {
@@ -220,17 +220,16 @@ function useManuscriptState(options: UseManuscriptStateOptions) {
     syncContent(mode);
   }, [mode, syncContent]);
 
+  // `get` is a new function every render, so it must not be a dependency;
+  // the editor-identity ref guard keeps wiring to a single registration per
+  // editor instance (Milkdown's markdownUpdated has no unsubscribe handle).
   useEffect(() => {
-    if (wiredRef.current) return;
     const editor = get();
-    if (!editor) return;
-    wiredRef.current = true;
+    if (!editor || editor === wiredEditorRef.current) return;
+    wiredEditorRef.current = editor;
     editorRef.current = editor;
     wireEditor(editor, saverRef.current!, syncContent, onEditorReady);
-    return () => {
-      wiredRef.current = false;
-    };
-  }, [loading, get, onEditorReady, workspace, syncContent]);
+  }, [loading, onEditorReady, workspace, syncContent]);
 
   useInitialCaret(loading, get);
 
