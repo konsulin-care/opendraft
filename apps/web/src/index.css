@@ -138,24 +138,29 @@ textarea {
   position: relative;
 }
 
-/* reading-width column for prose; ~70ch keeps lines readable */
+/* Reading-width column: 80% of the editor pane, centered, so side gutters
+   are always equal (10% each) at any viewport width. Border-box with no
+   horizontal padding keeps the text flush to the column on both edges. */
 .manuscript-editor .editor {
-  max-width: 70ch;
+  width: 80%;
+  box-sizing: border-box;
   margin-inline: auto;
-  padding: 2rem 1rem 4rem 3rem;
+  padding-block: 2rem 4rem;
+  padding-inline: 0;
 }
 
 /* The formatting toolbar spans the full editor width — no reading-column cap
    here, so no grey strip shows beside it. The toolbar keeps its button column
-   aligned to the editor's centered 70ch reading column internally. */
+   aligned to the editor's centered 80% column internally. */
 
-/* Source editor (CodeMirror) uses the same centered column, margin and
+/* Source editor (CodeMirror) uses the same centered column, margins and
    padding as the visual surface so source text starts at the same x-position. */
 .manuscript-editor .source-editor {
-  max-width: 70ch;
-  margin-inline: auto;
-  padding: 2rem 1rem 4rem 3rem;
+  width: 80%;
   box-sizing: border-box;
+  margin-inline: auto;
+  padding-block: 2rem 4rem;
+  padding-inline: 0;
   background: #ffffff;
 }
 

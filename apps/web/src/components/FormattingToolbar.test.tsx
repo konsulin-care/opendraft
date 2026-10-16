@@ -29,20 +29,13 @@ function fakeCommands(active: ActiveState = INACTIVE_STATE, canFormat = true): E
 
 /** Accessible names of the toolbar buttons, in large-screen order. */
 const LARGE_LAYOUT: Array<[name: string, icon: string]> = [
-  ['Undo', 'lucide-undo-2'],
-  ['Redo', 'lucide-redo-2'],
-  ['Paragraph style', 'lucide-pilcrow'],
-  ['Bold', 'lucide-bold'],
-  ['Italic', 'lucide-italic'],
-  ['Strikethrough', 'lucide-strikethrough'],
-  ['Inline code', 'lucide-code'],
-  ['Link', 'lucide-link'],
-  ['Citation', 'lucide-at-sign'],
-  ['Inline math', 'lucide-sigma'],
-  ['Bullet list', 'lucide-list'],
-  ['Numbered list', 'lucide-list-ordered'],
-  ['Task list', 'lucide-list-todo'],
-  ['Quote', 'lucide-text-quote'],
+  ['Undo', 'lucide-undo-2'], ['Redo', 'lucide-redo-2'],
+  ['Paragraph style', 'lucide-pilcrow'], ['Bold', 'lucide-bold'],
+  ['Italic', 'lucide-italic'], ['Strikethrough', 'lucide-strikethrough'],
+  ['Inline code', 'lucide-code'], ['Link', 'lucide-link'],
+  ['Citation', 'lucide-at-sign'], ['Inline math', 'lucide-sigma'],
+  ['Bullet list', 'lucide-list'], ['Numbered list', 'lucide-list-ordered'],
+  ['Task list', 'lucide-list-todo'], ['Quote', 'lucide-text-quote'],
   ['Insert', 'lucide-plus'],
   // The More overflow trigger is lg:hidden but always in the DOM.
   ['More', 'lucide-ellipsis'],
@@ -192,7 +185,6 @@ describe('FormattingToolbar compact layout (below the lg breakpoint)', () => {
     expect(dividers[4].className).not.toContain('hidden');
     expect(dividers[5].className).toContain('lg:hidden');
   });
-
 });
 
 describe('FormattingToolbar compact More menu', () => {
@@ -268,8 +260,15 @@ describe('index.css responsive layout (source scan)', () => {
     expect(reduced).toMatch(/\.editor-toolbar-collapse\s*\{[^}]*transition:\s*none/);
   });
 
-  it('sets the reading column to about 70ch', () => {
-    expect(css).toMatch(/\.manuscript-editor \.editor\s*\{[^}]*max-width:\s*70ch/);
+  it('sets the editor reading column to 80% width', () => {
+    expect(css).toMatch(/\.manuscript-editor \.editor\s*\{[^}]*width:\s*80%/);
+    expect(css).toMatch(/\.manuscript-editor \.source-editor\s*\{[^}]*width:\s*80%/);
+  });
+
+  it('aligns the toolbar button column to the 80% editor column', () => {
+    const toolbar = readFileSync(resolve(__dirname, 'FormattingToolbar.tsx'), 'utf-8');
+    expect(toolbar).toMatch(/className="[^"]*\bmx-auto\b[^"]*\bw-\[80%\][^"]*"/);
+    expect(toolbar).not.toMatch(/max-w-\[70ch\]/);
   });
 });
 

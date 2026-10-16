@@ -268,7 +268,7 @@ export function FormattingToolbar({ commands }: FormattingToolbarProps) {
       aria-label="Formatting"
       className="hidden md:flex w-full border-b border-stone-200 bg-white/70 backdrop-blur-md saturate-150"
     >
-      <div className="mx-auto flex w-full max-w-[70ch] items-center gap-0.5 px-2 py-1">
+      <div className="mx-auto flex w-[80%] items-center gap-0.5 px-2 py-1">
         <HistoryGroup {...groupProps} />
         <Divider />
         <ToolbarMenu label="Paragraph style" icon={Pilcrow} items={paragraphs} disabled={disabled} />
