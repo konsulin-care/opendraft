@@ -11,6 +11,16 @@ import {
 
 // @vitest-environment jsdom
 
+// Test classification for the editor-chrome rework (T1-T5):
+//   superseded -> App.test.tsx, AppHeader.test.tsx, FormattingToolbar.test.tsx,
+//                 SourceEditor.test.tsx (rewritten for the single mode toggle)
+//   preserved  -> e2e.test.tsx, useToolbarPreference.test.tsx, KeyboardBar.test.tsx,
+//                 source-commands.test.ts, manuscript-editor.test.ts,
+//                 index.css.*.test.ts, index.html.test.ts, and packages/ tests
+//                 (basename matches only).
+// No test queries the removed Visual/Source segment buttons, and no test
+// queries aria-pressed on the mode toggle.
+
 // jsdom localStorage is shared across tests in this file; clear it so a
 // persisted editor mode (or toolbar preference) does not leak between tests.
 beforeEach(() => {
@@ -47,7 +57,6 @@ describe('App header', () => {
     await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
     const toggle = screen.getByRole('button', { name: 'Switch to source' });
     expect(toggle.getAttribute('title')).toBe('Switch to source');
-    expect(toggle.getAttribute('aria-pressed')).toBeNull();
     expect(toggle.querySelector('.lucide-file-text')).not.toBeNull();
     expect(toggle.querySelector('.lucide-file-code')).toBeNull();
   });

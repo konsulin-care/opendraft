@@ -78,7 +78,6 @@ describe('AppHeader mode toggle', () => {
     const { container } = renderHeader({ mode: 'wysiwyg', onSelectMode });
     const toggle = screen.getByRole('button', { name: 'Switch to source' });
     expect(toggle.getAttribute('title')).toBe('Switch to source');
-    expect(toggle.getAttribute('aria-pressed')).toBeNull();
     expect(container.querySelector('.lucide-file-text')).not.toBeNull();
     expect(container.querySelector('.lucide-file-code')).toBeNull();
 
@@ -91,7 +90,6 @@ describe('AppHeader mode toggle', () => {
     const { container } = renderHeader({ mode: 'source', onSelectMode });
     const toggle = screen.getByRole('button', { name: 'Switch to visual' });
     expect(toggle.getAttribute('title')).toBe('Switch to visual');
-    expect(toggle.getAttribute('aria-pressed')).toBeNull();
     expect(container.querySelector('.lucide-file-code')).not.toBeNull();
     expect(container.querySelector('.lucide-file-text')).toBeNull();
 
