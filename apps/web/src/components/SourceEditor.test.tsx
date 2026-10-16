@@ -71,6 +71,12 @@ describe('SourceEditor line wrapping', () => {
     // generated style is white-space: pre-wrap — lines wrap instead of
     // producing a horizontal scrollbar.
     expect(content!.classList.contains('cm-lineWrapping')).toBe(true);
+    // The wrapping class maps to white-space: pre-wrap in the injected
+    // stylesheet, so lines break within the viewport rather than overflowing.
+    const styles = Array.from(document.querySelectorAll('style'))
+      .map((s) => s.textContent ?? '')
+      .join('\n');
+    expect(styles).toMatch(/\.cm-lineWrapping\s*\{[^}]*white-space:\s*pre-wrap/);
   });
 });
 
