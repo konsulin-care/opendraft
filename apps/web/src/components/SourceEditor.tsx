@@ -166,6 +166,8 @@ function createState(
         ...searchSearchKeymap,
       ]),
       markdown(),
+      // Wrap long lines within the viewport instead of scrolling horizontally.
+      EditorView.lineWrapping,
       lightEditorTheme,
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       EditorView.updateListener.of((update) => {

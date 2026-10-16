@@ -56,6 +56,24 @@ describe('SourceEditor', () => {
   });
 });
 
+describe('SourceEditor line wrapping', () => {
+  it('includes EditorView.lineWrapping in the extensions', () => {
+    expect(sourceEditorSource).toContain('EditorView.lineWrapping');
+  });
+
+  it('wraps long lines instead of scrolling horizontally', () => {
+    const { container } = render(
+      <SourceEditor value={'# '.padEnd(500, 'x')} onChange={vi.fn()} />,
+    );
+    const content = container.querySelector('.cm-content') as HTMLElement | null;
+    expect(content).not.toBeNull();
+    // EditorView.lineWrapping marks .cm-content with cm-lineWrapping, whose
+    // generated style is white-space: pre-wrap — lines wrap instead of
+    // producing a horizontal scrollbar.
+    expect(content!.classList.contains('cm-lineWrapping')).toBe(true);
+  });
+});
+
 describe('SourceEditor light theme', () => {
   it('no longer imports oneDark', () => {
     expect(sourceEditorSource).not.toContain('oneDark');
