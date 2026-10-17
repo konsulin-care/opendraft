@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import 'fake-indexeddb/auto';
+import { indexedDB } from 'fake-indexeddb';
 import { workspaceManager, WorkspaceManager } from '../src/manager.js';
+import { workspaceDbName } from '../src/db-names.js';
 import { IndexedDBWorkspace } from '../src/indexeddb.js';
 
 describe('WorkspaceManager', () => {
@@ -44,6 +46,29 @@ describe('WorkspaceManager', () => {
     expect(manager.has('unknown')).toBe(false);
     await manager.get('known');
     expect(manager.has('known')).toBe(true);
+  });
+});
+
+describe('WorkspaceManager.destroy', () => {
+  let manager: WorkspaceManager;
+
+  beforeEach(() => {
+    manager = new WorkspaceManager();
+  });
+
+  it('drops the workspace and deletes its database', async () => {
+    const ws = await manager.get('x');
+    await ws.writeFile('hello.md', 'hi');
+
+    await manager.destroy('x');
+
+    expect(manager.has('x')).toBe(false);
+    const names = (await indexedDB.databases()).map((db: { name?: string }) => db.name);
+    expect(names).not.toContain(workspaceDbName('x'));
+
+    const fresh = await manager.get('x');
+    expect(await fresh.listAll()).toEqual([]);
+    manager.release('x');
   });
 });
 

@@ -1,4 +1,6 @@
+import { deleteDB } from 'idb';
 import { IndexedDBWorkspace } from './indexeddb.js';
+import { workspaceDbName } from './db-names.js';
 
 interface WorkspaceEntry {
   instance: IndexedDBWorkspace;
@@ -57,6 +59,21 @@ export class WorkspaceManager {
       await entry.instance.close();
     }
     this.workspaces.clear();
+  }
+
+  /**
+   * Destroy a workspace completely, whatever its ref count.
+   * Drops the cached instance, closes its connection, then deletes
+   * the backing `od-ws-<id>` database.
+   * @param workspaceId - Workspace to destroy.
+   */
+  async destroy(workspaceId: string): Promise<void> {
+    const entry = this.workspaces.get(workspaceId);
+    if (entry) {
+      this.workspaces.delete(workspaceId);
+      await entry.instance.close();
+    }
+    await deleteDB(workspaceDbName(workspaceId));
   }
 
   /**
