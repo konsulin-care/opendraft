@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EditorView } from '@codemirror/view';
 import { Crepe } from '@milkdown/crepe';
 import { useEditor } from '@milkdown/react';
@@ -8,16 +8,19 @@ import { $prose, getMarkdown, replaceAll } from '@milkdown/kit/utils';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { saveManuscript } from '../persistence';
 import { PLACEHOLDER_HINT } from '../placeholder';
-import { createBlockGutterPlugin } from '../block-handle-gutter';
 import { createCitationPlugin } from '../citation/plugin';
 import type { CitationState } from '../citation/types';
 import { quartoRemarkPlugin, quartoInlineCodePlugin, quartoChunkOptionPlugin } from '../quarto-syntax';
 import { citationRemarkPlugin } from '../citation/citation-remark-plugin';
 import { EditorSurface } from './EditorSurface';
+import { EditorToolbars } from './EditorToolbars';
+import { useEditorCommands } from '../hooks/useEditorCommands';
+import { useFocusScrollGuard } from '../hooks/useFocusScrollGuard';
+import { useVirtualKeyboard } from '../hooks/useVirtualKeyboard';
+import { createModeSwitcher, placeVisualCaret, useInitialCaret } from '../caret-mode-switch';
 import type { SourceEditorHandle } from './SourceEditor';
-/** CodeMirror theme for code blocks: light yellow active line and selection
- * to match the light Crepe palette.
- */
+import type { SaveStatus } from './AppHeader';
+/** Code blocks: light yellow active line/selection matching the Crepe light palette. */
 const lightCodeBlockTheme = EditorView.theme({
   '.cm-activeLine': { backgroundColor: '#fef9c3' },
   '.cm-activeLineGutter': { backgroundColor: '#fef9c3' },
@@ -35,6 +38,10 @@ export interface EditorTestApi {
   setMarkdown(markdown: string): void;
   /** Switch between wysiwyg and source mode. */
   setMode(mode: 'wysiwyg' | 'source'): void;
+  /** Current visual (ProseMirror) selection position. */
+  getCaret(): number;
+  /** Place the visual caret; values past the end clamp to the document end. */
+  setCaret(pos: number): void;
 }
 
 interface ManuscriptEditorProps {
@@ -46,6 +53,10 @@ interface ManuscriptEditorProps {
   onEditorReady?: (api: EditorTestApi) => void;
   /** Editing mode: 'wysiwyg' (default) or 'source' (raw markdown). */
   mode?: 'wysiwyg' | 'source';
+  /** Reports autosave progress: saving, saved, or error. */
+  onSaveStatusChange?: (status: SaveStatus) => void;
+  /** Formatting-toolbar visibility preference, owned by the app shell. */
+  formattingToolbar?: boolean;
 }
 
 interface UseManuscriptStateOptions {
@@ -53,6 +64,7 @@ interface UseManuscriptStateOptions {
   defaultValue: string;
   mode: 'wysiwyg' | 'source';
   onEditorReady?: (api: EditorTestApi) => void;
+  onSaveStatusChange?: (status: SaveStatus) => void;
 }
 
 const SAVE_DEBOUNCE_MS = 800;
@@ -77,30 +89,47 @@ function createTestApi(editor: Editor, syncContent: (mode: 'wysiwyg' | 'source')
     getMarkdown: () => editor.action(getMarkdown()),
     setMarkdown: (markdown) => editor.action(replaceAll(markdown)),
     setMode: syncContent,
+    getCaret: () => editor.action((ctx) => ctx.get(editorViewCtx).state.selection.from),
+    setCaret: (pos) => editor.action((ctx) => placeVisualCaret(ctx.get(editorViewCtx), pos)),
   };
 }
 
 /** Debounced autosave writing the single manuscript markdown file. */
-function debouncedSaver(workspace: WorkspaceAdapter) {
+function debouncedSaver(workspace: WorkspaceAdapter, onStatus: (status: SaveStatus) => void) {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let pending: string | undefined;
 
   const save = (markdown: string): void => {
-    void saveManuscript(workspace, markdown).catch((error) =>
-      console.error('manuscript autosave failed:', error),
+    void saveManuscript(workspace, markdown).then(
+      () => {
+        if (!timer) onStatus('saved');
+      },
+      (error: unknown) => {
+        console.error('manuscript autosave failed:', error);
+        onStatus('error');
+      },
     );
   };
 
   const schedule = (markdown: string): void => {
     if (timer) clearTimeout(timer);
+    onStatus('saving');
+    pending = markdown;
     timer = setTimeout(() => {
       timer = undefined;
+      pending = undefined;
       save(markdown);
     }, SAVE_DEBOUNCE_MS);
   };
 
+  /** Save pending content (if any) synchronously, then clear the timer. */
   const flush = (): void => {
     if (timer) clearTimeout(timer);
     timer = undefined;
+    if (pending !== undefined) {
+      save(pending);
+      pending = undefined;
+    }
   };
 
   return { schedule, flush };
@@ -117,6 +146,7 @@ function createCrepeConfig(options: CrepeConfigOptions) {
     },
     featureConfigs: {
       [Crepe.Feature.Placeholder]: { text: placeholderText, mode: 'block' },
+      [Crepe.Feature.Cursor]: { virtual: false },
       [Crepe.Feature.CodeMirror]: {
         theme: lightCodeBlockTheme,
         extensions: [quartoChunkOptionPlugin],
@@ -129,33 +159,9 @@ function createCrepeConfig(options: CrepeConfigOptions) {
     },
   });
   crepe.addFeature((editor) => {
-    editor.use($prose(() => createBlockGutterPlugin()));
-  });
-  crepe.addFeature((editor) => {
     editor.use($prose(() => createCitationPlugin(workspace, onStateChangeRef.current)));
   });
   return crepe;
-}
-
-function useContentSync(
-  editorRef: React.MutableRefObject<Editor | null>,
-  prevModeRef: React.MutableRefObject<'wysiwyg' | 'source'>,
-  sourceMarkdown: string,
-  setSourceMarkdown: (md: string) => void,
-) {
-  return useCallback(
-    (newMode: 'wysiwyg' | 'source') => {
-      const editor = editorRef.current;
-      if (!editor) return;
-      if (newMode === 'wysiwyg' && prevModeRef.current === 'source') {
-        editor.action(replaceAll(sourceMarkdown));
-      } else if (newMode === 'source' && prevModeRef.current === 'wysiwyg') {
-        setSourceMarkdown(editor.action(getMarkdown()));
-      }
-      prevModeRef.current = newMode;
-    },
-    [sourceMarkdown],
-  );
 }
 
 /** Wire autosave listener and custom plugins into the Crepe editor. */
@@ -182,51 +188,54 @@ function wireEditor(
 
 /** Hook that wires up the Crepe editor, autosave, and mode sync. */
 function useManuscriptState(options: UseManuscriptStateOptions) {
-  const { workspace, defaultValue, mode, onEditorReady } = options;
-  const placeholderText = PLACEHOLDER_HINT;
+  const { workspace, defaultValue, mode, onEditorReady, onSaveStatusChange } = options;
   const [sourceMarkdown, setSourceMarkdown] = useState(defaultValue);
   const sourceEditorRef = useRef<SourceEditorHandle | null>(null);
   const editorRef = useRef<Editor | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const prevModeRef = useRef<'wysiwyg' | 'source'>(mode);
-
   const onStateChangeRef = useRef<(state: CitationState) => void>(() => {});
-
-  const syncContent = useContentSync(editorRef, prevModeRef, sourceMarkdown, setSourceMarkdown);
+  const syncContent = useMemo(() => createModeSwitcher(editorRef, sourceEditorRef, prevModeRef, setSourceMarkdown), []);
 
   const { loading, get } = useEditor(
-    (root) => createCrepeConfig({ root, defaultValue, placeholderText, workspace, onStateChangeRef }),
+    (root) => createCrepeConfig({ root, defaultValue, placeholderText: PLACEHOLDER_HINT, workspace, onStateChangeRef }),
     [defaultValue, workspace],
   );
 
+  const statusRef = useRef(onSaveStatusChange);
+  statusRef.current = onSaveStatusChange;
   const saverRef = useRef<ReturnType<typeof debouncedSaver> | null>(null);
-  if (!saverRef.current) saverRef.current = debouncedSaver(workspace);
-  const wiredRef = useRef(false);
+  if (!saverRef.current) saverRef.current = debouncedSaver(workspace, (s) => statusRef.current?.(s));
+  const wiredEditorRef = useRef<Editor | null>(null);
 
-  // Sync content when mode changes
+  // Source edits schedule the same debounced autosave as visual edits.
+  const handleSourceChange = useCallback((md: string) => {
+    setSourceMarkdown(md);
+    saverRef.current?.schedule(md);
+  }, []);
+
   useEffect(() => {
     syncContent(mode);
   }, [mode, syncContent]);
 
+  // `get` is a new function every render, so it must not be a dependency;
+  // the editor-identity ref guard keeps wiring to a single registration per
+  // editor instance (Milkdown's markdownUpdated has no unsubscribe handle).
   useEffect(() => {
-    if (wiredRef.current) return;
     const editor = get();
-    if (!editor) return;
-    wiredRef.current = true;
+    if (!editor || editor === wiredEditorRef.current) return;
+    wiredEditorRef.current = editor;
     editorRef.current = editor;
     wireEditor(editor, saverRef.current!, syncContent, onEditorReady);
+  }, [loading, onEditorReady, workspace, syncContent]);
 
-    return () => {
-      wiredRef.current = false;
-    };
-  }, [loading, get, onEditorReady, workspace, syncContent]);
+  useInitialCaret(loading, get);
 
-  useEffect(() => {
-    const saver = saverRef.current;
-    return () => saver?.flush();
-  }, []);
+  useFocusScrollGuard(scrollContainerRef);
 
-  return { sourceMarkdown, setSourceMarkdown, sourceEditorRef, scrollContainerRef, editorRef };
+  useEffect(() => () => saverRef.current?.flush(), []);
+
+  return { sourceMarkdown, handleSourceChange, sourceEditorRef, scrollContainerRef, editorRef };
 }
 
 /**
@@ -239,24 +248,40 @@ export function ManuscriptEditor({
   defaultValue,
   onEditorReady,
   mode = 'wysiwyg',
+  onSaveStatusChange,
+  formattingToolbar = true,
 }: ManuscriptEditorProps) {
   const editorRef = useRef<Editor | null>(null);
 
-  const { sourceMarkdown, setSourceMarkdown, sourceEditorRef, scrollContainerRef, editorRef: hookEditorRef } =
-    useManuscriptState({ workspace, defaultValue, mode, onEditorReady });
+  const { sourceMarkdown, handleSourceChange, sourceEditorRef, scrollContainerRef, editorRef: hookEditorRef } =
+    useManuscriptState({ workspace, defaultValue, mode, onEditorReady, onSaveStatusChange });
 
   // Update editorRef when hookEditorRef.current changes
   useEffect(() => {
     editorRef.current = hookEditorRef.current;
   }, [hookEditorRef.current]);
 
+  const commands = useEditorCommands(mode, () => sourceEditorRef.current?.getView() ?? null);
+  const { open: keyboardOpen, bottomOffset } = useVirtualKeyboard();
+
   return (
-    <EditorSurface
-      mode={mode}
-      sourceMarkdown={sourceMarkdown}
-      onSourceChange={setSourceMarkdown}
-      scrollContainerRef={scrollContainerRef}
-      sourceEditorRef={sourceEditorRef}
-    />
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <EditorToolbars
+        commands={commands}
+        formattingToolbar={formattingToolbar}
+        mode={mode}
+        open={keyboardOpen}
+        bottomOffset={bottomOffset}
+      />
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <EditorSurface
+          mode={mode}
+          sourceMarkdown={sourceMarkdown}
+          onSourceChange={handleSourceChange}
+          scrollContainerRef={scrollContainerRef}
+          sourceEditorRef={sourceEditorRef}
+        />
+      </div>
+    </div>
   );
 }

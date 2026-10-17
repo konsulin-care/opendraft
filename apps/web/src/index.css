@@ -50,48 +50,17 @@
   }
 }
 
-/* ── Hide stock Crepe block handle (we use custom gutter handle) ── */
+/* ── Hide stock Crepe block handle (BlockEdit config disables it) ── */
 .milkdown-block-handle {
   display: none !important;
 }
 
-/* ── Block gutter handle ── */
-/* The gutter container is positioned absolutely within .milkdown, holding the drag handle. */
-.block-gutter-container {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 40px;
-  pointer-events: none;
-}
-
-/* The draggable six-dot handle, vertically centered on the active block. */
-.block-gutter-handle {
-  position: absolute;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: grab;
-  border-radius: 4px;
-  pointer-events: auto;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.block-gutter-handle[data-show="true"] {
-  opacity: 1;
-}
-
-.block-gutter-handle:hover {
-  background: var(--crepe-color-hover);
-}
-
-.block-gutter-handle svg {
-  width: 24px;
-  height: 24px;
-  fill: var(--crepe-color-outline);
+/* ── Inactive Crepe table handles ── */
+/* Stock Crepe only fades hidden table handles (opacity: 0), so they keep
+   taking scroll height and can steal focus. Force display:none when hidden;
+   visible row/column drag handles (data-show="true") are unaffected. */
+.milkdown .milkdown-table-block [data-show='false'] {
+  display: none;
 }
 
 /* ── Quarto chunk option lines ── */
@@ -105,6 +74,14 @@
 /* ── Slash menu: fix padding + prevent horizontal scroll ── */
 .milkdown .milkdown-slash-menu {
   max-width: 380px;
+}
+
+/* Below the sm breakpoint (e.g. 375px phones) cap the menu at 320px so it
+   never forces horizontal scroll on narrow viewports. */
+@media (max-width: 639px) {
+  .milkdown .milkdown-slash-menu {
+    max-width: 320px;
+  }
 }
 
 .milkdown .milkdown-slash-menu .tab-group {
@@ -161,11 +138,53 @@ textarea {
   position: relative;
 }
 
-/* reading-width column for prose */
+/* Reading-width column: 80% of the editor pane, centered, so side gutters
+   are always equal (10% each) at any viewport width. Border-box with no
+   horizontal padding keeps the text flush to the column on both edges. */
 .manuscript-editor .editor {
-  max-width: 46rem;
+  width: 80%;
+  box-sizing: border-box;
   margin-inline: auto;
-  padding: 2rem 1rem 4rem 3rem;
+  padding-block: 2rem 4rem;
+  padding-inline: 0;
+}
+
+/* The formatting toolbar spans the full editor width — no reading-column cap
+   here, so no grey strip shows beside it. The toolbar keeps its button column
+   aligned to the editor's centered 80% column internally. */
+
+/* Source editor (CodeMirror) uses the same centered column, margins and
+   padding as the visual surface so source text starts at the same x-position. */
+.manuscript-editor .source-editor {
+  width: 80%;
+  box-sizing: border-box;
+  margin-inline: auto;
+  padding-block: 2rem 4rem;
+  padding-inline: 0;
+  background: #ffffff;
+}
+
+/* ── Editor toolbar collapse ── */
+/* Wraps the formatting toolbar; animates the show/hide over 150 ms. */
+.editor-toolbar-collapse {
+  overflow: hidden;
+  transition: max-height 150ms ease, opacity 150ms ease;
+}
+
+.editor-toolbar-collapse.is-open {
+  max-height: 4rem;
+  opacity: 1;
+}
+
+.editor-toolbar-collapse.is-closed {
+  max-height: 0;
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-toolbar-collapse {
+    transition: none;
+  }
 }
 
 .manuscript-editor .ProseMirror p {

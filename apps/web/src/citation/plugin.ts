@@ -107,6 +107,7 @@ export function shouldShowCitation(content: string | undefined): boolean {
 
 /** Rebuild decorations based on current document and references. */
 function rebuildDecorations(view: EditorView, references: Reference[]) {
+  if (view.isDestroyed) return;
   citekeyMap.clear();
   const decoSet = buildCitekeyDecorations(view.state.doc, references, citekeyMap);
   const tr = view.state.tr.setMeta(citationPluginKey, {
@@ -282,7 +283,7 @@ function syncQueryFromEditor(editorView: EditorView, dispatch: (action: Citation
 async function loadReferences(workspace: WorkspaceAdapter, view: EditorView): Promise<void> {
   try {
     const content = await workspace.readFile("references.bib");
-    if (!content) return;
+    if (!content || view.isDestroyed) return;
 
     try {
       const refs = parseBibTeX(content);

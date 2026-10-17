@@ -38,27 +38,61 @@ describe('index.css — stock block handle', () => {
   });
 });
 
-describe('index.css — custom gutter handle', () => {
-  it('styles the block-gutter-container', () => {
-    expect(css).toContain('.block-gutter-container');
-    expect(css).toContain('position: absolute');
-    expect(css).toContain('pointer-events: none');
+describe('index.css — block gutter removed', () => {
+  it('contains no .block-gutter-container or .block-gutter-handle rules', () => {
+    expect(css).not.toContain('.block-gutter-container');
+    expect(css).not.toContain('.block-gutter-handle');
   });
 
-  it('styles the block-gutter-handle', () => {
-    expect(css).toContain('.block-gutter-handle');
-    expect(css).toContain('cursor: grab');
-    expect(css).toContain('pointer-events: auto');
-    expect(css).toContain('opacity: 0');
-    expect(css).toContain('transition: opacity 0.15s');
+  it('hides inactive Crepe table handles with display none', () => {
+    expect(css).toMatch(/\.milkdown-table-block \[data-show='false'\]\s*\{[^}]*display:\s*none/);
+  });
+});
+
+describe('index.css — editor column is 80% of the editor pane', () => {
+  /** Returns the declaration block text for a top-level selector. */
+  const block = (selector: string): string => {
+    const start = css.indexOf(selector);
+    expect(start).toBeGreaterThanOrEqual(0);
+    const end = css.indexOf('}', start);
+    return css.slice(start, end);
+  };
+
+  it.each(['.manuscript-editor .editor', '.manuscript-editor .source-editor'])(
+    '%s is an 80% centered border-box column with no horizontal padding',
+    (selector) => {
+      const decl = block(selector);
+      expect(decl).toMatch(/width:\s*80%/);
+      expect(decl).toMatch(/margin-inline:\s*auto/);
+      expect(decl).toMatch(/box-sizing:\s*border-box/);
+      expect(decl).toMatch(/padding-inline:\s*0\s*;/);
+      // Vertical padding is preserved.
+      expect(decl).toMatch(/padding-block:/);
+    },
+  );
+
+  it('leaves equal 10% gutters at 375px, 1280px and 1920px viewport widths', () => {
+    const widthPct = Number(
+      block('.manuscript-editor .editor').match(/width:\s*([\d.]+)%/)![1],
+    );
+    for (const viewport of [375, 1280, 1920]) {
+      const column = (viewport * widthPct) / 100;
+      // margin-inline: auto splits the leftover space evenly.
+      const leftGutter = (viewport - column) / 2;
+      const rightGutter = leftGutter;
+      expect(leftGutter).toBeCloseTo(viewport * 0.1);
+      expect(leftGutter).toBeCloseTo(rightGutter);
+    }
   });
 
-  it('shows the block-gutter-handle when data-show is true', () => {
-    expect(css).toContain('.block-gutter-handle[data-show="true"]');
-    expect(css).toContain('opacity: 1');
-  });
-
-  it('adds left padding to editor for gutter space', () => {
-    expect(css).toContain('padding: 2rem 1rem 4rem 3rem');
+  it('keeps source mode on the same column as the visual editor', () => {
+    const editorDecl = block('.manuscript-editor .editor');
+    const sourceDecl = block('.manuscript-editor .source-editor');
+    const grab = (decl: string, prop: string) =>
+      decl.match(new RegExp(`${prop}:\\s*([^;]+);`))![1].trim();
+    expect(grab(sourceDecl, 'width')).toBe(grab(editorDecl, 'width'));
+    expect(grab(sourceDecl, 'margin-inline')).toBe(grab(editorDecl, 'margin-inline'));
+    expect(grab(sourceDecl, 'box-sizing')).toBe(grab(editorDecl, 'box-sizing'));
+    expect(grab(sourceDecl, 'padding-inline')).toBe(grab(editorDecl, 'padding-inline'));
   });
 });

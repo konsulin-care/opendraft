@@ -1,38 +1,15 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { MilkdownProvider } from '@milkdown/react';
+import { AppHeader } from './components/AppHeader';
+import type { SaveStatus } from './components/AppHeader';
 import { ManuscriptEditor } from './components/ManuscriptEditor';
 import { CommitDialog } from './components/CommitDialog';
 import { useWorkspace } from './hooks/useWorkspace';
-
-interface HeaderProps {
-  mode: 'wysiwyg' | 'source';
-  onToggleMode: () => void;
-  onCommit: () => void;
-}
-
-function Header({ mode, onToggleMode, onCommit }: HeaderProps) {
-  return (
-    <header style={{ padding: '1rem', borderBottom: '1px solid #ccc', display: 'flex', justifyContent: 'space-between' }}>  
-      <h1>OpenDraft</h1>
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>  
-        <button onClick={onToggleMode}>
-          {mode === 'wysiwyg' ? 'Source' : 'Visual'}
-        </button>
-        <button onClick={onCommit}>Commit</button>
-      </div>
-    </header>
-  );
-}
+import { useToolbarPreference } from './hooks/useToolbarPreference';
+import { useEditorMode } from './hooks/useEditorMode';
+import { MANUSCRIPT_PATH } from './persistence';
 
 const WORKSPACE_ID = 'opendraft-manuscript';
-
-function useMode() {
-  const [mode, setMode] = useState<'wysiwyg' | 'source'>('wysiwyg');
-  const toggleMode = useCallback(() => {
-    setMode((prev) => (prev === 'wysiwyg' ? 'source' : 'wysiwyg'));
-  }, []);
-  return { mode, toggleMode };
-}
 
 function useCommitDialog() {
   const [showCommitDialog, setShowCommitDialog] = useState(false);
@@ -40,13 +17,15 @@ function useCommitDialog() {
 }
 
 /**
- * App shell: header with commit action plus the single continuous
+ * App shell: icon header with commit action plus the single continuous
  * manuscript editor filling the viewport.
  */
 export function App() {
   const { workspace, markdown, loading, error } = useWorkspace(WORKSPACE_ID);
-  const { mode, toggleMode } = useMode();
+  const { mode, setMode } = useEditorMode();
   const { showCommitDialog, setShowCommitDialog } = useCommitDialog();
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
+  const { formattingToolbar, toggleFormattingToolbar } = useToolbarPreference();
 
   if (loading) {
     return <div>Loading workspace...</div>;
@@ -61,11 +40,25 @@ export function App() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}> 
-      <Header mode={mode} onToggleMode={toggleMode} onCommit={() => setShowCommitDialog(true)} />
-      <main style={{ flex: 1, overflow: 'hidden' }}> 
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <AppHeader
+        fileName={MANUSCRIPT_PATH}
+        mode={mode}
+        onSelectMode={setMode}
+        saveStatus={saveStatus}
+        formattingToolbar={formattingToolbar}
+        onToggleFormattingToolbar={toggleFormattingToolbar}
+        onCommit={() => setShowCommitDialog(true)}
+      />
+      <main style={{ flex: 1, overflow: 'hidden' }}>
         <MilkdownProvider>
-          <ManuscriptEditor workspace={workspace} defaultValue={markdown} mode={mode} />
+          <ManuscriptEditor
+            workspace={workspace}
+            defaultValue={markdown}
+            mode={mode}
+            onSaveStatusChange={setSaveStatus}
+            formattingToolbar={formattingToolbar}
+          />
         </MilkdownProvider>
       </main>
       <CommitDialog

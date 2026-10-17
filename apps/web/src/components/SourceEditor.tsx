@@ -2,24 +2,44 @@ import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { EditorState } from '@codemirror/state';
 import { EditorView, keymap, drawSelection, dropCursor, highlightActiveLine, highlightActiveLineGutter, highlightSpecialChars, lineNumbers, rectangularSelection, crosshairCursor } from '@codemirror/view';
 import { markdown } from '@codemirror/lang-markdown';
-import { oneDark } from '@codemirror/theme-one-dark';
 import { autocompletion, completionKeymap as autocompleteCompletionKeymap, closeBrackets } from '@codemirror/autocomplete';
 import { searchKeymap as searchSearchKeymap } from '@codemirror/search';
-import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
-import { foldGutter, foldKeymap, indentOnInput, bracketMatching } from '@codemirror/language';
+import { history, defaultKeymap, historyKeymap, undo as cmUndo, redo as cmRedo } from '@codemirror/commands';
+import { foldGutter, foldKeymap, indentOnInput, bracketMatching, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
 
-/** Imperative handle for SourceEditor — cursor and scroll preservation. */
+/** Imperative handle for SourceEditor — cursor, scroll, history, and view access. */
 export interface SourceEditorHandle {
   getCursor(): number;
   setCursor(pos: number): void;
+  /** Replace the whole document and place the caret in one transaction. */
+  setContent(markdown: string, cursor: number): void;
   getScrollTop(): number;
   setScrollTop(pos: number): void;
+  undo(): void;
+  redo(): void;
+  getView(): EditorView | null;
 }
 
 interface SourceEditorProps {
   value: string;
   onChange: (value: string) => void;
+  /** Additional class for the outer container (e.g. column layout). */
   className?: string;
+}
+
+/**
+ * Scroll the source viewport so the line at offset is visible. Uses the line
+ * block geometry only, avoiding CodeMirror's DOM measurement.
+ *
+ * @param view - CodeMirror view to scroll.
+ * @param offset - Character offset to reveal.
+ */
+function revealOffset(view: EditorView, offset: number): void {
+  const block = view.lineBlockAt(offset);
+  const { scrollDOM } = view;
+  const visibleBottom = scrollDOM.scrollTop + scrollDOM.clientHeight;
+  if (block.top >= scrollDOM.scrollTop && block.bottom <= visibleBottom) return;
+  scrollDOM.scrollTop = Math.max(0, block.top - scrollDOM.clientHeight / 3);
 }
 
 /** Create the imperative handle methods for cursor/scroll preservation. */
@@ -38,6 +58,17 @@ function makeImperativeHandle(
         selection: { anchor: Math.min(pos, view.state.doc.length) },
       });
     },
+    setContent(markdown: string, cursor: number) {
+      const view = viewRef.current;
+      if (!view) return;
+      const current = view.state.doc.toString();
+      const target = Math.min(cursor, markdown.length);
+      view.dispatch({
+        ...(current === markdown ? {} : { changes: { from: 0, to: current.length, insert: markdown } }),
+        selection: { anchor: target },
+      });
+      revealOffset(view, target);
+    },
     getScrollTop() {
       const view = viewRef.current;
       if (!view) return 0;
@@ -47,6 +78,17 @@ function makeImperativeHandle(
       const view = viewRef.current;
       if (!view) return;
       view.scrollDOM.scrollTop = pos;
+    },
+    undo() {
+      const view = viewRef.current;
+      if (view) cmUndo(view);
+    },
+    redo() {
+      const view = viewRef.current;
+      if (view) cmRedo(view);
+    },
+    getView() {
+      return viewRef.current;
     },
   };
 }
@@ -72,6 +114,25 @@ function useExternalValueSync(
     }
   }, [value]);
 }
+
+/**
+ * Light theme for the source editor: white background, dark foreground and a
+ * neutral gray active line, matching the .manuscript-editor reading surface.
+ */
+const lightEditorTheme = EditorView.theme({
+  '&': { color: '#212529', backgroundColor: '#ffffff' },
+  '.cm-content': { caretColor: '#212529' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: '#212529' },
+  '.cm-selectionBackground, .cm-content ::selection': { backgroundColor: '#d0d7de' },
+  '&.cm-focused .cm-selectionBackground': { backgroundColor: '#d0d7de' },
+  '.cm-activeLine': { backgroundColor: '#f2f2f2' },
+  '.cm-activeLineGutter': { backgroundColor: '#f2f2f2' },
+  '.cm-gutters': {
+    color: '#6c757d',
+    backgroundColor: '#f7f7f7',
+    borderRight: '1px solid #dee2e6',
+  },
+}, { dark: false });
 
 /** Create a CodeMirror EditorState with markdown support and change tracking. */
 function createState(
@@ -105,7 +166,10 @@ function createState(
         ...searchSearchKeymap,
       ]),
       markdown(),
-      oneDark,
+      // Wrap long lines within the viewport instead of scrolling horizontally.
+      EditorView.lineWrapping,
+      lightEditorTheme,
+      syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       EditorView.updateListener.of((update) => {
         if (update.docChanged) {
           isInternalChangeRef.current = true;
@@ -118,7 +182,8 @@ function createState(
 
 /**
  * Raw markdown editor backed by CodeMirror 6 with markdown syntax
- * highlighting and the oneDark theme. Used for the "source" mode
+ * highlighting and a light theme matching the visual surface. Used for the
+ * "source" mode
  * toggle in ManuscriptEditor.
  */
 export const SourceEditor = forwardRef<SourceEditorHandle, SourceEditorProps>(
