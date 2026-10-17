@@ -1,7 +1,7 @@
 import { openDB, type IDBPDatabase } from 'idb';
 import type { WorkspaceAdapter } from './adapter.js';
+import { workspaceDbName } from './db-names.js';
 
-const DB_NAME = 'opendraft-workspace';
 const STORE_NAME = 'files';
 
 /**
@@ -27,7 +27,7 @@ export class IndexedDBWorkspace implements WorkspaceAdapter {
 
   /** Initialize the IndexedDB database. */
   private async initDB(): Promise<IDBPDatabase> {
-    return openDB(`${DB_NAME}-${this.workspaceId}`, 1, {
+    return openDB(workspaceDbName(this.workspaceId), 1, {
       upgrade(db) {
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           db.createObjectStore(STORE_NAME);
@@ -122,5 +122,15 @@ export class IndexedDBWorkspace implements WorkspaceAdapter {
       }
     }
     return files;
+  }
+
+  /**
+   * List every stored file in the workspace.
+   * @returns Sorted array of all stored file paths, repo-relative.
+   */
+  async listAll(): Promise<string[]> {
+    const db = await this.getDB();
+    const keys = await db.getAllKeys(STORE_NAME);
+    return keys.map((key) => String(key)).sort();
   }
 }

@@ -2,3 +2,4 @@ export type { WorkspaceAdapter } from './adapter.js';
 export { MemoryWorkspace } from './memory.js';
 export { IndexedDBWorkspace } from './indexeddb.js';
 export { WorkspaceManager, workspaceManager } from './manager.js';
+export { REGISTRY_DB, workspaceDbName } from './db-names.js';

@@ -8,6 +8,7 @@ function createMockWorkspace(readContent: string | null = null): WorkspaceAdapte
     writeFile: vi.fn().mockResolvedValue(undefined),
     deleteFile: vi.fn().mockResolvedValue(undefined),
     listFiles: vi.fn().mockResolvedValue([]),
+    listAll: vi.fn().mockResolvedValue([]),
   };
 }
 

@@ -32,4 +32,10 @@ export interface WorkspaceAdapter {
    * @returns Array of filenames (not full paths) in the directory.
    */
   listFiles(dir: string): Promise<string[]>;
+
+  /**
+   * List every stored file in the workspace.
+   * @returns Sorted array of all stored file paths, repo-relative.
+   */
+  listAll(): Promise<string[]>;
 }

@@ -36,16 +36,21 @@ const pluginSource = readFileSync(
   "utf8",
 );
 
+function createMockWorkspace(): WorkspaceAdapter {
+  return {
+    readFile: vi.fn().mockResolvedValue(null),
+    writeFile: vi.fn().mockResolvedValue(undefined),
+    deleteFile: vi.fn().mockResolvedValue(undefined),
+    listFiles: vi.fn().mockResolvedValue([]),
+    listAll: vi.fn().mockResolvedValue([]),
+  };
+}
+
 describe("createCitationPlugin", () => {
   let workspace: WorkspaceAdapter;
 
   beforeEach(() => {
-    workspace = {
-      readFile: vi.fn().mockResolvedValue(null),
-      writeFile: vi.fn().mockResolvedValue(undefined),
-      deleteFile: vi.fn().mockResolvedValue(undefined),
-      listFiles: vi.fn().mockResolvedValue([]),
-    };
+    workspace = createMockWorkspace();
   });
 
   it("creates a plugin", () => {
@@ -266,12 +271,7 @@ describe("citation plugin — onStateChange callback", () => {
   let workspace: WorkspaceAdapter;
 
   beforeEach(() => {
-    workspace = {
-      readFile: vi.fn().mockResolvedValue(null),
-      writeFile: vi.fn().mockResolvedValue(undefined),
-      deleteFile: vi.fn().mockResolvedValue(undefined),
-      listFiles: vi.fn().mockResolvedValue([]),
-    };
+    workspace = createMockWorkspace();
   });
 
   it("accepts onStateChange parameter", () => {
