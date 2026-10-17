@@ -146,6 +146,7 @@ function createCrepeConfig(options: CrepeConfigOptions) {
     },
     featureConfigs: {
       [Crepe.Feature.Placeholder]: { text: placeholderText, mode: 'block' },
+      [Crepe.Feature.Cursor]: { virtual: false },
       [Crepe.Feature.CodeMirror]: {
         theme: lightCodeBlockTheme,
         extensions: [quartoChunkOptionPlugin],
