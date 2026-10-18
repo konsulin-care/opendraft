@@ -13,6 +13,8 @@ const BASE_PROPS: AppHeaderProps = {
   formattingToolbar: true,
   onToggleFormattingToolbar: vi.fn(),
   onCommit: vi.fn(),
+  sidebarOpen: false,
+  onToggleSidebar: vi.fn(),
 };
 
 /**

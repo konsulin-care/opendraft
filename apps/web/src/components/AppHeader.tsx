@@ -7,7 +7,9 @@ import {
   Type,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import type { RefObject } from 'react';
 import { formatFileName } from '../format-file-name';
+import { PROJECT_DRAWER_ID } from './project-drawer/ProjectDrawer';
 import { ModeSwitch } from './ModeSwitch';
 import type { EditorMode } from './ModeSwitch';
 import { HeaderOverflowMenu } from './HeaderOverflowMenu';
@@ -126,6 +128,12 @@ export interface AppHeaderProps {
   onCommit: () => void;
   /** Disables the mode switch when visual mode is unavailable for the file type. */
   modeSwitchDisabled?: boolean;
+  /** Called when the book button toggles the project drawer. */
+  onToggleSidebar?: () => void;
+  /** Whether the project drawer is currently open. */
+  sidebarOpen?: boolean;
+  /** Receives the book button element so the drawer can return focus to it. */
+  toggleButtonRef?: RefObject<HTMLButtonElement | null>;
 }
 
 /**
@@ -143,13 +151,25 @@ export function AppHeader({
   onToggleFormattingToolbar,
   onCommit,
   modeSwitchDisabled,
+  onToggleSidebar,
+  sidebarOpen = false,
+  toggleButtonRef,
 }: AppHeaderProps) {
   return (
     <header
       className="flex items-center gap-2 border-b border-gray-200 bg-white px-3 py-2"
       data-testid="app-header"
     >
-      <button type="button" aria-label="OpenDraft" title="OpenDraft" className={ICON_BUTTON}>
+      <button
+        type="button"
+        aria-label="OpenDraft"
+        title="OpenDraft"
+        aria-expanded={sidebarOpen}
+        aria-controls={PROJECT_DRAWER_ID}
+        onClick={onToggleSidebar}
+        ref={toggleButtonRef}
+        className={ICON_BUTTON}
+      >
         <BookOpenText className="h-5 w-5" aria-hidden="true" />
       </button>
       <span
