@@ -30,7 +30,8 @@
     "@opendraft/workspace": "workspace:*",
     "lucide-react": "1.57.0",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "ulid": "^3.0.2"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -43,11 +44,11 @@
     "jsdom": "^25.0.1",
     "remark-parse": "^11.0.0",
     "remark-stringify": "^11.0.0",
-    "yaml": "^2.9.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
     "unified": "^11.0.5",
     "vite": "^6.4.4",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "yaml": "^2.9.1"
   }
 }

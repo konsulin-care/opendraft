@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { MemoryWorkspace } from '@opendraft/workspace';
-import { validateManuscript, validateOpendraft } from '@opendraft/schema';
+import { validateAssembly, validateManuscript, validateOpendraft } from '@opendraft/schema';
 import protocolManifest from '../../../../protocol/protocol.manifest.json' with { type: 'json' };
 import { OPENDRAFT_CONFIG_PATH, scaffoldProject } from './scaffold';
 
@@ -10,6 +10,11 @@ const MANUSCRIPT_DIR = 'manuscripts/my-paper';
 /** List the file names inside the scaffolded manuscript directory. */
 async function manuscriptFiles(ws: MemoryWorkspace): Promise<string[]> {
   return ws.listFiles(MANUSCRIPT_DIR);
+}
+
+/** Extract the starter block path from a scaffolded container article. */
+function starterBlockPath(article: string): string {
+  return /\{\{< include (blocks\/[a-z0-9-]+\.qmd) >\}\}/.exec(article)?.[1] as string;
 }
 
 describe('scaffoldProject — opendraft.yml', () => {
@@ -41,6 +46,56 @@ describe('scaffoldProject — opendraft.yml', () => {
 
     const config = parse((await ws.readFile(OPENDRAFT_CONFIG_PATH)) as string);
     expect(config.manuscripts).toEqual([{ id: 'my-paper', path: 'manuscripts/my-paper' }]);
+  });
+});
+
+describe('scaffoldProject — container article.qmd', () => {
+  it('writes the container article with the include and refs fence', async () => {
+    const ws = new MemoryWorkspace();
+    await scaffoldProject(ws, { manuscriptId: 'my-paper' });
+
+    const article = (await ws.readFile(`${MANUSCRIPT_DIR}/article.qmd`)) as string;
+    expect(/\{\{< include (blocks\/[a-z0-9-]+\.qmd) >\}\}/.test(article)).toBe(true);
+
+    const blockPath = starterBlockPath(article);
+    expect(blockPath).toMatch(/^blocks\/[a-z0-9-]+\.qmd$/);
+    expect(article).toBe(`---
+metadata-files:
+- _author.yml
+- _abstract.yml
+- _frontmatter.yml
+
+{{< include ${blockPath} >}}
+
+::: {#refs}
+:::
+`);
+  });
+
+  it('writes an empty starter block file', async () => {
+    const ws = new MemoryWorkspace();
+    await scaffoldProject(ws, { manuscriptId: 'my-paper' });
+
+    const article = (await ws.readFile(`${MANUSCRIPT_DIR}/article.qmd`)) as string;
+    const block = await ws.readFile(`${MANUSCRIPT_DIR}/${starterBlockPath(article)}`);
+    expect(block).toBe('');
+  });
+
+  it('scaffolds an assembly that passes validateAssembly', async () => {
+    const ws = new MemoryWorkspace();
+    await scaffoldProject(ws, { manuscriptId: 'my-paper' });
+
+    const article = (await ws.readFile(`${MANUSCRIPT_DIR}/article.qmd`)) as string;
+    const blockPath = starterBlockPath(article);
+    const slug = blockPath.replace(/^blocks\//, '').replace(/\.qmd$/, '');
+
+    const result = validateAssembly({
+      assembly: article,
+      blockFiles: { [blockPath]: '' },
+      files: [`${slug}.qmd`],
+    });
+    expect(result.errors).toEqual([]);
+    expect(result.valid).toBe(true);
   });
 });
 

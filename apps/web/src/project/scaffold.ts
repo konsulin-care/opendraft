@@ -1,4 +1,5 @@
 import type { WorkspaceAdapter } from '@opendraft/workspace';
+import { ulid } from 'ulid';
 import { stringify } from 'yaml';
 import protocolManifest from '../../../../protocol/protocol.manifest.json' with { type: 'json' };
 
@@ -11,35 +12,25 @@ export interface ScaffoldOptions {
   manuscriptId: string;
 }
 
-/** Starter article, mirroring templates/manuscript/article.qmd. */
-const ARTICLE_QMD = `---
+/**
+ * Build the container article text for a starter block.
+ *
+ * @param blockPath - Repo-relative block path (`blocks/<slug>.qmd`).
+ * @returns Container article text with a single include and a refs fence.
+ */
+function containerArticle(blockPath: string): string {
+  return `---
 metadata-files:
-  - _author.yml
-  - _abstract.yml
-  - _frontmatter.yml
----
+- _author.yml
+- _abstract.yml
+- _frontmatter.yml
 
-# Introduction
-
-Write your introduction here.
-
-# Methods
-
-Write your methods here.
-
-# Results
-
-Write your results here.
-
-# Discussion
-
-Write your discussion here.
-
-# References
+{{< include ${blockPath} >}}
 
 ::: {#refs}
 :::
 `;
+}
 
 /** Starter author metadata, mirroring templates/manuscript/_author.yml. */
 const AUTHOR_YML = `authors:
@@ -85,8 +76,9 @@ const REFERENCES_BIB = `@article{doe2024,
  * Scaffold a new project workspace.
  *
  * Writes a spec-conformant `opendraft.yml` whose protocol block is copied
- * from protocol/protocol.manifest.json, plus the legacy five-file
- * manuscript layout under `manuscripts/<manuscriptId>/`.
+ * from protocol/protocol.manifest.json, plus the manuscript layout under
+ * `manuscripts/<manuscriptId>/`: a container `article.qmd` that includes
+ * an empty starter block, the metadata files, and the references file.
  *
  * @param ws - Workspace adapter to write into (in-place).
  * @param options - Scaffold options; see {@link ScaffoldOptions}.
@@ -101,7 +93,13 @@ export async function scaffoldProject(ws: WorkspaceAdapter, options: ScaffoldOpt
   };
   await ws.writeFile(OPENDRAFT_CONFIG_PATH, stringify(config));
 
-  await ws.writeFile(`${manuscriptPath}/article.qmd`, ARTICLE_QMD);
+  // Lowercase ULID: the validator (INCLUDE_RE, SLUG_RE) and the pre-commit
+  // assembly flow only accept blocks/[a-z0-9-]+.qmd.
+  const blockPath = `blocks/${ulid().toLowerCase()}.qmd`;
+  // Empty on purpose: Milkdown would render any comment or text in the
+  // visual editor.
+  await ws.writeFile(`${manuscriptPath}/${blockPath}`, '');
+  await ws.writeFile(`${manuscriptPath}/article.qmd`, containerArticle(blockPath));
   await ws.writeFile(`${manuscriptPath}/_author.yml`, AUTHOR_YML);
   await ws.writeFile(`${manuscriptPath}/_abstract.yml`, ABSTRACT_YML);
   await ws.writeFile(`${manuscriptPath}/_frontmatter.yml`, FRONTMATTER_YML);
