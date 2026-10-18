@@ -6,17 +6,17 @@ import { MilkdownProvider } from "@milkdown/react";
 import { EditorView } from "@codemirror/view";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { ManuscriptEditor } from "./components/ManuscriptEditor";
-import type { EditorTestApi } from "./components/ManuscriptEditor";
+import { ManuscriptEditor, type EditorTestApi } from "./components/ManuscriptEditor";
 import { EditorToolbars } from "./components/EditorToolbars";
 import { INACTIVE_STATE } from "./editor-commands/types";
 import type { EditorCommands } from "./editor-commands/types";
 import { readPreferences, writePreferences } from "./preferences";
-import { saveManuscript } from "./persistence";
+import { saveFile } from "./persistence";
 vi.mock("./persistence", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./persistence")>();
-  return { ...actual, saveManuscript: vi.fn().mockResolvedValue(undefined) };
+  return { ...actual, saveFile: vi.fn().mockResolvedValue(undefined) };
 });
+const DOC_PATH = "manuscript.md";
 const manuscriptSource = readFileSync(
   resolve(__dirname, "./components/ManuscriptEditor.tsx"),
   "utf8",
@@ -95,7 +95,7 @@ describe("ManuscriptEditor — block gutter removed", () => {
     const workspace = new MemoryWorkspace();
     let api: EditorTestApi | null = null;
     render(createElement(MilkdownProvider, null, createElement(ManuscriptEditor, {
-      workspace, defaultValue: "# Title\n\nSome text.", onEditorReady: (r) => { api = r; }, mode: "wysiwyg" as const,
+      workspace, defaultValue: "# Title\n\nSome text.", path: DOC_PATH, onEditorReady: (r) => { api = r; }, mode: "wysiwyg" as const,
     })));
     await waitFor(() => expect(api).not.toBeNull(), { timeout: 10000 });
     expect(document.querySelector(".block-gutter-container, .block-gutter-handle")).toBeNull();
@@ -138,7 +138,7 @@ describe("ManuscriptEditor — effective formatting toolbar visibility", () => {
     const workspace = new MemoryWorkspace();
     const props = {
       workspace,
-      defaultValue: "# Title\n\nSome text.",
+      defaultValue: "# Title\n\nSome text.", path: DOC_PATH,
       formattingToolbar: readPreferences().formattingToolbar,
     };
     const result = render(
@@ -184,6 +184,7 @@ function renderSourceEditor(defaultValue: string) {
     createElement(MilkdownProvider, null, createElement(ManuscriptEditor, {
       workspace,
       defaultValue,
+      path: DOC_PATH,
       mode: "source",
     })),
   );
@@ -196,24 +197,24 @@ function renderSourceEditor(defaultValue: string) {
 
 describe("ManuscriptEditor — source editor autosave", () => {
   it("schedules the debounced save with the new source markdown on source edits", async () => {
-    vi.mocked(saveManuscript).mockClear();
+    vi.mocked(saveFile).mockClear();
     const { workspace, view } = renderSourceEditor("# Title\n\nSome text.");
     const newMarkdown = "# Title\n\nEdited in source.";
     act(() => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: newMarkdown } }));
 
     // The save is debounced; after the window it must persist the new text.
-    await waitFor(() => expect(saveManuscript).toHaveBeenCalledWith(workspace, newMarkdown), { timeout: 3000 });
+    await waitFor(() => expect(saveFile).toHaveBeenCalledWith(workspace, DOC_PATH, newMarkdown), { timeout: 3000 });
   }, 20000);
 
   it("saves the pending markdown on flush (unmount) instead of discarding it", async () => {
-    vi.mocked(saveManuscript).mockClear();
+    vi.mocked(saveFile).mockClear();
     const { unmount, workspace, view } = renderSourceEditor("# Title\n\nSome text.");
     const pendingMarkdown = "# Title\n\nEdited right before unmount.";
     act(() => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: pendingMarkdown } }));
 
     // Unmount while the debounce is still pending: flush must save, not drop.
     unmount();
-    await waitFor(() => expect(saveManuscript).toHaveBeenCalledWith(workspace, pendingMarkdown));
+    await waitFor(() => expect(saveFile).toHaveBeenCalledWith(workspace, DOC_PATH, pendingMarkdown));
   }, 20000);
 });
 
@@ -272,12 +273,12 @@ describe("ManuscriptEditor — citekey insertion removed (now in plugin)", () =>
 
 describe("ManuscriptEditor — editor wiring happens exactly once", () => {
   it("wires once across re-renders so one markdown update schedules one autosave", async () => {
-    vi.mocked(saveManuscript).mockClear();
+    vi.mocked(saveFile).mockClear();
     const workspace = new MemoryWorkspace();
     let api: EditorTestApi | null = null;
     const onReady = vi.fn((ready: EditorTestApi) => { api = ready; });
     const app = () => createElement(MilkdownProvider, null, createElement(ManuscriptEditor, {
-      workspace, defaultValue: "# Title\n\nSome text.", onEditorReady: onReady, mode: "wysiwyg" as const,
+      workspace, defaultValue: "# Title\n\nSome text.", path: DOC_PATH, onEditorReady: onReady, mode: "wysiwyg" as const,
     }));
     const result = render(app());
     await waitFor(() => expect(api).not.toBeNull(), { timeout: 10000 });
@@ -290,8 +291,8 @@ describe("ManuscriptEditor — editor wiring happens exactly once", () => {
       await act(async () => {});
       act(() => { vi.advanceTimersByTime(1000); });
       await act(async () => {});
-      expect(saveManuscript).toHaveBeenCalledTimes(1);
-      expect(saveManuscript).toHaveBeenCalledWith(workspace, expect.stringContaining("Edited exactly once."));
+      expect(saveFile).toHaveBeenCalledTimes(1);
+      expect(saveFile).toHaveBeenCalledWith(workspace, DOC_PATH, expect.stringContaining("Edited exactly once."));
     } finally {
       vi.useRealTimers();
     }

@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { MemoryWorkspace } from '@opendraft/workspace';
-import { loadManuscript, saveManuscript, MANUSCRIPT_PATH } from './persistence';
+import { loadFile, saveFile } from './persistence';
 
 /**
- * Manuscript persistence: the whole manuscript lives in a single
- * markdown file at the workspace root. No blocks, no assembly.
+ * Path-aware persistence: every file lives at its own workspace path.
+ * Saving trims trailing whitespace and writes one trailing newline.
  */
 let workspace: MemoryWorkspace;
 
@@ -12,31 +12,38 @@ beforeEach(() => {
   workspace = new MemoryWorkspace();
 });
 
-describe('saveManuscript', () => {
-  it('writes the manuscript as a single markdown file', async () => {
-    await saveManuscript(workspace, '# Intro\n\npara');
-    const raw = await workspace.readFile(MANUSCRIPT_PATH);
+describe('saveFile', () => {
+  it('writes the text to the explicit path', async () => {
+    await saveFile(workspace, 'a/x.qmd', '# Intro\n\npara');
+    const raw = await workspace.readFile('a/x.qmd');
     expect(raw).toBe('# Intro\n\npara\n');
   });
 
   it('trims trailing whitespace and keeps a single trailing newline', async () => {
-    await saveManuscript(workspace, '# Intro\n\npara  \n\n');
-    expect(await workspace.readFile(MANUSCRIPT_PATH)).toBe('# Intro\n\npara\n');
+    await saveFile(workspace, 'a/x.qmd', '# Intro\n\npara  \n\n');
+    expect(await workspace.readFile('a/x.qmd')).toBe('# Intro\n\npara\n');
+  });
+
+  it('keeps files at distinct paths independent', async () => {
+    await saveFile(workspace, 'a/x.qmd', '# X');
+    await saveFile(workspace, 'a/y.qmd', '# Y');
+    expect(await workspace.readFile('a/x.qmd')).toBe('# X\n');
+    expect(await workspace.readFile('a/y.qmd')).toBe('# Y\n');
   });
 });
 
-describe('loadManuscript', () => {
-  it('returns an empty string when no manuscript exists', async () => {
-    expect(await loadManuscript(workspace)).toBe('');
+describe('loadFile', () => {
+  it('returns an empty string when the file does not exist', async () => {
+    expect(await loadFile(workspace, 'a/x.qmd')).toBe('');
   });
 
   it('round-trips the saved markdown', async () => {
-    await saveManuscript(workspace, '# Intro\n\npara');
-    expect(await loadManuscript(workspace)).toBe('# Intro\n\npara\n');
+    await saveFile(workspace, 'a/x.qmd', '# Intro\n\npara');
+    expect(await loadFile(workspace, 'a/x.qmd')).toBe('# Intro\n\npara\n');
   });
 
-  it('reads a hand-authored manuscript file unchanged', async () => {
-    await workspace.writeFile(MANUSCRIPT_PATH, '# Intro\n\nhand written');
-    expect(await loadManuscript(workspace)).toBe('# Intro\n\nhand written');
+  it('reads a hand-authored file unchanged', async () => {
+    await workspace.writeFile('a/x.qmd', '# Intro\n\nhand written');
+    expect(await loadFile(workspace, 'a/x.qmd')).toBe('# Intro\n\nhand written');
   });
 });

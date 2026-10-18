@@ -27,17 +27,11 @@ export function App() {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   const { formattingToolbar, toggleFormattingToolbar } = useToolbarPreference();
 
-  if (loading) {
-    return <div>Loading workspace...</div>;
-  }
+  if (loading) return <div>Loading workspace...</div>;
 
-  if (error) {
-    return <div>Error: {error.message}</div>;
-  }
+  if (error) return <div>Error: {error.message}</div>;
 
-  if (!workspace || markdown === null) {
-    return <div>Empty workspace</div>;
-  }
+  if (!workspace || markdown === null) return <div>Empty workspace</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
@@ -55,6 +49,7 @@ export function App() {
           <ManuscriptEditor
             workspace={workspace}
             defaultValue={markdown}
+            path={MANUSCRIPT_PATH}
             mode={mode}
             onSaveStatusChange={setSaveStatus}
             formattingToolbar={formattingToolbar}

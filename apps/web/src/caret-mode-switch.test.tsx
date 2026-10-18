@@ -18,7 +18,7 @@ const DOC = '# Title\n\nFirst paragraph.\n\nLast paragraph here.\n';
 function mount(workspace: MemoryWorkspace, mode: 'wysiwyg' | 'source', onReady: (api: EditorTestApi) => void) {
   return render(
     <MilkdownProvider>
-      <ManuscriptEditor workspace={workspace} defaultValue={DOC} onEditorReady={onReady} mode={mode} />
+      <ManuscriptEditor workspace={workspace} defaultValue={DOC} path="manuscript.md" onEditorReady={onReady} mode={mode} />
     </MilkdownProvider>,
   );
 }
@@ -27,7 +27,7 @@ function mount(workspace: MemoryWorkspace, mode: 'wysiwyg' | 'source', onReady: 
 function setMode(result: ReturnType<typeof render>, workspace: MemoryWorkspace, mode: 'wysiwyg' | 'source') {
   result.rerender(
     <MilkdownProvider>
-      <ManuscriptEditor workspace={workspace} defaultValue={DOC} mode={mode} />
+      <ManuscriptEditor workspace={workspace} defaultValue={DOC} path="manuscript.md" mode={mode} />
     </MilkdownProvider>,
   );
 }

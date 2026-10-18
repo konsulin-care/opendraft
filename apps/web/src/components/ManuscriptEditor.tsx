@@ -6,7 +6,6 @@ import { editorViewCtx, remarkPluginsCtx, type Editor } from '@milkdown/kit/core
 import { listenerCtx } from '@milkdown/kit/plugin/listener';
 import { $prose, getMarkdown, replaceAll } from '@milkdown/kit/utils';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
-import { saveManuscript } from '../persistence';
 import { PLACEHOLDER_HINT } from '../placeholder';
 import { createCitationPlugin } from '../citation/plugin';
 import type { CitationState } from '../citation/types';
@@ -18,6 +17,7 @@ import { useEditorCommands } from '../hooks/useEditorCommands';
 import { useFocusScrollGuard } from '../hooks/useFocusScrollGuard';
 import { useVirtualKeyboard } from '../hooks/useVirtualKeyboard';
 import { createModeSwitcher, placeVisualCaret, useInitialCaret } from '../caret-mode-switch';
+import { useDebouncedSaver, type DebouncedSaver } from './editor/autosave';
 import type { SourceEditorHandle } from './SourceEditor';
 import type { SaveStatus } from './AppHeader';
 /** Code blocks: light yellow active line/selection matching the Crepe light palette. */
@@ -49,6 +49,8 @@ interface ManuscriptEditorProps {
   workspace: WorkspaceAdapter;
   /** Initial markdown content; must be ready before mount. */
   defaultValue: string;
+  /** Workspace path this editor autosaves to; pending edits flush to the old path on change. */
+  path: string;
   /** Called once the editor instance is ready. */
   onEditorReady?: (api: EditorTestApi) => void;
   /** Editing mode: 'wysiwyg' (default) or 'source' (raw markdown). */
@@ -62,12 +64,12 @@ interface ManuscriptEditorProps {
 interface UseManuscriptStateOptions {
   workspace: WorkspaceAdapter;
   defaultValue: string;
+  path: string;
   mode: 'wysiwyg' | 'source';
   onEditorReady?: (api: EditorTestApi) => void;
   onSaveStatusChange?: (status: SaveStatus) => void;
 }
 
-const SAVE_DEBOUNCE_MS = 800;
 interface CrepeConfigOptions {
   root: HTMLElement;
   defaultValue: string;
@@ -94,46 +96,6 @@ function createTestApi(editor: Editor, syncContent: (mode: 'wysiwyg' | 'source')
   };
 }
 
-/** Debounced autosave writing the single manuscript markdown file. */
-function debouncedSaver(workspace: WorkspaceAdapter, onStatus: (status: SaveStatus) => void) {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  let pending: string | undefined;
-
-  const save = (markdown: string): void => {
-    void saveManuscript(workspace, markdown).then(
-      () => {
-        if (!timer) onStatus('saved');
-      },
-      (error: unknown) => {
-        console.error('manuscript autosave failed:', error);
-        onStatus('error');
-      },
-    );
-  };
-
-  const schedule = (markdown: string): void => {
-    if (timer) clearTimeout(timer);
-    onStatus('saving');
-    pending = markdown;
-    timer = setTimeout(() => {
-      timer = undefined;
-      pending = undefined;
-      save(markdown);
-    }, SAVE_DEBOUNCE_MS);
-  };
-
-  /** Save pending content (if any) synchronously, then clear the timer. */
-  const flush = (): void => {
-    if (timer) clearTimeout(timer);
-    timer = undefined;
-    if (pending !== undefined) {
-      save(pending);
-      pending = undefined;
-    }
-  };
-
-  return { schedule, flush };
-}
 /** Create the Crepe configuration for the editor. */
 function createCrepeConfig(options: CrepeConfigOptions) {
   const { root, defaultValue, placeholderText, workspace, onStateChangeRef } = options;
@@ -167,7 +129,7 @@ function createCrepeConfig(options: CrepeConfigOptions) {
 /** Wire autosave listener and custom plugins into the Crepe editor. */
 function wireEditor(
   editor: Editor,
-  saver: ReturnType<typeof debouncedSaver>,
+  saver: DebouncedSaver,
   syncContent: (mode: 'wysiwyg' | 'source') => void,
   onEditorReady?: (api: EditorTestApi) => void,
 ): void {
@@ -188,7 +150,7 @@ function wireEditor(
 
 /** Hook that wires up the Crepe editor, autosave, and mode sync. */
 function useManuscriptState(options: UseManuscriptStateOptions) {
-  const { workspace, defaultValue, mode, onEditorReady, onSaveStatusChange } = options;
+  const { workspace, defaultValue, path, mode, onEditorReady, onSaveStatusChange } = options;
   const [sourceMarkdown, setSourceMarkdown] = useState(defaultValue);
   const sourceEditorRef = useRef<SourceEditorHandle | null>(null);
   const editorRef = useRef<Editor | null>(null);
@@ -197,22 +159,23 @@ function useManuscriptState(options: UseManuscriptStateOptions) {
   const onStateChangeRef = useRef<(state: CitationState) => void>(() => {});
   const syncContent = useMemo(() => createModeSwitcher(editorRef, sourceEditorRef, prevModeRef, setSourceMarkdown), []);
 
+  // When the path prop changes, write any pending debounced save to the OLD
+  // path before the new file's content loads. Declared before useEditor so
+  // the flush effect runs ahead of the editor-recreation effects.
+  const saver = useDebouncedSaver(workspace, path, onSaveStatusChange);
+
   const { loading, get } = useEditor(
     (root) => createCrepeConfig({ root, defaultValue, placeholderText: PLACEHOLDER_HINT, workspace, onStateChangeRef }),
     [defaultValue, workspace],
   );
 
-  const statusRef = useRef(onSaveStatusChange);
-  statusRef.current = onSaveStatusChange;
-  const saverRef = useRef<ReturnType<typeof debouncedSaver> | null>(null);
-  if (!saverRef.current) saverRef.current = debouncedSaver(workspace, (s) => statusRef.current?.(s));
   const wiredEditorRef = useRef<Editor | null>(null);
 
   // Source edits schedule the same debounced autosave as visual edits.
   const handleSourceChange = useCallback((md: string) => {
     setSourceMarkdown(md);
-    saverRef.current?.schedule(md);
-  }, []);
+    saver.schedule(md);
+  }, [saver]);
 
   useEffect(() => {
     syncContent(mode);
@@ -226,26 +189,26 @@ function useManuscriptState(options: UseManuscriptStateOptions) {
     if (!editor || editor === wiredEditorRef.current) return;
     wiredEditorRef.current = editor;
     editorRef.current = editor;
-    wireEditor(editor, saverRef.current!, syncContent, onEditorReady);
-  }, [loading, onEditorReady, workspace, syncContent]);
+    wireEditor(editor, saver, syncContent, onEditorReady);
+  }, [loading, onEditorReady, workspace, syncContent, saver]);
 
   useInitialCaret(loading, get);
 
   useFocusScrollGuard(scrollContainerRef);
 
-  useEffect(() => () => saverRef.current?.flush(), []);
-
   return { sourceMarkdown, handleSourceChange, sourceEditorRef, scrollContainerRef, editorRef };
 }
 
 /**
- * Continuous whole-manuscript editor: one Milkdown/Crepe surface over
- * plain markdown, autosaved to a single workspace file.
+ * Continuous editor over one workspace file: one Milkdown/Crepe surface
+ * over plain markdown, autosaved to the `path` prop.
+ * Pending debounced saves flush to the old path before switching files.
  * Supports toggling between WYSIWYG and raw source editing.
  */
 export function ManuscriptEditor({
   workspace,
   defaultValue,
+  path,
   onEditorReady,
   mode = 'wysiwyg',
   onSaveStatusChange,
@@ -254,7 +217,7 @@ export function ManuscriptEditor({
   const editorRef = useRef<Editor | null>(null);
 
   const { sourceMarkdown, handleSourceChange, sourceEditorRef, scrollContainerRef, editorRef: hookEditorRef } =
-    useManuscriptState({ workspace, defaultValue, mode, onEditorReady, onSaveStatusChange });
+    useManuscriptState({ workspace, defaultValue, path, mode, onEditorReady, onSaveStatusChange });
 
   // Update editorRef when hookEditorRef.current changes
   useEffect(() => {

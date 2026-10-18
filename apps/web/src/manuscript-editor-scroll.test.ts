@@ -15,7 +15,7 @@ async function mountScrollSurface(): Promise<HTMLDivElement> {
   const workspace = new MemoryWorkspace();
   let api: EditorTestApi | null = null;
   render(createElement(MilkdownProvider, null, createElement(ManuscriptEditor, {
-    workspace, defaultValue: "# Title\n\nSome text.", onEditorReady: (r) => { api = r; }, mode: "wysiwyg" as const,
+    workspace, defaultValue: "# Title\n\nSome text.", path: "manuscript.md", onEditorReady: (r) => { api = r; }, mode: "wysiwyg" as const,
   })));
   await waitFor(() => expect(api).not.toBeNull(), { timeout: 10000 });
   const container = document.querySelector('[data-testid="manuscript-editor"] > div') as HTMLDivElement;
