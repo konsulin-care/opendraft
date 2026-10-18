@@ -19,6 +19,7 @@ import { useVirtualKeyboard } from '../hooks/useVirtualKeyboard';
 import { createModeSwitcher, placeVisualCaret, useInitialCaret } from '../caret-mode-switch';
 import { getFileCapability } from '../project/file-capability';
 import { useDebouncedSaver, type DebouncedSaver } from './editor/autosave';
+import { OpendraftConfigWarning } from './OpendraftConfigWarning';
 import type { SourceEditorHandle } from './SourceEditor';
 import type { SaveStatus } from './AppHeader';
 /** Code blocks: light yellow active line/selection matching the Crepe light palette. */
@@ -228,14 +229,25 @@ function useManuscriptState(options: UseManuscriptStateOptions) {
 }
 
 /**
+ * File-type gate: rich files honor the preferred mode, other text files
+ * are forced to source mode, and binary content never reaches an editor.
+ *
+ * @param path - Workspace path of the file being edited.
+ * @param defaultValue - Current file content.
+ * @param mode - User-preferred editing mode.
+ * @returns The file capability, editor-safe content, and effective mode.
+ */
+function resolveEditorGate(path: string, defaultValue: string, mode: 'wysiwyg' | 'source') {
+  const capability = getFileCapability(path, defaultValue);
+  const content = capability === 'binary' ? '' : defaultValue;
+  return { capability, content, editorMode: capability === 'rich' ? mode : 'source' };
+}
+
+/**
  * Continuous editor over one workspace file: one Milkdown/Crepe surface
  * over plain markdown, autosaved to the `path` prop.
  * Pending debounced saves flush to the old path before switching files.
  * Supports toggling between WYSIWYG and raw source editing.
- *
- * File-type gate: non-markdown files are forced to source mode without
- * touching the user's persisted preference, and binary files are never
- * passed to either editor.
  */
 export function ManuscriptEditor({
   workspace,
@@ -248,11 +260,7 @@ export function ManuscriptEditor({
 }: ManuscriptEditorProps) {
   const editorRef = useRef<Editor | null>(null);
 
-  // Capability gate: rich files honor the preferred mode, other text files
-  // are forced to source mode, and binary content never reaches an editor.
-  const capability = getFileCapability(path, defaultValue);
-  const content = capability === 'binary' ? '' : defaultValue;
-  const editorMode: 'wysiwyg' | 'source' = capability === 'rich' ? mode : 'source';
+  const { capability, content, editorMode } = resolveEditorGate(path, defaultValue, mode);
 
   const { sourceMarkdown, handleSourceChange, sourceEditorRef, scrollContainerRef, editorRef: hookEditorRef } =
     useManuscriptState({ workspace, defaultValue: content, path, mode: editorMode, onEditorReady, onSaveStatusChange });
@@ -274,6 +282,7 @@ export function ManuscriptEditor({
         open={keyboardOpen}
         bottomOffset={bottomOffset}
       />
+      <OpendraftConfigWarning path={path} content={sourceMarkdown} />
       <div style={{ flex: 1, minHeight: 0 }}>
         <EditorSurface
           mode={editorMode}
