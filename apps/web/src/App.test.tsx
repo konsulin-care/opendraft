@@ -27,6 +27,10 @@ import {
 // persisted editor mode (or toolbar preference) does not leak between tests.
 // The project registry is also reset so each test boots the app against an
 // empty IndexedDB and triggers the auto-created starter project.
+//
+// The default file is now the scaffolded starter block
+// (manuscripts/<id>/blocks/<lowercase-ulid>.qmd), not article.qmd.
+const BLOCK_TITLE = /^[a-z0-9]+\.qmd$/;
 beforeEach(async () => {
   localStorage.clear();
   for (const record of await projectRegistry.list()) {
@@ -52,7 +56,7 @@ describe('App', () => {
 
   it('boots into an auto-created scaffolded project and reopens the last file', async () => {
     const { unmount } = render(<App />);
-    await waitFor(() => expect(screen.getByTitle('article.qmd')).toBeDefined(), { timeout: 10000 });
+    await waitFor(() => expect(screen.getByTitle(BLOCK_TITLE)).toBeDefined(), { timeout: 10000 });
 
     // One registry record, and its od-ws-<id> database holds the scaffold.
     const records = await projectRegistry.list();
@@ -85,7 +89,8 @@ describe('App header', () => {
     const logo = screen.getByRole('button', { name: 'OpenDraft' });
     expect(logo.getAttribute('title')).toBe('OpenDraft');
     expect(screen.queryByText('OpenDraft')).toBeNull();
-    expect(screen.getByTitle('article.qmd').textContent).toBe('article.qmd');
+    const fileName = screen.getByTitle(BLOCK_TITLE);
+    expect(fileName.textContent).toBe(fileName.getAttribute('title'));
   });
 
   it('shows a single mode toggle naming the target mode', async () => {

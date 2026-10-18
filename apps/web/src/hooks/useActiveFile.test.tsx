@@ -8,11 +8,11 @@ import { scaffoldProject } from '../project/scaffold';
 
 // @vitest-environment jsdom
 
-const ARTICLE_PATH = 'manuscripts/p/article.qmd';
 const BIB_PATH = 'manuscripts/p/references.bib';
 
 let projectId: string;
 let ws: IndexedDBWorkspace;
+let starterBlockPath: string;
 
 /** Remove every registry project and clear localStorage. */
 async function resetRegistry(): Promise<void> {
@@ -28,6 +28,8 @@ beforeEach(async () => {
   projectId = record.id;
   ws = await workspaceManager.get(projectId);
   await scaffoldProject(ws, { manuscriptId: 'p' });
+  const blockNames = await ws.listFiles('manuscripts/p/blocks');
+  starterBlockPath = `manuscripts/p/blocks/${blockNames[0]}`;
 });
 
 afterEach(async () => {
@@ -36,15 +38,15 @@ afterEach(async () => {
 });
 
 describe('useActiveFile', () => {
-  it('resolves the manuscript article when no last path is stored', async () => {
+  it('resolves the starter block when no last path is stored', async () => {
     const { result, unmount } = renderHook(() => useActiveFile(ws, projectId));
-    await waitFor(() => expect(result.current.activePath).toBe(ARTICLE_PATH));
+    await waitFor(() => expect(result.current.activePath).toBe(starterBlockPath));
     unmount();
   });
 
   it('openFile activates a path and persists it as the project last path', async () => {
     const { result, unmount } = renderHook(() => useActiveFile(ws, projectId));
-    await waitFor(() => expect(result.current.activePath).toBe(ARTICLE_PATH));
+    await waitFor(() => expect(result.current.activePath).toBe(starterBlockPath));
 
     await act(async () => {
       await result.current.openFile(BIB_PATH);
@@ -57,7 +59,7 @@ describe('useActiveFile', () => {
 
   it('reopens the stored last path after a remount', async () => {
     const first = renderHook(() => useActiveFile(ws, projectId));
-    await waitFor(() => expect(first.result.current.activePath).toBe(ARTICLE_PATH));
+    await waitFor(() => expect(first.result.current.activePath).toBe(starterBlockPath));
     await act(async () => {
       await first.result.current.openFile(BIB_PATH);
     });
@@ -68,10 +70,10 @@ describe('useActiveFile', () => {
     second.unmount();
   });
 
-  it('falls back to the article when the stored last path no longer exists', async () => {
+  it('falls back to the starter block when the stored last path no longer exists', async () => {
     await projectRegistry.setLastPath(projectId, 'manuscripts/p/missing.qmd');
     const { result, unmount } = renderHook(() => useActiveFile(ws, projectId));
-    await waitFor(() => expect(result.current.activePath).toBe(ARTICLE_PATH));
+    await waitFor(() => expect(result.current.activePath).toBe(starterBlockPath));
     unmount();
   });
 });

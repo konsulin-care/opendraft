@@ -12,9 +12,11 @@ const MARKDOWN_EXTENSIONS = ['.qmd', '.md'];
  *
  * Resolution order:
  * 1. `lastPath`, if that file exists in the workspace;
- * 2. `<manuscripts[0].path>/article.qmd`, parsed from `opendraft.yml`;
- * 3. the first `.qmd`/`.md` file from `listAll()`;
- * 4. `null` if none of the above applies.
+ * 2. the first sorted `blocks/*.qmd` under `<manuscripts[0].path>/`,
+ *    parsed from `opendraft.yml` (ULID names sort chronologically);
+ * 3. `<manuscripts[0].path>/article.qmd`, when no block exists;
+ * 4. the first `.qmd`/`.md` file from `listAll()`;
+ * 5. `null` if none of the above applies.
  *
  * @param ws - Workspace adapter to inspect.
  * @param lastPath - Previously opened path, or null when none is stored.
@@ -37,11 +39,14 @@ export async function resolveDefaultFile(ws: WorkspaceAdapter, lastPath: string 
 }
 
 /**
- * Resolve the default file from `opendraft.yml`.
+ * Resolve the default file inside the first configured manuscript.
  *
- * @param ws - Workspace adapter to read the config from.
- * @returns `<manuscripts[0].path>/article.qmd`, or null when the config is
- * missing, unparseable, or declares no manuscripts.
+ * Prefers the first sorted `blocks/*.qmd` file; falls back to the
+ * container `article.qmd` only when no block exists.
+ *
+ * @param ws - Workspace adapter to read the config from and list blocks.
+ * @returns The first block path, `<manuscriptPath>/article.qmd`, or null
+ * when the config is missing, unparseable, or declares no manuscripts.
  */
 async function resolveFromConfig(ws: WorkspaceAdapter): Promise<string | null> {
   const raw = await ws.readFile(OPENDRAFT_CONFIG_PATH);
@@ -66,7 +71,27 @@ async function resolveFromConfig(ws: WorkspaceAdapter): Promise<string | null> {
     return null;
   }
 
+  const block = await resolveFirstBlock(ws, first.path);
+  if (block) {
+    return block;
+  }
+
   return `${first.path}/article.qmd`;
+}
+
+/**
+ * Find the first sorted `blocks/*.qmd` file under a manuscript.
+ *
+ * @param ws - Workspace adapter to list the blocks directory from.
+ * @param manuscriptPath - Repo-relative path of the manuscript.
+ * @returns The first block path by sorted name, or null when no block exists.
+ */
+async function resolveFirstBlock(ws: WorkspaceAdapter, manuscriptPath: string): Promise<string | null> {
+  const names = await ws.listFiles(`${manuscriptPath}/blocks`);
+  const first = names
+    .filter((name) => name.toLowerCase().endsWith('.qmd'))
+    .sort()[0];
+  return first ? `${manuscriptPath}/blocks/${first}` : null;
 }
 
 /**
