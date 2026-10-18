@@ -8,6 +8,7 @@ import type { EditorMode } from './components/ModeSwitch';
 import { CommitDialog } from './components/CommitDialog';
 import { ProjectDrawer, useDrawerState } from './components/project-drawer/ProjectDrawer';
 import { ProjectSwitcher } from './components/project-drawer/ProjectSwitcher';
+import { FileTree } from './components/project-drawer/FileTree';
 import { useProjects } from './hooks/useProjects';
 import { useActiveFile } from './hooks/useActiveFile';
 import { useToolbarPreference } from './hooks/useToolbarPreference';
@@ -66,6 +67,35 @@ function useActiveFileContent(
 }
 
 /**
+ * List every file path in the active project's workspace.
+ *
+ * @param workspace - Workspace of the active project, or null before boot.
+ * @returns Repo-relative paths of all workspace files, empty while loading.
+ */
+function useWorkspacePaths(workspace: WorkspaceAdapter | null): string[] {
+  const [paths, setPaths] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!workspace) {
+      setPaths([]);
+      return undefined;
+    }
+    let cancelled = false;
+    workspace.listAll().then(
+      (list) => {
+        if (!cancelled) setPaths(list);
+      },
+      (err: unknown) => console.error('workspace file listing failed:', err),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [workspace]);
+
+  return paths;
+}
+
+/**
  * Always-present editor region. Renders the Milkdown editor once the active
  * file's content has loaded; `file` is null while loading or stale.
  *
@@ -107,20 +137,8 @@ function EditorArea({
   );
 }
 
-/**
- * Overlay project drawer with the project switcher pinned in its header.
- *
- * @param props - Projects, active project, registry actions, drawer state.
- */
-function DrawerSection({
-  projects,
-  active,
-  switchTo,
-  create,
-  rename,
-  remove,
-  drawer,
-}: {
+/** Props for the overlay project drawer section. */
+interface DrawerSectionProps {
   /** All registered projects. */
   projects: ReturnType<typeof useProjects>['projects'];
   /** The active project, or null when none. */
@@ -135,7 +153,34 @@ function DrawerSection({
   remove: (id: string) => void;
   /** Drawer open state and toggle wiring. */
   drawer: ReturnType<typeof useDrawerState>;
-}) {
+  /** Workspace of the active project. */
+  workspace: WorkspaceAdapter;
+  /** Repo-relative path of the active file, or null. */
+  activePath: string | null;
+  /** Open a file in the editor. */
+  onOpen: (path: string) => void;
+}
+
+/**
+ * Overlay project drawer with the project switcher pinned in its header
+ * and the active project's file tree as its body.
+ *
+ * @param props - Projects, active project, registry actions, drawer state,
+ *   workspace, active file path and the open-file handler.
+ */
+function DrawerSection({
+  projects,
+  active,
+  switchTo,
+  create,
+  rename,
+  remove,
+  drawer,
+  workspace,
+  activePath,
+  onOpen,
+}: DrawerSectionProps) {
+  const paths = useWorkspacePaths(workspace);
   return (
     <ProjectDrawer
       open={drawer.open}
@@ -152,7 +197,14 @@ function DrawerSection({
           remove={remove}
         />
       }
-    />
+    >
+      <FileTree
+        paths={paths}
+        workspace={workspace}
+        activePath={activePath}
+        onOpen={onOpen}
+      />
+    </ProjectDrawer>
   );
 }
 
@@ -192,7 +244,7 @@ export function App() {
   const {
     workspace, projects, active, loading, error, switchTo, create, rename, remove,
   } = useProjects();
-  const { activePath } = useActiveFile(workspace, active?.id ?? null);
+  const { activePath, openFile } = useActiveFile(workspace, active?.id ?? null);
   const { mode, setMode } = useEditorMode();
   const { showCommitDialog, setShowCommitDialog } = useCommitDialog();
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
@@ -228,6 +280,7 @@ export function App() {
       <DrawerSection
         projects={projects} active={active} switchTo={switchTo}
         create={create} rename={rename} remove={remove} drawer={drawer}
+        workspace={workspace} activePath={activePath} onOpen={openFile}
       />
       <CommitSection
         open={showCommitDialog}

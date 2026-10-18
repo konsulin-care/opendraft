@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, renderHook, act, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, renderHook, act, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { App } from './App';
 import { projectRegistry } from './hooks/useProjects';
 import { workspaceManager } from '@opendraft/workspace';
@@ -80,6 +80,54 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByTitle('references.bib')).toBeDefined(), { timeout: 10000 });
   });
 
+});
+
+describe('App project drawer', () => {
+  it('renders the project selector and a file tree whose files open on click', async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
+
+    // Open the drawer via the book icon.
+    fireEvent.click(screen.getByRole('button', { name: 'OpenDraft' }));
+    const drawer = screen.getByTestId('project-drawer');
+
+    // Pinned header: the project selector.
+    expect(within(drawer).getByRole('button', { name: 'Untitled project' })).toBeDefined();
+
+    // Body: a treeitem for every workspace file, ULID block names as-is.
+    const records = await projectRegistry.list();
+    const ws = await workspaceManager.get(records[0].id);
+    let paths: string[];
+    try {
+      paths = await ws.listAll();
+    } finally {
+      workspaceManager.release(records[0].id);
+    }
+    expect(paths.length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(within(drawer).getAllByRole('treeitem').length).toBeGreaterThan(1);
+    });
+    for (const path of paths) {
+      const name = path.split('/').pop() as string;
+      expect(within(drawer).getByRole('treeitem', { name })).toBeDefined();
+    }
+    const blockName = paths
+      .map((p) => p.split('/').pop() as string)
+      .find((n) => /^[a-z0-9]{26}\.qmd$/.test(n));
+    expect(blockName).toBeDefined();
+    expect(
+      within(drawer).getByRole('treeitem', { name: blockName as string }),
+    ).toBeDefined();
+
+    // Clicking a file opens its path.
+    fireEvent.click(within(drawer).getByRole('treeitem', { name: 'article.qmd' }));
+    await waitFor(() => expect(screen.getByTitle('article.qmd')).toBeDefined());
+    await waitFor(async () => {
+      expect(await projectRegistry.getLastPath(records[0].id)).toBe(
+        'manuscripts/untitled-project/article.qmd',
+      );
+    });
+  });
 });
 
 describe('App header', () => {
