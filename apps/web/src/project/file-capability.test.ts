@@ -8,6 +8,17 @@ describe('getFileCapability', () => {
     expect(getFileCapability('B.QMD', 'x')).toBe('rich');
   });
 
+  it('classifies the container article.qmd at the manuscript root as text', () => {
+    const container = '---\nmetadata-files:\n- _author.yml\n\n{{< include blocks/01hx.qmd >}}\n::: {#refs}\n:::\n';
+    expect(getFileCapability('manuscripts/2024-01/article.qmd', container)).toBe('text');
+    expect(getFileCapability('article.qmd', container)).toBe('text');
+  });
+
+  it('keeps block files under blocks/ as rich', () => {
+    expect(getFileCapability('manuscripts/2024-01/blocks/01hx00000000.qmd', '# Heading\n')).toBe('rich');
+    expect(getFileCapability('manuscripts/2024-01/blocks/01hx00000000.qmd', '')).toBe('rich');
+  });
+
   it('classifies other files with normal text as text', () => {
     expect(getFileCapability('refs.bib', 'normal text')).toBe('text');
     expect(getFileCapability('opendraft.yml', 'manuscripts: []')).toBe('text');

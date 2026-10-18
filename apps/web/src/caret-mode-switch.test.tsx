@@ -67,7 +67,7 @@ async function expectVisualRestored(getApi: () => EditorTestApi | null) {
   expect(readPreferences().editorMode).toBe('wysiwyg');
 }
 
-/** Re-render the gate shell with a markdown file and wait for the editor. */
+/** Re-render the gate shell with a rich block file and wait for the editor. */
 async function openMarkdown(
   rerender: (ui: React.ReactElement) => void,
   workspace: MemoryWorkspace,
@@ -76,7 +76,7 @@ async function openMarkdown(
   rerender(
     <GatedShell
       workspace={workspace}
-      path="manuscripts/p/article.qmd"
+      path="manuscripts/p/blocks/01hx00000000.qmd"
       content="# Article\n\nBody text.\n"
       onReady={onReady}
     />,
