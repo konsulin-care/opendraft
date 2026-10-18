@@ -2,6 +2,8 @@ import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, renderHook, act, screen, waitFor, fireEvent } from '@testing-library/react';
 import { App } from './App';
+import { projectRegistry } from './hooks/useProjects';
+import { workspaceManager } from '@opendraft/workspace';
 import { useEditorMode } from './hooks/useEditorMode';
 import {
   PREFERENCES_STORAGE_KEY,
@@ -23,12 +25,20 @@ import {
 
 // jsdom localStorage is shared across tests in this file; clear it so a
 // persisted editor mode (or toolbar preference) does not leak between tests.
-beforeEach(() => {
+// The project registry is also reset so each test boots the app against an
+// empty IndexedDB and triggers the auto-created starter project.
+beforeEach(async () => {
   localStorage.clear();
+  for (const record of await projectRegistry.list()) {
+    await projectRegistry.remove(record.id);
+  }
 });
 
-afterEach(() => {
+afterEach(async () => {
   localStorage.clear();
+  for (const record of await projectRegistry.list()) {
+    await projectRegistry.remove(record.id);
+  }
 });
 
 describe('App', () => {
@@ -40,6 +50,32 @@ describe('App', () => {
     );
   });
 
+  it('boots into an auto-created scaffolded project and reopens the last file', async () => {
+    const { unmount } = render(<App />);
+    await waitFor(() => expect(screen.getByTitle('article.qmd')).toBeDefined(), { timeout: 10000 });
+
+    // One registry record, and its od-ws-<id> database holds the scaffold.
+    const records = await projectRegistry.list();
+    expect(records).toHaveLength(1);
+    expect(records[0].name).toBe('Untitled project');
+    const dbNames = (await indexedDB.databases()).map((db) => db.name);
+    expect(dbNames).toContain('od-registry');
+    expect(dbNames).toContain(`od-ws-${records[0].id}`);
+    const ws = await workspaceManager.get(records[0].id);
+    try {
+      expect(await ws.readFile('opendraft.yml')).not.toBeNull();
+      expect(await ws.readFile('manuscripts/untitled-project/article.qmd')).not.toBeNull();
+    } finally {
+      workspaceManager.release(records[0].id);
+    }
+
+    // Opening another file is remembered; a remount reopens it.
+    await projectRegistry.setLastPath(records[0].id, 'manuscripts/untitled-project/references.bib');
+    unmount();
+    render(<App />);
+    await waitFor(() => expect(screen.getByTitle('references.bib')).toBeDefined(), { timeout: 10000 });
+  });
+
 });
 
 describe('App header', () => {
@@ -49,7 +85,7 @@ describe('App header', () => {
     const logo = screen.getByRole('button', { name: 'OpenDraft' });
     expect(logo.getAttribute('title')).toBe('OpenDraft');
     expect(screen.queryByText('OpenDraft')).toBeNull();
-    expect(screen.getByTitle('manuscript.md').textContent).toBe('manuscript.md');
+    expect(screen.getByTitle('article.qmd').textContent).toBe('article.qmd');
   });
 
   it('shows a single mode toggle naming the target mode', async () => {
