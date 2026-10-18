@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { MemoryWorkspace } from '@opendraft/workspace';
@@ -96,6 +98,24 @@ metadata-files:
     });
     expect(result.errors).toEqual([]);
     expect(result.valid).toBe(true);
+  });
+});
+
+describe('templates/manuscript/article.qmd', () => {
+  it('mirrors the scaffolded container text', async () => {
+    const template = readFileSync(
+      resolve(__dirname, '../../../../templates/manuscript/article.qmd'),
+      'utf8',
+    );
+    const templateBlock = /\{\{< include (blocks\/[a-z0-9-]+\.qmd) >\}\}/.exec(template)?.[1] as string;
+    expect(templateBlock).toMatch(/^blocks\/[a-z0-9-]+\.qmd$/);
+
+    const ws = new MemoryWorkspace();
+    await scaffoldProject(ws, { manuscriptId: 'my-paper' });
+    const article = (await ws.readFile(`${MANUSCRIPT_DIR}/article.qmd`)) as string;
+    const scaffoldBlock = starterBlockPath(article);
+
+    expect(template.replace(templateBlock, scaffoldBlock)).toBe(article);
   });
 });
 
