@@ -7,6 +7,7 @@ import { ManuscriptEditor } from './components/ManuscriptEditor';
 import type { EditorMode } from './components/ModeSwitch';
 import { CommitDialog } from './components/CommitDialog';
 import { ProjectDrawer, useDrawerState } from './components/project-drawer/ProjectDrawer';
+import { ProjectSwitcher } from './components/project-drawer/ProjectSwitcher';
 import { useProjects } from './hooks/useProjects';
 import { useActiveFile } from './hooks/useActiveFile';
 import { useToolbarPreference } from './hooks/useToolbarPreference';
@@ -107,12 +108,90 @@ function EditorArea({
 }
 
 /**
+ * Overlay project drawer with the project switcher pinned in its header.
+ *
+ * @param props - Projects, active project, registry actions, drawer state.
+ */
+function DrawerSection({
+  projects,
+  active,
+  switchTo,
+  create,
+  rename,
+  remove,
+  drawer,
+}: {
+  /** All registered projects. */
+  projects: ReturnType<typeof useProjects>['projects'];
+  /** The active project, or null when none. */
+  active: ReturnType<typeof useProjects>['active'];
+  /** Make the given project active. */
+  switchTo: (id: string) => void;
+  /** Register and scaffold a new project. */
+  create: (name: string, manuscriptId: string) => void;
+  /** Rename a project. */
+  rename: (id: string, name: string) => void;
+  /** Remove a project. */
+  remove: (id: string) => void;
+  /** Drawer open state and toggle wiring. */
+  drawer: ReturnType<typeof useDrawerState>;
+}) {
+  return (
+    <ProjectDrawer
+      open={drawer.open}
+      onClose={drawer.close}
+      toggleRef={drawer.toggleRef}
+      title={active?.name}
+      header={
+        <ProjectSwitcher
+          projects={projects}
+          active={active}
+          switchTo={switchTo}
+          create={create}
+          rename={rename}
+          remove={remove}
+        />
+      }
+    />
+  );
+}
+
+/**
+ * Commit dialog, shown after the header's Commit action.
+ *
+ * @param props - Dialog visibility, close handler, and the workspace to commit.
+ */
+function CommitSection({
+  open,
+  onClose,
+  workspace,
+}: {
+  /** Whether the dialog is visible. */
+  open: boolean;
+  /** Close the dialog. */
+  onClose: () => void;
+  /** Workspace committed to. */
+  workspace: WorkspaceAdapter;
+}) {
+  return (
+    <CommitDialog
+      isOpen={open}
+      onClose={onClose}
+      onCommit={(message) => console.log('Committed:', message)}
+      workspace={workspace}
+    />
+  );
+}
+
+/**
  * App shell: icon header with commit action plus the single continuous
  * editor for the active project file. Boots into the auto-created
  * "Untitled project" and opens the project's default file.
  */
 export function App() {
-  const { workspace, active, loading, error } = useProjects();
+  const {
+    workspace, projects, active, loading, error, switchTo, create, rename, remove,
+  } = useProjects();
   const { activePath } = useActiveFile(workspace, active?.id ?? null);
   const { mode, setMode } = useEditorMode();
   const { showCommitDialog, setShowCommitDialog } = useCommitDialog();
@@ -146,16 +225,13 @@ export function App() {
         onSaveStatusChange={setSaveStatus}
         formattingToolbar={formattingToolbar}
       />
-      <ProjectDrawer
-        open={drawer.open}
-        onClose={drawer.close}
-        toggleRef={drawer.toggleRef}
-        title={active?.name}
+      <DrawerSection
+        projects={projects} active={active} switchTo={switchTo}
+        create={create} rename={rename} remove={remove} drawer={drawer}
       />
-      <CommitDialog
-        isOpen={showCommitDialog}
+      <CommitSection
+        open={showCommitDialog}
         onClose={() => setShowCommitDialog(false)}
-        onCommit={(message) => console.log('Committed:', message)}
         workspace={workspace}
       />
     </div>

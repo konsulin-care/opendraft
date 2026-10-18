@@ -55,6 +55,18 @@ export function readDrawerOpenState(): boolean {
   return localStorage.getItem(DRAWER_OPEN_STORAGE_KEY) === 'true';
 }
 
+/** Drawer open state exposed to the app shell. */
+export interface DrawerState {
+  /** Whether the drawer is currently open. */
+  open: boolean;
+  /** Toggle the drawer. */
+  toggle: () => void;
+  /** Close the drawer. */
+  close: () => void;
+  /** Ref of the book button that regains focus on close. */
+  toggleRef: RefObject<HTMLButtonElement | null>;
+}
+
 /**
  * Drawer open state for the app shell: initialises from the persisted value
  * and exposes toggle/close handlers plus the book-button ref used to return
@@ -62,12 +74,7 @@ export function readDrawerOpenState(): boolean {
  *
  * @returns The drawer open state and its wiring.
  */
-export function useDrawerState(): {
-  open: boolean;
-  toggle: () => void;
-  close: () => void;
-  toggleRef: RefObject<HTMLButtonElement | null>;
-} {
+export function useDrawerState(): DrawerState {
   const [open, setOpen] = useState(readDrawerOpenState);
   const toggleRef = useRef<HTMLButtonElement>(null);
   return {
@@ -158,6 +165,8 @@ export interface ProjectDrawerProps {
   toggleRef?: RefObject<HTMLElement | null>;
   /** Project name shown in the pinned drawer header. */
   title?: string;
+  /** Custom pinned-header content (e.g. {@link ProjectSwitcher}); replaces the title. */
+  header?: ReactNode;
   /** Drawer body, typically the file tree; only this region scrolls. */
   children?: ReactNode;
 }
@@ -187,18 +196,15 @@ function DrawerPanel({
   compact,
   panelRef,
   title,
+  header,
   onClose,
   children,
 }: {
-  /** Whether the drawer is the full-width sheet used below 640px. */
   compact: boolean;
-  /** Ref forwarded to the panel so focus can move into it. */
   panelRef: RefObject<HTMLDivElement | null>;
-  /** Project name shown in the pinned header. */
   title?: string;
-  /** Close handler for the compact close button. */
+  header?: ReactNode;
   onClose: () => void;
-  /** Scrollable drawer body. */
   children?: ReactNode;
 }) {
   return (
@@ -214,7 +220,11 @@ function DrawerPanel({
       }`}
     >
       <header className="flex items-center justify-between gap-2 border-b border-gray-200 px-3 py-2">
-        <span className="min-w-0 truncate text-sm font-medium text-gray-900">{title ?? 'Project'}</span>
+        {header ?? (
+          <span className="min-w-0 truncate text-sm font-medium text-gray-900">
+            {title ?? 'Project'}
+          </span>
+        )}
         {compact && (
           <button
             type="button"
@@ -244,6 +254,7 @@ export function ProjectDrawer({
   onClose,
   toggleRef,
   title,
+  header,
   children,
 }: ProjectDrawerProps) {
   const width = useViewportWidth();
@@ -268,7 +279,7 @@ export function ProjectDrawer({
   return (
     <ProjectDrawerContext.Provider value={context}>
       {width >= BACKDROP_MIN_WIDTH && <DrawerBackdrop dimmed={compact} onClose={onClose} />}
-      <DrawerPanel compact={compact} panelRef={panelRef} title={title} onClose={onClose}>
+      <DrawerPanel compact={compact} panelRef={panelRef} title={title} header={header} onClose={onClose}>
         {children}
       </DrawerPanel>
     </ProjectDrawerContext.Provider>
