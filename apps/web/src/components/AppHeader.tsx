@@ -62,6 +62,8 @@ interface HeaderActionsProps {
   onToggleFormattingToolbar: () => void;
   /** Called when the Commit action is activated. */
   onCommit: () => void;
+  /** Disables the mode switch when visual mode is unavailable for the file. */
+  modeSwitchDisabled?: boolean;
 }
 
 /**
@@ -76,10 +78,11 @@ function HeaderActions({
   formattingToolbar,
   onToggleFormattingToolbar,
   onCommit,
+  modeSwitchDisabled = false,
 }: HeaderActionsProps) {
   return (
     <div className="flex items-center gap-1">
-      <ModeSwitch mode={mode} onSelectMode={onSelectMode} />
+      <ModeSwitch mode={mode} onSelectMode={onSelectMode} disabled={modeSwitchDisabled} />
       <button
         type="button"
         aria-label="Formatting toolbar"
@@ -121,6 +124,8 @@ export interface AppHeaderProps {
   onToggleFormattingToolbar: () => void;
   /** Called when the Commit action is activated. */
   onCommit: () => void;
+  /** Disables the mode switch when visual mode is unavailable for the file type. */
+  modeSwitchDisabled?: boolean;
 }
 
 /**
@@ -137,6 +142,7 @@ export function AppHeader({
   formattingToolbar,
   onToggleFormattingToolbar,
   onCommit,
+  modeSwitchDisabled,
 }: AppHeaderProps) {
   return (
     <header
@@ -160,6 +166,7 @@ export function AppHeader({
         formattingToolbar={formattingToolbar}
         onToggleFormattingToolbar={onToggleFormattingToolbar}
         onCommit={onCommit}
+        modeSwitchDisabled={modeSwitchDisabled}
       />
     </header>
   );

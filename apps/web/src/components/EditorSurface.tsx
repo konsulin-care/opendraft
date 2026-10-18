@@ -12,6 +12,8 @@ interface EditorSurfaceProps {
   scrollContainerRef: React.RefObject<HTMLDivElement | null>;
   /** Ref to source editor handle. */
   sourceEditorRef: React.RefObject<SourceEditorHandle | null>;
+  /** Syntax language for the source buffer: markdown only for rich files. */
+  sourceLanguage?: 'markdown' | 'plain';
 }
 
 /**
@@ -24,6 +26,7 @@ export function EditorSurface({
   onSourceChange,
   scrollContainerRef,
   sourceEditorRef,
+  sourceLanguage = 'markdown',
 }: EditorSurfaceProps) {
   return (
     <div className="manuscript-editor" data-testid="manuscript-editor">
@@ -50,6 +53,7 @@ export function EditorSurface({
           value={sourceMarkdown}
           onChange={onSourceChange}
           className="source-editor"
+          language={sourceLanguage}
         />
       </div>
     </div>
