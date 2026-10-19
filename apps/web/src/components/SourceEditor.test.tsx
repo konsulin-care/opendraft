@@ -86,16 +86,29 @@ describe('SourceEditor light theme', () => {
     expect(sourceEditorSource).not.toContain('@codemirror/theme-one-dark');
   });
 
-  it('defines a light EditorView.theme with white background and dark foreground', () => {
+  it('defines a light EditorView.theme referencing color tokens', () => {
     expect(sourceEditorSource).toMatch(/lightEditorTheme\s*=\s*EditorView\.theme\(/);
-    expect(sourceEditorSource).toContain("backgroundColor: '#ffffff'");
-    expect(sourceEditorSource).toContain("color: '#212529'");
+    expect(sourceEditorSource).toContain("backgroundColor: 'var(--color-white)'");
+    expect(sourceEditorSource).toContain("color: 'var(--color-black)'");
     expect(sourceEditorSource).toContain('{ dark: false }');
   });
 
-  it('uses a neutral gray active line', () => {
+  it('uses a neutral gray active line via the active-line token', () => {
     expect(sourceEditorSource).toContain("'.cm-activeLine'");
-    expect(sourceEditorSource).toMatch(/'\.cm-activeLine':\s*\{ backgroundColor: '#f2f2f2' \}/);
+    expect(sourceEditorSource).toMatch(
+      /'\.cm-activeLine':\s*\{ backgroundColor: 'var\(--color-active-line\)' \}/,
+    );
+  });
+
+  it('uses only var(--color-*) tokens in the theme, no hex literals', () => {
+    const themeBlock = sourceEditorSource.match(
+      /lightEditorTheme\s*=\s*EditorView\.theme\(\{([\s\S]*?)\},\s*\{ dark: false \}\)/,
+    )?.[1];
+    expect(themeBlock).toBeDefined();
+    // No raw hex color may remain; every color references a declared token.
+    expect(themeBlock).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    const tokenRefs = themeBlock!.match(/var\(--color-[\w-]+\)/g) ?? [];
+    expect(tokenRefs.length).toBeGreaterThan(0);
   });
 
   it('applies the default highlight style via syntaxHighlighting', () => {
@@ -107,9 +120,9 @@ describe('SourceEditor light theme', () => {
     const styles = Array.from(document.querySelectorAll('style'))
       .map((s) => s.textContent ?? '')
       .join('\n');
-    // Our light theme colors reach the injected stylesheet…
-    expect(styles).toContain('#ffffff');
-    expect(styles).toContain('#212529');
+    // Our light theme reaches the injected stylesheet as token references…
+    expect(styles).toContain('var(--color-white)');
+    expect(styles).toContain('var(--color-black)');
     // …and oneDark's dark background (#282c34) does not.
     expect(styles).not.toContain('#282c34');
   });

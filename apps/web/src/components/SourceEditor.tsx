@@ -130,19 +130,22 @@ function useExternalValueSync(
 /**
  * Light theme for the source editor: white background, dark foreground and a
  * neutral gray active line, matching the .manuscript-editor reading surface.
+ * Colors reference the @theme tokens in index.css so hex values live in one
+ * place; the rendered values are unchanged because the tokens hold the
+ * original hex values.
  */
 const lightEditorTheme = EditorView.theme({
-  '&': { color: '#212529', backgroundColor: '#ffffff' },
-  '.cm-content': { caretColor: '#212529' },
-  '.cm-cursor, .cm-dropCursor': { borderLeftColor: '#212529' },
-  '.cm-selectionBackground, .cm-content ::selection': { backgroundColor: '#d0d7de' },
-  '&.cm-focused .cm-selectionBackground': { backgroundColor: '#d0d7de' },
-  '.cm-activeLine': { backgroundColor: '#f2f2f2' },
-  '.cm-activeLineGutter': { backgroundColor: '#f2f2f2' },
+  '&': { color: 'var(--color-black)', backgroundColor: 'var(--color-white)' },
+  '.cm-content': { caretColor: 'var(--color-black)' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--color-black)' },
+  '.cm-selectionBackground, .cm-content ::selection': { backgroundColor: 'var(--color-selection)' },
+  '&.cm-focused .cm-selectionBackground': { backgroundColor: 'var(--color-selection)' },
+  '.cm-activeLine': { backgroundColor: 'var(--color-active-line)' },
+  '.cm-activeLineGutter': { backgroundColor: 'var(--color-active-line)' },
   '.cm-gutters': {
-    color: '#6c757d',
-    backgroundColor: '#f7f7f7',
-    borderRight: '1px solid #dee2e6',
+    color: 'var(--color-muted)',
+    backgroundColor: 'var(--color-gutter-bg)',
+    borderRight: '1px solid var(--color-secondary)',
   },
 }, { dark: false });
 

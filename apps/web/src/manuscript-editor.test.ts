@@ -109,22 +109,21 @@ describe("ManuscriptEditor — light code block theme", () => {
   it("defines a lightCodeBlockTheme via EditorView.theme()", () => {
     expect(manuscriptSource).toMatch(/lightCodeBlockTheme\s*=\s*EditorView\.theme\(/);
   });
-  it("sets cm-activeLine background to light yellow (#fef9c3)", () => {
+  it("sets active line and gutter backgrounds via the yellow token", () => {
     expect(manuscriptSource).toContain("'.cm-activeLine'");
-    expect(manuscriptSource).toContain("backgroundColor");
-    expect(manuscriptSource).toContain("#fef9c3");
-  });
-  it("sets cm-activeLineGutter background to light yellow (#fef9c3)", () => {
     expect(manuscriptSource).toContain("'.cm-activeLineGutter'");
-    expect(manuscriptSource).toContain("#fef9c3");
+    expect(manuscriptSource).toContain("backgroundColor: 'var(--color-yellow-200)'");
   });
-  it("sets cm-selectionBackground background to light yellow (#fef9c3)", () => {
+  it("sets selection backgrounds via the yellow token", () => {
     expect(manuscriptSource).toContain("'.cm-selectionBackground'");
-    expect(manuscriptSource).toContain("#fef9c3");
-  });
-  it("overrides focused selection background to light yellow (#fef9c3)", () => {
     expect(manuscriptSource).toContain("'.cm-focused .cm-selectionBackground'");
-    expect(manuscriptSource).toContain("#fef9c3");
+    expect(manuscriptSource).toContain("var(--color-yellow-200)");
+  });
+  it("uses only var(--color-*) tokens in the code block theme, no hex literals", () => {
+    const themeBlock = manuscriptSource.match(/lightCodeBlockTheme\s*=\s*EditorView\.theme\(\{([\s\S]*?)\}\)/)?.[1];
+    expect(themeBlock).toBeDefined();
+    expect(themeBlock).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(themeBlock).toMatch(/var\(--color-[\w-]+\)/);
   });
   it("wires the theme into the CodeMirror feature config", () => {
     expect(manuscriptSource).toContain("Crepe.Feature.CodeMirror");

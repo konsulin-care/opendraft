@@ -22,12 +22,12 @@ import { useDebouncedSaver, type DebouncedSaver } from './editor/autosave';
 import { OpendraftConfigWarning } from './OpendraftConfigWarning';
 import type { SourceEditorHandle } from './SourceEditor';
 import type { SaveStatus } from './AppHeader';
-/** Code blocks: light yellow active line/selection matching the Crepe light palette. */
+/** Code blocks: light yellow active line/selection via @theme tokens in index.css. */
 const lightCodeBlockTheme = EditorView.theme({
-  '.cm-activeLine': { backgroundColor: '#fef9c3' },
-  '.cm-activeLineGutter': { backgroundColor: '#fef9c3' },
-  '.cm-selectionBackground': { backgroundColor: '#fef9c3' },
-  '.cm-focused .cm-selectionBackground': { backgroundColor: '#fef9c3' },
+  '.cm-activeLine': { backgroundColor: 'var(--color-yellow-200)' },
+  '.cm-activeLineGutter': { backgroundColor: 'var(--color-yellow-200)' },
+  '.cm-selectionBackground': { backgroundColor: 'var(--color-yellow-200)' },
+  '.cm-focused .cm-selectionBackground': { backgroundColor: 'var(--color-yellow-200)' },
 });
 
 /** Imperative handle exposed for tests and external tools. */
