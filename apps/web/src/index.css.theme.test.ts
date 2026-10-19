@@ -51,10 +51,13 @@ const expectedTokens = [
   '--color-red-800: #991b1b',
   '--color-green-700: #15803d',
   '--color-sky-600: #0284c7',
+  '--color-stone-200: #e7e5e4',
+  '--color-stone-300: #d6d3d1',
 ];
 
+const themeBlock = css.match(/@theme\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
+
 describe('index.css — color token theme', () => {
-  const themeBlock = css.match(/@theme\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
 
   it('resets all default color tokens so only declared tokens exist', () => {
     expect(themeBlock).toContain('--color-*: initial');
@@ -75,6 +78,36 @@ describe('index.css — color token theme', () => {
   it('declares every expected token with today\'s values', () => {
     for (const token of expectedTokens) {
       expect(themeBlock).toContain(token);
+    }
+  });
+});
+
+describe('index.css — stone palette tokens', () => {
+  it('declares --color-stone-200 with the Tailwind stone value', () => {
+    expect(themeBlock).toContain('--color-stone-200: #e7e5e4');
+  });
+
+  it('declares --color-stone-300 with the Tailwind stone value', () => {
+    expect(themeBlock).toContain('--color-stone-300: #d6d3d1');
+  });
+
+  it('resolves every stone utility used by FormattingToolbar to a declared token', () => {
+    const toolbar = readFileSync(
+      fileURLToPath(
+        new URL('./components/FormattingToolbar.tsx', import.meta.url),
+      ),
+      'utf8',
+    );
+    const utilities = Array.from(
+      toolbar.matchAll(
+        /\b(?:bg|text|border|outline|ring|fill|stroke|from|to|via|shadow|placeholder|divide|decoration|accent|caret)-(stone-\w+)/g,
+      ),
+    ).map((m) => m[1]);
+    expect(utilities.length).toBeGreaterThan(0);
+    for (const token of utilities) {
+      expect(themeBlock, `--color-${token} must be declared`).toContain(
+        `--color-${token}:`,
+      );
     }
   });
 });
