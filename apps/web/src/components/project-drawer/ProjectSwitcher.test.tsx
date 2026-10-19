@@ -246,7 +246,7 @@ describe('project switcher new project dialog', () => {
     render(<Harness create={create} />);
     openDropdown();
 
-    fireEvent.click(screen.getByRole('button', { name: '+ New project' }));
+    fireEvent.click(screen.getByRole('button', { name: 'New project' }));
     const nameInput = screen.getByLabelText('Project name') as HTMLInputElement;
     const idInput = screen.getByLabelText('Manuscript id') as HTMLInputElement;
 
@@ -264,23 +264,23 @@ describe('project switcher new project dialog', () => {
   });
 });
 
-describe('project switcher delete', () => {
-  it('requires the exact project name before removing', () => {
-    const remove = vi.fn<(id: string) => void>();
-    render(<Harness remove={remove} />);
+describe('project switcher new project action', () => {
+  it('offers New project as the panel’s only action, full width and black', () => {
+    render(<Harness />);
     openDropdown();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-    const confirm = screen.getByRole('button', { name: 'Delete project' }) as HTMLButtonElement;
-    expect(confirm.disabled).toBe(true);
+    // The panel's only button outside the project list is New project.
+    const list = screen.getByRole('list', { name: 'Projects' });
+    const panel = list.parentElement as HTMLElement;
+    const outsideList = within(panel)
+      .getAllByRole('button')
+      .filter((button) => !list.contains(button));
+    expect(outsideList.map((button) => button.textContent)).toEqual(['New project']);
 
-    const input = screen.getByLabelText('Confirm project name');
-    fireEvent.change(input, { target: { value: 'Newer Pape' } });
-    expect(confirm.disabled).toBe(true);
-
-    fireEvent.change(input, { target: { value: 'Newer Paper' } });
-    expect(confirm.disabled).toBe(false);
-    fireEvent.click(confirm);
-    expect(remove).toHaveBeenCalledWith(NEWER_ID);
+    const newProject = screen.getByRole('button', { name: 'New project' });
+    expect(newProject.className).toContain('w-full');
+    expect(newProject.className).toContain('px-3');
+    expect(newProject.className).toContain('bg-black');
+    expect(newProject.className).toContain('text-white');
   });
 });

@@ -95,34 +95,24 @@ export function DeletePanel({
 }
 
 /**
- * Action row under the project list: delete confirmation and new project.
+ * Dropdown footer: the panel's only action, opening the new-project dialog.
  *
- * @param props - Handlers for each action.
+ * @param props - Handler for the new-project action.
  */
 export function ActionsRow({
-  onDelete,
   onNew,
 }: {
-  /** Enter delete confirmation mode. */
-  onDelete: () => void;
   /** Open the new-project dialog. */
   onNew: () => void;
 }) {
   return (
-    <div className="flex items-center gap-1 px-1">
-      <button
-        type="button"
-        onClick={onDelete}
-        className="rounded-md px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
-      >
-        Delete
-      </button>
+    <div className="px-2 py-1">
       <button
         type="button"
         onClick={onNew}
-        className="ml-auto rounded-md px-2 py-1 text-xs text-blue-600 hover:bg-blue-50"
+        className="w-full rounded-md bg-black px-3 py-1 text-sm text-white hover:bg-gray-900"
       >
-        + New project
+        New project
       </button>
     </div>
   );
@@ -170,12 +160,13 @@ function ActivePanel({
   if (mode === 'delete') {
     return wrap(<DeletePanel project={active} onConfirm={onConfirmDelete} onCancel={cancel} />);
   }
-  return wrap(<ActionsRow onDelete={() => onSetMode('delete')} onNew={onNew} />);
+  return wrap(<ActionsRow onNew={onNew} />);
 }
 
 /**
  * Open switcher dropdown: the project list plus, for the active project,
- * the delete confirmation or action row.
+ * the panel for the current mode (delete confirmation, or the new-project
+ * action as its only button).
  *
  * The panel is absolutely positioned under the trigger at its width, so it
  * overlays the file tree instead of pushing it down.

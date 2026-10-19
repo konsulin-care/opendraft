@@ -144,8 +144,8 @@ function useSwitcherState(
 
 /**
  * Project switcher for the drawer header: a dropdown of recently opened
- * projects, delete behind an exact-name confirmation, and a
- * "+ New project" action opening {@link NewProjectDialog}.
+ * projects with a full-width "New project" action opening
+ * {@link NewProjectDialog}.
  *
  * @param props - See {@link ProjectSwitcherProps}.
  */
