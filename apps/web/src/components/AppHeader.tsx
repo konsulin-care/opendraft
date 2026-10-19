@@ -9,6 +9,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import type { RefObject } from 'react';
 import { formatFileName } from '../format-file-name';
+import { APP_BAR_HEIGHT } from './app-bar-layout';
 import { PROJECT_DRAWER_ID } from './project-drawer/ProjectDrawer';
 import { ModeSwitch } from './ModeSwitch';
 import type { EditorMode } from './ModeSwitch';
@@ -142,8 +143,8 @@ export interface AppHeaderProps {
 }
 
 /**
- * Application header: OpenDraft mark, file name, save state, and the
- * header actions.
+ * Application header: OpenDraft mark, the file-name subtitle (or a
+ * "No file selected" placeholder), save state, and the header actions.
  *
  * @param props - See {@link AppHeaderProps}.
  */
@@ -162,7 +163,7 @@ export function AppHeader({
 }: AppHeaderProps) {
   return (
     <header
-      className="flex items-center gap-2 border-b border-gray-200 bg-white px-3 py-2"
+      className={`flex items-center gap-2 border-b border-gray-200 bg-white px-3 py-2 ${APP_BAR_HEIGHT}`}
       data-testid="app-header"
     >
       <button
@@ -178,11 +179,11 @@ export function AppHeader({
         <BookOpenText className="h-5 w-5" aria-hidden="true" />
       </button>
       <span
-        className="min-w-0 flex-1 truncate text-sm text-gray-700"
-        style={{ minWidth: 0, overflow: 'hidden' }}
-        title={fileName}
+        className="min-w-0 flex-1 truncate text-xs text-gray-700"
+        data-testid="file-subtitle"
+        title={fileName || 'No file selected'}
       >
-        {formatFileName(fileName)}
+        {fileName ? formatFileName(fileName) : 'No file selected'}
       </span>
       <SaveIndicator status={saveStatus} />
       <HeaderActions

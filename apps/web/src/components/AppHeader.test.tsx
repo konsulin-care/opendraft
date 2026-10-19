@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { AppHeader } from './AppHeader';
 import type { AppHeaderProps } from './AppHeader';
+import { APP_BAR_HEIGHT } from './app-bar-layout';
 
 // @vitest-environment jsdom
 
@@ -57,19 +58,37 @@ describe('AppHeader identity', () => {
     expect(screen.queryByText('OpenDraft')).toBeNull();
   });
 
-  it('shows the file name with the full name in title', () => {
+  it('shows the file name as a small subtitle with the full name in title', () => {
     renderHeader({ fileName: 'manuscript.md' });
-    const label = screen.getByTitle('manuscript.md');
-    expect(label.textContent).toBe('manuscript.md');
+    const subtitle = screen.getByTestId('file-subtitle');
+    expect(subtitle.textContent).toBe('manuscript.md');
+    expect(subtitle.getAttribute('title')).toBe('manuscript.md');
+    expect(subtitle.className).toMatch(/\btext-xs\b/);
   });
 
+  it('shows "No file selected" when no file is open', () => {
+    renderHeader({ fileName: '' });
+    const subtitle = screen.getByTestId('file-subtitle');
+    expect(subtitle.textContent).toBe('No file selected');
+  });
+});
+
+describe('AppHeader layout', () => {
   it('truncates long file names but keeps the full name in title', () => {
     const longName = 'a'.repeat(200) + '.md';
     renderHeader({ fileName: longName });
-    const label = screen.getByTitle(longName);
-    const codePoints = Array.from(label.textContent ?? '');
+    const subtitle = screen.getByTitle(longName);
+    const codePoints = Array.from(subtitle.textContent ?? '');
     expect(codePoints).toHaveLength(140);
     expect(codePoints[0]).toBe('…');
+  });
+
+  it('carries the APP_BAR_HEIGHT class on the header root', () => {
+    renderHeader();
+    const header = screen.getByTestId('app-header');
+    for (const cls of APP_BAR_HEIGHT.split(/\s+/)) {
+      expect(header.className.split(/\s+/)).toContain(cls);
+    }
   });
 
   it('renders the same header markup with and without projectName', () => {
