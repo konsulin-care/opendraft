@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { ProjectRecord } from '@opendraft/workspace';
 
 /** Panel shown under the project list in the switcher dropdown. */
-export type SwitcherMode = 'list' | 'rename' | 'delete';
+export type SwitcherMode = 'list' | 'delete';
 
 /**
  * Dropdown list of projects, most recently opened first.
@@ -38,55 +38,6 @@ export function ProjectList({
         </li>
       ))}
     </ul>
-  );
-}
-
-/**
- * Inline rename panel: a text input pre-filled with the current name plus a
- * save button; Enter also saves. Empty or unchanged names save nothing.
- *
- * @param props - Current name, commit handler, and cancel handler.
- */
-export function RenamePanel({
-  currentName,
-  onCommit,
-  onCancel,
-}: {
-  /** Name shown in the input initially. */
-  currentName: string;
-  /** Receive the new name. */
-  onCommit: (name: string) => void;
-  /** Leave rename mode without changing anything. */
-  onCancel: () => void;
-}) {
-  const [value, setValue] = useState(currentName);
-  const trimmed = value.trim();
-  const save = () => {
-    if (trimmed !== '' && trimmed !== currentName) onCommit(trimmed);
-    onCancel();
-  };
-  return (
-    <div className="flex items-center gap-1 px-2 py-1">
-      <input
-        type="text"
-        aria-label="Project name"
-        value={value}
-        autoFocus
-        onChange={(event) => setValue(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') save();
-          if (event.key === 'Escape') onCancel();
-        }}
-        className="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-500"
-      />
-      <button
-        type="button"
-        onClick={save}
-        className="rounded-md bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700"
-      >
-        Save
-      </button>
-    </div>
   );
 }
 
@@ -144,17 +95,14 @@ export function DeletePanel({
 }
 
 /**
- * Action row under the project list: rename, delete, and new project.
+ * Action row under the project list: delete confirmation and new project.
  *
  * @param props - Handlers for each action.
  */
 export function ActionsRow({
-  onRename,
   onDelete,
   onNew,
 }: {
-  /** Enter inline rename mode. */
-  onRename: () => void;
   /** Enter delete confirmation mode. */
   onDelete: () => void;
   /** Open the new-project dialog. */
@@ -162,13 +110,6 @@ export function ActionsRow({
 }) {
   return (
     <div className="flex items-center gap-1 px-1">
-      <button
-        type="button"
-        onClick={onRename}
-        className="rounded-md px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
-      >
-        Rename
-      </button>
       <button
         type="button"
         onClick={onDelete}
@@ -197,8 +138,6 @@ export interface SwitcherDropdownProps {
   mode: SwitcherMode;
   /** Choose a project from the list. */
   onSelect: (id: string) => void;
-  /** Rename the active project. */
-  onCommitRename: (name: string) => void;
   /** Switch to the given panel mode. */
   onSetMode: (mode: SwitcherMode) => void;
   /** Remove the active project. */
@@ -208,45 +147,35 @@ export interface SwitcherDropdownProps {
 }
 
 /**
- * Panel shown for the active project: inline rename, delete confirmation,
- * or the action row. Renders nothing when there is no active project.
+ * Panel shown for the active project: delete confirmation or the action
+ * row. Renders nothing when there is no active project.
  *
  * @param props - Active project, panel mode, and the panel handlers.
  */
 function ActivePanel({
   active,
   mode,
-  onCommitRename,
   onSetMode,
   onConfirmDelete,
   onNew,
 }: Pick<
   SwitcherDropdownProps,
-  'active' | 'mode' | 'onCommitRename' | 'onSetMode' | 'onConfirmDelete' | 'onNew'
+  'active' | 'mode' | 'onSetMode' | 'onConfirmDelete' | 'onNew'
 >) {
   if (!active) return null;
   const cancel = () => onSetMode('list');
   const wrap = (panel: ReactNode) => (
     <div className="border-t border-gray-100 py-1">{panel}</div>
   );
-  if (mode === 'rename') {
-    return wrap(<RenamePanel currentName={active.name} onCommit={onCommitRename} onCancel={cancel} />);
-  }
   if (mode === 'delete') {
     return wrap(<DeletePanel project={active} onConfirm={onConfirmDelete} onCancel={cancel} />);
   }
-  return wrap(
-    <ActionsRow
-      onRename={() => onSetMode('rename')}
-      onDelete={() => onSetMode('delete')}
-      onNew={onNew}
-    />,
-  );
+  return wrap(<ActionsRow onDelete={() => onSetMode('delete')} onNew={onNew} />);
 }
 
 /**
  * Open switcher dropdown: the project list plus, for the active project,
- * the rename panel, delete confirmation, or action row.
+ * the delete confirmation or action row.
  *
  * The panel is absolutely positioned under the trigger at its width, so it
  * overlays the file tree instead of pushing it down.
@@ -258,7 +187,6 @@ export function SwitcherDropdown({
   active,
   mode,
   onSelect,
-  onCommitRename,
   onSetMode,
   onConfirmDelete,
   onNew,
@@ -269,7 +197,6 @@ export function SwitcherDropdown({
       <ActivePanel
         active={active}
         mode={mode}
-        onCommitRename={onCommitRename}
         onSetMode={onSetMode}
         onConfirmDelete={onConfirmDelete}
         onNew={onNew}

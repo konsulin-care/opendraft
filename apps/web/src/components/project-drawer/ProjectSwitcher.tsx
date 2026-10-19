@@ -14,8 +14,6 @@ export interface ProjectSwitcherProps {
   active: ProjectRecord | null;
   /** Make the given project active. */
   switchTo: (id: string) => void;
-  /** Rename a project (the id never changes). */
-  rename: (id: string, name: string) => void;
   /** Register and scaffold a new project. */
   create: (name: string, manuscriptId: string) => void;
   /** Remove a project. */
@@ -93,10 +91,8 @@ interface SwitcherState {
   toggle: () => void;
   /** Choose a project from the dropdown and close it. */
   choose: (id: string) => void;
-  /** Enter inline rename mode. */
+  /** Switch the dropdown panel mode. */
   setMode: (mode: SwitcherMode) => void;
-  /** Rename the active project. */
-  commitRename: (name: string) => void;
   /** Leave delete mode, remove the active project, and close the dropdown. */
   confirmDelete: () => void;
   /** Open or close the new-project dialog. */
@@ -109,14 +105,12 @@ interface SwitcherState {
  *
  * @param active - The active project, or null when none.
  * @param switchTo - Make the given project active.
- * @param rename - Rename the active project.
  * @param remove - Remove the active project.
  * @returns See {@link SwitcherState}.
  */
 function useSwitcherState(
   active: ProjectRecord | null,
   switchTo: (id: string) => void,
-  rename: (id: string, name: string) => void,
   remove: (id: string) => void,
 ): SwitcherState {
   const [open, setOpen] = useState(false);
@@ -136,11 +130,6 @@ function useSwitcherState(
     setOpen(false);
   };
 
-  /** Rename the active project. */
-  const commitRename = (name: string) => {
-    if (active) rename(active.id, name);
-  };
-
   return {
     open,
     mode,
@@ -148,7 +137,6 @@ function useSwitcherState(
     toggle: () => setOpen((o) => !o),
     choose,
     setMode,
-    commitRename,
     confirmDelete,
     setCreating,
   };
@@ -156,7 +144,7 @@ function useSwitcherState(
 
 /**
  * Project switcher for the drawer header: a dropdown of recently opened
- * projects, inline rename, delete behind an exact-name confirmation, and a
+ * projects, delete behind an exact-name confirmation, and a
  * "+ New project" action opening {@link NewProjectDialog}.
  *
  * @param props - See {@link ProjectSwitcherProps}.
@@ -165,11 +153,10 @@ export function ProjectSwitcher({
   projects,
   active,
   switchTo,
-  rename,
   create,
   remove,
 }: ProjectSwitcherProps) {
-  const state = useSwitcherState(active, switchTo, rename, remove);
+  const state = useSwitcherState(active, switchTo, remove);
 
   return (
     <div className="relative min-w-0">
@@ -184,7 +171,6 @@ export function ProjectSwitcher({
           active={active}
           mode={state.mode}
           onSelect={state.choose}
-          onCommitRename={state.commitRename}
           onSetMode={state.setMode}
           onConfirmDelete={state.confirmDelete}
           onNew={() => state.setCreating(true)}

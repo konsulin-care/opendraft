@@ -4,6 +4,8 @@ import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import type { ProjectRecord } from '@opendraft/workspace';
 import { ProjectSwitcher } from './ProjectSwitcher';
 import type { ProjectSwitcherProps } from './ProjectSwitcher';
+import { AppHeader } from '../AppHeader';
+import type { AppHeaderProps } from '../AppHeader';
 
 // @vitest-environment jsdom
 
@@ -13,24 +15,12 @@ const NEWER_ID = 'id-newer';
 /** Id of the older project offered in the dropdown. */
 const OLDER_ID = 'id-older';
 
-/**
- * Build a project record for the harness.
- *
- * @param id - Stable project id.
- * @param name - Display name.
- * @param lastOpenedAt - Last-opened time driving list order.
- * @returns A local-source project record.
- */
+/** Build a local-source project record for the harness. */
 function makeRecord(id: string, name: string, lastOpenedAt: number): ProjectRecord {
   return { id, name, source: { kind: 'local' }, createdAt: 0, lastOpenedAt };
 }
 
-/**
- * Harness holding projects in state so rename/switch/remove reflect in the
- * rendered names, with optional spies asserted by the tests.
- *
- * @param overrides - Spy handlers recorded before the state updates.
- */
+/** Harness holding projects in state; spies come from `overrides`. */
 function Harness(overrides: Partial<ProjectSwitcherProps> = {}) {
   // Passed deliberately unsorted: the switcher must sort by lastOpenedAt.
   const [projects, setProjects] = useState<ProjectRecord[]>([
@@ -46,10 +36,6 @@ function Harness(overrides: Partial<ProjectSwitcherProps> = {}) {
       switchTo={(id) => {
         overrides.switchTo?.(id);
         setActiveId(id);
-      }}
-      rename={(id, name) => {
-        overrides.rename?.(id, name);
-        setProjects((ps) => ps.map((p) => (p.id === id ? { ...p, name } : p)));
       }}
       create={(name, manuscriptId) => overrides.create?.(name, manuscriptId)}
       remove={(id) => {
@@ -72,11 +58,7 @@ class MockResizeObserver {
   readonly unobserve = vi.fn();
   readonly disconnect = vi.fn();
 
-  /**
-   * Record the instance and keep the resize callback.
-   *
-   * @param callback - Callback invoked on resize notifications.
-   */
+  /** Record the instance and keep the resize callback. */
   constructor(private readonly callback: ResizeObserverCallback) {
     MockResizeObserver.instances.push(this);
   }
@@ -87,13 +69,7 @@ class MockResizeObserver {
   }
 }
 
-/**
- * Stub the scroll metrics of an element.
- *
- * @param element - Element to stub.
- * @param scrollWidth - Value reported as `scrollWidth`.
- * @param clientWidth - Value reported as `clientWidth`.
- */
+/** Stub the scrollWidth/clientWidth metrics of an element. */
 function stubOverflow(
   element: HTMLElement,
   scrollWidth: number,
@@ -219,21 +195,48 @@ describe('project switcher panel positioning', () => {
   });
 });
 
+/** Render the app header that now owns the inline project rename (B7). */
+function renderHeader(overrides: Partial<AppHeaderProps> = {}) {
+  render(
+    <AppHeader fileName="manuscript.md" projectName="Newer Paper" mode="wysiwyg"
+      onSelectMode={vi.fn()} saveStatus="saved" formattingToolbar
+      onToggleFormattingToolbar={vi.fn()} onCommit={vi.fn()} {...overrides} />,
+  );
+}
+
 describe('project switcher rename', () => {
-  it('renames inline and displays the new name', () => {
-    const rename = vi.fn<(id: string, name: string) => void>();
-    render(<Harness rename={rename} />);
+  it('offers no Rename action in the dropdown', () => {
+    render(<Harness />);
     openDropdown();
+    expect(screen.queryByRole('button', { name: 'Rename' })).toBeNull();
+  });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
-    fireEvent.change(screen.getByLabelText('Project name'), {
-      target: { value: 'Renamed Paper' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  // Rename moved out of the dropdown into the header inline input.
+  it('renames through the header input with the trimmed name on Enter and blur', () => {
+    const onRename = vi.fn();
+    renderHeader({ onRename });
+    const input = screen.getByRole('textbox', { name: 'Project name' });
+    fireEvent.change(input, { target: { value: '  Renamed Paper  ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onRename).toHaveBeenCalledWith('Renamed Paper');
 
-    expect(rename).toHaveBeenCalledWith(NEWER_ID, 'Renamed Paper');
-    const shown = screen.getAllByRole('button', { name: 'Renamed Paper' });
-    expect(shown.length).toBeGreaterThan(0);
+    fireEvent.change(input, { target: { value: 'Blurred Name' } });
+    fireEvent.blur(input);
+    expect(onRename).toHaveBeenCalledWith('Blurred Name');
+  });
+
+  it('restores the previous name on Escape or an empty entry, without renaming', () => {
+    const onRename = vi.fn();
+    renderHeader({ onRename });
+    const input = screen.getByRole('textbox', { name: 'Project name' }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'Typo' } });
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(onRename).not.toHaveBeenCalled();
+    expect(input.value).toBe('Newer Paper');
+    fireEvent.change(input, { target: { value: '   ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onRename).not.toHaveBeenCalled();
+    expect(input.value).toBe('Newer Paper');
   });
 });
 

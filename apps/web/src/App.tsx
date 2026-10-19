@@ -147,8 +147,6 @@ interface DrawerSectionProps {
   switchTo: (id: string) => void;
   /** Register and scaffold a new project. */
   create: (name: string, manuscriptId: string) => void;
-  /** Rename a project. */
-  rename: (id: string, name: string) => void;
   /** Remove a project. */
   remove: (id: string) => void;
   /** Drawer open state and toggle wiring. */
@@ -173,7 +171,6 @@ function DrawerSection({
   active,
   switchTo,
   create,
-  rename,
   remove,
   drawer,
   workspace,
@@ -193,7 +190,6 @@ function DrawerSection({
           active={active}
           switchTo={switchTo}
           create={create}
-          rename={rename}
           remove={remove}
         />
       }
@@ -277,7 +273,7 @@ export function App() {
       />
       <DrawerSection
         projects={projects} active={active} switchTo={switchTo}
-        create={create} rename={rename} remove={remove} drawer={drawer}
+        create={create} remove={remove} drawer={drawer}
         workspace={workspace} activePath={activePath} onOpen={openFile}
       />
       <CommitSection
