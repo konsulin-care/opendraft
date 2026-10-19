@@ -79,24 +79,54 @@ describe('index.css — color token theme', () => {
   });
 });
 
+describe('theme — crepe color variables reference tokens', () => {
+  const crepeColorVars = Object.fromEntries(
+    Array.from(css.matchAll(/(--crepe-color-[\w-]+):\s*([^;]+);/g)).map((m) => [
+      m[1],
+      m[2].trim(),
+    ]),
+  );
+
+  it('declares every crepe color variable', () => {
+    const expected = [
+      '--crepe-color-background',
+      '--crepe-color-on-background',
+      '--crepe-color-surface',
+      '--crepe-color-surface-low',
+      '--crepe-color-on-surface',
+      '--crepe-color-on-surface-variant',
+      '--crepe-color-outline',
+      '--crepe-color-primary',
+      '--crepe-color-secondary',
+      '--crepe-color-on-secondary',
+      '--crepe-color-inverse',
+      '--crepe-color-on-inverse',
+      '--crepe-color-hover',
+      '--crepe-color-selected',
+      '--crepe-color-inline-code',
+      '--crepe-color-error',
+    ];
+    for (const name of expected) {
+      expect(crepeColorVars[name], `${name} must be declared`).toBeDefined();
+    }
+  });
+
+  it('maps --crepe-color-primary to var(--color-black)', () => {
+    expect(crepeColorVars['--crepe-color-primary']).toBe('var(--color-black)');
+  });
+
+  it('maps every --crepe-color-* entry to a var(--color-*) token', () => {
+    for (const [name, value] of Object.entries(crepeColorVars)) {
+      expect(value, `${name} must reference a color token`).toMatch(
+        /^var\(--color-[\w-]+\)$/,
+      );
+    }
+  });
+});
+
 describe('theme — no cascade layers', () => {
   it('contains zero @layer declarations', () => {
     expect(css).not.toMatch(/^@layer\s+/m);
-  });
-
-  it('sets monochrome palette variables under .milkdown', () => {
-    expect(css).toContain('--crepe-color-background: #ffffff');
-    expect(css).toContain('--crepe-color-on-background: #212529');
-    expect(css).toContain('--crepe-color-surface: #ffffff');
-    expect(css).toContain('--crepe-color-surface-low: #f8f9fa');
-    expect(css).toContain('--crepe-color-on-surface: #212529');
-    expect(css).toContain('--crepe-color-on-surface-variant: #6c757d');
-    expect(css).toContain('--crepe-color-outline: #adb5bd');
-    expect(css).toContain('--crepe-color-primary: #212529');
-    expect(css).toContain('--crepe-color-secondary: #dee2e6');
-    expect(css).toContain('--crepe-color-hover: #e9ecef');
-    expect(css).toContain('--crepe-color-selected: #dee2e6');
-    expect(css).toContain('--crepe-color-error: #dc3545');
   });
 
   it('sets font family variables', () => {

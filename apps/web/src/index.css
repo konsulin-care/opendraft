@@ -3,22 +3,22 @@
 
 /* ── Palette: monochrome + error red ── */
 .milkdown {
-  --crepe-color-background: #ffffff;
-  --crepe-color-on-background: #212529;
-  --crepe-color-surface: #ffffff;
-  --crepe-color-surface-low: #f8f9fa;
-  --crepe-color-on-surface: #212529;
-  --crepe-color-on-surface-variant: #6c757d;
-  --crepe-color-outline: #adb5bd;
-  --crepe-color-primary: #212529;
-  --crepe-color-secondary: #dee2e6;
-  --crepe-color-on-secondary: #212529;
-  --crepe-color-inverse: #343a40;
-  --crepe-color-on-inverse: #f8f9fa;
-  --crepe-color-hover: #e9ecef;
-  --crepe-color-selected: #dee2e6;
-  --crepe-color-inline-code: #495057;
-  --crepe-color-error: #dc3545;
+  --crepe-color-background: var(--color-white);
+  --crepe-color-on-background: var(--color-black);
+  --crepe-color-surface: var(--color-white);
+  --crepe-color-surface-low: var(--color-surface-low);
+  --crepe-color-on-surface: var(--color-black);
+  --crepe-color-on-surface-variant: var(--color-muted);
+  --crepe-color-outline: var(--color-outline);
+  --crepe-color-primary: var(--color-black);
+  --crepe-color-secondary: var(--color-secondary);
+  --crepe-color-on-secondary: var(--color-black);
+  --crepe-color-inverse: var(--color-inverse);
+  --crepe-color-on-inverse: var(--color-surface-low);
+  --crepe-color-hover: var(--color-hover);
+  --crepe-color-selected: var(--color-secondary);
+  --crepe-color-inline-code: var(--color-inline-code);
+  --crepe-color-error: var(--color-error);
 }
 
 /* ── Fonts ── */
@@ -535,8 +535,8 @@ textarea {
 
 /* ── Citekey inline decorations (subtle pill) ── */
 .citekey-link {
-  color: #2563eb;
-  background: rgba(37, 99, 235, 0.1);
+  color: var(--color-blue-600);
+  background: var(--color-blue-600-10);
   border-radius: 4px;
   padding: 0 4px;
   text-decoration: none;
@@ -545,7 +545,7 @@ textarea {
 }
 
 .citekey-link:hover {
-  background: rgba(37, 99, 235, 0.18);
+  background: var(--color-blue-600-18);
 }
 
 /* ── Citekey hover tooltip ── */

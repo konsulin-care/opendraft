@@ -91,8 +91,16 @@ describe('index.css — citekey pill styling', () => {
     expect(css).toMatch(/\.citekey-link\s*\{[^}]*text-decoration:\s*none/);
   });
 
-  it('has .citekey-link with accent color', () => {
-    expect(css).toMatch(/\.citekey-link\s*\{[^}]*color:\s*#2563eb/);
+  it('has .citekey-link with accent color via a token that resolves to #2563eb', () => {
+    const rule = css.match(/\.citekey-link\s*\{([^}]*)\}/)?.[1] ?? '';
+    const color = rule.match(/(?:^|;)\s*color:\s*([^;]+);/)?.[1]?.trim() ?? '';
+    expect(color).toMatch(/^var\(--color-[\w-]+\)$/);
+    const token = color.slice('var('.length, -1);
+    const themeBlock = css.match(/@theme\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
+    const value = themeBlock
+      .match(new RegExp(`${token}:\\s*([^;]+);`))?.[1]
+      ?.trim();
+    expect(value).toBe('#2563eb');
   });
 
   it('has no .citation-key rule (citekey hidden from dropdown rows)', () => {
