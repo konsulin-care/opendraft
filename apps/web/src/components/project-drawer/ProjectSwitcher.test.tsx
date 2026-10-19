@@ -84,6 +84,24 @@ describe('project switcher dropdown', () => {
   });
 });
 
+describe('project switcher trigger', () => {
+  it('shows the chevron before a truncated name with the full name as title', () => {
+    render(<Harness />);
+    const trigger = screen.getByRole('button', { name: 'Newer Paper' });
+
+    // The chevron element must precede the name in the DOM.
+    const children = Array.from(trigger.children);
+    expect(children[0]?.tagName.toLowerCase()).toBe('svg');
+    const nameSpan = trigger.querySelector('span');
+    expect(children[1]).toBe(nameSpan);
+
+    expect(nameSpan?.className).toContain('truncate');
+    expect(nameSpan?.getAttribute('title')).toBe('Newer Paper');
+    expect(trigger.className).toContain('px-3');
+    expect(trigger.className).toContain('w-full');
+  });
+});
+
 describe('project switcher rename', () => {
   it('renames inline and displays the new name', () => {
     const rename = vi.fn<(id: string, name: string) => void>();

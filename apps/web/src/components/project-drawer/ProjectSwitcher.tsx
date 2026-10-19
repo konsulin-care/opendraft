@@ -49,10 +49,12 @@ function SwitcherButton({
       aria-haspopup="true"
       aria-expanded={open}
       onClick={onToggle}
-      className="flex w-full items-center justify-between gap-1 rounded-md px-2 py-1 text-sm font-medium text-gray-900 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-500"
+      className="flex w-full items-center gap-1 rounded-md px-3 py-1 text-sm font-medium text-gray-900 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-500"
     >
-      <span className="min-w-0 truncate">{label}</span>
       <ChevronDown className="h-4 w-4 shrink-0 text-gray-500" aria-hidden="true" />
+      <span className="min-w-0 truncate" title={label}>
+        {label}
+      </span>
     </button>
   );
 }
