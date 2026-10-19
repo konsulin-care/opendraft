@@ -251,6 +251,29 @@ textarea {
   }
 }
 
+/* ── Marquee: scroll overflowing text right to left in a loop ── */
+/* Pair with duplicated text content so the -50% translate loops seamlessly. */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee {
+  display: inline-block;
+  white-space: nowrap;
+  animation: marquee 8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee {
+    animation: none;
+  }
+}
+
 .manuscript-editor .ProseMirror p {
   @apply my-4 text-base leading-relaxed first:mt-0 last:mb-0;
 }

@@ -186,6 +186,39 @@ describe('theme — no cascade layers', () => {
   });
 });
 
+describe('index.css — marquee animation', () => {
+  it('defines a marquee keyframe that moves text from right to left', () => {
+    const keyframes = css.match(/@keyframes\s+marquee\s*\{([\s\S]*?)\n\}/);
+    expect(keyframes, '@keyframes marquee must be defined').not.toBeNull();
+    const body = keyframes![1];
+    expect(body).toMatch(/from\s*\{[^}]*transform:\s*translateX\(0\)/);
+    expect(body).toMatch(/to\s*\{[^}]*transform:\s*translateX\(-\d+%\)/);
+  });
+
+  it('has a .marquee class that applies the marquee animation', () => {
+    const rule = css.match(/\.marquee\s*\{([^}]*)\}/);
+    expect(rule, '.marquee class must be defined').not.toBeNull();
+    const body = rule![1];
+    expect(body).toMatch(/animation:\s*marquee\s+\d+(?:\.\d+)?s/);
+    expect(body).toContain('infinite');
+  });
+
+  it('disables the marquee animation under prefers-reduced-motion', () => {
+    const mediaBlocks =
+      css.match(/@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\n\}/g) ??
+      [];
+    expect(mediaBlocks.length).toBeGreaterThan(0);
+    const disablesMarquee = mediaBlocks.some((block) => {
+      const rule = block.match(/\.marquee\s*\{([^}]*)\}/);
+      return rule !== null && /animation(?:-name)?:\s*none/.test(rule[1]);
+    });
+    expect(
+      disablesMarquee,
+      'a prefers-reduced-motion rule must set .marquee animation to none',
+    ).toBe(true);
+  });
+});
+
 describe('index.css — editor focus and blockquote styling', () => {
   it('does not apply focus-visible outline to contenteditable elements', () => {
     // The [contenteditable] selector must not appear in the focus-visible rule
