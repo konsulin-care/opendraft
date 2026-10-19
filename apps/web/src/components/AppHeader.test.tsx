@@ -249,8 +249,18 @@ describe('AppHeader commit and overflow', () => {
     expect(commit.className).toMatch(/hover:bg-gray-800/);
     expect(commit.className).not.toMatch(/\btext-gray-600\b/);
     expect(commit.className).not.toMatch(/hover:bg-gray-100/);
-    expect(commit.querySelector('.lucide-git-commit-horizontal')).not.toBeNull();
+    expect(commit.querySelector('.lucide-git-branch')).not.toBeNull();
+    expect(commit.querySelector('.lucide-git-commit-horizontal')).toBeNull();
     expect(commit.textContent).toBe('Commit');
+  });
+
+  it('shares an h-9 height across the book and Commit buttons, labeling Commit at text-xs', () => {
+    renderHeader();
+    const book = screen.getByRole('button', { name: 'OpenDraft' });
+    const commit = screen.getByRole('button', { name: 'Commit' });
+    expect(book.className).toMatch(/\bh-9\b/);
+    expect(commit.className).toMatch(/\bh-9\b/);
+    expect(commit.querySelector('span')?.className).toMatch(/\btext-xs\b/);
   });
 
   it('calls onCommit when the Commit button is clicked', () => {

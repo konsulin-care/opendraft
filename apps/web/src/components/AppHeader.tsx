@@ -2,7 +2,7 @@ import {
   BookOpenText,
   Check,
   CircleAlert,
-  GitCommitHorizontal,
+  GitBranch,
   LoaderCircle,
   Type,
 } from 'lucide-react';
@@ -30,7 +30,7 @@ const ICON_BUTTON =
   'inline-flex items-center justify-center rounded-md p-2 text-gray-600 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-500';
 
 const COMMIT_BUTTON =
-  'inline-flex items-center justify-center gap-1 rounded-md p-2 bg-gray-900 text-white hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-500 hidden md:inline-flex';
+  'h-9 inline-flex items-center justify-center gap-1 rounded-md p-2 bg-gray-900 text-white hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-500 hidden md:inline-flex';
 
 /** Props for {@link SaveIndicator}. */
 interface SaveIndicatorProps {
@@ -103,8 +103,8 @@ function HeaderActions({
         onClick={onCommit}
         className={COMMIT_BUTTON}
       >
-        <GitCommitHorizontal className="h-4 w-4" aria-hidden="true" />
-        <span className="hidden md:inline">Commit</span>
+        <GitBranch className="h-4 w-4" aria-hidden="true" />
+        <span className="hidden md:inline text-xs">Commit</span>
       </button>
       <HeaderOverflowMenu mode={mode} onSelectMode={onSelectMode} onCommit={onCommit} />
     </div>
@@ -233,7 +233,7 @@ export function AppHeader({
         aria-controls={PROJECT_DRAWER_ID}
         onClick={onToggleSidebar}
         ref={toggleButtonRef}
-        className={ICON_BUTTON}
+        className={`${ICON_BUTTON} h-9`}
       >
         <BookOpenText className="h-5 w-5" aria-hidden="true" />
       </button>
