@@ -14,10 +14,10 @@ export interface OpendraftConfigWarningProps {
 const ALERT_STYLE: CSSProperties = {
   padding: '8px 12px',
   margin: '8px 12px',
-  border: '1px solid #f59e0b',
+  border: '1px solid var(--color-amber-500)',
   borderRadius: '4px',
-  backgroundColor: '#fef3c7',
-  color: '#92400e',
+  backgroundColor: 'var(--color-amber-100)',
+  color: 'var(--color-amber-800)',
   fontSize: '13px',
 };
 
