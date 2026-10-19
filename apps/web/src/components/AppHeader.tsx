@@ -114,6 +114,11 @@ function HeaderActions({
 export interface AppHeaderProps {
   /** Full manuscript file name; displayed truncated with the full name in `title`. */
   fileName: string;
+  /**
+   * Name of the active project. Accepted but not rendered yet; the header
+   * markup is identical with or without it.
+   */
+  projectName?: string;
   /** Current editing mode. */
   mode: EditorMode;
   /** Called when the user picks an editing mode. */

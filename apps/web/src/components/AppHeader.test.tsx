@@ -72,6 +72,17 @@ describe('AppHeader identity', () => {
     expect(codePoints[0]).toBe('…');
   });
 
+  it('renders the same header markup with and without projectName', () => {
+    const { container, unmount } = renderHeader();
+    const baseline = container.querySelector('[data-testid="app-header"]')?.innerHTML;
+    expect(baseline).toBeDefined();
+    unmount();
+
+    const { container: withNameContainer } = renderHeader({ projectName: 'My Project' });
+    expect(withNameContainer.querySelector('[data-testid="app-header"]')?.innerHTML).toBe(
+      baseline,
+    );
+  });
 });
 
 describe('AppHeader mode toggle', () => {
