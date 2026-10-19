@@ -139,7 +139,7 @@ describe('App header', () => {
     expect(screen.queryByText('OpenDraft')).toBeNull();
     // The header shows the active project name above the file-name subtitle.
     const header = screen.getByTestId('app-header');
-    expect(within(header).getByText('Untitled project')).toBeDefined();
+    expect(within(header).getByDisplayValue('Untitled project')).toBeDefined();
     const subtitle = within(header).getByTestId('file-subtitle');
     expect(subtitle.getAttribute('title')).toMatch(BLOCK_TITLE);
     expect(subtitle.textContent).toBe(subtitle.getAttribute('title'));

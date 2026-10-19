@@ -14,6 +14,7 @@ import { PROJECT_DRAWER_ID } from './project-drawer/ProjectDrawer';
 import { ModeSwitch } from './ModeSwitch';
 import type { EditorMode } from './ModeSwitch';
 import { HeaderOverflowMenu } from './HeaderOverflowMenu';
+import { ProjectNameInput } from './ProjectNameInput';
 
 export type { EditorMode } from './ModeSwitch';
 
@@ -120,6 +121,8 @@ export interface AppHeaderProps {
    * file-name subtitle when provided.
    */
   projectName?: string;
+  /** Called with the trimmed name when the user saves an inline rename. */
+  onRename?: (name: string) => void | Promise<void>;
   /** Current editing mode. */
   mode: EditorMode;
   /** Called when the user picks an editing mode. */
@@ -148,21 +151,21 @@ interface HeaderTitleProps {
   fileName: string;
   /** Name of the active project, rendered above the subtitle when provided. */
   projectName?: string;
+  /** Called with the trimmed name when the user saves an inline rename. */
+  onRename?: (name: string) => void | Promise<void>;
 }
 
 /**
- * Header title block: the active project name above the file-name
+ * Header title block: the editable project name above the file-name
  * subtitle (or a "No file selected" placeholder).
  *
  * @param props - See {@link HeaderTitleProps}.
  */
-function HeaderTitle({ fileName, projectName }: HeaderTitleProps) {
+function HeaderTitle({ fileName, projectName, onRename }: HeaderTitleProps) {
   return (
     <span className="flex min-w-0 flex-1 flex-col" data-testid="header-title">
       {projectName !== undefined && (
-        <span className="truncate text-sm font-medium text-gray-900" data-testid="project-name">
-          {projectName}
-        </span>
+        <ProjectNameInput name={projectName} onRename={onRename} />
       )}
       <span
         className="truncate text-xs text-gray-700"
@@ -185,6 +188,7 @@ function HeaderTitle({ fileName, projectName }: HeaderTitleProps) {
 export function AppHeader({
   fileName,
   projectName,
+  onRename,
   mode,
   onSelectMode,
   saveStatus,
@@ -213,7 +217,7 @@ export function AppHeader({
       >
         <BookOpenText className="h-5 w-5" aria-hidden="true" />
       </button>
-      <HeaderTitle fileName={fileName} projectName={projectName} />
+      <HeaderTitle fileName={fileName} projectName={projectName} onRename={onRename} />
       <SaveIndicator status={saveStatus} />
       <HeaderActions
         mode={mode}

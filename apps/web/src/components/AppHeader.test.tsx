@@ -91,13 +91,82 @@ describe('AppHeader layout', () => {
     }
   });
 
-  it('shows the project name when provided and only the subtitle otherwise', () => {
+  it('shows the project name input when provided and only the subtitle otherwise', () => {
     const { unmount } = renderHeader();
-    expect(screen.queryByTestId('project-name')).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Project name' })).toBeNull();
     unmount();
 
     renderHeader({ projectName: 'My Project' });
-    expect(screen.getByTestId('project-name').textContent).toBe('My Project');
+    const input = screen.getByRole('textbox', { name: 'Project name' }) as HTMLInputElement;
+    expect(input.value).toBe('My Project');
+  });
+});
+
+describe('AppHeader inline project rename', () => {
+  it('renders the project name as a plain-text input with a hover/focus pencil icon', () => {
+    const { container } = renderHeader({ projectName: 'My Project' });
+    const input = screen.getByRole('textbox', { name: 'Project name' });
+    expect((input as HTMLInputElement).value).toBe('My Project');
+    // At least 44px tall for a comfortable touch target.
+    expect(input.className).toMatch(/\bmin-h-11\b/);
+    expect(input.className).toMatch(/\bborder-0\b/);
+    const pencil = container.querySelector('.lucide-pencil');
+    expect(pencil).not.toBeNull();
+    expect(pencil?.getAttribute('class')).toMatch(/opacity-0/);
+    expect(pencil?.getAttribute('class')).toMatch(/group-hover:opacity-100/);
+    expect(pencil?.getAttribute('class')).toMatch(/group-focus-within:opacity-100/);
+  });
+
+  it('calls onRename with the trimmed name on Enter', () => {
+    const onRename = vi.fn();
+    renderHeader({ projectName: 'My Project', onRename });
+    const input = screen.getByRole('textbox', { name: 'Project name' });
+    fireEvent.change(input, { target: { value: '  New Name  ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onRename).toHaveBeenCalledTimes(1);
+    expect(onRename).toHaveBeenCalledWith('New Name');
+  });
+
+  it('calls onRename with the trimmed name on blur', () => {
+    const onRename = vi.fn();
+    renderHeader({ projectName: 'My Project', onRename });
+    const input = screen.getByRole('textbox', { name: 'Project name' });
+    fireEvent.change(input, { target: { value: 'Renamed ' } });
+    fireEvent.blur(input);
+    expect(onRename).toHaveBeenCalledTimes(1);
+    expect(onRename).toHaveBeenCalledWith('Renamed');
+  });
+});
+
+describe('AppHeader inline rename cancellation', () => {
+  it('restores the previous name on Escape without calling onRename', () => {
+    const onRename = vi.fn();
+    renderHeader({ projectName: 'My Project', onRename });
+    const input = screen.getByRole('textbox', { name: 'Project name' }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'Typo' } });
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(onRename).not.toHaveBeenCalled();
+    expect(input.value).toBe('My Project');
+  });
+
+  it('rejects an empty or whitespace-only name and restores the old name', () => {
+    const onRename = vi.fn();
+    renderHeader({ projectName: 'My Project', onRename });
+    const input = screen.getByRole('textbox', { name: 'Project name' }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '   ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onRename).not.toHaveBeenCalled();
+    expect(input.value).toBe('My Project');
+  });
+
+  it('shows an inline error when the rename is rejected', async () => {
+    const onRename = vi.fn().mockRejectedValue(new Error('nope'));
+    renderHeader({ projectName: 'My Project', onRename });
+    const input = screen.getByRole('textbox', { name: 'Project name' });
+    fireEvent.change(input, { target: { value: 'Renamed' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toMatch(/rename/i);
   });
 });
 

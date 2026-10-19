@@ -260,6 +260,7 @@ export function App() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <AppHeader
         projectName={active?.name} fileName={baseName(activePath)}
+        onRename={active ? (name) => rename(active.id, name) : undefined}
         mode={mode} onSelectMode={setMode} saveStatus={saveStatus}
         formattingToolbar={formattingToolbar}
         onToggleFormattingToolbar={toggleFormattingToolbar}
