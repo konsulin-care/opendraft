@@ -23,7 +23,7 @@ function makeRecord(id: string, name: string, lastOpenedAt: number): ProjectReco
 /** Harness holding projects in state; spies come from `overrides`. */
 function Harness(overrides: Partial<ProjectSwitcherProps> = {}) {
   // Passed deliberately unsorted: the switcher must sort by lastOpenedAt.
-  const [projects, setProjects] = useState<ProjectRecord[]>([
+  const [projects] = useState<ProjectRecord[]>([
     makeRecord(OLDER_ID, 'Older Paper', 100),
     makeRecord(NEWER_ID, 'Newer Paper', 200),
   ]);
@@ -38,10 +38,6 @@ function Harness(overrides: Partial<ProjectSwitcherProps> = {}) {
         setActiveId(id);
       }}
       create={(name, manuscriptId) => overrides.create?.(name, manuscriptId)}
-      remove={(id) => {
-        overrides.remove?.(id);
-        setProjects((ps) => ps.filter((p) => p.id !== id));
-      }}
     />
   );
 }
@@ -276,6 +272,8 @@ describe('project switcher new project action', () => {
       .getAllByRole('button')
       .filter((button) => !list.contains(button));
     expect(outsideList.map((button) => button.textContent)).toEqual(['New project']);
+    // Deletion moved to the drawer footer dialog; the dropdown offers none.
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
 
     const newProject = screen.getByRole('button', { name: 'New project' });
     expect(newProject.className).toContain('w-full');

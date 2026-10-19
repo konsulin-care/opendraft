@@ -1,9 +1,4 @@
-import { useState } from 'react';
-import type { ReactNode } from 'react';
 import type { ProjectRecord } from '@opendraft/workspace';
-
-/** Panel shown under the project list in the switcher dropdown. */
-export type SwitcherMode = 'list' | 'delete';
 
 /**
  * Dropdown list of projects, most recently opened first.
@@ -42,59 +37,6 @@ export function ProjectList({
 }
 
 /**
- * Delete confirmation panel. The confirm button stays disabled until the
- * exact project name is typed.
- *
- * @param props - Project to delete, confirm handler, and cancel handler.
- */
-export function DeletePanel({
-  project,
-  onConfirm,
-  onCancel,
-}: {
-  /** Project being deleted; its exact name unlocks the confirm button. */
-  project: ProjectRecord;
-  /** Remove the project. */
-  onConfirm: () => void;
-  /** Leave delete mode without removing anything. */
-  onCancel: () => void;
-}) {
-  const [value, setValue] = useState('');
-  return (
-    <div className="px-2 py-1">
-      <p className="mb-1 text-xs text-gray-600">
-        Type “{project.name}” to confirm deletion.
-      </p>
-      <div className="flex items-center gap-1">
-        <input
-          type="text"
-          aria-label="Confirm project name"
-          value={value}
-          autoFocus
-          onChange={(event) => setValue(event.target.value)}
-          className="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-500"
-        />
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-md px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={onConfirm}
-          disabled={value !== project.name}
-          className="rounded-md bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Delete project
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/**
  * Dropdown footer: the panel's only action, opening the new-project dialog.
  *
  * @param props - Handler for the new-project action.
@@ -124,49 +66,15 @@ export interface SwitcherDropdownProps {
   projects: ProjectRecord[];
   /** The active project, or null when none. */
   active: ProjectRecord | null;
-  /** Which panel to show under the list. */
-  mode: SwitcherMode;
   /** Choose a project from the list. */
   onSelect: (id: string) => void;
-  /** Switch to the given panel mode. */
-  onSetMode: (mode: SwitcherMode) => void;
-  /** Remove the active project. */
-  onConfirmDelete: () => void;
   /** Open the new-project dialog. */
   onNew: () => void;
 }
 
 /**
- * Panel shown for the active project: delete confirmation or the action
- * row. Renders nothing when there is no active project.
- *
- * @param props - Active project, panel mode, and the panel handlers.
- */
-function ActivePanel({
-  active,
-  mode,
-  onSetMode,
-  onConfirmDelete,
-  onNew,
-}: Pick<
-  SwitcherDropdownProps,
-  'active' | 'mode' | 'onSetMode' | 'onConfirmDelete' | 'onNew'
->) {
-  if (!active) return null;
-  const cancel = () => onSetMode('list');
-  const wrap = (panel: ReactNode) => (
-    <div className="border-t border-gray-100 py-1">{panel}</div>
-  );
-  if (mode === 'delete') {
-    return wrap(<DeletePanel project={active} onConfirm={onConfirmDelete} onCancel={cancel} />);
-  }
-  return wrap(<ActionsRow onNew={onNew} />);
-}
-
-/**
  * Open switcher dropdown: the project list plus, for the active project,
- * the panel for the current mode (delete confirmation, or the new-project
- * action as its only button).
+ * the new-project action as the panel's only button.
  *
  * The panel is absolutely positioned under the trigger at its width, so it
  * overlays the file tree instead of pushing it down.
@@ -176,22 +84,17 @@ function ActivePanel({
 export function SwitcherDropdown({
   projects,
   active,
-  mode,
   onSelect,
-  onSetMode,
-  onConfirmDelete,
   onNew,
 }: SwitcherDropdownProps) {
   return (
     <div className="absolute left-0 right-0 top-full z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg">
       <ProjectList projects={projects} activeId={active?.id} onSelect={onSelect} />
-      <ActivePanel
-        active={active}
-        mode={mode}
-        onSetMode={onSetMode}
-        onConfirmDelete={onConfirmDelete}
-        onNew={onNew}
-      />
+      {active && (
+        <div className="border-t border-gray-100 py-1">
+          <ActionsRow onNew={onNew} />
+        </div>
+      )}
     </div>
   );
 }

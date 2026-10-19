@@ -8,6 +8,7 @@ import type { EditorMode } from './components/ModeSwitch';
 import { CommitDialog } from './components/CommitDialog';
 import { ProjectDrawer, useDrawerState } from './components/project-drawer/ProjectDrawer';
 import { ProjectSwitcher } from './components/project-drawer/ProjectSwitcher';
+import { DeleteProjectAction } from './components/project-drawer/DeleteProjectDialog';
 import { FileTree } from './components/project-drawer/FileTree';
 import { useProjects } from './hooks/useProjects';
 import { useActiveFile } from './hooks/useActiveFile';
@@ -160,8 +161,9 @@ interface DrawerSectionProps {
 }
 
 /**
- * Overlay project drawer with the project switcher pinned in its header
- * and the active project's file tree as its body.
+ * Overlay project drawer with the project switcher pinned in its header,
+ * the active project's file tree as its body, and the delete action in
+ * its footer.
  *
  * @param props - Projects, active project, registry actions, drawer state,
  *   workspace, active file path and the open-file handler.
@@ -190,8 +192,12 @@ function DrawerSection({
           active={active}
           switchTo={switchTo}
           create={create}
-          remove={remove}
         />
+      }
+      footer={
+        active ? (
+          <DeleteProjectAction project={active} onConfirm={remove} />
+        ) : undefined
       }
     >
       <FileTree

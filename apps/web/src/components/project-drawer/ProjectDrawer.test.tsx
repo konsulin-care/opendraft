@@ -1,10 +1,11 @@
 import 'fake-indexeddb/auto';
 import { useRef, useState } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { AppHeader } from '../AppHeader';
 import type { AppHeaderProps } from '../AppHeader';
 import { ProjectDrawer, useProjectDrawer, DRAWER_OPEN_STORAGE_KEY } from './ProjectDrawer';
+import { DeleteProjectAction } from './DeleteProjectDialog';
 import { App } from '../../App';
 import { projectRegistry } from '../../hooks/useProjects';
 
@@ -189,6 +190,68 @@ describe('project drawer persistence', () => {
     openDrawer();
     await waitFor(() => expect(screen.getByRole('dialog')).toBeDefined());
     expect(localStorage.getItem(DRAWER_OPEN_STORAGE_KEY)).toBe('true');
+  });
+});
+
+/** Project the footer's delete action removes. */
+const DELETE_PROJECT = { id: 'proj-1', name: 'Paper' };
+
+/** Drawer harness carrying the delete footer the app composes in. */
+function DeleteFooterHarness({
+  onConfirm,
+}: {
+  /** Stands in for the registry remove action. */
+  onConfirm: (id: string) => void;
+}) {
+  return (
+    <ProjectDrawer
+      open
+      onClose={() => {}}
+      title="Paper"
+      footer={<DeleteProjectAction project={DELETE_PROJECT} onConfirm={onConfirm} />}
+    >
+      <FileListStub />
+    </ProjectDrawer>
+  );
+}
+
+describe('project drawer delete footer', () => {
+  it('holds a full-width red Delete project button that opens the dialog', () => {
+    render(<DeleteFooterHarness onConfirm={vi.fn()} />);
+    const button = screen.getByRole('button', { name: 'Delete project' });
+
+    expect(button.closest('footer')).not.toBeNull();
+    expect(button.className).toContain('w-full');
+    expect(button.className).toContain('px-3');
+    expect(button.className).toContain('bg-red-600');
+    expect(button.className).toContain('text-white');
+
+    fireEvent.click(button);
+    expect(screen.getByRole('dialog', { name: 'Delete project' })).toBeDefined();
+  });
+
+  it('runs remove only after the matching name is typed', () => {
+    const remove = vi.fn<(id: string) => void>();
+    render(<DeleteFooterHarness onConfirm={remove} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete project' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete project' });
+    const confirm = within(dialog).getByRole('button', {
+      name: 'Delete project',
+    }) as HTMLButtonElement;
+    const input = within(dialog).getByLabelText('Confirm project name');
+
+    fireEvent.change(input, { target: { value: 'Pape' } });
+    expect(confirm.disabled).toBe(true);
+    fireEvent.click(confirm);
+    expect(remove).not.toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: 'Paper' } });
+    expect(confirm.disabled).toBe(false);
+    fireEvent.click(confirm);
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(remove).toHaveBeenCalledWith(DELETE_PROJECT.id);
+    expect(screen.queryByRole('dialog', { name: 'Delete project' })).toBeNull();
   });
 });
 

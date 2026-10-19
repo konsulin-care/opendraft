@@ -156,3 +156,47 @@ export function DeleteProjectDialog({
     </div>
   );
 }
+
+/**
+ * Footer delete action for the project drawer: a full-width red button
+ * that opens {@link DeleteProjectDialog}. Confirming removes the project
+ * and closes the dialog; cancelling just closes it.
+ *
+ * @param props - Project to delete and the remove handler.
+ */
+export function DeleteProjectAction({
+  project,
+  onConfirm,
+}: {
+  /** Project being deleted; its exact name unlocks the confirm action. */
+  project: DeletableProject;
+  /** Remove the project; called once with the project id after a match. */
+  onConfirm: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  /** Remove the project, then close the dialog. */
+  const confirm = (id: string) => {
+    onConfirm(id);
+    setOpen(false);
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="w-full rounded-md bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700"
+      >
+        Delete project
+      </button>
+      {open && (
+        <DeleteProjectDialog
+          project={project}
+          onConfirm={confirm}
+          onCancel={() => setOpen(false)}
+        />
+      )}
+    </>
+  );
+}

@@ -167,6 +167,8 @@ export interface ProjectDrawerProps {
   title?: string;
   /** Custom pinned-header content (e.g. {@link ProjectSwitcher}); replaces the title. */
   header?: ReactNode;
+  /** Non-scrolling footer content (e.g. the delete action), below the body. */
+  footer?: ReactNode;
   /** Drawer body, typically the file tree; only this region scrolls. */
   children?: ReactNode;
 }
@@ -197,6 +199,7 @@ function DrawerPanel({
   panelRef,
   title,
   header,
+  footer,
   onClose,
   children,
 }: {
@@ -204,6 +207,7 @@ function DrawerPanel({
   panelRef: RefObject<HTMLDivElement | null>;
   title?: string;
   header?: ReactNode;
+  footer?: ReactNode;
   onClose: () => void;
   children?: ReactNode;
 }) {
@@ -221,9 +225,7 @@ function DrawerPanel({
     >
       <header className="flex items-center justify-between gap-2 border-b border-gray-200 px-3 py-2">
         {header ?? (
-          <span className="min-w-0 truncate text-sm font-medium text-gray-900">
-            {title ?? 'Project'}
-          </span>
+          <span className="min-w-0 truncate text-sm font-medium text-gray-900">{title ?? 'Project'}</span>
         )}
         {compact && (
           <button
@@ -237,6 +239,7 @@ function DrawerPanel({
         )}
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+      {footer && <footer className="shrink-0 border-t border-gray-200 px-3 py-2">{footer}</footer>}
     </div>
   );
 }
@@ -255,6 +258,7 @@ export function ProjectDrawer({
   toggleRef,
   title,
   header,
+  footer,
   children,
 }: ProjectDrawerProps) {
   const width = useViewportWidth();
@@ -279,7 +283,14 @@ export function ProjectDrawer({
   return (
     <ProjectDrawerContext.Provider value={context}>
       {width >= BACKDROP_MIN_WIDTH && <DrawerBackdrop dimmed={compact} onClose={onClose} />}
-      <DrawerPanel compact={compact} panelRef={panelRef} title={title} header={header} onClose={onClose}>
+      <DrawerPanel
+        compact={compact}
+        panelRef={panelRef}
+        title={title}
+        header={header}
+        footer={footer}
+        onClose={onClose}
+      >
         {children}
       </DrawerPanel>
     </ProjectDrawerContext.Provider>

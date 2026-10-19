@@ -4,7 +4,6 @@ import { ChevronDown } from 'lucide-react';
 import { useOverflowMarquee } from '../../hooks/use-overflow-marquee';
 import { NewProjectDialog } from './NewProjectDialog';
 import { SwitcherDropdown } from './project-switcher-panels';
-import type { SwitcherMode } from './project-switcher-panels';
 
 /** Props for {@link ProjectSwitcher}. */
 export interface ProjectSwitcherProps {
@@ -16,8 +15,6 @@ export interface ProjectSwitcherProps {
   switchTo: (id: string) => void;
   /** Register and scaffold a new project. */
   create: (name: string, manuscriptId: string) => void;
-  /** Remove a project. */
-  remove: (id: string) => void;
 }
 
 /** Sort projects by most recently opened, first. */
@@ -83,38 +80,30 @@ function SwitcherButton({
 interface SwitcherState {
   /** Whether the dropdown is open. */
   open: boolean;
-  /** Panel shown under the project list. */
-  mode: SwitcherMode;
   /** Whether the new-project dialog is open. */
   creating: boolean;
   /** Toggle the dropdown. */
   toggle: () => void;
   /** Choose a project from the dropdown and close it. */
   choose: (id: string) => void;
-  /** Switch the dropdown panel mode. */
-  setMode: (mode: SwitcherMode) => void;
-  /** Leave delete mode, remove the active project, and close the dropdown. */
-  confirmDelete: () => void;
   /** Open or close the new-project dialog. */
   setCreating: (creating: boolean) => void;
 }
 
 /**
- * Dropdown, panel-mode, and dialog state for the project switcher, wiring
- * the callbacks to the registry actions passed in.
+ * Dropdown and dialog state for the project switcher, wiring the
+ * callbacks to the registry actions passed in. Deletion lives in the
+ * drawer footer, not the dropdown.
  *
  * @param active - The active project, or null when none.
  * @param switchTo - Make the given project active.
- * @param remove - Remove the active project.
  * @returns See {@link SwitcherState}.
  */
 function useSwitcherState(
   active: ProjectRecord | null,
   switchTo: (id: string) => void,
-  remove: (id: string) => void,
 ): SwitcherState {
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<SwitcherMode>('list');
   const [creating, setCreating] = useState(false);
 
   /** Choose a project from the dropdown and close it. */
@@ -123,21 +112,11 @@ function useSwitcherState(
     setOpen(false);
   };
 
-  /** Leave delete mode and close the dropdown. */
-  const confirmDelete = () => {
-    if (active) remove(active.id);
-    setMode('list');
-    setOpen(false);
-  };
-
   return {
     open,
-    mode,
     creating,
     toggle: () => setOpen((o) => !o),
     choose,
-    setMode,
-    confirmDelete,
     setCreating,
   };
 }
@@ -154,9 +133,8 @@ export function ProjectSwitcher({
   active,
   switchTo,
   create,
-  remove,
 }: ProjectSwitcherProps) {
-  const state = useSwitcherState(active, switchTo, remove);
+  const state = useSwitcherState(active, switchTo);
 
   return (
     <div className="relative min-w-0">
@@ -169,10 +147,7 @@ export function ProjectSwitcher({
         <SwitcherDropdown
           projects={byRecentFirst(projects)}
           active={active}
-          mode={state.mode}
           onSelect={state.choose}
-          onSetMode={state.setMode}
-          onConfirmDelete={state.confirmDelete}
           onNew={() => state.setCreating(true)}
         />
       )}
