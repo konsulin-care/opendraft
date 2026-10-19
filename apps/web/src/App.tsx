@@ -22,13 +22,14 @@ function useCommitDialog() {
 }
 
 /**
- * Extract the base file name of a repo-relative path.
+ * Extract the manuscript directory name from a repo-relative path.
  *
  * @param path - Repo-relative path such as `manuscripts/p/article.qmd`.
- * @returns The segment after the last slash, e.g. `article.qmd`.
+ * @returns The directory segment under `manuscripts/`, or null.
  */
-function baseName(path: string): string {
-  return path.split('/').pop() ?? path;
+function manuscriptDirName(path: string): string | null {
+  const [root, dir] = path.split('/');
+  return root === 'manuscripts' && dir ? dir : null;
 }
 
 /**
@@ -257,12 +258,14 @@ export function App() {
   if (loading) return <div>Loading workspace...</div>;
   if (error) return <div>Error: {error.message}</div>;
   if (!workspace || !activePath) return <div>Empty workspace</div>;
+  const dirName = manuscriptDirName(activePath);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <AppHeader
-        projectName={active?.name} fileName={baseName(activePath)}
-        onRename={active ? (name) => rename(active.id, name) : undefined}
+        projectName={active?.name} manuscriptDir={dirName ?? undefined}
+        manuscriptName={dirName !== null ? active?.manuscriptNames?.[dirName] : undefined}
+        onRenameProject={active ? (name) => rename(active.id, name) : undefined}
         mode={mode} onSelectMode={setMode} saveStatus={saveStatus}
         formattingToolbar={formattingToolbar}
         onToggleFormattingToolbar={toggleFormattingToolbar}

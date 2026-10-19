@@ -11,12 +11,14 @@ export interface InlineEditFieldProps {
   testId?: string;
   /** Called with the trimmed value when the user saves via Enter or blur. */
   onSave?: (value: string) => void | Promise<void>;
+  /** Extra classes appended after the base input classes. */
+  inputClassName?: string;
 }
 
 const SAVE_ERROR = 'Could not rename.';
 
 const INPUT_CLASS =
-  'min-h-11 w-full min-w-0 border-0 p-0 text-sm font-medium text-gray-900 focus:outline-none';
+  'w-full min-w-0 border-0 p-0 text-sm font-medium leading-tight text-gray-900 focus:outline-none';
 
 /**
  * Draft state for the inline edit: tracks the edited value, the last
@@ -75,7 +77,7 @@ function useEditDraft(value: string, onSave?: (value: string) => void | Promise<
  *
  * @param props - See {@link InlineEditFieldProps}.
  */
-export function InlineEditField({ value, label, testId, onSave }: InlineEditFieldProps) {
+export function InlineEditField({ value, label, testId, onSave, inputClassName }: InlineEditFieldProps) {
   const { draft, setDraft, error, save, restore } = useEditDraft(value, onSave);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -107,7 +109,7 @@ export function InlineEditField({ value, label, testId, onSave }: InlineEditFiel
           }
         }}
         onBlur={save}
-        className={INPUT_CLASS}
+        className={inputClassName ? `${INPUT_CLASS} ${inputClassName}` : INPUT_CLASS}
       />
       <SquarePen
         className="h-3.5 w-3.5 shrink-0 text-gray-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"

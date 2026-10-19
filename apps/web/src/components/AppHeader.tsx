@@ -8,7 +8,6 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { RefObject } from 'react';
-import { formatFileName } from '../format-file-name';
 import { APP_BAR_HEIGHT } from './app-bar-layout';
 import { PROJECT_DRAWER_ID } from './project-drawer/ProjectDrawer';
 import { ModeSwitch } from './ModeSwitch';
@@ -114,15 +113,23 @@ function HeaderActions({
 
 /** Props for {@link AppHeader}. */
 export interface AppHeaderProps {
-  /** Full manuscript file name; displayed truncated with the full name in `title`. */
-  fileName: string;
+  /** @deprecated No longer rendered; kept for legacy callers. */
+  fileName?: string;
   /**
-   * Name of the active project. Rendered as the primary title above the
-   * file-name subtitle when provided.
+   * Name of the active project. Rendered as the second line of the
+   * title column when provided.
    */
   projectName?: string;
-  /** Called with the trimmed name when the user saves an inline rename. */
+  /** Display name of the open manuscript (line 1 of the title column). */
+  manuscriptName?: string;
+  /** Manuscript directory name; used when no display name is set. */
+  manuscriptDir?: string;
+  /** @deprecated Use {@link AppHeaderProps.onRenameProject}. */
   onRename?: (name: string) => void | Promise<void>;
+  /** Called with the trimmed title when the user renames the manuscript. */
+  onRenameManuscript?: (name: string) => void | Promise<void>;
+  /** Called with the trimmed name when the user renames the project. */
+  onRenameProject?: (name: string) => void | Promise<void>;
   /** Current editing mode. */
   mode: EditorMode;
   /** Called when the user picks an editing mode. */
@@ -147,53 +154,61 @@ export interface AppHeaderProps {
 
 /** Props for {@link HeaderTitle}. */
 interface HeaderTitleProps {
-  /** Full manuscript file name, or empty when no file is open. */
-  fileName: string;
-  /** Name of the active project, rendered above the subtitle when provided. */
+  /** Display name of the open manuscript, falling back to the dir name. */
+  title?: string;
+  /** Name of the active project, rendered below the title when provided. */
   projectName?: string;
-  /** Called with the trimmed name when the user saves an inline rename. */
-  onRename?: (name: string) => void | Promise<void>;
+  /** Called with the trimmed title when the user renames the manuscript. */
+  onRenameManuscript?: (name: string) => void | Promise<void>;
+  /** Called with the trimmed name when the user renames the project. */
+  onRenameProject?: (name: string) => void | Promise<void>;
 }
 
 /**
- * Header title block: the editable project name above the file-name
- * subtitle (or a "No file selected" placeholder).
+ * Header title column: the editable manuscript title (line 1) above the
+ * editable project name (line 2), kept in an h-9 vertically centered
+ * block so the subtitle clears the header divider.
  *
  * @param props - See {@link HeaderTitleProps}.
  */
-function HeaderTitle({ fileName, projectName, onRename }: HeaderTitleProps) {
+function HeaderTitle({ title, projectName, onRenameManuscript, onRenameProject }: HeaderTitleProps) {
   return (
-    <span className="flex min-w-0 flex-1 flex-col" data-testid="header-title">
+    <span
+      className="flex h-9 min-w-0 flex-1 flex-col items-center justify-center"
+      data-testid="header-title"
+    >
+      {title !== undefined && (
+        <InlineEditField
+          value={title}
+          label="Manuscript name"
+          testId="manuscript-title"
+          onSave={onRenameManuscript}
+        />
+      )}
       {projectName !== undefined && (
         <InlineEditField
           value={projectName}
           label="Project name"
           testId="project-name"
-          onSave={onRename}
+          inputClassName="text-xs font-normal text-gray-700"
+          onSave={onRenameProject}
         />
       )}
-      <span
-        className="truncate text-xs text-gray-700"
-        data-testid="file-subtitle"
-        title={fileName || 'No file selected'}
-      >
-        {fileName ? formatFileName(fileName) : 'No file selected'}
-      </span>
     </span>
   );
 }
 
 /**
- * Application header: OpenDraft mark, the active project name with the
- * file-name subtitle (or a "No file selected" placeholder), save state,
- * and the header actions.
+ * Application header: OpenDraft mark, the manuscript title over the
+ * project name, save state, and the header actions.
  *
  * @param props - See {@link AppHeaderProps}.
  */
 export function AppHeader({
-  fileName,
   projectName,
-  onRename,
+  manuscriptName,
+  manuscriptDir,
+  onRename, onRenameManuscript, onRenameProject,
   mode,
   onSelectMode,
   saveStatus,
@@ -222,7 +237,11 @@ export function AppHeader({
       >
         <BookOpenText className="h-5 w-5" aria-hidden="true" />
       </button>
-      <HeaderTitle fileName={fileName} projectName={projectName} onRename={onRename} />
+      <HeaderTitle
+        title={manuscriptName ?? manuscriptDir} projectName={projectName}
+        onRenameManuscript={onRenameManuscript}
+        onRenameProject={onRenameProject ?? onRename}
+      />
       <SaveIndicator status={saveStatus} />
       <HeaderActions
         mode={mode}

@@ -30,7 +30,6 @@ import {
 //
 // The default file is now the scaffolded starter block
 // (manuscripts/<id>/blocks/<lowercase-ulid>.qmd), not article.qmd.
-const BLOCK_TITLE = /^[a-z0-9]+\.qmd$/;
 beforeEach(async () => {
   localStorage.clear();
   for (const record of await projectRegistry.list()) {
@@ -56,7 +55,7 @@ describe('App', () => {
 
   it('boots into an auto-created scaffolded project and reopens the last file', async () => {
     const { unmount } = render(<App />);
-    await waitFor(() => expect(screen.getByTitle(BLOCK_TITLE)).toBeDefined(), { timeout: 10000 });
+    await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
 
     // One registry record, and its od-ws-<id> database holds the scaffold.
     const records = await projectRegistry.list();
@@ -77,7 +76,16 @@ describe('App', () => {
     await projectRegistry.setLastPath(records[0].id, 'manuscripts/untitled-project/references.bib');
     unmount();
     render(<App />);
-    await waitFor(() => expect(screen.getByTitle('references.bib')).toBeDefined(), { timeout: 10000 });
+    await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
+
+    // The remount reopens the last file: its treeitem is selected.
+    fireEvent.click(screen.getByRole('button', { name: 'OpenDraft' }));
+    const drawer = screen.getByTestId('project-drawer');
+    await waitFor(() => {
+      expect(
+        within(drawer).getByRole('treeitem', { name: 'references.bib' }).getAttribute('aria-selected'),
+      ).toBe('true');
+    });
   });
 
 });
@@ -104,9 +112,7 @@ describe('App project drawer', () => {
       workspaceManager.release(records[0].id);
     }
     expect(paths.length).toBeGreaterThan(0);
-    await waitFor(() => {
-      expect(within(drawer).getAllByRole('treeitem').length).toBeGreaterThan(1);
-    });
+    await waitFor(() => expect(within(drawer).getAllByRole('treeitem').length).toBeGreaterThan(1));
     for (const path of paths) {
       const name = path.split('/').pop() as string;
       expect(within(drawer).getByRole('treeitem', { name })).toBeDefined();
@@ -119,9 +125,11 @@ describe('App project drawer', () => {
       within(drawer).getByRole('treeitem', { name: blockName as string }),
     ).toBeDefined();
 
-    // Clicking a file opens its path.
+    // Clicking a file opens its path and selects its treeitem.
     fireEvent.click(within(drawer).getByRole('treeitem', { name: 'article.qmd' }));
-    await waitFor(() => expect(screen.getByTitle('article.qmd')).toBeDefined());
+    await waitFor(() => expect(
+      within(drawer).getByRole('treeitem', { name: 'article.qmd' }).getAttribute('aria-selected'),
+    ).toBe('true'));
     await waitFor(async () => {
       expect(await projectRegistry.getLastPath(records[0].id)).toBe(
         'manuscripts/untitled-project/article.qmd',
@@ -131,18 +139,18 @@ describe('App project drawer', () => {
 });
 
 describe('App header', () => {
-  it('shows the icon header with the active project name and file subtitle', async () => {
+  it('shows the icon header with the manuscript title over the project name', async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('app-header')).toBeDefined());
     const logo = screen.getByRole('button', { name: 'OpenDraft' });
     expect(logo.getAttribute('title')).toBe('OpenDraft');
     expect(screen.queryByText('OpenDraft')).toBeNull();
-    // The header shows the active project name above the file-name subtitle.
+    // The header shows the manuscript dir name (no display name stored
+    // yet) over the active project name.
     const header = screen.getByTestId('app-header');
+    const title = within(header).getByTestId('manuscript-title') as HTMLInputElement;
+    expect(title.value).toBe('untitled-project');
     expect(within(header).getByDisplayValue('Untitled project')).toBeDefined();
-    const subtitle = within(header).getByTestId('file-subtitle');
-    expect(subtitle.getAttribute('title')).toMatch(BLOCK_TITLE);
-    expect(subtitle.textContent).toBe(subtitle.getAttribute('title'));
   });
 
   it('shows a single mode toggle naming the target mode', async () => {

@@ -58,29 +58,27 @@ describe('AppHeader identity', () => {
     expect(screen.queryByText('OpenDraft')).toBeNull();
   });
 
-  it('shows the file name as a small subtitle with the full name in title', () => {
-    renderHeader({ fileName: 'manuscript.md' });
-    const subtitle = screen.getByTestId('file-subtitle');
-    expect(subtitle.textContent).toBe('manuscript.md');
-    expect(subtitle.getAttribute('title')).toBe('manuscript.md');
-    expect(subtitle.className).toMatch(/\btext-xs\b/);
+  it('shows the manuscript display name over the project name', () => {
+    renderHeader({ manuscriptName: 'My Thesis', projectName: 'Test Project' });
+    const title = screen.getByTestId('manuscript-title') as HTMLInputElement;
+    expect(title.value).toBe('My Thesis');
+    const subtitle = screen.getByTestId('project-name') as HTMLInputElement;
+    expect(subtitle.value).toBe('Test Project');
   });
 
-  it('shows "No file selected" when no file is open', () => {
-    renderHeader({ fileName: '' });
-    const subtitle = screen.getByTestId('file-subtitle');
-    expect(subtitle.textContent).toBe('No file selected');
+  it('falls back to the manuscript dir name when no display name is set', () => {
+    renderHeader({ manuscriptDir: 'my-thesis', projectName: 'Test Project' });
+    const title = screen.getByTestId('manuscript-title') as HTMLInputElement;
+    expect(title.value).toBe('my-thesis');
   });
 });
 
 describe('AppHeader layout', () => {
-  it('truncates long file names but keeps the full name in title', () => {
-    const longName = 'a'.repeat(200) + '.md';
-    renderHeader({ fileName: longName });
-    const subtitle = screen.getByTitle(longName);
-    const codePoints = Array.from(subtitle.textContent ?? '');
-    expect(codePoints).toHaveLength(140);
-    expect(codePoints[0]).toBe('…');
+  it('keeps the title and project name in an h-9 centered column', () => {
+    renderHeader({ manuscriptName: 'My Thesis', projectName: 'Test Project' });
+    const block = screen.getByTestId('header-title');
+    expect(block.className).toMatch(/\bh-9\b/);
+    expect(block.className).toMatch(/\bitems-center\b/);
   });
 
   it('carries the APP_BAR_HEIGHT class on the header root', () => {
@@ -91,7 +89,7 @@ describe('AppHeader layout', () => {
     }
   });
 
-  it('shows the project name input when provided and only the subtitle otherwise', () => {
+  it('shows the project name field only when a project name is provided', () => {
     const { unmount } = renderHeader();
     expect(screen.queryByRole('textbox', { name: 'Project name' })).toBeNull();
     unmount();
@@ -110,8 +108,6 @@ describe('AppHeader inline project rename', () => {
     const { container } = renderHeader({ projectName: 'My Project' });
     const input = screen.getByTestId('project-name');
     expect((input as HTMLInputElement).value).toBe('My Project');
-    // At least 44px tall for a comfortable touch target.
-    expect(input.className).toMatch(/\bmin-h-11\b/);
     expect(input.className).toMatch(/\bborder-0\b/);
     const pen = container.querySelector('.lucide-square-pen');
     expect(pen).not.toBeNull();
@@ -120,51 +116,67 @@ describe('AppHeader inline project rename', () => {
     expect(pen?.getAttribute('class')).toMatch(/group-focus-within:opacity-100/);
   });
 
-  it('calls onRename with the trimmed name on Enter', () => {
-    const onRename = vi.fn();
-    renderHeader({ projectName: 'My Project', onRename });
+  it('calls onRenameProject with the trimmed name on Enter', () => {
+    const onRenameProject = vi.fn();
+    renderHeader({ projectName: 'My Project', onRenameProject });
     const input = screen.getByTestId('project-name');
     fireEvent.change(input, { target: { value: '  New Name  ' } });
     fireEvent.keyDown(input, { key: 'Enter' });
-    expect(onRename).toHaveBeenCalledTimes(1);
-    expect(onRename).toHaveBeenCalledWith('New Name');
+    expect(onRenameProject).toHaveBeenCalledTimes(1);
+    expect(onRenameProject).toHaveBeenCalledWith('New Name');
   });
 
-  it('calls onRename with the trimmed name on blur', () => {
-    const onRename = vi.fn();
-    renderHeader({ projectName: 'My Project', onRename });
+  it('calls onRenameProject with the trimmed name on blur', () => {
+    const onRenameProject = vi.fn();
+    renderHeader({ projectName: 'My Project', onRenameProject });
     const input = screen.getByTestId('project-name');
     fireEvent.change(input, { target: { value: 'Renamed ' } });
     fireEvent.blur(input);
-    expect(onRename).toHaveBeenCalledTimes(1);
-    expect(onRename).toHaveBeenCalledWith('Renamed');
+    expect(onRenameProject).toHaveBeenCalledTimes(1);
+    expect(onRenameProject).toHaveBeenCalledWith('Renamed');
+  });
+});
+
+describe('AppHeader manuscript title rename', () => {
+  it('calls onRenameManuscript with the edited title on Enter', () => {
+    const onRenameManuscript = vi.fn();
+    renderHeader({
+      manuscriptName: 'My Thesis',
+      projectName: 'Test Project',
+      onRenameManuscript,
+    });
+    const title = screen.getByTestId('manuscript-title');
+    fireEvent.change(title, { target: { value: 'My Thesis edited' } });
+    fireEvent.keyDown(title, { key: 'Enter' });
+    expect(onRenameManuscript).toHaveBeenCalledTimes(1);
+    expect(onRenameManuscript).toHaveBeenCalledWith('My Thesis edited');
   });
 });
 
 describe('AppHeader inline rename cancellation', () => {
-  it('restores the previous name on Escape without calling onRename', () => {
-    const onRename = vi.fn();
-    renderHeader({ projectName: 'My Project', onRename });
+  it('restores the previous name on Escape without calling onRenameProject', () => {
+    const onRenameProject = vi.fn();
+    renderHeader({ projectName: 'My Project', onRenameProject });
     const input = screen.getByTestId('project-name') as HTMLInputElement;
     fireEvent.change(input, { target: { value: 'Typo' } });
     fireEvent.keyDown(input, { key: 'Escape' });
-    expect(onRename).not.toHaveBeenCalled();
+    expect(onRenameProject).not.toHaveBeenCalled();
     expect(input.value).toBe('My Project');
   });
 
   it('rejects an empty or whitespace-only name and restores the old name', () => {
-    const onRename = vi.fn();
-    renderHeader({ projectName: 'My Project', onRename });
+    const onRenameProject = vi.fn();
+    renderHeader({ projectName: 'My Project', onRenameProject });
     const input = screen.getByTestId('project-name') as HTMLInputElement;
     fireEvent.change(input, { target: { value: '   ' } });
     fireEvent.keyDown(input, { key: 'Enter' });
-    expect(onRename).not.toHaveBeenCalled();
+    expect(onRenameProject).not.toHaveBeenCalled();
     expect(input.value).toBe('My Project');
   });
 
   it('shows an inline error when the rename is rejected', async () => {
-    const onRename = vi.fn().mockRejectedValue(new Error('nope'));
-    renderHeader({ projectName: 'My Project', onRename });
+    const onRenameProject = vi.fn().mockRejectedValue(new Error('nope'));
+    renderHeader({ projectName: 'My Project', onRenameProject });
     const input = screen.getByTestId('project-name');
     fireEvent.change(input, { target: { value: 'Renamed' } });
     fireEvent.keyDown(input, { key: 'Enter' });
