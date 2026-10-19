@@ -14,7 +14,7 @@ import { PROJECT_DRAWER_ID } from './project-drawer/ProjectDrawer';
 import { ModeSwitch } from './ModeSwitch';
 import type { EditorMode } from './ModeSwitch';
 import { HeaderOverflowMenu } from './HeaderOverflowMenu';
-import { ProjectNameInput } from './ProjectNameInput';
+import { InlineEditField } from './InlineEditField';
 
 export type { EditorMode } from './ModeSwitch';
 
@@ -165,7 +165,12 @@ function HeaderTitle({ fileName, projectName, onRename }: HeaderTitleProps) {
   return (
     <span className="flex min-w-0 flex-1 flex-col" data-testid="header-title">
       {projectName !== undefined && (
-        <ProjectNameInput name={projectName} onRename={onRename} />
+        <InlineEditField
+          value={projectName}
+          label="Project name"
+          testId="project-name"
+          onSave={onRename}
+        />
       )}
       <span
         className="truncate text-xs text-gray-700"

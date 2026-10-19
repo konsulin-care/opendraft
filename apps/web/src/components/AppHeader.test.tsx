@@ -103,18 +103,18 @@ describe('AppHeader layout', () => {
 });
 
 describe('AppHeader inline project rename', () => {
-  it('renders the project name as a plain-text input with a hover/focus pencil icon', () => {
+  it('renders the project name as a plain-text input with a hover/focus SquarePen icon', () => {
     const { container } = renderHeader({ projectName: 'My Project' });
     const input = screen.getByRole('textbox', { name: 'Project name' });
     expect((input as HTMLInputElement).value).toBe('My Project');
     // At least 44px tall for a comfortable touch target.
     expect(input.className).toMatch(/\bmin-h-11\b/);
     expect(input.className).toMatch(/\bborder-0\b/);
-    const pencil = container.querySelector('.lucide-pencil');
-    expect(pencil).not.toBeNull();
-    expect(pencil?.getAttribute('class')).toMatch(/opacity-0/);
-    expect(pencil?.getAttribute('class')).toMatch(/group-hover:opacity-100/);
-    expect(pencil?.getAttribute('class')).toMatch(/group-focus-within:opacity-100/);
+    const pen = container.querySelector('.lucide-square-pen');
+    expect(pen).not.toBeNull();
+    expect(pen?.getAttribute('class')).toMatch(/opacity-0/);
+    expect(pen?.getAttribute('class')).toMatch(/group-hover:opacity-100/);
+    expect(pen?.getAttribute('class')).toMatch(/group-focus-within:opacity-100/);
   });
 
   it('calls onRename with the trimmed name on Enter', () => {
