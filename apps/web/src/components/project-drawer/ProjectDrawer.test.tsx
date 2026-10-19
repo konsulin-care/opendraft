@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { AppHeader } from '../AppHeader';
+import { APP_BAR_HEIGHT } from '../app-bar-layout';
 import type { AppHeaderProps } from '../AppHeader';
 import { ProjectDrawer, useProjectDrawer, DRAWER_OPEN_STORAGE_KEY } from './ProjectDrawer';
 import { DeleteProjectAction } from './DeleteProjectDialog';
@@ -14,10 +15,7 @@ import { projectRegistry } from '../../hooks/useProjects';
 /** Files offered by the stub tree inside the drawer. */
 const FILES = ['manuscripts/p/article.qmd', 'manuscripts/p/refs.bib'];
 
-/**
- * Stub tree: picks files through the drawer context, standing in for
- * FileTree so the drawer's close-on-select behavior is tested in isolation.
- */
+/** Stub tree standing in for FileTree; picks files through the drawer context. */
 function FileListStub() {
   const { onFileSelected } = useProjectDrawer();
   return (
@@ -64,11 +62,7 @@ function Harness() {
   );
 }
 
-/**
- * Set the jsdom viewport width and notify listeners.
- *
- * @param width - Window width in pixels.
- */
+/** Set the jsdom viewport width and notify listeners. */
 function setViewport(width: number) {
   Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: width });
   window.dispatchEvent(new Event('resize'));
@@ -252,6 +246,27 @@ describe('project drawer delete footer', () => {
     expect(remove).toHaveBeenCalledTimes(1);
     expect(remove).toHaveBeenCalledWith(DELETE_PROJECT.id);
     expect(screen.queryByRole('dialog', { name: 'Delete project' })).toBeNull();
+  });
+});
+
+describe('project drawer layout regions', () => {
+  it('has an APP_BAR_HEIGHT header, one scroll container around the tree, and a shrink-0 footer outside it', () => {
+    setViewport(375);
+    render(<DeleteFooterHarness onConfirm={vi.fn()} />);
+    const panel = screen.getByTestId('project-drawer');
+    const header = panel.querySelector('header') as HTMLElement;
+    const footer = panel.querySelector('footer');
+    const scrollers = panel.querySelectorAll('.overflow-y-auto');
+
+    expect(panel.className).toContain('flex-col');
+    expect(header.className).toContain(APP_BAR_HEIGHT);
+    expect(scrollers).toHaveLength(1);
+    expect(scrollers[0].contains(screen.getByText(FILES[0]))).toBe(true);
+    expect(footer?.className).toContain('shrink-0');
+    expect(scrollers[0].contains(footer)).toBe(false);
+    expect([panel.children[0], panel.children[2]]).toEqual([header, footer]);
+    expect(within(header).getByRole('button', { name: 'Close project drawer' })).toBeDefined();
+    expect(header.textContent).toContain('Paper');
   });
 });
 

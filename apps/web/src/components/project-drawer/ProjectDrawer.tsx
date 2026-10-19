@@ -9,6 +9,7 @@ import {
   type RefObject,
 } from 'react';
 import { X } from 'lucide-react';
+import { APP_BAR_HEIGHT } from '../app-bar-layout';
 
 /** DOM id of the drawer panel; referenced by the header toggle's aria-controls. */
 export const PROJECT_DRAWER_ID = 'project-drawer';
@@ -223,7 +224,7 @@ function DrawerPanel({
         compact ? 'w-full' : 'w-80 max-w-full'
       }`}
     >
-      <header className="flex items-center justify-between gap-2 border-b border-gray-200 px-3 py-2">
+      <header className={`${APP_BAR_HEIGHT} flex shrink-0 items-center justify-between gap-2 border-b border-gray-200 px-3`}>
         {header ?? (
           <span className="min-w-0 truncate text-sm font-medium text-gray-900">{title ?? 'Project'}</span>
         )}
