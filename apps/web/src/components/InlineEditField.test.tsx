@@ -53,3 +53,35 @@ describe('InlineEditField pen icon', () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 });
+
+describe('InlineEditField save and revert', () => {
+  it('saves the trimmed value on Enter', () => {
+    const onSave = vi.fn();
+    renderField({ onSave });
+    const input = screen.getByRole('textbox', { name: 'Test field' }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '  New Name  ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave).toHaveBeenCalledWith('New Name');
+  });
+
+  it('ignores a whitespace-only value on blur and restores the previous value', () => {
+    const onSave = vi.fn();
+    renderField({ onSave });
+    const input = screen.getByRole('textbox', { name: 'Test field' }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '   ' } });
+    fireEvent.blur(input);
+    expect(onSave).not.toHaveBeenCalled();
+    expect(input.value).toBe('Test Project');
+  });
+
+  it('reverts to the original text on Escape without saving', () => {
+    const onSave = vi.fn();
+    renderField({ onSave });
+    const input = screen.getByRole('textbox', { name: 'Test field' }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'Typo' } });
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(onSave).not.toHaveBeenCalled();
+    expect(input.value).toBe('Test Project');
+  });
+});

@@ -103,9 +103,12 @@ describe('AppHeader layout', () => {
 });
 
 describe('AppHeader inline project rename', () => {
+  // The project-name InlineEditField is the subtitle line of the title
+  // column; the save/revert behavior itself is covered by
+  // InlineEditField.test.tsx.
   it('renders the project name as a plain-text input with a hover/focus SquarePen icon', () => {
     const { container } = renderHeader({ projectName: 'My Project' });
-    const input = screen.getByRole('textbox', { name: 'Project name' });
+    const input = screen.getByTestId('project-name');
     expect((input as HTMLInputElement).value).toBe('My Project');
     // At least 44px tall for a comfortable touch target.
     expect(input.className).toMatch(/\bmin-h-11\b/);
@@ -120,7 +123,7 @@ describe('AppHeader inline project rename', () => {
   it('calls onRename with the trimmed name on Enter', () => {
     const onRename = vi.fn();
     renderHeader({ projectName: 'My Project', onRename });
-    const input = screen.getByRole('textbox', { name: 'Project name' });
+    const input = screen.getByTestId('project-name');
     fireEvent.change(input, { target: { value: '  New Name  ' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(onRename).toHaveBeenCalledTimes(1);
@@ -130,7 +133,7 @@ describe('AppHeader inline project rename', () => {
   it('calls onRename with the trimmed name on blur', () => {
     const onRename = vi.fn();
     renderHeader({ projectName: 'My Project', onRename });
-    const input = screen.getByRole('textbox', { name: 'Project name' });
+    const input = screen.getByTestId('project-name');
     fireEvent.change(input, { target: { value: 'Renamed ' } });
     fireEvent.blur(input);
     expect(onRename).toHaveBeenCalledTimes(1);
@@ -142,7 +145,7 @@ describe('AppHeader inline rename cancellation', () => {
   it('restores the previous name on Escape without calling onRename', () => {
     const onRename = vi.fn();
     renderHeader({ projectName: 'My Project', onRename });
-    const input = screen.getByRole('textbox', { name: 'Project name' }) as HTMLInputElement;
+    const input = screen.getByTestId('project-name') as HTMLInputElement;
     fireEvent.change(input, { target: { value: 'Typo' } });
     fireEvent.keyDown(input, { key: 'Escape' });
     expect(onRename).not.toHaveBeenCalled();
@@ -152,7 +155,7 @@ describe('AppHeader inline rename cancellation', () => {
   it('rejects an empty or whitespace-only name and restores the old name', () => {
     const onRename = vi.fn();
     renderHeader({ projectName: 'My Project', onRename });
-    const input = screen.getByRole('textbox', { name: 'Project name' }) as HTMLInputElement;
+    const input = screen.getByTestId('project-name') as HTMLInputElement;
     fireEvent.change(input, { target: { value: '   ' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(onRename).not.toHaveBeenCalled();
@@ -162,7 +165,7 @@ describe('AppHeader inline rename cancellation', () => {
   it('shows an inline error when the rename is rejected', async () => {
     const onRename = vi.fn().mockRejectedValue(new Error('nope'));
     renderHeader({ projectName: 'My Project', onRename });
-    const input = screen.getByRole('textbox', { name: 'Project name' });
+    const input = screen.getByTestId('project-name');
     fireEvent.change(input, { target: { value: 'Renamed' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     const alert = await screen.findByRole('alert');
