@@ -39,8 +39,10 @@ export function useOverflowMarquee<T extends HTMLElement>(): OverflowMarquee<T> 
       setOverflowing(element.scrollWidth > element.clientWidth);
     };
     measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
+    // Without ResizeObserver support the element is measured once on mount.
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(element);
     const onEngage = (): void => setEngaged(true);
     const onRelease = (): void => setEngaged(false);
     element.addEventListener('mouseenter', onEngage);
@@ -48,7 +50,7 @@ export function useOverflowMarquee<T extends HTMLElement>(): OverflowMarquee<T> 
     element.addEventListener('focus', onEngage);
     element.addEventListener('blur', onRelease);
     return () => {
-      observer.disconnect();
+      observer?.disconnect();
       element.removeEventListener('mouseenter', onEngage);
       element.removeEventListener('mouseleave', onRelease);
       element.removeEventListener('focus', onEngage);

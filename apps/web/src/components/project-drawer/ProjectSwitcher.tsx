@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ProjectRecord } from '@opendraft/workspace';
 import { ChevronDown } from 'lucide-react';
+import { useOverflowMarquee } from '../../hooks/use-overflow-marquee';
 import { NewProjectDialog } from './NewProjectDialog';
 import { SwitcherDropdown } from './project-switcher-panels';
 import type { SwitcherMode } from './project-switcher-panels';
@@ -29,6 +30,11 @@ function byRecentFirst(projects: ProjectRecord[]): ProjectRecord[] {
 /**
  * Switcher toggle button labelled with the active project's name.
  *
+ * The name is tracked by the overflow-marquee hook: when it overflows and
+ * the trigger is hovered or focused, the `marquee` class scrolls the name
+ * right to left in a loop. The hook listens on the name element, so the
+ * trigger's hover and focus transitions are relayed onto it.
+ *
  * @param props - Button label, open state, and toggle handler.
  */
 function SwitcherButton({
@@ -43,16 +49,32 @@ function SwitcherButton({
   /** Toggle the dropdown. */
   onToggle: () => void;
 }) {
+  const { ref, marquee } = useOverflowMarquee<HTMLSpanElement>();
+
+  /** Relay a trigger hover/focus transition to the tracked name element. */
+  const relay =
+    (type: 'mouseenter' | 'mouseleave' | 'focus' | 'blur') => () => {
+      ref.current?.dispatchEvent(new Event(type));
+    };
+
   return (
     <button
       type="button"
       aria-haspopup="true"
       aria-expanded={open}
       onClick={onToggle}
+      onMouseEnter={relay('mouseenter')}
+      onMouseLeave={relay('mouseleave')}
+      onFocus={relay('focus')}
+      onBlur={relay('blur')}
       className="flex w-full items-center gap-1 rounded-md px-3 py-1 text-sm font-medium text-gray-900 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-500"
     >
       <ChevronDown className="h-4 w-4 shrink-0 text-gray-500" aria-hidden="true" />
-      <span className="min-w-0 truncate" title={label}>
+      <span
+        ref={ref}
+        className={`min-w-0 truncate${marquee ? ' marquee' : ''}`}
+        title={label}
+      >
         {label}
       </span>
     </button>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import type { ProjectRecord } from '@opendraft/workspace';
 import { ProjectSwitcher } from './ProjectSwitcher';
 import type { ProjectSwitcherProps } from './ProjectSwitcher';
@@ -65,8 +65,78 @@ function openDropdown() {
   fireEvent.click(screen.getByRole('button', { name: 'Newer Paper' }));
 }
 
+/** Mock ResizeObserver recorded per test so re-measures can be triggered. */
+class MockResizeObserver {
+  static instances: MockResizeObserver[] = [];
+  readonly observe = vi.fn();
+  readonly unobserve = vi.fn();
+  readonly disconnect = vi.fn();
+
+  /**
+   * Record the instance and keep the resize callback.
+   *
+   * @param callback - Callback invoked on resize notifications.
+   */
+  constructor(private readonly callback: ResizeObserverCallback) {
+    MockResizeObserver.instances.push(this);
+  }
+
+  /** Fire the stored callback to simulate a resize notification. */
+  trigger(): void {
+    this.callback([], this as unknown as ResizeObserver);
+  }
+}
+
+/**
+ * Stub the scroll metrics of an element.
+ *
+ * @param element - Element to stub.
+ * @param scrollWidth - Value reported as `scrollWidth`.
+ * @param clientWidth - Value reported as `clientWidth`.
+ */
+function stubOverflow(
+  element: HTMLElement,
+  scrollWidth: number,
+  clientWidth: number,
+): void {
+  Object.defineProperty(element, 'scrollWidth', {
+    value: scrollWidth,
+    configurable: true,
+  });
+  Object.defineProperty(element, 'clientWidth', {
+    value: clientWidth,
+    configurable: true,
+  });
+}
+
+/** Re-measure the tracked name by firing the hook's ResizeObserver. */
+function actResize(): void {
+  const instance = MockResizeObserver.instances.at(-1);
+  if (!instance) throw new Error('ResizeObserver was not constructed');
+  act(() => instance.trigger());
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  MockResizeObserver.instances = [];
+  vi.stubGlobal('ResizeObserver', MockResizeObserver);
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  );
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe('project switcher dropdown', () => {
@@ -99,6 +169,53 @@ describe('project switcher trigger', () => {
     expect(nameSpan?.getAttribute('title')).toBe('Newer Paper');
     expect(trigger.className).toContain('px-3');
     expect(trigger.className).toContain('w-full');
+  });
+});
+
+describe('project switcher marquee', () => {
+  it('scrolls the name only while the trigger is hovered or focused and it overflows', () => {
+    render(<Harness />);
+    const trigger = screen.getByRole('button', { name: 'Newer Paper' });
+    const nameSpan = trigger.querySelector('span') as HTMLElement;
+    stubOverflow(nameSpan, 300, 120);
+    actResize();
+
+    expect(nameSpan.className).not.toContain('marquee');
+
+    fireEvent.mouseOver(trigger);
+    expect(nameSpan.className).toContain('marquee');
+    fireEvent.mouseOut(trigger);
+    expect(nameSpan.className).not.toContain('marquee');
+
+    fireEvent.focus(trigger);
+    expect(nameSpan.className).toContain('marquee');
+    fireEvent.blur(trigger);
+    expect(nameSpan.className).not.toContain('marquee');
+  });
+
+  it('does not scroll a name that fits, even while hovered', () => {
+    render(<Harness />);
+    const trigger = screen.getByRole('button', { name: 'Newer Paper' });
+    const nameSpan = trigger.querySelector('span') as HTMLElement;
+    stubOverflow(nameSpan, 100, 200);
+    actResize();
+
+    fireEvent.mouseOver(trigger);
+    expect(nameSpan.className).not.toContain('marquee');
+  });
+});
+
+describe('project switcher panel positioning', () => {
+  it('is absolutely positioned under the trigger at its width, overlaying the tree', () => {
+    render(<Harness />);
+    openDropdown();
+
+    const panel = screen
+      .getByRole('list', { name: 'Projects' })
+      .parentElement as HTMLElement;
+    expect(panel.className).toContain('absolute');
+    expect(panel.className).toContain('top-full');
+    expect(panel.className).toContain('w-full');
   });
 });
 

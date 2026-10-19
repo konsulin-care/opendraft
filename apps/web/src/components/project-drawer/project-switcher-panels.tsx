@@ -248,6 +248,9 @@ function ActivePanel({
  * Open switcher dropdown: the project list plus, for the active project,
  * the rename panel, delete confirmation, or action row.
  *
+ * The panel is absolutely positioned under the trigger at its width, so it
+ * overlays the file tree instead of pushing it down.
+ *
  * @param props - See {@link SwitcherDropdownProps}.
  */
 export function SwitcherDropdown({
@@ -261,7 +264,7 @@ export function SwitcherDropdown({
   onNew,
 }: SwitcherDropdownProps) {
   return (
-    <div className="absolute left-0 right-0 top-full z-10 mt-1 rounded-md border border-gray-200 bg-white shadow-lg">
+    <div className="absolute left-0 right-0 top-full z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg">
       <ProjectList projects={projects} activeId={active?.id} onSelect={onSelect} />
       <ActivePanel
         active={active}
