@@ -34,6 +34,11 @@ export interface ProjectRecord {
   createdAt: number;
   /** Last-opened time (epoch milliseconds); drives list ordering. */
   lastOpenedAt: number;
+  /**
+   * Optional map of manuscript directory name to its user-facing display name.
+   * Records created before this field existed keep working without it.
+   */
+  manuscriptNames?: Record<string, string>;
 }
 
 /** Per-project metadata, keyed by project id. */
@@ -150,6 +155,76 @@ export class ProjectRegistry {
       throw new Error(`Project not found: ${id}`);
     }
     const updated: ProjectRecord = { ...record, name };
+    await db.put(PROJECTS_STORE, updated, id);
+    return updated;
+  }
+
+  /**
+   * Get the display name for a manuscript directory in a project.
+   * @param id - Project id.
+   * @param dirName - Manuscript directory name under `manuscripts/`.
+   * @returns The stored display name, or undefined when unset or the project has no map.
+   */
+  async getManuscriptDisplayName(id: string, dirName: string): Promise<string | undefined> {
+    const db = await this.getDB();
+    const record = (await db.get(PROJECTS_STORE, id)) as ProjectRecord | undefined;
+    return record?.manuscriptNames?.[dirName];
+  }
+
+  /**
+   * Set the display name for a manuscript directory in a project.
+   * @param id - Project id.
+   * @param dirName - Manuscript directory name under `manuscripts/`.
+   * @param displayName - User-facing manuscript name.
+   * @returns The updated record.
+   */
+  async setManuscriptDisplayName(
+    id: string,
+    dirName: string,
+    displayName: string,
+  ): Promise<ProjectRecord> {
+    const db = await this.getDB();
+    const record = (await db.get(PROJECTS_STORE, id)) as ProjectRecord | undefined;
+    if (!record) {
+      throw new Error(`Project not found: ${id}`);
+    }
+    const updated: ProjectRecord = {
+      ...record,
+      manuscriptNames: { ...(record.manuscriptNames ?? {}), [dirName]: displayName },
+    };
+    await db.put(PROJECTS_STORE, updated, id);
+    return updated;
+  }
+
+  /**
+   * Move a manuscript directory key, carrying its display name to the new key.
+   * A no-op when the source key holds no display name.
+   * @param id - Project id.
+   * @param fromDir - Existing manuscript directory name.
+   * @param toDir - New manuscript directory name.
+   * @returns The updated record, or the unchanged record when there was nothing to move.
+   */
+  async moveManuscriptKey(id: string, fromDir: string, toDir: string): Promise<ProjectRecord> {
+    if (fromDir === toDir) {
+      const record = await this.get(id);
+      if (!record) {
+        throw new Error(`Project not found: ${id}`);
+      }
+      return record;
+    }
+    const db = await this.getDB();
+    const record = (await db.get(PROJECTS_STORE, id)) as ProjectRecord | undefined;
+    if (!record) {
+      throw new Error(`Project not found: ${id}`);
+    }
+    const names = record.manuscriptNames;
+    const moved = names?.[fromDir];
+    if (!names || moved === undefined) {
+      return record;
+    }
+    const next: Record<string, string> = { ...names, [toDir]: moved };
+    delete next[fromDir];
+    const updated: ProjectRecord = { ...record, manuscriptNames: next };
     await db.put(PROJECTS_STORE, updated, id);
     return updated;
   }

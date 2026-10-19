@@ -93,6 +93,54 @@ describe('ProjectRegistry.rename and lastPath meta', () => {
   });
 });
 
+describe('ProjectRegistry manuscript display names', () => {
+  let registry: ProjectRegistry;
+
+  beforeEach(async () => {
+    registry = await freshRegistry();
+  });
+
+  afterEach(async () => {
+    await registry.close();
+  });
+
+  it('setManuscriptDisplayName persists and getManuscriptDisplayName reads it after reopen', async () => {
+    const record = await registry.create('Paper A');
+    await registry.setManuscriptDisplayName(record.id, 'my-thesis', 'My Thesis');
+    await registry.close();
+
+    const next = new ProjectRegistry();
+    try {
+      expect(await next.getManuscriptDisplayName(record.id, 'my-thesis')).toBe('My Thesis');
+    } finally {
+      await next.close();
+    }
+  });
+
+  it('getManuscriptDisplayName returns undefined for a project with no map', async () => {
+    const record = await registry.create('Paper A');
+    expect(record.manuscriptNames).toBeUndefined();
+    expect(await registry.getManuscriptDisplayName(record.id, 'my-thesis')).toBeUndefined();
+  });
+
+  it('moveManuscriptKey reads the value under the new key and no longer under the old one', async () => {
+    const record = await registry.create('Paper A');
+    await registry.setManuscriptDisplayName(record.id, 'old', 'Old Name');
+
+    await registry.moveManuscriptKey(record.id, 'old', 'new');
+
+    expect(await registry.getManuscriptDisplayName(record.id, 'new')).toBe('Old Name');
+    expect(await registry.getManuscriptDisplayName(record.id, 'old')).toBeUndefined();
+  });
+
+  it('moveManuscriptKey on a project without the field leaves records working', async () => {
+    const record = await registry.create('Paper A');
+    await registry.moveManuscriptKey(record.id, 'old', 'new');
+    expect(await registry.getManuscriptDisplayName(record.id, 'new')).toBeUndefined();
+    expect((await registry.get(record.id))?.name).toBe('Paper A');
+  });
+});
+
 describe('ProjectRegistry.remove', () => {
   let registry: ProjectRegistry;
 
