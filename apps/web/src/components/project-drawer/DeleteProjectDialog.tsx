@@ -62,7 +62,7 @@ function DialogActions({
       <button
         type="button"
         onClick={onCancel}
-        className="rounded-md px-3 py-1 text-sm text-gray-600 hover:bg-gray-100"
+        className="min-h-11 rounded-md px-3 py-1 text-sm text-gray-600 hover:bg-gray-100"
       >
         Cancel
       </button>
@@ -70,11 +70,30 @@ function DialogActions({
         type="button"
         onClick={() => onConfirm(id)}
         disabled={!matches}
-        className="rounded-md bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+        className="min-h-11 rounded-md bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
       >
         Delete project
       </button>
     </div>
+  );
+}
+
+/**
+ * Large monospace display of the project name; tapping it copies the
+ * name to the clipboard so it can be pasted into the confirm field.
+ *
+ * @param props - The project name to display and copy.
+ */
+function CopyNameButton({ name }: { name: string }) {
+  return (
+    <button
+      type="button"
+      title="Copy project name"
+      onClick={() => void navigator.clipboard.writeText(name)}
+      className="mb-2 flex min-h-11 w-full items-center truncate rounded-md bg-gray-100 px-2 text-left font-mono text-lg text-gray-900"
+    >
+      {name}
+    </button>
   );
 }
 
@@ -97,12 +116,14 @@ function ConfirmPanel({ project, onConfirm, onCancel }: DeleteProjectDialogProps
 
   return (
     <div
+      data-testid="delete-project-dialog-panel"
       onClick={(event) => event.stopPropagation()}
-      className="relative w-full max-w-sm rounded-lg bg-white p-4 shadow-xl"
+      className="relative max-h-[90dvh] w-full overflow-y-auto rounded-t-2xl bg-white p-4 shadow-xl sm:max-w-sm sm:rounded-2xl"
     >
       <h2 className="mb-1 text-sm font-semibold text-gray-900">Delete project</h2>
+      <CopyNameButton name={project.name} />
       <p className="mb-2 text-xs text-gray-600">
-        Type “{project.name}” to confirm deletion.
+        Type the project name to confirm deletion.
       </p>
       <label className="mb-3 block text-sm text-gray-700">
         Project name
@@ -112,6 +133,11 @@ function ConfirmPanel({ project, onConfirm, onCancel }: DeleteProjectDialogProps
           value={value}
           onChange={(event) => setValue(event.target.value)}
           onKeyDown={onKeyDown}
+          autoFocus
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
+          autoComplete="off"
           className={FIELD_CLASS}
         />
       </label>
@@ -127,9 +153,12 @@ function ConfirmPanel({ project, onConfirm, onCancel }: DeleteProjectDialogProps
 
 /**
  * Modal dialog for deleting a project with type-the-name confirmation.
- * The confirm action stays disabled until the input equals the project
- * name exactly, and Enter submits only on a match. Escape and a backdrop
- * click cancel without deleting.
+ * On narrow viewports it renders as a bottom sheet capped at 90dvh, with
+ * an autofocused input tuned for exact typing and 44px-tall buttons. The
+ * project name is shown large in monospace; tapping it copies the name to
+ * the clipboard. The confirm action stays disabled until the input equals
+ * the project name exactly, and Enter submits only on a match. Escape and
+ * a backdrop click cancel without deleting.
  *
  * @param props - See {@link DeleteProjectDialogProps}.
  */
@@ -144,7 +173,7 @@ export function DeleteProjectDialog({
     <div
       role="dialog"
       aria-label="Delete project"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-4 sm:items-center"
     >
       <div
         data-testid="delete-project-dialog-backdrop"
