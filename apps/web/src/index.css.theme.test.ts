@@ -8,6 +8,77 @@ const css = readFileSync(
   'utf8',
 );
 
+const expectedTokens = [
+  '--color-black: #212529',
+  '--color-white: #ffffff',
+  '--color-surface-low: #f8f9fa',
+  '--color-hover: #e9ecef',
+  '--color-outline: #adb5bd',
+  '--color-secondary: #dee2e6',
+  '--color-muted: #6c757d',
+  '--color-inline-code: #495057',
+  '--color-inverse: #343a40',
+  '--color-error: #dc3545',
+  '--color-selection: #d0d7de',
+  '--color-active-line: #f2f2f2',
+  '--color-gutter-bg: #f7f7f7',
+  '--color-editor-dark: #282c34',
+  '--color-amber-100: #fef3c7',
+  '--color-amber-500: #f59e0b',
+  '--color-amber-800: #92400e',
+  '--color-yellow-200: #fef9c3',
+  '--color-slate-800: #1e293b',
+  '--color-blue-600-10: rgba(37, 99, 235, 0.1)',
+  '--color-blue-600-18: rgba(37, 99, 235, 0.18)',
+  '--color-black-08: rgba(0, 0, 0, 0.08)',
+  '--color-gray-50: #f9fafb',
+  '--color-gray-100: #f3f4f6',
+  '--color-gray-200: #e5e7eb',
+  '--color-gray-300: #d1d5db',
+  '--color-gray-400: #9ca3af',
+  '--color-gray-500: #6b7280',
+  '--color-gray-600: #4b5563',
+  '--color-gray-700: #374151',
+  '--color-gray-800: #1f2937',
+  '--color-gray-900: #111827',
+  '--color-blue-50: #eff6ff',
+  '--color-blue-600: #2563eb',
+  '--color-blue-700: #1d4ed8',
+  '--color-red-50: #fef2f2',
+  '--color-red-300: #fca5a5',
+  '--color-red-600: #dc3545',
+  '--color-red-700: #b91c1c',
+  '--color-red-800: #991b1b',
+  '--color-green-700: #15803d',
+  '--color-sky-600: #0284c7',
+];
+
+describe('index.css — color token theme', () => {
+  const themeBlock = css.match(/@theme\s*\{([\s\S]*?)\n\}/)?.[1] ?? '';
+
+  it('resets all default color tokens so only declared tokens exist', () => {
+    expect(themeBlock).toContain('--color-*: initial');
+  });
+
+  it('has an @theme block', () => {
+    expect(themeBlock).not.toBe('');
+  });
+
+  it('resolves --color-black to #212529', () => {
+    expect(themeBlock).toContain('--color-black: #212529');
+  });
+
+  it('resolves --color-white to #ffffff', () => {
+    expect(themeBlock).toContain('--color-white: #ffffff');
+  });
+
+  it('declares every expected token with today\'s values', () => {
+    for (const token of expectedTokens) {
+      expect(themeBlock).toContain(token);
+    }
+  });
+});
+
 describe('theme — no cascade layers', () => {
   it('contains zero @layer declarations', () => {
     expect(css).not.toMatch(/^@layer\s+/m);
