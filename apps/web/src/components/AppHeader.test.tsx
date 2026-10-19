@@ -91,16 +91,13 @@ describe('AppHeader layout', () => {
     }
   });
 
-  it('renders the same header markup with and without projectName', () => {
-    const { container, unmount } = renderHeader();
-    const baseline = container.querySelector('[data-testid="app-header"]')?.innerHTML;
-    expect(baseline).toBeDefined();
+  it('shows the project name when provided and only the subtitle otherwise', () => {
+    const { unmount } = renderHeader();
+    expect(screen.queryByTestId('project-name')).toBeNull();
     unmount();
 
-    const { container: withNameContainer } = renderHeader({ projectName: 'My Project' });
-    expect(withNameContainer.querySelector('[data-testid="app-header"]')?.innerHTML).toBe(
-      baseline,
-    );
+    renderHeader({ projectName: 'My Project' });
+    expect(screen.getByTestId('project-name').textContent).toBe('My Project');
   });
 });
 

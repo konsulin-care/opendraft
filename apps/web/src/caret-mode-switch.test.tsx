@@ -101,6 +101,7 @@ function GatedShell({
     <>
       <AppHeader
         fileName={path}
+        projectName="Test Project"
         mode={mode}
         onSelectMode={() => {}}
         saveStatus="saved"

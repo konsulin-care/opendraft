@@ -259,15 +259,12 @@ export function App() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <AppHeader
-        fileName={baseName(activePath)}
-        mode={mode}
-        onSelectMode={setMode}
-        saveStatus={saveStatus}
+        projectName={active?.name} fileName={baseName(activePath)}
+        mode={mode} onSelectMode={setMode} saveStatus={saveStatus}
         formattingToolbar={formattingToolbar}
         onToggleFormattingToolbar={toggleFormattingToolbar}
         onCommit={() => setShowCommitDialog(true)}
-        sidebarOpen={drawer.open}
-        onToggleSidebar={drawer.toggle}
+        sidebarOpen={drawer.open} onToggleSidebar={drawer.toggle}
         toggleButtonRef={drawer.toggleRef}
       />
       <EditorArea

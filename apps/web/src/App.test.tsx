@@ -131,14 +131,18 @@ describe('App project drawer', () => {
 });
 
 describe('App header', () => {
-  it('shows the icon header with the OpenDraft button and file name', async () => {
+  it('shows the icon header with the active project name and file subtitle', async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('app-header')).toBeDefined());
     const logo = screen.getByRole('button', { name: 'OpenDraft' });
     expect(logo.getAttribute('title')).toBe('OpenDraft');
     expect(screen.queryByText('OpenDraft')).toBeNull();
-    const fileName = screen.getByTitle(BLOCK_TITLE);
-    expect(fileName.textContent).toBe(fileName.getAttribute('title'));
+    // The header shows the active project name above the file-name subtitle.
+    const header = screen.getByTestId('app-header');
+    expect(within(header).getByText('Untitled project')).toBeDefined();
+    const subtitle = within(header).getByTestId('file-subtitle');
+    expect(subtitle.getAttribute('title')).toMatch(BLOCK_TITLE);
+    expect(subtitle.textContent).toBe(subtitle.getAttribute('title'));
   });
 
   it('shows a single mode toggle naming the target mode', async () => {

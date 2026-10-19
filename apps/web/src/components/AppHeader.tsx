@@ -116,8 +116,8 @@ export interface AppHeaderProps {
   /** Full manuscript file name; displayed truncated with the full name in `title`. */
   fileName: string;
   /**
-   * Name of the active project. Accepted but not rendered yet; the header
-   * markup is identical with or without it.
+   * Name of the active project. Rendered as the primary title above the
+   * file-name subtitle when provided.
    */
   projectName?: string;
   /** Current editing mode. */
@@ -142,14 +142,49 @@ export interface AppHeaderProps {
   toggleButtonRef?: RefObject<HTMLButtonElement | null>;
 }
 
+/** Props for {@link HeaderTitle}. */
+interface HeaderTitleProps {
+  /** Full manuscript file name, or empty when no file is open. */
+  fileName: string;
+  /** Name of the active project, rendered above the subtitle when provided. */
+  projectName?: string;
+}
+
 /**
- * Application header: OpenDraft mark, the file-name subtitle (or a
- * "No file selected" placeholder), save state, and the header actions.
+ * Header title block: the active project name above the file-name
+ * subtitle (or a "No file selected" placeholder).
+ *
+ * @param props - See {@link HeaderTitleProps}.
+ */
+function HeaderTitle({ fileName, projectName }: HeaderTitleProps) {
+  return (
+    <span className="flex min-w-0 flex-1 flex-col" data-testid="header-title">
+      {projectName !== undefined && (
+        <span className="truncate text-sm font-medium text-gray-900" data-testid="project-name">
+          {projectName}
+        </span>
+      )}
+      <span
+        className="truncate text-xs text-gray-700"
+        data-testid="file-subtitle"
+        title={fileName || 'No file selected'}
+      >
+        {fileName ? formatFileName(fileName) : 'No file selected'}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Application header: OpenDraft mark, the active project name with the
+ * file-name subtitle (or a "No file selected" placeholder), save state,
+ * and the header actions.
  *
  * @param props - See {@link AppHeaderProps}.
  */
 export function AppHeader({
   fileName,
+  projectName,
   mode,
   onSelectMode,
   saveStatus,
@@ -178,13 +213,7 @@ export function AppHeader({
       >
         <BookOpenText className="h-5 w-5" aria-hidden="true" />
       </button>
-      <span
-        className="min-w-0 flex-1 truncate text-xs text-gray-700"
-        data-testid="file-subtitle"
-        title={fileName || 'No file selected'}
-      >
-        {fileName ? formatFileName(fileName) : 'No file selected'}
-      </span>
+      <HeaderTitle fileName={fileName} projectName={projectName} />
       <SaveIndicator status={saveStatus} />
       <HeaderActions
         mode={mode}
