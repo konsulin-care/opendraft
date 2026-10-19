@@ -29,6 +29,18 @@ function process(data: unknown) { /* ... */ }
 - Register service workers in main.ts.
 - Handle offline gracefully — show cached state.
 
+## Colors
+
+Colors come only from the tokens declared in the `@theme` block of
+`apps/web/src/index.css`, used via Tailwind token utilities (e.g. `bg-black`,
+`text-white`, `bg-red-600`) or `var(--color-*)`.
+
+- Raw `#hex`, `rgb()`, and `rgba()` values are not allowed in source.
+- Default Tailwind palette colors that are not declared as tokens are not
+  allowed (the theme drops the whole default palette with `--color-*: initial`).
+- The guard test `apps/web/src/color-tokens.guard.test.ts` enforces this for
+  all non-test source under `apps/web/src`.
+
 ## Error Handling
 
 - TypeScript: Result<T, E> pattern or throw with typed errors.
