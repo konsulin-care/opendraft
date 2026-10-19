@@ -556,9 +556,9 @@ textarea {
   z-index: 200;
   max-width: 380px;
   padding: 10px 14px;
-  background: #ffffff;
-  color: #212529;
-  border: 1px solid #adb5bd;
+  background: var(--color-white);
+  color: var(--color-black);
+  border: 1px solid var(--color-outline);
   border-radius: 8px;
   font-size: 0.8125rem;
   line-height: 1.5;
