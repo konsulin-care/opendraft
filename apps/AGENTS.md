@@ -20,6 +20,7 @@ Contains the runnable applications:
 3. **Don't store manuscripts server-side** — IndexedDB is the persistence layer.
 4. **Don't bypass packages/** — shared logic belongs in packages/.
 5. **Don't expose secrets to browser** — BFF mediates all credential flows.
+6. **Don't hardcode colors** — use the tokens in the `@theme` block of `apps/web/src/index.css` (token utilities or `var(--color-*)`), never raw hex, rgb, or rgba.
 
 ## When to Read convention.md
 
