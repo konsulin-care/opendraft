@@ -1,23 +1,32 @@
 /** Capability of a workspace file as seen by the editor. */
 export type FileCapability = 'rich' | 'text' | 'binary';
 
-/** File extensions that get the rich visual editor. */
-const RICH_EXTENSIONS = new Set(['md', 'qmd']);
-
-/** Basename of the scaffolded container article (source mode only). */
-const CONTAINER_BASENAME = 'article.qmd';
+/** Manuscript block file: manuscripts/<id>/blocks/<26-char lowercase ULID>.qmd. */
+const BLOCK_PATH_RE = /^manuscripts\/[^/]+\/blocks\/[0-9abcdefghjkmnpqrstvwxyz]{26}\.qmd$/;
 
 /** Maximum share of control characters (excluding \t, \n, \r) before a file counts as binary. */
 const CONTROL_CHAR_THRESHOLD = 0.1;
 
 /**
+ * Report whether a path is a manuscript block file: `manuscripts/<id>/blocks/`
+ * followed by a 26-character lowercase Crockford ULID and a `.qmd` extension.
+ * These are the only files that may mount the rich visual editor.
+ *
+ * @param path - Repo-relative file path.
+ * @returns True when the path matches the block-file shape exactly.
+ */
+export function isManuscriptBlockPath(path: string): boolean {
+  return BLOCK_PATH_RE.test(path);
+}
+
+/**
  * Report whether a file should open in the rich editor, as plain text, or not at all.
  *
  * Content containing a NUL character, or where more than 10% of the characters
- * are control characters other than `\t`, `\n` and `\r`, is `binary`. The
- * container `article.qmd` (identified by basename) is `text` because it only
- * holds includes and frontmatter. Files with a `.md` or `.qmd` extension
- * (case-insensitive) are `rich`. Everything else is `text`.
+ * are control characters other than `\t`, `\n` and `\r`, is `binary`. Only
+ * manuscript block files (`manuscripts/<id>/blocks/<ULID>.qmd`) are `rich`;
+ * everything else — root `.md`/`.qmd`, `article.qmd`, `.yml`, `.bib` — is
+ * `text` and opens in the source editor.
  *
  * @param path - Repo-relative file path.
  * @param content - Full file content.
@@ -25,31 +34,8 @@ const CONTROL_CHAR_THRESHOLD = 0.1;
  */
 export function getFileCapability(path: string, content: string): FileCapability {
   if (isBinaryContent(content)) return 'binary';
-  if (basenameOf(path) === CONTAINER_BASENAME) return 'text';
-  if (RICH_EXTENSIONS.has(extensionOf(path))) return 'rich';
+  if (isManuscriptBlockPath(path)) return 'rich';
   return 'text';
-}
-
-/**
- * Extract the basename (final path segment) of a path.
- *
- * @param path - Repo-relative file path.
- * @returns The final segment of the path.
- */
-function basenameOf(path: string): string {
-  return path.split('/').pop() ?? '';
-}
-
-/**
- * Extract the lowercase extension of a path (without the dot).
- *
- * @param path - Repo-relative file path.
- * @returns The extension in lowercase, or an empty string when there is none.
- */
-function extensionOf(path: string): string {
-  const segment = basenameOf(path);
-  const dot = segment.lastIndexOf('.');
-  return dot <= 0 ? '' : segment.slice(dot + 1).toLowerCase();
 }
 
 /**

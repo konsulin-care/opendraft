@@ -4,7 +4,7 @@ import { FileCode, FileText } from 'lucide-react';
 export type EditorMode = 'wysiwyg' | 'source';
 
 /** Explanation shown by the toggle when visual mode is unavailable for the file type. */
-export const VISUAL_MODE_GATE_TITLE = 'Visual mode is only available for .md and .qmd files';
+export const VISUAL_MODE_GATE_TITLE = 'Visual mode is only available for manuscript block files';
 
 /** Props for {@link ModeSwitch}. */
 export interface ModeSwitchProps {

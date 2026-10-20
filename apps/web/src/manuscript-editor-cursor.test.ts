@@ -27,7 +27,7 @@ function mountEditor(workspace: MemoryWorkspace, onReady: (api: EditorTestApi) =
     createElement(
       MilkdownProvider,
       null,
-      createElement(ManuscriptEditor, { workspace, defaultValue: DOC, path: "manuscript.md", onEditorReady: onReady }),
+      createElement(ManuscriptEditor, { workspace, defaultValue: DOC, path: "manuscripts/p/blocks/01hxyz00000000000000000000.qmd", onEditorReady: onReady }),
     ),
   );
 }

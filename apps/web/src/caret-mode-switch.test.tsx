@@ -5,6 +5,7 @@ import { MemoryWorkspace } from '@opendraft/workspace';
 import { MilkdownProvider } from '@milkdown/react';
 import { EditorView } from '@codemirror/view';
 import { AppHeader } from './components/AppHeader';
+import { VISUAL_MODE_GATE_TITLE } from './components/ModeSwitch';
 import { ManuscriptEditor, type EditorTestApi } from './components/ManuscriptEditor';
 import { useEditorMode } from './hooks/useEditorMode';
 import { getFileCapability } from './project/file-capability';
@@ -18,11 +19,14 @@ if (!Range.prototype.getClientRects) {
 
 const DOC = '# Title\n\nFirst paragraph.\n\nLast paragraph here.\n';
 
+/** Manuscript block path: the only file type that mounts the visual editor. */
+const BLOCK_PATH = 'manuscripts/p/blocks/01hxyz00000000000000000000.qmd';
+
 /** Mount the editor in the given mode and capture its test API. */
 function mount(workspace: MemoryWorkspace, mode: 'wysiwyg' | 'source', onReady: (api: EditorTestApi) => void) {
   return render(
     <MilkdownProvider>
-      <ManuscriptEditor workspace={workspace} defaultValue={DOC} path="manuscript.md" onEditorReady={onReady} mode={mode} />
+      <ManuscriptEditor workspace={workspace} defaultValue={DOC} path={BLOCK_PATH} onEditorReady={onReady} mode={mode} />
     </MilkdownProvider>,
   );
 }
@@ -31,7 +35,7 @@ function mount(workspace: MemoryWorkspace, mode: 'wysiwyg' | 'source', onReady: 
 function setMode(result: ReturnType<typeof render>, workspace: MemoryWorkspace, mode: 'wysiwyg' | 'source') {
   result.rerender(
     <MilkdownProvider>
-      <ManuscriptEditor workspace={workspace} defaultValue={DOC} path="manuscript.md" mode={mode} />
+      <ManuscriptEditor workspace={workspace} defaultValue={DOC} path={BLOCK_PATH} mode={mode} />
     </MilkdownProvider>,
   );
 }
@@ -48,7 +52,7 @@ async function sourceView(): Promise<EditorView> {
 }
 
 /** Explanation shown by the mode switch when visual mode is unavailable. */
-const GATE_TITLE = 'Visual mode is only available for .md and .qmd files';
+const GATE_TITLE = VISUAL_MODE_GATE_TITLE;
 
 /** Wait until the mode switch is disabled and carries the gate explanation. */
 function expectGateDisabled(): HTMLButtonElement {
@@ -76,7 +80,7 @@ async function openMarkdown(
   rerender(
     <GatedShell
       workspace={workspace}
-      path="manuscripts/p/blocks/01hx00000000.qmd"
+      path="manuscripts/p/blocks/01hxyz00000000000000000000.qmd"
       content="# Article\n\nBody text.\n"
       onReady={onReady}
     />,
@@ -151,7 +155,7 @@ describe('File-type-gated editing mode', () => {
     // The persisted preference is not rewritten by the gate.
     expect(readPreferences().editorMode).toBe('wysiwyg');
 
-    // Opening a markdown file restores the preferred visual mode and the switch.
+    // Opening a manuscript block file restores the preferred visual mode and the switch.
     api = null;
     await openMarkdown(rerender, workspace, onReady);
     await expectVisualRestored(() => api);

@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { MemoryWorkspace } from '@opendraft/workspace';
 import { MilkdownProvider } from '@milkdown/react';
-import { ManuscriptEditor, type EditorTestApi } from './ManuscriptEditor';
+import { EditorView } from '@codemirror/view';
+import { ManuscriptEditor } from './ManuscriptEditor';
 import { scaffoldProject } from '../project/scaffold';
 import { loadFile } from '../persistence';
 
@@ -23,40 +24,49 @@ const MISSING_MANUSCRIPTS = 'protocol:\n  version: "1.0"\n';
 const UNPARSEABLE = 'manuscripts: [unclosed\n';
 
 /**
- * Mount the editor on opendraft.yml content, wait until the editor API is
- * ready and the warning alert is rendered, then return both.
+ * Mount the editor on opendraft.yml content and wait until the source
+ * editor and the warning alert are rendered, then return both.
+ *
+ * opendraft.yml is not a manuscript block file, so the editor opens in
+ * source mode and no Crepe/Milkdown instance is created.
  *
  * @param workspace - Workspace to mount the editor against.
  * @param content - Initial opendraft.yml content.
- * @returns The rendered alert element and the ready editor API.
+ * @returns The rendered alert element and the CodeMirror source view.
  */
 async function mountConfigAlert(
   workspace: MemoryWorkspace,
   content: string,
-): Promise<{ alert: HTMLElement; api: EditorTestApi }> {
-  let api: EditorTestApi | null = null;
-  mountConfig(workspace, content, (ready) => (api = ready));
-  await waitFor(() => expect(api).not.toBeNull(), { timeout: 10000 });
+): Promise<{ alert: HTMLElement; view: EditorView }> {
+  mountConfig(workspace, content);
   const alert = await screen.findByRole('alert', {}, { timeout: 10000 });
-  return { alert, api: api! };
+  const view = await sourceView();
+  return { alert, view };
 }
 
 /** Mount the editor on opendraft.yml with the given content. */
-function mountConfig(
-  workspace: MemoryWorkspace,
-  content: string,
-  onReady?: (api: EditorTestApi) => void,
-) {
+function mountConfig(workspace: MemoryWorkspace, content: string) {
   return render(
     <MilkdownProvider>
-      <ManuscriptEditor
-        workspace={workspace}
-        defaultValue={content}
-        path={CONFIG_PATH}
-        onEditorReady={onReady}
-      />
+      <ManuscriptEditor workspace={workspace} defaultValue={content} path={CONFIG_PATH} />
     </MilkdownProvider>,
   );
+}
+
+/** Wait for the source editor's CodeMirror view. */
+async function sourceView(): Promise<EditorView> {
+  let view: EditorView | null = null;
+  await waitFor(() => {
+    const cmContent = document.querySelector('.cm-content') as HTMLElement | null;
+    view = cmContent ? EditorView.findFromDOM(cmContent) : null;
+    expect(view).not.toBeNull();
+  }, { timeout: 10000 });
+  return view!;
+}
+
+/** Replace the whole source document, scheduling a debounced save. */
+function typeInSource(view: EditorView, text: string) {
+  act(() => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } }));
 }
 
 describe('OpendraftConfigWarning', () => {
@@ -74,13 +84,12 @@ describe('OpendraftConfigWarning', () => {
     const workspace = new MemoryWorkspace();
     await scaffoldProject(workspace, { manuscriptId: 'p' });
     const valid = await loadFile(workspace, CONFIG_PATH);
-    let api: EditorTestApi | null = null;
-    mountConfig(workspace, valid, (ready) => (api = ready));
-    await waitFor(() => expect(api).not.toBeNull(), { timeout: 10000 });
-    // Let the editor settle before asserting the absence of an alert.
-    await waitFor(() => expect(document.querySelector('.cm-editor, .milkdown')).not.toBeNull(), {
+    mountConfig(workspace, valid);
+    // The config opens in source mode: no alert, no Milkdown root.
+    await waitFor(() => expect(document.querySelector('.cm-editor')).not.toBeNull(), {
       timeout: 10000,
     });
+    expect(document.querySelector('[data-milkdown-root]')).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
   }, 20000);
 
@@ -97,8 +106,8 @@ describe('OpendraftConfigWarning', () => {
 
   it('saves edits to the workspace while the warning is shown', async () => {
     const workspace = new MemoryWorkspace();
-    const { api } = await mountConfigAlert(workspace, MISSING_MANUSCRIPTS);
-    api.insertText('\nmanuscripts edited while invalid\n');
+    const { view } = await mountConfigAlert(workspace, MISSING_MANUSCRIPTS);
+    typeInSource(view, MISSING_MANUSCRIPTS + '\nmanuscripts edited while invalid\n');
     await waitFor(
       async () => {
         expect(await workspace.readFile(CONFIG_PATH)).toContain('manuscripts edited while invalid');

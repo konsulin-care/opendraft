@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EditorView } from '@codemirror/view';
 import { Crepe } from '@milkdown/crepe';
 import { useEditor } from '@milkdown/react';
-import { editorViewCtx, remarkPluginsCtx, type Editor } from '@milkdown/kit/core';
+import { remarkPluginsCtx, remarkStringifyOptionsCtx, type Editor } from '@milkdown/kit/core';
 import { listenerCtx } from '@milkdown/kit/plugin/listener';
-import { $prose, getMarkdown, replaceAll } from '@milkdown/kit/utils';
+import { $prose } from '@milkdown/kit/utils';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { PLACEHOLDER_HINT } from '../placeholder';
 import { createCitationPlugin } from '../citation/plugin';
@@ -12,16 +12,21 @@ import type { CitationState } from '../citation/types';
 import { quartoRemarkPlugin, quartoInlineCodePlugin, quartoChunkOptionPlugin } from '../quarto-syntax';
 import { citationRemarkPlugin } from '../citation/citation-remark-plugin';
 import { EditorSurface } from './EditorSurface';
-import { EditorToolbars } from './EditorToolbars';
-import { useEditorCommands } from '../hooks/useEditorCommands';
 import { useFocusScrollGuard } from '../hooks/useFocusScrollGuard';
-import { useVirtualKeyboard } from '../hooks/useVirtualKeyboard';
-import { createModeSwitcher, placeVisualCaret, useInitialCaret } from '../caret-mode-switch';
+import { SourceEditor, type SourceEditorHandle } from './SourceEditor';
+import { EditorFrame } from './editor-frame';
+import {
+  createModeSwitcher,
+  createTestApi,
+  useInitialCaret,
+  type EditorTestApi,
+} from '../caret-mode-switch';
 import { getFileCapability } from '../project/file-capability';
 import { useDebouncedSaver, type DebouncedSaver } from './editor/autosave';
-import { OpendraftConfigWarning } from './OpendraftConfigWarning';
-import type { SourceEditorHandle } from './SourceEditor';
 import type { SaveStatus } from './AppHeader';
+
+export type { EditorTestApi } from '../caret-mode-switch';
+
 /** Code blocks: light yellow active line/selection via @theme tokens in index.css. */
 const lightCodeBlockTheme = EditorView.theme({
   '.cm-activeLine': { backgroundColor: 'var(--color-yellow-200)' },
@@ -30,22 +35,6 @@ const lightCodeBlockTheme = EditorView.theme({
   '.cm-focused .cm-selectionBackground': { backgroundColor: 'var(--color-yellow-200)' },
 });
 
-/** Imperative handle exposed for tests and external tools. */
-export interface EditorTestApi {
-  /** Insert text at the end of the document through the editor state. */
-  insertText(text: string): void;
-  /** Current markdown as seen by the editor. */
-  getMarkdown(): string;
-  /** Replace the entire editor content with new markdown. */
-  setMarkdown(markdown: string): void;
-  /** Switch between wysiwyg and source mode. */
-  setMode(mode: 'wysiwyg' | 'source'): void;
-  /** Current visual (ProseMirror) selection position. */
-  getCaret(): number;
-  /** Place the visual caret; values past the end clamp to the document end. */
-  setCaret(pos: number): void;
-}
-
 interface ManuscriptEditorProps {
   /** Workspace adapter used for autosave persistence. */
   workspace: WorkspaceAdapter;
@@ -53,7 +42,7 @@ interface ManuscriptEditorProps {
   defaultValue: string;
   /** Workspace path this editor autosaves to; pending edits flush to the old path on change. */
   path: string;
-  /** Called once the editor instance is ready. */
+  /** Called once the editor instance is ready (rich/block files only). */
   onEditorReady?: (api: EditorTestApi) => void;
   /** Editing mode: 'wysiwyg' (default) or 'source' (raw markdown). */
   mode?: 'wysiwyg' | 'source';
@@ -72,30 +61,17 @@ interface UseManuscriptStateOptions {
   onSaveStatusChange?: (status: SaveStatus) => void;
 }
 
+/** Props shared by the rich and source-only editor variants. */
+interface FileEditorProps extends UseManuscriptStateOptions {
+  formattingToolbar: boolean;
+}
+
 interface CrepeConfigOptions {
   root: HTMLElement;
   defaultValue: string;
   placeholderText: string;
   workspace: WorkspaceAdapter;
   onStateChangeRef: React.MutableRefObject<(state: CitationState) => void>;
-}
-
-/** Build the imperative test/external API around a milkdown editor. */
-function createTestApi(editor: Editor, syncContent: (mode: 'wysiwyg' | 'source') => void): EditorTestApi {
-  return {
-    insertText: (text) => {
-      editor.action((ctx) => {
-        const view = ctx.get(editorViewCtx);
-        const position = view.state.doc.content.size;
-        view.dispatch(view.state.tr.insertText(text, position));
-      });
-    },
-    getMarkdown: () => editor.action(getMarkdown()),
-    setMarkdown: (markdown) => editor.action(replaceAll(markdown)),
-    setMode: syncContent,
-    getCaret: () => editor.action((ctx) => ctx.get(editorViewCtx).state.selection.from),
-    setCaret: (pos) => editor.action((ctx) => placeVisualCaret(ctx.get(editorViewCtx), pos)),
-  };
 }
 
 /** Create the Crepe configuration for the editor. */
@@ -115,15 +91,17 @@ function createCrepeConfig(options: CrepeConfigOptions) {
         theme: lightCodeBlockTheme,
         extensions: [quartoChunkOptionPlugin],
       },
-      [Crepe.Feature.BlockEdit]: {
-        blockHandle: {
-          shouldShow: () => false,
-        },
-      },
+      [Crepe.Feature.BlockEdit]: { blockHandle: { shouldShow: () => false } },
     },
   });
   crepe.addFeature((editor) => {
     editor.use($prose(() => createCitationPlugin(workspace, onStateChangeRef.current)));
+  });
+  // Visual edits serialize lists with '-' bullets instead of the remark
+  // default '*'. Config callbacks run at ConfigReady, before InitReady
+  // snapshots remarkStringifyOptionsCtx into the serializer.
+  crepe.editor.config((ctx) => {
+    ctx.update(remarkStringifyOptionsCtx, (options) => ({ ...options, bullet: '-' }));
   });
   return crepe;
 }
@@ -137,7 +115,9 @@ function wireEditor(
 ): void {
   editor.action((ctx) => {
     const listener = ctx.get(listenerCtx);
-    listener.markdownUpdated((_ctx, markdown) => saver.schedule(markdown));
+    listener.markdownUpdated((_ctx, markdown) => {
+      saver.schedule(markdown);
+    });
   });
   editor.action((ctx) => {
     ctx.update(remarkPluginsCtx, (ps) => [
@@ -225,12 +205,13 @@ function useManuscriptState(options: UseManuscriptStateOptions) {
 
   useFocusScrollGuard(scrollContainerRef);
 
-  return { sourceMarkdown, handleSourceChange, sourceEditorRef, scrollContainerRef, editorRef };
+  return { sourceMarkdown, handleSourceChange, sourceEditorRef, scrollContainerRef };
 }
 
 /**
- * File-type gate: rich files honor the preferred mode, other text files
- * are forced to source mode, and binary content never reaches an editor.
+ * File-type gate: manuscript block files honor the preferred mode, other
+ * text files are forced to source mode, and binary content never reaches
+ * an editor.
  *
  * @param path - Workspace path of the file being edited.
  * @param defaultValue - Current file content.
@@ -243,11 +224,62 @@ function resolveEditorGate(path: string, defaultValue: string, mode: 'wysiwyg' |
   return { capability, content, editorMode: capability === 'rich' ? mode : 'source' };
 }
 
+/** Rich visual editor for manuscript block files: Milkdown/Crepe + source companion. */
+function RichFileEditor({ workspace, defaultValue, path, mode, onEditorReady, onSaveStatusChange, formattingToolbar }: FileEditorProps) {
+  const { sourceMarkdown, handleSourceChange, sourceEditorRef, scrollContainerRef } = useManuscriptState({
+    workspace, defaultValue, path, mode, onEditorReady, onSaveStatusChange,
+  });
+  return (
+    <EditorFrame editorMode={mode} formattingToolbar={formattingToolbar} path={path} sourceMarkdown={sourceMarkdown} sourceEditorRef={sourceEditorRef}>
+      <EditorSurface
+        mode={mode}
+        sourceMarkdown={sourceMarkdown}
+        onSourceChange={handleSourceChange}
+        scrollContainerRef={scrollContainerRef}
+        sourceEditorRef={sourceEditorRef}
+        sourceLanguage="markdown"
+      />
+    </EditorFrame>
+  );
+}
+
 /**
- * Continuous editor over one workspace file: one Milkdown/Crepe surface
- * over plain markdown, autosaved to the `path` prop.
+ * Source-only editor for every non-block file (config, root markdown,
+ * bibliography, ...): a CodeMirror surface that never creates a
+ * Crepe/Milkdown instance, so non-block files are never rewritten.
+ */
+function SourceOnlyEditor({ workspace, defaultValue, path, onSaveStatusChange, formattingToolbar }: FileEditorProps) {
+  const [sourceMarkdown, setSourceMarkdown] = useState(defaultValue);
+  const sourceEditorRef = useRef<SourceEditorHandle | null>(null);
+  const saver = useDebouncedSaver(workspace, path, onSaveStatusChange);
+
+  // Reload the buffer when the open file changes.
+  useEffect(() => {
+    setSourceMarkdown(defaultValue);
+  }, [path, defaultValue]);
+
+  // Source edits schedule the same debounced autosave as visual edits.
+  const handleSourceChange = useCallback((md: string) => {
+    setSourceMarkdown(md);
+    saver.schedule(md);
+  }, [saver]);
+
+  return (
+    <EditorFrame editorMode="source" formattingToolbar={formattingToolbar} path={path} sourceMarkdown={sourceMarkdown} sourceEditorRef={sourceEditorRef}>
+      <div className="manuscript-editor" data-testid="manuscript-editor">
+        <div style={{ height: '100%', overflow: 'auto' }}>
+          <SourceEditor ref={sourceEditorRef} value={sourceMarkdown} onChange={handleSourceChange} className="source-editor" language="plain" />
+        </div>
+      </div>
+    </EditorFrame>
+  );
+}
+
+/**
+ * Continuous editor over one workspace file, autosaved to the `path` prop.
+ * Manuscript block files mount the Milkdown/Crepe visual editor; every
+ * other file opens in a source-only surface with no Crepe instance.
  * Pending debounced saves flush to the old path before switching files.
- * Supports toggling between WYSIWYG and raw source editing.
  */
 export function ManuscriptEditor({
   workspace,
@@ -258,41 +290,10 @@ export function ManuscriptEditor({
   onSaveStatusChange,
   formattingToolbar = true,
 }: ManuscriptEditorProps) {
-  const editorRef = useRef<Editor | null>(null);
-
   const { capability, content, editorMode } = resolveEditorGate(path, defaultValue, mode);
-
-  const { sourceMarkdown, handleSourceChange, sourceEditorRef, scrollContainerRef, editorRef: hookEditorRef } =
-    useManuscriptState({ workspace, defaultValue: content, path, mode: editorMode, onEditorReady, onSaveStatusChange });
-
-  // Update editorRef when hookEditorRef.current changes
-  useEffect(() => {
-    editorRef.current = hookEditorRef.current;
-  }, [hookEditorRef.current]);
-
-  const commands = useEditorCommands(editorMode, () => sourceEditorRef.current?.getView() ?? null);
-  const { open: keyboardOpen, bottomOffset } = useVirtualKeyboard();
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <EditorToolbars
-        commands={commands}
-        formattingToolbar={formattingToolbar}
-        mode={editorMode}
-        open={keyboardOpen}
-        bottomOffset={bottomOffset}
-      />
-      <OpendraftConfigWarning path={path} content={sourceMarkdown} />
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <EditorSurface
-          mode={editorMode}
-          sourceMarkdown={sourceMarkdown}
-          onSourceChange={handleSourceChange}
-          scrollContainerRef={scrollContainerRef}
-          sourceEditorRef={sourceEditorRef}
-          sourceLanguage={capability === 'rich' ? 'markdown' : 'plain'}
-        />
-      </div>
-    </div>
-  );
+  const shared = { workspace, defaultValue: content, path, onSaveStatusChange, formattingToolbar };
+  if (capability === 'rich') {
+    return <RichFileEditor {...shared} mode={editorMode} onEditorReady={onEditorReady} />;
+  }
+  return <SourceOnlyEditor {...shared} />;
 }

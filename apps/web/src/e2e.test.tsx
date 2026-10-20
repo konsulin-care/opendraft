@@ -7,8 +7,8 @@ import { ManuscriptEditor, type EditorTestApi } from './components/ManuscriptEdi
 
 // @vitest-environment jsdom
 
-/** Path used by the legacy single-manuscript flow tests. */
-const DOC_PATH = 'manuscript.md';
+/** Manuscript block path: the only file type that mounts the visual editor. */
+const DOC_PATH = 'manuscripts/p/blocks/01hxyz00000000000000000000.qmd';
 
 interface MountOptions {
   mode?: 'wysiwyg' | 'source';
