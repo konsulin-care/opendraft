@@ -4,65 +4,150 @@ import '@testing-library/jest-dom/vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { FormattingToolbar } from './FormattingToolbar';
+import { TOOLBAR_ITEMS } from './toolbar-items';
 import { EditorToolbars } from './EditorToolbars';
 import { INACTIVE_STATE } from '../editor-commands/types';
 import type { ActiveState, EditorCommands } from '../editor-commands/types';
 
-/** Action names on {@link EditorCommands} that get a spy. */
-const ACTIONS = [
-  'undo', 'redo', 'toggleBold', 'toggleItalic', 'toggleStrike', 'toggleInlineCode', 'toggleLink', 'insertCitation',
-  'inlineMath', 'setHeading', 'bulletList', 'orderedList', 'taskList', 'blockquote', 'codeBlock', 'table', 'hr', 'image',
-] as const;
+/** Controllable visible count returned by the mocked overflow hook. */
+const { overflow } = vi.hoisted(() => ({ overflow: { visibleCount: 6 } }));
 
-/**
- * Build a fake {@link EditorCommands} with a spy per action.
- *
- * @param active - Active state reported at the selection.
- * @param canFormat - Whether formatting actions are available.
- * @returns A command set with vi.fn() spies.
- */
+// jsdom measures every width as 0, so tests mock the hook and set the count directly.
+vi.mock('./use-overflow-count', () => ({
+  useOverflowCount: ({ itemCount }: { itemCount: number }) => ({
+    visibleCount: Math.min(overflow.visibleCount, itemCount),
+    rowRef: { current: null }, moreRef: { current: null }, setItemRef: () => () => undefined,
+  }),
+}));
+
+/** Action names on {@link EditorCommands} that get a spy. */
+const ACTIONS = ['undo', 'redo', 'toggleBold', 'toggleItalic', 'toggleStrike', 'toggleInlineCode', 'toggleLink',
+  'insertCitation', 'inlineMath', 'setHeading', 'bulletList', 'orderedList', 'taskList', 'blockquote', 'codeBlock',
+  'table', 'hr', 'image'] as const;
+
+/** Inline item labels when the visible count is 6, in row order. */
+const INLINE_6 = ['Undo', 'Redo', 'Paragraph style', 'Bold', 'Italic', 'Strikethrough'];
+/** Hidden item labels when the visible count is 6, in More-menu order. */
+const HIDDEN_6 = ['Inline code', 'Link', 'Citation', 'Inline math', 'Bullet list', 'Numbered list',
+  'Task list', 'Quote', 'Image', 'Table', 'Code block', 'Rule'];
+
+/** Build a fake EditorCommands with a vi.fn() spy per action. */
 function fakeCommands(active: ActiveState = INACTIVE_STATE, canFormat = true): EditorCommands {
   const spies = Object.fromEntries(ACTIONS.map((name) => [name, vi.fn()]));
   return { ...spies, canFormat, activeState: () => active } as unknown as EditorCommands;
 }
 
-/** Accessible names of the toolbar buttons, in large-screen order. */
-const LARGE_LAYOUT: Array<[name: string, icon: string]> = [
-  ['Undo', 'lucide-undo-2'], ['Redo', 'lucide-redo-2'], ['Paragraph style', 'lucide-pilcrow'],
-  ['Bold', 'lucide-bold'], ['Italic', 'lucide-italic'], ['Strikethrough', 'lucide-strikethrough'],
-  ['Inline code', 'lucide-code'], ['Link', 'lucide-link'], ['Citation', 'lucide-at-sign'],
-  ['Inline math', 'lucide-sigma'], ['Bullet list', 'lucide-list'], ['Numbered list', 'lucide-list-ordered'],
-  ['Task list', 'lucide-list-todo'], ['Quote', 'lucide-text-quote'], ['Insert', 'lucide-plus'],
-  // The More overflow trigger is lg:hidden but always in the DOM.
-  ['More', 'lucide-ellipsis'],
-];
+/** Accessible aria-label of every inline row button, More trigger included. */
+function inlineNames(container: HTMLElement): Array<string | null> {
+  const toolbar = container.querySelector('[role="toolbar"]')!;
+  return within(toolbar as HTMLElement).getAllByRole('button').map((button) => button.getAttribute('aria-label'));
+}
 
-/** Formatting buttons disabled in source mode. */
-const FORMATTING_NAMES = LARGE_LAYOUT.map(([name]) => name).filter((name) => name !== 'Undo' && name !== 'Redo');
+/** The inner row div holding the inline items and the More trigger. */
+function rowOf(container: HTMLElement): HTMLElement {
+  return container.querySelector('[role="toolbar"] > div') as HTMLElement;
+}
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  overflow.visibleCount = 6;
+});
 
-describe('FormattingToolbar buttons', () => {
-  it('renders every button with its accessible name and icon', () => {
+describe('FormattingToolbar inline row (visible count 6)', () => {
+  it('renders the first six items inline in priority order, then More', () => {
+    const { container } = render(<FormattingToolbar commands={fakeCommands()} />);
+    const names = inlineNames(container);
+    expect(names.slice(0, 6)).toEqual(INLINE_6);
+    expect(names[names.length - 1]).toBe('More');
+  });
+
+  it('renders a More trigger and no Insert trigger', () => {
+    const { container } = render(<FormattingToolbar commands={fakeCommands()} />);
+    expect(screen.getByRole('button', { name: 'More' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Insert' })).toBeNull();
+    expect(inlineNames(container)).toHaveLength(7);
+  });
+});
+
+describe('FormattingToolbar dividers (visible groups only)', () => {
+  it('renders dividers only between adjacent visible groups, never at row ends', () => {
+    const { container } = render(<FormattingToolbar commands={fakeCommands()} />);
+    const dividerIndexes = Array.from(rowOf(container).children)
+      .map((element, index) => (element.className.includes('w-px') ? index : -1))
+      .filter((index) => index >= 0);
+    // Between Redo and Paragraph style, and between Paragraph style and Bold.
+    expect(dividerIndexes).toEqual([2, 4]);
+  });
+
+  it('renders one divider between the two visible groups, none for empty groups', () => {
+    overflow.visibleCount = 1;
+    const { container } = render(<FormattingToolbar commands={fakeCommands()} />);
+    // Pinned Paragraph style forces three inline items: one divider, none at row ends.
+    expect(rowOf(container).querySelectorAll('.w-px')).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Bold' })).toBeNull();
+  });
+});
+
+describe('FormattingToolbar More menu', () => {
+  it('lists the hidden items by aria-label when opened', () => {
     render(<FormattingToolbar commands={fakeCommands()} />);
-    for (const [name, icon] of LARGE_LAYOUT) {
-      const button = screen.getByRole('button', { name });
-      expect(button.querySelector('svg')?.getAttribute('class')).toContain(icon);
+    fireEvent.click(screen.getByRole('button', { name: 'More' }));
+    const items = within(screen.getByRole('menu')).getAllByRole('menuitem');
+    expect(items.map((item) => item.getAttribute('aria-label'))).toEqual(HIDDEN_6);
+  });
+
+  it('reaches Image, Table, Code block, and Rule through More when they overflow', () => {
+    const commands = fakeCommands();
+    render(<FormattingToolbar commands={commands} />);
+    fireEvent.click(screen.getByRole('button', { name: 'More' }));
+    const icons: Array<[string, string]> = [
+      ['Image', 'lucide-image-plus'], ['Table', 'lucide-table'],
+      ['Code block', 'lucide-square-code'], ['Rule', 'lucide-minus'],
+    ];
+    for (const [name, icon] of icons) {
+      const item = screen.getByRole('menuitem', { name });
+      expect(item.querySelector('svg')?.getAttribute('class')).toContain(icon);
+    }
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Table' }));
+    expect(commands.table).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('FormattingToolbar More menu overflow entries', () => {
+  it('shows Strikethrough inline but Citation and Inline math in More', () => {
+    const { container } = render(<FormattingToolbar commands={fakeCommands()} />);
+    const strike = screen.getByRole('button', { name: 'Strikethrough' });
+    expect(strike.querySelector('svg')?.getAttribute('class')).toContain('lucide-strikethrough');
+    expect(rowOf(container).contains(strike)).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'More' }));
+    for (const [name, icon] of [['Citation', 'lucide-at-sign'], ['Inline math', 'lucide-sigma']] as const) {
+      const item = screen.getByRole('menuitem', { name });
+      expect(item.querySelector('svg')?.getAttribute('class')).toContain(icon);
     }
   });
 
-  it('lays the buttons out in the large-screen group order with dividers', () => {
-    const { container } = render(<FormattingToolbar commands={fakeCommands()} />);
-    const toolbar = container.querySelector('[role="toolbar"]')!;
-    const names = within(toolbar as HTMLElement)
-      .getAllByRole('button')
-      .map((button) => button.getAttribute('aria-label'));
-    expect(names).toEqual(LARGE_LAYOUT.map(([name]) => name));
-    // Six in-toolbar groups plus the compact-only More menu, separated by
-    // six dividers; the last divider is hidden at the lg breakpoint and up.
-    expect(toolbar.querySelectorAll('.w-px')).toHaveLength(6);
+  it('portals to document.body and closes after selecting an item', () => {
+    const commands = fakeCommands();
+    const { container } = render(<FormattingToolbar commands={commands} />);
+    fireEvent.click(screen.getByRole('button', { name: 'More' }));
+    const menu = screen.getByRole('menu');
+    expect(menu.parentElement).toBe(document.body);
+    expect(container.querySelector('[role="toolbar"]')!.contains(menu)).toBe(false);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Code block' }));
+    expect(commands.codeBlock).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('menu')).toBeNull();
   });
 
+  it('still renders the More trigger when every item fits inline', () => {
+    overflow.visibleCount = TOOLBAR_ITEMS.length;
+    const { container } = render(<FormattingToolbar commands={fakeCommands()} />);
+    expect(inlineNames(container)).toHaveLength(TOOLBAR_ITEMS.length + 1);
+    fireEvent.click(screen.getByRole('button', { name: 'More' }));
+    expect(within(screen.getByRole('menu')).queryAllByRole('menuitem')).toHaveLength(0);
+  });
+});
+
+describe('FormattingToolbar button behavior', () => {
   it('clicking Bold calls toggleBold', () => {
     const commands = fakeCommands();
     render(<FormattingToolbar commands={commands} />);
@@ -96,28 +181,12 @@ describe('FormattingToolbar menus', () => {
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Heading 1' }));
     expect(commands.setHeading).toHaveBeenCalledWith(1);
   });
-
-  it('Insert menu offers Image, Table, Code block, and Rule', () => {
-    const commands = fakeCommands();
-    render(<FormattingToolbar commands={commands} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Insert' }));
-    const icons: Array<[string, string]> = [
-      ['Image', 'lucide-image-plus'], ['Table', 'lucide-table'],
-      ['Code block', 'lucide-square-code'], ['Rule', 'lucide-minus'],
-    ];
-    for (const [name, icon] of icons) {
-      const item = screen.getByRole('menuitem', { name });
-      expect(item.querySelector('svg')?.getAttribute('class')).toContain(icon);
-    }
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Table' }));
-    expect(commands.table).toHaveBeenCalledTimes(1);
-  });
 });
 
 describe('FormattingToolbar in source mode (canFormat false)', () => {
-  it('disables every formatting control but keeps Undo and Redo enabled', () => {
+  it('disables visible formatting controls but keeps Undo and Redo enabled', () => {
     render(<FormattingToolbar commands={fakeCommands(INACTIVE_STATE, false)} />);
-    for (const name of FORMATTING_NAMES) {
+    for (const name of [...INLINE_6.slice(2), 'More']) {
       expect(screen.getByRole('button', { name }), name).toBeDisabled();
     }
     expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled();
@@ -144,77 +213,6 @@ describe('FormattingToolbar visibility and responsiveness', () => {
   });
 });
 
-describe('FormattingToolbar compact layout (below the lg breakpoint)', () => {
-  it('hides the inline-code button and the inline and list groups below lg', () => {
-    render(<FormattingToolbar commands={fakeCommands()} />);
-    const inlineCode = screen.getByRole('button', { name: 'Inline code' });
-    expect(inlineCode.parentElement?.className).toContain('hidden');
-    expect(inlineCode.parentElement?.className).toContain('lg:block');
-    for (const name of ['Link', 'Citation', 'Inline math', 'Bullet list', 'Numbered list', 'Task list', 'Quote']) {
-      const button = screen.getByRole('button', { name });
-      expect(button.parentElement?.className, name).toContain('hidden');
-      expect(button.parentElement?.className, name).toContain('lg:flex');
-    }
-  });
-
-  it('hides the dividers around the lg-only groups below lg', () => {
-    const { container } = render(<FormattingToolbar commands={fakeCommands()} />);
-    const dividers = Array.from(container.querySelectorAll('.w-px'));
-    // Compact order: after History, after Paragraph style, after Emphasis,
-    // and before More. The two around the hidden groups are lg-only.
-    expect(dividers).toHaveLength(6);
-    expect(dividers[0].className).not.toContain('hidden');
-    expect(dividers[1].className).not.toContain('hidden');
-    expect(dividers[2].className).toContain('hidden');
-    expect(dividers[2].className).toContain('lg:block');
-    expect(dividers[3].className).toContain('hidden');
-    expect(dividers[3].className).toContain('lg:block');
-    expect(dividers[4].className).not.toContain('hidden');
-    expect(dividers[5].className).toContain('lg:hidden');
-  });
-});
-
-describe('FormattingToolbar menu portal', () => {
-  it.each([
-    ['Insert', 'image'],
-    ['More', 'toggleLink'],
-  ] as const)(
-    '%s menu portals to document.body and closes after selecting an item',
-    (triggerName, action) => {
-      const commands = fakeCommands();
-      const { container } = render(<FormattingToolbar commands={commands} />);
-      const toolbar = container.querySelector('[role="toolbar"]')!;
-      fireEvent.click(screen.getByRole('button', { name: triggerName }));
-      const menu = screen.getByRole('menu');
-      // Portaled to document.body so the backdrop-blur toolbar root and the
-      // overflow-hidden collapse container cannot clip it.
-      expect(menu.parentElement).toBe(document.body);
-      expect(toolbar.contains(menu)).toBe(false);
-      const item = within(menu).getAllByRole('menuitem')[0];
-      fireEvent.click(item);
-      expect(commands[action]).toHaveBeenCalledTimes(1);
-      expect(screen.queryByRole('menu')).toBeNull();
-    },
-  );
-});
-
-describe('FormattingToolbar compact More menu', () => {
-  it('shows an Ellipsis More menu below lg holding the hidden actions', () => {
-    const commands = fakeCommands();
-    render(<FormattingToolbar commands={commands} />);
-    const more = screen.getByRole('button', { name: 'More' });
-    expect(more.parentElement?.className).toContain('lg:hidden');
-    fireEvent.click(more);
-    const items = within(screen.getByRole('menu')).getAllByRole('menuitem');
-    expect(items.map((item) => item.getAttribute('aria-label'))).toEqual([
-      'Link', 'Citation', 'Inline math', 'Inline code', 'Bullet list', 'Numbered list',
-      'Task list', 'Quote', 'Code block', 'Table', 'Image', 'Rule',
-    ]);
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Code block' }));
-    expect(commands.codeBlock).toHaveBeenCalledTimes(1);
-  });
-});
-
 describe('FormattingToolbar collapse transition', () => {
   it('wraps the toolbar in the collapse container, open when the preference is on', () => {
     const { container } = render(<EditorToolbars commands={fakeCommands()} formattingToolbar />);
@@ -226,9 +224,7 @@ describe('FormattingToolbar collapse transition', () => {
   it('collapses over 150 ms: mounted while closing, unmounted after the timer', () => {
     vi.useFakeTimers();
     try {
-      const { container, rerender } = render(
-        <EditorToolbars commands={fakeCommands()} formattingToolbar />,
-      );
+      const { container, rerender } = render(<EditorToolbars commands={fakeCommands()} formattingToolbar />);
       rerender(<EditorToolbars commands={fakeCommands()} formattingToolbar={false} />);
       const wrap = container.querySelector('.editor-toolbar-collapse')!;
       expect(wrap.className).toContain('is-closed');
@@ -244,6 +240,8 @@ describe('FormattingToolbar collapse transition', () => {
 
 describe('index.css responsive layout (source scan)', () => {
   const css = readFileSync(resolve(__dirname, '../index.css'), 'utf-8');
+  const toolbar = readFileSync(resolve(__dirname, 'FormattingToolbar.tsx'), 'utf-8');
+  const menu = readFileSync(resolve(__dirname, 'ToolbarMenu.tsx'), 'utf-8');
 
   it('transitions the toolbar collapse on max-height and opacity over 150 ms', () => {
     expect(css).toMatch(/\.editor-toolbar-collapse\s*\{[^}]*transition:[^}]*max-height 150ms/);
@@ -266,10 +264,11 @@ describe('index.css responsive layout (source scan)', () => {
     expect(css).toMatch(/\.manuscript-editor \.source-editor\s*\{[^}]*width:\s*80%/);
   });
 
-  it('aligns the toolbar button column to the 80% editor column', () => {
-    const toolbar = readFileSync(resolve(__dirname, 'FormattingToolbar.tsx'), 'utf-8');
-    expect(toolbar).toMatch(/className="[^"]*\bmx-auto\b[^"]*\bw-\[80%\][^"]*"/);
-    expect(toolbar).not.toMatch(/max-w-\[70ch\]/);
+  it('fills the editor column with w-full and no lg-only visibility classes', () => {
+    expect(toolbar).toMatch(/className="[^"]*\bmx-auto\b[^"]*\bw-full\b/);
+    expect(toolbar).not.toContain('w-[80%]');
+    expect(toolbar).not.toMatch(/"[^"]*lg:/);
+    expect(menu).not.toMatch(/"[^"]*lg:/);
   });
 });
 
@@ -278,9 +277,8 @@ describe('Responsive header actions (source scan)', () => {
 
   it('keeps the mode toggle and Commit hidden below md, in the overflow menu instead', () => {
     expect(read('ModeSwitch.tsx')).toMatch(/className="[^"]*\bhidden\b[^"]*\bmd:flex\b/);
-    const appHeader = read('AppHeader.tsx');
-    expect(appHeader).toMatch(/bg-gray-900 text-white hover:bg-gray-800[^\n]*hidden md:inline-flex/);
-    expect(appHeader).toMatch(/className=\{COMMIT_BUTTON\}/);
+    expect(read('AppHeader.tsx')).toMatch(/bg-gray-900 text-white hover:bg-gray-800[^\n]*hidden md:inline-flex/);
+    expect(read('AppHeader.tsx')).toMatch(/className=\{COMMIT_BUTTON\}/);
     expect(read('HeaderOverflowMenu.tsx')).toMatch(/className="relative md:hidden"/);
   });
 });

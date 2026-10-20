@@ -64,7 +64,8 @@ export function useOverflowCount({
   // which drives the recomputation below. Item widths are untouched here.
   useLayoutEffect(() => {
     const row = rowRef.current;
-    if (!row) return;
+    // Guard for environments without ResizeObserver (e.g. plain jsdom).
+    if (!row || typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(() => setRowWidth(row.getBoundingClientRect().width));
     observer.observe(row);
     return () => observer.disconnect();

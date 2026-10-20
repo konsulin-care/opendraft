@@ -27,6 +27,8 @@ export interface ToolbarMenuProps {
   disabled?: boolean;
   /** Extra classes for the wrapper, e.g. responsive visibility. */
   wrapClassName?: string;
+  /** Receives the underlying trigger button element, e.g. for overflow measurement. */
+  measureRef?: (element: HTMLButtonElement | null) => void;
 }
 
 const TRIGGER_CLASS =
@@ -100,12 +102,19 @@ function MenuPanel({ items, onSelect, menuRef }: MenuPanelProps) {
  * `@floating-ui/dom` under the trigger using the fixed strategy. The portal
  * keeps the menu out of the toolbar root's backdrop-blur containing block
  * and the overflow-hidden collapse container, which would otherwise clip
- * it. Used for the Paragraph style, Insert, and More groups.
+ * it. Used for the Paragraph style, Insert, and More triggers.
  *
  * @param props - See {@link ToolbarMenuProps}.
  * @returns The trigger button plus, when open, the portaled menu panel.
  */
-export function ToolbarMenu({ label, icon: Icon, items, disabled, wrapClassName }: ToolbarMenuProps) {
+export function ToolbarMenu({
+  label,
+  icon: Icon,
+  items,
+  disabled,
+  wrapClassName,
+  measureRef,
+}: ToolbarMenuProps) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -118,7 +127,10 @@ export function ToolbarMenu({ label, icon: Icon, items, disabled, wrapClassName 
   return (
     <div ref={wrapRef} className={`relative shrink-0 ${wrapClassName ?? ''}`.trim()}>
       <button
-        ref={triggerRef}
+        ref={(element) => {
+          triggerRef.current = element;
+          measureRef?.(element);
+        }}
         type="button"
         aria-label={label}
         title={label}

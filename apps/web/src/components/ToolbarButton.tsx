@@ -12,6 +12,8 @@ export interface ToolbarButtonProps {
   disabled?: boolean;
   /** Toggle state; renders `aria-pressed` when provided. */
   pressed?: boolean;
+  /** Receives the underlying button element, e.g. for overflow measurement. */
+  measureRef?: (element: HTMLButtonElement | null) => void;
 }
 
 const BUTTON_CLASS =
@@ -31,9 +33,11 @@ export function ToolbarButton({
   onClick,
   disabled,
   pressed,
+  measureRef,
 }: ToolbarButtonProps) {
   return (
     <button
+      ref={measureRef}
       type="button"
       aria-label={label}
       title={label}
