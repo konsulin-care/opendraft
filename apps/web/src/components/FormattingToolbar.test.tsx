@@ -285,10 +285,10 @@ describe('Responsive header actions (source scan)', () => {
 });
 
 describe('Crepe selection toolbar stays enabled (source scan)', () => {
-  const manuscriptSource = readFileSync(resolve(__dirname, 'ManuscriptEditor.tsx'), 'utf8');
+  const crepeConfigSource = readFileSync(resolve(__dirname, 'crepe-config.ts'), 'utf8');
 
-  it('ManuscriptEditor.tsx does not disable Crepe.Feature.Toolbar', () => {
-    expect(manuscriptSource).not.toMatch(/Crepe\.Feature\.Toolbar[^\n]*false/);
+  it('crepe-config.ts does not disable Crepe.Feature.Toolbar', () => {
+    expect(crepeConfigSource).not.toMatch(/Crepe\.Feature\.Toolbar[^\n]*false/);
   });
 
   it('App.tsx passes the formattingToolbar preference to ManuscriptEditor', () => {

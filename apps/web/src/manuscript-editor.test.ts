@@ -17,10 +17,10 @@ vi.mock("./persistence", async (importOriginal) => {
   return { ...actual, saveFile: vi.fn().mockResolvedValue(undefined) };
 });
 const DOC_PATH = "manuscripts/p/blocks/01hxyz00000000000000000000.qmd";
-/** Non-block files must open in source mode without a Crepe instance. */
 const NON_BLOCK_PATHS = ["opendraft.yml", "article.qmd", "manuscript.md", "notes.qmd", "refs.bib"];
 /** Source text of the modules under test, for source-scan assertions. */
 const manuscriptSource = readFileSync(resolve(__dirname, "./components/ManuscriptEditor.tsx"), "utf8");
+const crepeConfigSource = readFileSync(resolve(__dirname, "./components/crepe-config.ts"), "utf8");
 const editorSurfaceSource = readFileSync(resolve(__dirname, "./components/EditorSurface.tsx"), "utf8");
 const caretSwitchSource = readFileSync(resolve(__dirname, "./caret-mode-switch.ts"), "utf8");
 const css = readFileSync(resolve(__dirname, "./index.css"), "utf8");
@@ -71,14 +71,14 @@ describe("ManuscriptEditor crepe theme integration", () => {
     expect(css).toContain("@milkdown/crepe/theme/classic.css");
   });
   it("configures a static placeholder feature", () => {
-    expect(manuscriptSource).toContain("Crepe.Feature.Placeholder");
-    expect(manuscriptSource).toContain("PLACEHOLDER_HINT");
-    expect(manuscriptSource).not.toContain("pickPlaceholderHint");
+    expect(crepeConfigSource).toContain("Crepe.Feature.Placeholder");
+    expect(crepeConfigSource).toContain("PLACEHOLDER_HINT");
+    expect(crepeConfigSource).not.toContain("pickPlaceholderHint");
   });
   it("configures block handle at content edge", () => {
-    expect(manuscriptSource).toContain("Crepe.Feature.BlockEdit");
-    expect(manuscriptSource).toContain("blockHandle");
-    expect(manuscriptSource).toContain("shouldShow: () => false");
+    expect(crepeConfigSource).toContain("Crepe.Feature.BlockEdit");
+    expect(crepeConfigSource).toContain("blockHandle");
+    expect(crepeConfigSource).toContain("shouldShow: () => false");
   });
 });
 describe("ManuscriptEditor — block-only visual editor mount", () => {
@@ -99,9 +99,9 @@ describe("ManuscriptEditor — block-only visual editor mount", () => {
   }, 20000);
 });
 describe("ManuscriptEditor — block gutter removed", () => {
-  it("does not reference the block-gutter plugin in the component source", () => {
-    expect(manuscriptSource).not.toContain("block-handle-gutter");
-    expect(manuscriptSource).not.toContain("createBlockGutterPlugin");
+  it("does not reference the block-gutter plugin in the editor sources", () => {
+    expect(manuscriptSource + crepeConfigSource).not.toContain("block-handle-gutter");
+    expect(manuscriptSource + crepeConfigSource).not.toContain("createBlockGutterPlugin");
   });
   it("renders no .block-gutter-container or .block-gutter-handle elements", async () => {
     const { getApi } = renderEditor({ path: DOC_PATH });
@@ -111,29 +111,29 @@ describe("ManuscriptEditor — block gutter removed", () => {
 });
 describe("ManuscriptEditor — light code block theme", () => {
   it("imports EditorView from @codemirror/view", () => {
-    expect(manuscriptSource).toMatch(/EditorView.*from\s+['"]@codemirror\/view['"]|@codemirror\/view.*EditorView/);
+    expect(crepeConfigSource).toMatch(/EditorView.*from\s+['"]@codemirror\/view['"]|@codemirror\/view.*EditorView/);
   });
   it("defines a lightCodeBlockTheme via EditorView.theme()", () => {
-    expect(manuscriptSource).toMatch(/lightCodeBlockTheme\s*=\s*EditorView\.theme\(/);
+    expect(crepeConfigSource).toMatch(/lightCodeBlockTheme\s*=\s*EditorView\.theme\(/);
   });
   it("sets active line and gutter backgrounds via the yellow token", () => {
-    expect(manuscriptSource).toContain("'.cm-activeLine'");
-    expect(manuscriptSource).toContain("'.cm-activeLineGutter'");
-    expect(manuscriptSource).toContain("backgroundColor: 'var(--color-yellow-200)'");
+    expect(crepeConfigSource).toContain("'.cm-activeLine'");
+    expect(crepeConfigSource).toContain("'.cm-activeLineGutter'");
+    expect(crepeConfigSource).toContain("backgroundColor: 'var(--color-yellow-200)'");
   });
   it("sets selection backgrounds via the yellow token", () => {
-    expect(manuscriptSource).toMatch(/\.cm-selectionBackground'.*\.cm-focused \.cm-selectionBackground/s);
-    expect(manuscriptSource).toContain("var(--color-yellow-200)");
+    expect(crepeConfigSource).toMatch(/\.cm-selectionBackground'.*\.cm-focused \.cm-selectionBackground/s);
+    expect(crepeConfigSource).toContain("var(--color-yellow-200)");
   });
   it("uses only var(--color-*) tokens in the code block theme, no hex literals", () => {
-    const themeBlock = manuscriptSource.match(/lightCodeBlockTheme\s*=\s*EditorView\.theme\(\{([\s\S]*?)\}\)/)?.[1];
+    const themeBlock = crepeConfigSource.match(/lightCodeBlockTheme\s*=\s*EditorView\.theme\(\{([\s\S]*?)\}\)/)?.[1];
     expect(themeBlock).toBeDefined();
     expect(themeBlock).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     expect(themeBlock).toMatch(/var\(--color-[\w-]+\)/);
   });
   it("wires the theme into the CodeMirror feature config", () => {
-    expect(manuscriptSource).toContain("Crepe.Feature.CodeMirror");
-    expect(manuscriptSource).toContain("theme: lightCodeBlockTheme");
+    expect(crepeConfigSource).toContain("Crepe.Feature.CodeMirror");
+    expect(crepeConfigSource).toContain("theme: lightCodeBlockTheme");
   });
 });
 describe("ManuscriptEditor — effective formatting toolbar visibility", () => {
@@ -234,12 +234,12 @@ describe("ManuscriptEditor — list bullet preservation", () => {
 });
 describe("ManuscriptEditor — citation dropdown mounting", () => {
   it("does not import citationPluginKey (insertion moved to plugin)", () => {
-    expect(manuscriptSource).not.toContain("citationPluginKey");
+    expect(manuscriptSource + crepeConfigSource).not.toContain("citationPluginKey");
   });
   it("registers citation plugin via crepe.addFeature()", () => {
-    expect(manuscriptSource).toContain("crepe.addFeature");
-    expect(manuscriptSource).toContain("createCitationPlugin");
-    expect(manuscriptSource).toMatch(/\$prose.*createCitationPlugin/);
+    expect(crepeConfigSource).toContain("crepe.addFeature");
+    expect(crepeConfigSource).toContain("createCitationPlugin");
+    expect(crepeConfigSource).toMatch(/\$prose.*createCitationPlugin/);
   });
   it("no longer renders CitationDropdown in EditorSurface (rendered by plugin)", () => {
     expect(editorSurfaceSource).not.toMatch(/<CitationDropdown|citationState|onCitationDispatch|onSelectCitekey/);
@@ -250,16 +250,16 @@ describe("ManuscriptEditor — @ trigger integration", () => {
     expect(manuscriptSource).not.toContain("useCitationState");
   });
   it("uses onStateChangeRef to wire citation plugin", () => {
-    expect(manuscriptSource).toContain("onStateChangeRef");
-    expect(manuscriptSource).toContain("createCitationPlugin");
-    expect(manuscriptSource).toContain("onStateChangeRef.current");
+    expect(crepeConfigSource).toContain("onStateChangeRef");
+    expect(crepeConfigSource).toContain("createCitationPlugin");
+    expect(crepeConfigSource).toContain("onStateChangeRef.current");
   });
   it("test API module imports editorViewCtx (not a citation trigger in the component)", () => {
     // createTestApi moved to caret-mode-switch.ts; editorViewCtx lives there
     // for caret placement, and the component itself no longer touches it.
     expect(caretSwitchSource).toContain("editorViewCtx");
     expect(caretSwitchSource).toMatch(/editorViewCtx.*from.*['"]@milkdown\/kit\/core['"]/);
-    expect(manuscriptSource).not.toContain("editorViewCtx");
+    expect(manuscriptSource + crepeConfigSource).not.toContain("editorViewCtx");
   });
 });
 describe("ManuscriptEditor — citekey insertion removed (now in plugin)", () => {
@@ -267,7 +267,7 @@ describe("ManuscriptEditor — citekey insertion removed (now in plugin)", () =>
     "createSelectCitekeyHandler", "citationDispatchRef", "handleSelectCitekey",
     "useCitationState", "onSelectCitekey", "CitationSelectHandler",
   ])("does not contain %s", (token) => {
-    expect(manuscriptSource).not.toContain(token);
+    expect(manuscriptSource + crepeConfigSource).not.toContain(token);
   });
 });
 describe("ManuscriptEditor — editor wiring happens exactly once", () => {

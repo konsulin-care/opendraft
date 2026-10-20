@@ -38,6 +38,36 @@ export function getFileCapability(path: string, content: string): FileCapability
   return 'text';
 }
 
+/** Editor decision produced by {@link resolveEditorGate}. */
+export interface EditorGate {
+  /** File capability as seen by the editor. */
+  capability: FileCapability;
+  /** Editor-safe content (empty string for binary files). */
+  content: string;
+  /** Effective mode: the preferred mode for rich files, otherwise `'source'`. */
+  editorMode: 'wysiwyg' | 'source';
+}
+
+/**
+ * File-type gate: manuscript block files honor the preferred mode, other
+ * text files are forced to source mode, and binary content never reaches
+ * an editor.
+ *
+ * @param path - Repo-relative file path.
+ * @param defaultValue - Current file content.
+ * @param mode - User-preferred editing mode.
+ * @returns The file capability, editor-safe content, and effective mode.
+ */
+export function resolveEditorGate(
+  path: string,
+  defaultValue: string,
+  mode: 'wysiwyg' | 'source',
+): EditorGate {
+  const capability = getFileCapability(path, defaultValue);
+  const content = capability === 'binary' ? '' : defaultValue;
+  return { capability, content, editorMode: capability === 'rich' ? mode : 'source' };
+}
+
 /**
  * Detect binary content by NUL bytes and dense control characters.
  *
