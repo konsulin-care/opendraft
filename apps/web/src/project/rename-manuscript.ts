@@ -123,3 +123,64 @@ export async function renameManuscript(
   await project.registry.setManuscriptDisplayName(project.record.id, newDir, displayName);
   return { ok: true, dirName: newDir, displayName, moved };
 }
+
+/** Wiring needed to rename the open manuscript from the app shell. */
+export interface OpenManuscriptWiring extends RenameProject {
+  /** Repo-relative path of the file open in the editor, or null. */
+  activePath: string | null;
+  /** Manuscript directory of the open file, or null when none. */
+  currentDir: string | null;
+  /** Opens a repo-relative path in the editor and persists it as last path. */
+  openFile: (path: string) => void | Promise<void>;
+  /** Refreshes the app view (active record, file tree) after the rename. */
+  refresh: () => void | Promise<void>;
+}
+
+/**
+ * Rename the open manuscript for the app shell: applies the rename, reopens
+ * the moved file under its new path, and refreshes the view so the header
+ * and the file tree show the new directory. A refused rename rejects with
+ * the error so the caller can surface it inline; nothing runs on failure.
+ *
+ * @param wiring - Project handles plus the active-file wiring.
+ * @param newName - New user-facing manuscript name, e.g. "My Thesis".
+ * @returns Resolves once the rename and the view refresh have finished.
+ */
+export async function renameOpenManuscript(
+  wiring: OpenManuscriptWiring,
+  newName: string,
+): Promise<void> {
+  if (wiring.currentDir === null) {
+    throw new Error('No manuscript is open');
+  }
+  const result = await renameManuscript(wiring, wiring.currentDir, newName);
+  if (!result.ok) {
+    throw new Error(result.error);
+  }
+  const { activePath } = wiring;
+  const prefix = `manuscripts/${wiring.currentDir}/`;
+  if (result.moved && activePath?.startsWith(prefix)) {
+    await wiring.openFile(`manuscripts/${result.dirName}/${activePath.slice(prefix.length)}`);
+  }
+  await wiring.refresh();
+}
+
+/**
+ * Build the header's manuscript-rename handler for the app shell, or
+ * undefined when no manuscript directory is open.
+ *
+ * @param active - Active project record, or null when none is open.
+ * @param currentDir - Manuscript directory of the open file, or null.
+ * @param wiring - Workspace, registry and active-file wiring minus the record.
+ * @returns A handler renaming the open manuscript, or undefined.
+ */
+export function createOpenManuscriptRenamer(
+  active: ProjectRecord | null,
+  currentDir: string | null,
+  wiring: Omit<OpenManuscriptWiring, 'record' | 'currentDir'>,
+): ((name: string) => Promise<void>) | undefined {
+  if (!active || currentDir === null) return undefined;
+  const record = active;
+  const dir = currentDir;
+  return (name) => renameOpenManuscript({ ...wiring, record, currentDir: dir }, name);
+}

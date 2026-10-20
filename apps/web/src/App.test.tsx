@@ -153,6 +153,30 @@ describe('App header', () => {
     expect(within(header).getByDisplayValue('Untitled project')).toBeDefined();
   });
 
+  it('renaming the manuscript title moves the files and updates the tree and config', async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
+    const [record] = await projectRegistry.list();
+    const ws = await workspaceManager.get(record.id);
+    try {
+      const title = within(screen.getByTestId('app-header')).getByTestId('manuscript-title');
+      fireEvent.change(title, { target: { value: 'My Thesis' } });
+      fireEvent.keyDown(title, { key: 'Enter' });
+      await waitFor(async () => {
+        const listing = (await ws.listAll()).join('\n');
+        expect(listing).toContain('manuscripts/my-thesis/');
+        expect(listing).not.toContain('manuscripts/untitled-project/');
+      }, { timeout: 5000 });
+      expect(await projectRegistry.getLastPath(record.id)).toMatch(/^manuscripts\/my-thesis\//);
+      expect(await ws.readFile('opendraft.yml')).toContain('manuscripts/my-thesis');
+      fireEvent.click(screen.getByRole('button', { name: 'OpenDraft' }));
+      const drawer = screen.getByTestId('project-drawer');
+      await waitFor(() => expect(within(drawer).getByRole('treeitem', { name: 'my-thesis' })).toBeDefined());
+    } finally {
+      workspaceManager.release(record.id);
+    }
+  });
+
   it('shows a single mode toggle naming the target mode', async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });

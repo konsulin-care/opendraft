@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { MilkdownProvider } from '@milkdown/react';
-import type { WorkspaceAdapter } from '@opendraft/workspace';
+import type { ProjectRecord, WorkspaceAdapter } from '@opendraft/workspace';
 import { AppHeader } from './components/AppHeader';
 import type { SaveStatus } from './components/AppHeader';
 import { ManuscriptEditor } from './components/ManuscriptEditor';
@@ -10,16 +10,12 @@ import { ProjectDrawer, useDrawerState } from './components/project-drawer/Proje
 import { ProjectSwitcher } from './components/project-drawer/ProjectSwitcher';
 import { DeleteProjectAction } from './components/project-drawer/DeleteProjectDialog';
 import { FileTree } from './components/project-drawer/FileTree';
-import { useProjects } from './hooks/useProjects';
+import { useProjects, projectRegistry } from './hooks/useProjects';
 import { useActiveFile } from './hooks/useActiveFile';
 import { useToolbarPreference } from './hooks/useToolbarPreference';
 import { useEditorMode } from './hooks/useEditorMode';
 import { loadFile } from './persistence';
-
-function useCommitDialog() {
-  const [showCommitDialog, setShowCommitDialog] = useState(false);
-  return { showCommitDialog, setShowCommitDialog };
-}
+import { createOpenManuscriptRenamer } from './project/rename-manuscript';
 
 /**
  * Extract the manuscript directory name from a repo-relative path.
@@ -72,9 +68,10 @@ function useActiveFileContent(
  * List every file path in the active project's workspace.
  *
  * @param workspace - Workspace of the active project, or null before boot.
+ * @param active - Active project record; changes (e.g. a manuscript rename) re-list the workspace.
  * @returns Repo-relative paths of all workspace files, empty while loading.
  */
-function useWorkspacePaths(workspace: WorkspaceAdapter | null): string[] {
+function useWorkspacePaths(workspace: WorkspaceAdapter | null, active: ProjectRecord | null): string[] {
   const [paths, setPaths] = useState<string[]>([]);
 
   useEffect(() => {
@@ -92,7 +89,7 @@ function useWorkspacePaths(workspace: WorkspaceAdapter | null): string[] {
     return () => {
       cancelled = true;
     };
-  }, [workspace]);
+  }, [workspace, active]);
 
   return paths;
 }
@@ -180,7 +177,7 @@ function DrawerSection({
   activePath,
   onOpen,
 }: DrawerSectionProps) {
-  const paths = useWorkspacePaths(workspace);
+  const paths = useWorkspacePaths(workspace, active);
   return (
     <ProjectDrawer
       open={drawer.open}
@@ -249,7 +246,7 @@ export function App() {
   } = useProjects();
   const { activePath, openFile } = useActiveFile(workspace, active?.id ?? null);
   const { mode, setMode } = useEditorMode();
-  const { showCommitDialog, setShowCommitDialog } = useCommitDialog();
+  const [showCommitDialog, setShowCommitDialog] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   const { formattingToolbar, toggleFormattingToolbar } = useToolbarPreference();
   const file = useActiveFileContent(workspace, activePath);
@@ -266,12 +263,12 @@ export function App() {
         projectName={active?.name} manuscriptDir={dirName ?? undefined}
         manuscriptName={dirName !== null ? active?.manuscriptNames?.[dirName] : undefined}
         onRenameProject={active ? (name) => rename(active.id, name) : undefined}
+        onRenameManuscript={createOpenManuscriptRenamer(active, dirName, { workspace, registry: projectRegistry, openFile, activePath, refresh: () => switchTo(active.id) })}
         mode={mode} onSelectMode={setMode} saveStatus={saveStatus}
         formattingToolbar={formattingToolbar}
         onToggleFormattingToolbar={toggleFormattingToolbar}
         onCommit={() => setShowCommitDialog(true)}
-        sidebarOpen={drawer.open} onToggleSidebar={drawer.toggle}
-        toggleButtonRef={drawer.toggleRef}
+        sidebarOpen={drawer.open} onToggleSidebar={drawer.toggle} toggleButtonRef={drawer.toggleRef}
       />
       <EditorArea
         workspace={workspace}

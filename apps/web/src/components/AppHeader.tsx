@@ -166,15 +166,15 @@ interface HeaderTitleProps {
 
 /**
  * Header title column: the editable manuscript title (line 1) above the
- * editable project name (line 2), kept in an h-9 vertically centered
- * block so the subtitle clears the header divider.
+ * editable project name (line 2), left-aligned next to the book icon and
+ * kept in an h-9 block so the subtitle clears the header divider.
  *
  * @param props - See {@link HeaderTitleProps}.
  */
 function HeaderTitle({ title, projectName, onRenameManuscript, onRenameProject }: HeaderTitleProps) {
   return (
     <span
-      className="flex h-9 min-w-0 flex-1 flex-col items-center justify-center"
+      className="flex h-9 min-w-0 flex-1 flex-col items-start justify-center text-left"
       data-testid="header-title"
     >
       {title !== undefined && (

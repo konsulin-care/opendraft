@@ -74,11 +74,12 @@ describe('AppHeader identity', () => {
 });
 
 describe('AppHeader layout', () => {
-  it('keeps the title and project name in an h-9 centered column', () => {
+  it('keeps the title and project name in an h-9 left-aligned column', () => {
     renderHeader({ manuscriptName: 'My Thesis', projectName: 'Test Project' });
     const block = screen.getByTestId('header-title');
     expect(block.className).toMatch(/\bh-9\b/);
-    expect(block.className).toMatch(/\bitems-center\b/);
+    expect(block.className).toMatch(/\bitems-start\b/);
+    expect(block.className).not.toMatch(/\bitems-center\b/);
   });
 
   it('carries the APP_BAR_HEIGHT class on the header root', () => {

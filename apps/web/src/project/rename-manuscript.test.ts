@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { indexedDB } from 'fake-indexeddb';
 import { parse } from 'yaml';
@@ -8,7 +8,12 @@ import {
   REGISTRY_DB,
   type ProjectRecord,
 } from '@opendraft/workspace';
-import { renameManuscript, type RenameProject } from './rename-manuscript';
+import {
+  renameManuscript,
+  renameOpenManuscript,
+  type RenameProject,
+  type OpenManuscriptWiring,
+} from './rename-manuscript';
 import { OPENDRAFT_CONFIG_PATH } from './scaffold';
 
 /** Delete the registry database between tests. */
@@ -83,6 +88,53 @@ async function rejectsEmptyName(project: RenameProject): Promise<void> {
   expect(await registryName(project, 'old')).toBe('Old Title');
 }
 
+/** Wiring for {@link renameOpenManuscript} over the shared test project. */
+function openWiring(
+  project: RenameProject,
+  overrides: Partial<OpenManuscriptWiring> = {},
+): OpenManuscriptWiring {
+  return {
+    ...project,
+    activePath: 'manuscripts/old/blocks/a.qmd',
+    currentDir: 'old',
+    openFile: vi.fn(),
+    refresh: vi.fn(),
+    ...overrides,
+  };
+}
+
+/** Reopens the moved file under its new path and refreshes the view. */
+async function reopensMovedFile(project: RenameProject): Promise<void> {
+  const wiring = openWiring(project);
+
+  await renameOpenManuscript(wiring, 'My New Title');
+
+  expect(wiring.openFile).toHaveBeenCalledWith('manuscripts/my-new-title/blocks/a.qmd');
+  expect(wiring.refresh).toHaveBeenCalledTimes(1);
+  expect(await project.workspace.readFile('manuscripts/my-new-title/blocks/a.qmd')).toBe('block content');
+}
+
+/** Rejects a duplicate target without touching the editor or the view. */
+async function rejectsDuplicateOpenRename(project: RenameProject): Promise<void> {
+  await project.workspace.writeFile('manuscripts/my-new-title/blocks/x.qmd', 'existing');
+  const wiring = openWiring(project);
+
+  await expect(renameOpenManuscript(wiring, 'My New Title')).rejects.toThrow(/already exists/);
+
+  expect(wiring.openFile).not.toHaveBeenCalled();
+  expect(wiring.refresh).not.toHaveBeenCalled();
+}
+
+/** Throws when the app has no open manuscript directory. */
+async function throwsWithoutOpenManuscript(project: RenameProject): Promise<void> {
+  const wiring = openWiring(project, { currentDir: null });
+
+  await expect(renameOpenManuscript(wiring, 'Anything')).rejects.toThrow('No manuscript is open');
+
+  expect(wiring.openFile).not.toHaveBeenCalled();
+  expect(wiring.refresh).not.toHaveBeenCalled();
+}
+
 /** Read a manuscript display name from the project's registry record. */
 function registryName(
   project: RenameProject,
@@ -120,4 +172,10 @@ describe('renameManuscript', () => {
   it('returns an error and changes nothing when the target directory exists', () => refusesOverwrite(project));
   it('updates only the display name when the name normalizes to the current dir', () => displayNameOnly(project));
   it('rejects an empty or whitespace-only name without changes', () => rejectsEmptyName(project));
+
+  describe('renameOpenManuscript', () => {
+    it('reopens the moved file and refreshes the view', () => reopensMovedFile(project));
+    it('rejects a duplicate target without touching the view', () => rejectsDuplicateOpenRename(project));
+    it('throws when no manuscript directory is open', () => throwsWithoutOpenManuscript(project));
+  });
 });
