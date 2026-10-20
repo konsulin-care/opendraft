@@ -137,7 +137,7 @@ export function ProjectSwitcher({
   const state = useSwitcherState(active, switchTo);
 
   return (
-    <div className="relative min-w-0">
+    <div className="relative min-w-0 flex-1">
       <SwitcherButton
         label={active?.name ?? 'Project'}
         open={state.open}

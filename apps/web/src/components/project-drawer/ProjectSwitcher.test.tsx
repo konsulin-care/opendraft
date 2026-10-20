@@ -92,17 +92,13 @@ beforeEach(() => {
   vi.clearAllMocks();
   MockResizeObserver.instances = [];
   vi.stubGlobal('ResizeObserver', MockResizeObserver);
+  // Only `matches` and the change-listener pair are consumed by the marquee hook.
   vi.stubGlobal(
     'matchMedia',
-    vi.fn((query: string) => ({
+    vi.fn(() => ({
       matches: false,
-      media: query,
-      onchange: null,
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn(),
     })),
   );
 });
@@ -182,12 +178,28 @@ describe('project switcher panel positioning', () => {
     render(<Harness />);
     openDropdown();
 
-    const panel = screen
-      .getByRole('list', { name: 'Projects' })
-      .parentElement as HTMLElement;
+    const panel = screen.getByRole('list', { name: 'Projects' }).parentElement as HTMLElement;
     expect(panel.className).toContain('absolute');
     expect(panel.className).toContain('top-full');
     expect(panel.className).toContain('w-full');
+  });
+
+  it('fills the drawer header free width and insets the panel by the sidebar padding', () => {
+    render(<Harness />);
+    const trigger = screen.getByRole('button', { name: 'Newer Paper' });
+    const wrapper = trigger.parentElement as HTMLElement;
+
+    // The wrapper fills the header's free space instead of shrinking to the title.
+    expect(wrapper.className).toMatch(/\b(flex-1|w-full)\b/);
+    expect(wrapper.className).toContain('min-w-0');
+
+    openDropdown();
+    const panel = screen.getByRole('list', { name: 'Projects' }).parentElement as HTMLElement;
+    expect(panel.className).toContain('absolute');
+    expect(panel.className).toContain('top-full');
+    expect(panel.className).toContain('w-full');
+    // Inset by the sidebar padding (px-3) on both sides.
+    expect(panel.className).toContain('mx-3');
   });
 });
 
@@ -268,10 +280,8 @@ describe('project switcher new project action', () => {
     // The panel's only button outside the project list is New project.
     const list = screen.getByRole('list', { name: 'Projects' });
     const panel = list.parentElement as HTMLElement;
-    const outsideList = within(panel)
-      .getAllByRole('button')
-      .filter((button) => !list.contains(button));
-    expect(outsideList.map((button) => button.textContent)).toEqual(['New project']);
+    const outsideList = within(panel).getAllByRole('button').filter((b) => !list.contains(b));
+    expect(outsideList.map((b) => b.textContent)).toEqual(['New project']);
     // Deletion moved to the drawer footer dialog; the dropdown offers none.
     expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
 

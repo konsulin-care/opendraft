@@ -88,7 +88,7 @@ export function SwitcherDropdown({
   onNew,
 }: SwitcherDropdownProps) {
   return (
-    <div className="absolute left-0 right-0 top-full z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg">
+    <div className="absolute left-0 right-0 top-full z-10 mx-3 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg">
       <ProjectList projects={projects} activeId={active?.id} onSelect={onSelect} />
       {active && (
         <div className="border-t border-gray-100 py-1">
