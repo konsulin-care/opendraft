@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { computePosition, flip, offset, shift } from '@floating-ui/dom';
 import type { LucideIcon } from 'lucide-react';
 
@@ -38,8 +39,10 @@ const ITEM_CLASS =
   'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100';
 
 /**
- * Position the open menu under its trigger with floating-ui. Falls back to
- * no movement when either element is not mounted.
+ * Position the open menu under its trigger with floating-ui using the fixed
+ * strategy, so coordinates are viewport-relative once the panel is portaled
+ * to document.body. Falls back to no movement when either element is not
+ * mounted.
  *
  * @param trigger - Trigger button element.
  * @param menu - Menu panel element.
@@ -47,6 +50,7 @@ const ITEM_CLASS =
 function positionMenu(trigger: HTMLElement | null, menu: HTMLElement | null): void {
   if (!trigger || !menu) return;
   void computePosition(trigger, menu, {
+    strategy: 'fixed',
     placement: 'bottom-start',
     middleware: [offset(4), flip(), shift()],
   }).then(({ x, y }) => {
@@ -92,11 +96,14 @@ function MenuPanel({ items, onSelect, menuRef }: MenuPanelProps) {
 
 /**
  * Icon-plus-label toolbar button that opens a floating dropdown menu,
- * positioned with `@floating-ui/dom` under the trigger. Used for the
- * Paragraph style and Insert groups.
+ * rendered through a React portal into `document.body` and positioned with
+ * `@floating-ui/dom` under the trigger using the fixed strategy. The portal
+ * keeps the menu out of the toolbar root's backdrop-blur containing block
+ * and the overflow-hidden collapse container, which would otherwise clip
+ * it. Used for the Paragraph style, Insert, and More groups.
  *
  * @param props - See {@link ToolbarMenuProps}.
- * @returns The trigger button plus, when open, the menu panel.
+ * @returns The trigger button plus, when open, the portaled menu panel.
  */
 export function ToolbarMenu({ label, icon: Icon, items, disabled, wrapClassName }: ToolbarMenuProps) {
   const [open, setOpen] = useState(false);
@@ -125,7 +132,8 @@ export function ToolbarMenu({ label, icon: Icon, items, disabled, wrapClassName 
       >
         <Icon className="h-4 w-4" aria-hidden="true" />
       </button>
-      {open && <MenuPanel items={items} onSelect={() => setOpen(false)} menuRef={menuRef} />}
+      {open &&
+        createPortal(<MenuPanel items={items} onSelect={() => setOpen(false)} menuRef={menuRef} />, document.body)}
     </div>
   );
 }

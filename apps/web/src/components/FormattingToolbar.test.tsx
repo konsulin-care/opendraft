@@ -10,9 +10,8 @@ import type { ActiveState, EditorCommands } from '../editor-commands/types';
 
 /** Action names on {@link EditorCommands} that get a spy. */
 const ACTIONS = [
-  'undo', 'redo', 'toggleBold', 'toggleItalic', 'toggleStrike', 'toggleInlineCode',
-  'toggleLink', 'insertCitation', 'inlineMath', 'setHeading', 'bulletList', 'orderedList',
-  'taskList', 'blockquote', 'codeBlock', 'table', 'hr', 'image',
+  'undo', 'redo', 'toggleBold', 'toggleItalic', 'toggleStrike', 'toggleInlineCode', 'toggleLink', 'insertCitation',
+  'inlineMath', 'setHeading', 'bulletList', 'orderedList', 'taskList', 'blockquote', 'codeBlock', 'table', 'hr', 'image',
 ] as const;
 
 /**
@@ -29,14 +28,11 @@ function fakeCommands(active: ActiveState = INACTIVE_STATE, canFormat = true): E
 
 /** Accessible names of the toolbar buttons, in large-screen order. */
 const LARGE_LAYOUT: Array<[name: string, icon: string]> = [
-  ['Undo', 'lucide-undo-2'], ['Redo', 'lucide-redo-2'],
-  ['Paragraph style', 'lucide-pilcrow'], ['Bold', 'lucide-bold'],
-  ['Italic', 'lucide-italic'], ['Strikethrough', 'lucide-strikethrough'],
-  ['Inline code', 'lucide-code'], ['Link', 'lucide-link'],
-  ['Citation', 'lucide-at-sign'], ['Inline math', 'lucide-sigma'],
-  ['Bullet list', 'lucide-list'], ['Numbered list', 'lucide-list-ordered'],
-  ['Task list', 'lucide-list-todo'], ['Quote', 'lucide-text-quote'],
-  ['Insert', 'lucide-plus'],
+  ['Undo', 'lucide-undo-2'], ['Redo', 'lucide-redo-2'], ['Paragraph style', 'lucide-pilcrow'],
+  ['Bold', 'lucide-bold'], ['Italic', 'lucide-italic'], ['Strikethrough', 'lucide-strikethrough'],
+  ['Inline code', 'lucide-code'], ['Link', 'lucide-link'], ['Citation', 'lucide-at-sign'],
+  ['Inline math', 'lucide-sigma'], ['Bullet list', 'lucide-list'], ['Numbered list', 'lucide-list-ordered'],
+  ['Task list', 'lucide-list-todo'], ['Quote', 'lucide-text-quote'], ['Insert', 'lucide-plus'],
   // The More overflow trigger is lg:hidden but always in the DOM.
   ['More', 'lucide-ellipsis'],
 ];
@@ -44,9 +40,7 @@ const LARGE_LAYOUT: Array<[name: string, icon: string]> = [
 /** Formatting buttons disabled in source mode. */
 const FORMATTING_NAMES = LARGE_LAYOUT.map(([name]) => name).filter((name) => name !== 'Undo' && name !== 'Redo');
 
-beforeEach(() => {
-  vi.clearAllMocks();
-});
+beforeEach(() => vi.clearAllMocks());
 
 describe('FormattingToolbar buttons', () => {
   it('renders every button with its accessible name and icon', () => {
@@ -97,12 +91,7 @@ describe('FormattingToolbar menus', () => {
     render(<FormattingToolbar commands={commands} />);
     fireEvent.click(screen.getByRole('button', { name: 'Paragraph style' }));
     const items = screen.getAllByRole('menuitemradio');
-    expect(items.map((item) => item.getAttribute('aria-label'))).toEqual([
-      'Paragraph',
-      'Heading 1',
-      'Heading 2',
-      'Heading 3',
-    ]);
+    expect(items.map((item) => item.getAttribute('aria-label'))).toEqual(['Paragraph', 'Heading 1', 'Heading 2', 'Heading 3']);
     expect(items[0]).toHaveAttribute('aria-checked', 'true');
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Heading 1' }));
     expect(commands.setHeading).toHaveBeenCalledWith(1);
@@ -113,10 +102,8 @@ describe('FormattingToolbar menus', () => {
     render(<FormattingToolbar commands={commands} />);
     fireEvent.click(screen.getByRole('button', { name: 'Insert' }));
     const icons: Array<[string, string]> = [
-      ['Image', 'lucide-image-plus'],
-      ['Table', 'lucide-table'],
-      ['Code block', 'lucide-square-code'],
-      ['Rule', 'lucide-minus'],
+      ['Image', 'lucide-image-plus'], ['Table', 'lucide-table'],
+      ['Code block', 'lucide-square-code'], ['Rule', 'lucide-minus'],
     ];
     for (const [name, icon] of icons) {
       const item = screen.getByRole('menuitem', { name });
@@ -187,6 +174,30 @@ describe('FormattingToolbar compact layout (below the lg breakpoint)', () => {
   });
 });
 
+describe('FormattingToolbar menu portal', () => {
+  it.each([
+    ['Insert', 'image'],
+    ['More', 'toggleLink'],
+  ] as const)(
+    '%s menu portals to document.body and closes after selecting an item',
+    (triggerName, action) => {
+      const commands = fakeCommands();
+      const { container } = render(<FormattingToolbar commands={commands} />);
+      const toolbar = container.querySelector('[role="toolbar"]')!;
+      fireEvent.click(screen.getByRole('button', { name: triggerName }));
+      const menu = screen.getByRole('menu');
+      // Portaled to document.body so the backdrop-blur toolbar root and the
+      // overflow-hidden collapse container cannot clip it.
+      expect(menu.parentElement).toBe(document.body);
+      expect(toolbar.contains(menu)).toBe(false);
+      const item = within(menu).getAllByRole('menuitem')[0];
+      fireEvent.click(item);
+      expect(commands[action]).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('menu')).toBeNull();
+    },
+  );
+});
+
 describe('FormattingToolbar compact More menu', () => {
   it('shows an Ellipsis More menu below lg holding the hidden actions', () => {
     const commands = fakeCommands();
@@ -196,18 +207,8 @@ describe('FormattingToolbar compact More menu', () => {
     fireEvent.click(more);
     const items = within(screen.getByRole('menu')).getAllByRole('menuitem');
     expect(items.map((item) => item.getAttribute('aria-label'))).toEqual([
-      'Link',
-      'Citation',
-      'Inline math',
-      'Inline code',
-      'Bullet list',
-      'Numbered list',
-      'Task list',
-      'Quote',
-      'Code block',
-      'Table',
-      'Image',
-      'Rule',
+      'Link', 'Citation', 'Inline math', 'Inline code', 'Bullet list', 'Numbered list',
+      'Task list', 'Quote', 'Code block', 'Table', 'Image', 'Rule',
     ]);
     fireEvent.click(screen.getByRole('menuitem', { name: 'Code block' }));
     expect(commands.codeBlock).toHaveBeenCalledTimes(1);
