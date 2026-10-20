@@ -121,6 +121,21 @@ export function insertItems(
 }
 
 /**
+ * Whether any item collapsed into the More menu has its format active at the
+ * current selection, so the More trigger can show an active state.
+ *
+ * @param hidden - Items beyond the visible count, in list order.
+ * @param active - Active marks and block state at the selection.
+ * @returns True when a hidden item's pressedKey is on.
+ */
+export function hiddenFormatActive(
+  hidden: readonly ToolbarItemDef[],
+  active: ActiveState,
+): boolean {
+  return hidden.some((item) => Boolean(item.pressedKey && active[item.pressedKey]));
+}
+
+/**
  * Build the More-menu entries for the hidden tail of the item list, in
  * priority order, each running its item's command.
  *

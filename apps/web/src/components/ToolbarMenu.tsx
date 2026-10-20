@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { computePosition, flip, offset, shift } from '@floating-ui/dom';
 import type { LucideIcon } from 'lucide-react';
+import { ACTIVE_CLASS } from './ToolbarButton';
 
 /** One selectable item in a {@link ToolbarMenu} dropdown. */
 export interface ToolbarMenuItem {
@@ -29,6 +30,8 @@ export interface ToolbarMenuProps {
   wrapClassName?: string;
   /** Receives the underlying trigger button element, e.g. for overflow measurement. */
   measureRef?: (element: HTMLButtonElement | null) => void;
+  /** Highlights the trigger as active (aria-pressed) when a collapsed item's format is on. */
+  pressed?: boolean;
 }
 
 const TRIGGER_CLASS =
@@ -114,6 +117,7 @@ export function ToolbarMenu({
   disabled,
   wrapClassName,
   measureRef,
+  pressed,
 }: ToolbarMenuProps) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -136,8 +140,9 @@ export function ToolbarMenu({
         title={label}
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-pressed={pressed}
         disabled={disabled}
-        className={TRIGGER_CLASS}
+        className={pressed ? `${TRIGGER_CLASS} ${ACTIVE_CLASS}` : TRIGGER_CLASS}
         onMouseDown={(event) => event.preventDefault()}
         onPointerDown={(event) => event.preventDefault()}
         onClick={() => setOpen((value) => !value)}

@@ -3,7 +3,7 @@ import { Ellipsis } from 'lucide-react';
 import { ToolbarButton } from './ToolbarButton';
 import { ToolbarMenu } from './ToolbarMenu';
 import type { ToolbarMenuItem } from './ToolbarMenu';
-import { TOOLBAR_ITEMS, headingItems, hiddenMenuItems, insertItems } from './toolbar-items';
+import { TOOLBAR_ITEMS, headingItems, hiddenFormatActive, hiddenMenuItems, insertItems } from './toolbar-items';
 import type { ToolbarItemDef } from './toolbar-items';
 import { useActiveState } from '../hooks/useActiveState';
 import { useOverflowCount } from './use-overflow-count';
@@ -94,10 +94,7 @@ function ToolbarRow({ commands, disabled }: ToolbarRowProps) {
   const [active, refresh] = useActiveState(commands);
 
   /** Run a command, then re-read the active state so aria-pressed updates. */
-  const run = (action: () => void): void => {
-    action();
-    refresh();
-  };
+  const run = (action: () => void): void => { action(); refresh(); };
 
   const pinned = useMemo(() => TOOLBAR_ITEMS.map((item) => Boolean(item.pinned)), []);
   const { visibleCount, rowRef, moreRef, setItemRef } = useOverflowCount({
@@ -111,6 +108,8 @@ function ToolbarRow({ commands, disabled }: ToolbarRowProps) {
   const visible = TOOLBAR_ITEMS.slice(0, inlineCount);
   const hidden = TOOLBAR_ITEMS.slice(inlineCount);
   const moreEntries: ToolbarMenuItem[] = hiddenMenuItems(hidden, commands, run);
+  // The More trigger shows an active state while a collapsed item's format is on.
+  const moreActive = hiddenFormatActive(hidden, active);
 
   return (
     <div ref={rowRef} className="mx-auto flex w-full items-center gap-0.5 px-2 py-1">
@@ -132,10 +131,9 @@ function ToolbarRow({ commands, disabled }: ToolbarRowProps) {
         label="More"
         icon={Ellipsis}
         items={moreEntries}
+        pressed={moreActive}
         disabled={disabled}
-        measureRef={(element) => {
-          moreRef.current = element;
-        }}
+        measureRef={(element) => { moreRef.current = element; }}
       />
     </div>
   );

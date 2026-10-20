@@ -54,18 +54,11 @@ beforeEach(() => {
 });
 
 describe('FormattingToolbar inline row (visible count 6)', () => {
-  it('renders the first six items inline in priority order, then More', () => {
+  it('renders the first six items inline in priority order, then More, no Insert', () => {
     const { container } = render(<FormattingToolbar commands={fakeCommands()} />);
     const names = inlineNames(container);
-    expect(names.slice(0, 6)).toEqual(INLINE_6);
-    expect(names[names.length - 1]).toBe('More');
-  });
-
-  it('renders a More trigger and no Insert trigger', () => {
-    const { container } = render(<FormattingToolbar commands={fakeCommands()} />);
-    expect(screen.getByRole('button', { name: 'More' })).toBeInTheDocument();
+    expect(names).toEqual([...INLINE_6, 'More']);
     expect(screen.queryByRole('button', { name: 'Insert' })).toBeNull();
-    expect(inlineNames(container)).toHaveLength(7);
   });
 });
 
@@ -102,24 +95,34 @@ describe('FormattingToolbar More menu', () => {
   it('lists the hidden items by aria-label when opened', () => {
     render(<FormattingToolbar commands={fakeCommands()} />);
     fireEvent.click(screen.getByRole('button', { name: 'More' }));
-    const items = within(screen.getByRole('menu')).getAllByRole('menuitem');
-    expect(items.map((item) => item.getAttribute('aria-label'))).toEqual(HIDDEN_6);
+    expect(within(screen.getByRole('menu')).getAllByRole('menuitem').map((item) => item.getAttribute('aria-label'))).toEqual(HIDDEN_6);
   });
 
   it('reaches Image, Table, Code block, and Rule through More when they overflow', () => {
     const commands = fakeCommands();
     render(<FormattingToolbar commands={commands} />);
     fireEvent.click(screen.getByRole('button', { name: 'More' }));
-    const icons: Array<[string, string]> = [
-      ['Image', 'lucide-image-plus'], ['Table', 'lucide-table'],
-      ['Code block', 'lucide-square-code'], ['Rule', 'lucide-minus'],
-    ];
+    const icons: Array<[string, string]> = [['Image', 'lucide-image-plus'], ['Table', 'lucide-table'], ['Code block', 'lucide-square-code'], ['Rule', 'lucide-minus']];
     for (const [name, icon] of icons) {
       const item = screen.getByRole('menuitem', { name });
       expect(item.querySelector('svg')?.getAttribute('class')).toContain(icon);
     }
     fireEvent.click(screen.getByRole('menuitem', { name: 'Table' }));
     expect(commands.table).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('FormattingToolbar More active state (collapsed format)', () => {
+  it('marks More pressed with the active class when the active format is collapsed', () => {
+    render(<FormattingToolbar commands={fakeCommands({ ...INACTIVE_STATE, link: true })} />);
+    const more = screen.getByRole('button', { name: 'More' });
+    expect(more).toHaveAttribute('aria-pressed', 'true');
+    expect(more.className.split(/\s+/)).toContain('bg-gray-100');
+  });
+
+  it('keeps More unpressed when the active format is an inline item', () => {
+    render(<FormattingToolbar commands={fakeCommands({ ...INACTIVE_STATE, bold: true })} />);
+    expect(screen.getByRole('button', { name: 'More' })).toHaveAttribute('aria-pressed', 'false');
   });
 });
 
@@ -165,9 +168,11 @@ describe('FormattingToolbar button behavior', () => {
     expect(commands.toggleBold).toHaveBeenCalledTimes(1);
   });
 
-  it('marks Bold pressed when the active state reports bold', () => {
+  it('marks Bold pressed with the shared active class when the state reports bold', () => {
     render(<FormattingToolbar commands={fakeCommands({ ...INACTIVE_STATE, bold: true })} />);
-    expect(screen.getByRole('button', { name: 'Bold' })).toHaveAttribute('aria-pressed', 'true');
+    const bold = screen.getByRole('button', { name: 'Bold' });
+    expect(bold).toHaveAttribute('aria-pressed', 'true');
+    expect(bold.className.split(/\s+/)).toContain('bg-gray-100');
     expect(screen.getByRole('button', { name: 'Italic' })).toHaveAttribute('aria-pressed', 'false');
   });
 
@@ -196,23 +201,17 @@ describe('FormattingToolbar menus', () => {
 describe('FormattingToolbar in source mode (canFormat false)', () => {
   it('disables visible formatting controls but keeps Undo and Redo enabled', () => {
     render(<FormattingToolbar commands={fakeCommands(INACTIVE_STATE, false)} />);
-    for (const name of [...INLINE_6.slice(2), 'More']) {
-      expect(screen.getByRole('button', { name }), name).toBeDisabled();
-    }
-    expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Redo' })).toBeEnabled();
+    for (const name of [...INLINE_6.slice(2), 'More']) expect(screen.getByRole('button', { name }), name).toBeDisabled();
+    for (const name of ['Undo', 'Redo']) expect(screen.getByRole('button', { name })).toBeEnabled();
   });
 });
 
 describe('FormattingToolbar visibility and responsiveness', () => {
-  it('is not rendered when the formattingToolbar preference is off', () => {
-    const { container } = render(<EditorToolbars commands={fakeCommands()} formattingToolbar={false} />);
-    expect(container.querySelector('[role="toolbar"]')).toBeNull();
-  });
-
-  it('is rendered through EditorToolbars when the preference is on', () => {
-    const { container } = render(<EditorToolbars commands={fakeCommands()} formattingToolbar={true} />);
-    expect(container.querySelector('[role="toolbar"]')).not.toBeNull();
+  it('renders through EditorToolbars only when the preference is on', () => {
+    const off = render(<EditorToolbars commands={fakeCommands()} formattingToolbar={false} />);
+    expect(off.container.querySelector('[role="toolbar"]')).toBeNull();
+    const on = render(<EditorToolbars commands={fakeCommands()} formattingToolbar={true} />);
+    expect(on.container.querySelector('[role="toolbar"]')).not.toBeNull();
   });
 
   it('hides below the md breakpoint via hidden md:flex classes', () => {
