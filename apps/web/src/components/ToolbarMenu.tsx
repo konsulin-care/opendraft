@@ -1,6 +1,8 @@
 import { useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { computePosition, flip, offset, shift } from '@floating-ui/dom';
 import type { LucideIcon } from 'lucide-react';
+import { ACTIVE_CLASS } from './ToolbarButton';
 
 /** One selectable item in a {@link ToolbarMenu} dropdown. */
 export interface ToolbarMenuItem {
@@ -26,6 +28,10 @@ export interface ToolbarMenuProps {
   disabled?: boolean;
   /** Extra classes for the wrapper, e.g. responsive visibility. */
   wrapClassName?: string;
+  /** Receives the underlying trigger button element, e.g. for overflow measurement. */
+  measureRef?: (element: HTMLButtonElement | null) => void;
+  /** Highlights the trigger as active (aria-pressed) when a collapsed item's format is on. */
+  pressed?: boolean;
 }
 
 const TRIGGER_CLASS =
@@ -38,8 +44,10 @@ const ITEM_CLASS =
   'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100';
 
 /**
- * Position the open menu under its trigger with floating-ui. Falls back to
- * no movement when either element is not mounted.
+ * Position the open menu under its trigger with floating-ui using the fixed
+ * strategy, so coordinates are viewport-relative once the panel is portaled
+ * to document.body. Falls back to no movement when either element is not
+ * mounted.
  *
  * @param trigger - Trigger button element.
  * @param menu - Menu panel element.
@@ -47,6 +55,7 @@ const ITEM_CLASS =
 function positionMenu(trigger: HTMLElement | null, menu: HTMLElement | null): void {
   if (!trigger || !menu) return;
   void computePosition(trigger, menu, {
+    strategy: 'fixed',
     placement: 'bottom-start',
     middleware: [offset(4), flip(), shift()],
   }).then(({ x, y }) => {
@@ -92,13 +101,24 @@ function MenuPanel({ items, onSelect, menuRef }: MenuPanelProps) {
 
 /**
  * Icon-plus-label toolbar button that opens a floating dropdown menu,
- * positioned with `@floating-ui/dom` under the trigger. Used for the
- * Paragraph style and Insert groups.
+ * rendered through a React portal into `document.body` and positioned with
+ * `@floating-ui/dom` under the trigger using the fixed strategy. The portal
+ * keeps the menu out of the toolbar root's backdrop-blur containing block
+ * and the overflow-hidden collapse container, which would otherwise clip
+ * it. Used for the Paragraph style, Insert, and More triggers.
  *
  * @param props - See {@link ToolbarMenuProps}.
- * @returns The trigger button plus, when open, the menu panel.
+ * @returns The trigger button plus, when open, the portaled menu panel.
  */
-export function ToolbarMenu({ label, icon: Icon, items, disabled, wrapClassName }: ToolbarMenuProps) {
+export function ToolbarMenu({
+  label,
+  icon: Icon,
+  items,
+  disabled,
+  wrapClassName,
+  measureRef,
+  pressed,
+}: ToolbarMenuProps) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -111,21 +131,26 @@ export function ToolbarMenu({ label, icon: Icon, items, disabled, wrapClassName 
   return (
     <div ref={wrapRef} className={`relative shrink-0 ${wrapClassName ?? ''}`.trim()}>
       <button
-        ref={triggerRef}
+        ref={(element) => {
+          triggerRef.current = element;
+          measureRef?.(element);
+        }}
         type="button"
         aria-label={label}
         title={label}
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-pressed={pressed}
         disabled={disabled}
-        className={TRIGGER_CLASS}
+        className={pressed ? `${TRIGGER_CLASS} ${ACTIVE_CLASS}` : TRIGGER_CLASS}
         onMouseDown={(event) => event.preventDefault()}
         onPointerDown={(event) => event.preventDefault()}
         onClick={() => setOpen((value) => !value)}
       >
         <Icon className="h-4 w-4" aria-hidden="true" />
       </button>
-      {open && <MenuPanel items={items} onSelect={() => setOpen(false)} menuRef={menuRef} />}
+      {open &&
+        createPortal(<MenuPanel items={items} onSelect={() => setOpen(false)} menuRef={menuRef} />, document.body)}
     </div>
   );
 }

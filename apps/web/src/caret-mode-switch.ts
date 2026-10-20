@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { Editor } from '@milkdown/kit/core';
 import { editorViewCtx, parserCtx, serializerCtx } from '@milkdown/kit/core';
-import { replaceAll } from '@milkdown/kit/utils';
+import { getMarkdown, replaceAll } from '@milkdown/kit/utils';
 import { Selection, TextSelection } from '@milkdown/kit/prose/state';
 import type { EditorView } from '@milkdown/kit/prose/view';
 import { visualSelectionToSourceOffset, sourceOffsetToVisualPosition } from './caret-sync';
@@ -13,6 +13,46 @@ export type EditorMode = 'wysiwyg' | 'source';
 /** Mutable ref shape used by the mode switcher. */
 interface Ref<T> {
   current: T;
+}
+
+/** Imperative handle exposed for tests and external tools. */
+export interface EditorTestApi {
+  /** Insert text at the end of the document through the editor state. */
+  insertText(text: string): void;
+  /** Current markdown as seen by the editor. */
+  getMarkdown(): string;
+  /** Replace the entire editor content with new markdown. */
+  setMarkdown(markdown: string): void;
+  /** Switch between wysiwyg and source mode. */
+  setMode(mode: EditorMode): void;
+  /** Current visual (ProseMirror) selection position. */
+  getCaret(): number;
+  /** Place the visual caret; values past the end clamp to the document end. */
+  setCaret(pos: number): void;
+}
+
+/**
+ * Build the imperative test/external API around a milkdown editor.
+ *
+ * @param editor - The Milkdown editor instance to wrap.
+ * @param syncContent - Callback switching the surface between modes.
+ * @returns The imperative API bound to the editor.
+ */
+export function createTestApi(editor: Editor, syncContent: (mode: EditorMode) => void): EditorTestApi {
+  return {
+    insertText: (text) => {
+      editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const position = view.state.doc.content.size;
+        view.dispatch(view.state.tr.insertText(text, position));
+      });
+    },
+    getMarkdown: () => editor.action(getMarkdown()),
+    setMarkdown: (markdown) => editor.action(replaceAll(markdown)),
+    setMode: syncContent,
+    getCaret: () => editor.action((ctx) => ctx.get(editorViewCtx).state.selection.from),
+    setCaret: (pos) => editor.action((ctx) => placeVisualCaret(ctx.get(editorViewCtx), pos)),
+  };
 }
 
 /**

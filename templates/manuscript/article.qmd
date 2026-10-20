@@ -1,27 +1,11 @@
 ---
 metadata-files:
-  - _author.yml
-  - _abstract.yml
-  - _frontmatter.yml
+- _author.yml
+- _abstract.yml
+- _frontmatter.yml
 ---
 
-# Introduction
-
-Write your introduction here.
-
-# Methods
-
-Write your methods here.
-
-# Results
-
-Write your results here.
-
-# Discussion
-
-Write your discussion here.
-
-# References
+{{< include blocks/01jb5k7m9q2v4x6z8a0c2e4g6i.qmd >}}
 
 ::: {#refs}
 :::

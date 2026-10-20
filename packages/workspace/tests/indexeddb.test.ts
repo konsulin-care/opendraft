@@ -2,6 +2,46 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import 'fake-indexeddb/auto';
 import { indexedDB } from 'fake-indexeddb';
 import { IndexedDBWorkspace } from '../src/indexeddb.js';
+import { REGISTRY_DB, workspaceDbName } from '../src/db-names.js';
+
+describe('database names', () => {
+  it("workspaceDbName('abc') returns 'od-ws-abc'", () => {
+    expect(workspaceDbName('abc')).toBe('od-ws-abc');
+  });
+
+  it('REGISTRY_DB is od-registry', () => {
+    expect(REGISTRY_DB).toBe('od-registry');
+  });
+});
+
+describe('IndexedDBWorkspace database naming', () => {
+  it("opens a database named 'od-ws-abc'", async () => {
+    const workspace = new IndexedDBWorkspace('abc');
+    await workspace.writeFile('a.md', 'a');
+
+    const names = (await indexedDB.databases()).map((db: { name?: string }) => db.name);
+    expect(names).toContain('od-ws-abc');
+    expect(names).not.toContain('opendraft-workspace-abc');
+  });
+});
+
+describe('IndexedDBWorkspace.listAll', () => {
+  it('returns every stored file path, sorted', async () => {
+    const workspace = new IndexedDBWorkspace('listall-test');
+    await workspace.writeFile('dir/sub/c.bib', 'c');
+    await workspace.writeFile('a.md', 'a');
+    await workspace.writeFile('dir/b.yml', 'b');
+
+    const files = await workspace.listAll();
+    expect(files).toEqual(['a.md', 'dir/b.yml', 'dir/sub/c.bib']);
+  });
+
+  it('returns empty array when no files are stored', async () => {
+    const workspace = new IndexedDBWorkspace('listall-empty-test');
+    const files = await workspace.listAll();
+    expect(files).toEqual([]);
+  });
+});
 
 function createWorkspace(): IndexedDBWorkspace {
   return new IndexedDBWorkspace('test-workspace');
@@ -101,7 +141,7 @@ describe('IndexedDBWorkspace.ready', () => {
 
 describe('IndexedDBWorkspace.close', () => {
   it('closes the connection so the database can be deleted without blocking', async () => {
-    const name = 'opendraft-workspace-close-test';
+    const name = workspaceDbName('close-test');
     const workspace = new IndexedDBWorkspace('close-test');
     await workspace.writeFile('test.txt', 'hello');
     await workspace.close();

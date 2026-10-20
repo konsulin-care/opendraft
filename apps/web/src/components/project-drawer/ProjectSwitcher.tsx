@@ -1,0 +1,159 @@
+import { useState } from 'react';
+import type { ProjectRecord } from '@opendraft/workspace';
+import { ChevronDown } from 'lucide-react';
+import { useOverflowMarquee } from '../../hooks/use-overflow-marquee';
+import { NewProjectDialog } from './NewProjectDialog';
+import { SwitcherDropdown } from './project-switcher-panels';
+
+/** Props for {@link ProjectSwitcher}. */
+export interface ProjectSwitcherProps {
+  /** Projects to offer; re-sorted by most recently opened before display. */
+  projects: ProjectRecord[];
+  /** The active project, whose name labels the switcher button. */
+  active: ProjectRecord | null;
+  /** Make the given project active. */
+  switchTo: (id: string) => void;
+  /** Register and scaffold a new project. */
+  create: (name: string, manuscriptId: string) => void;
+}
+
+/** Sort projects by most recently opened, first. */
+function byRecentFirst(projects: ProjectRecord[]): ProjectRecord[] {
+  return [...projects].sort((a, b) => b.lastOpenedAt - a.lastOpenedAt);
+}
+
+/**
+ * Switcher toggle button labelled with the active project's name.
+ *
+ * The name is tracked by the overflow-marquee hook: when it overflows and
+ * the trigger is hovered or focused, the `marquee` class scrolls the name
+ * right to left in a loop. The hook listens on the name element, so the
+ * trigger's hover and focus transitions are relayed onto it.
+ *
+ * @param props - Button label, open state, and toggle handler.
+ */
+function SwitcherButton({
+  label,
+  open,
+  onToggle,
+}: {
+  /** Accessible label and visible text; the active project's name. */
+  label: string;
+  /** Whether the dropdown is open. */
+  open: boolean;
+  /** Toggle the dropdown. */
+  onToggle: () => void;
+}) {
+  const { ref, marquee } = useOverflowMarquee<HTMLSpanElement>();
+
+  /** Relay a trigger hover/focus transition to the tracked name element. */
+  const relay =
+    (type: 'mouseenter' | 'mouseleave' | 'focus' | 'blur') => () => {
+      ref.current?.dispatchEvent(new Event(type));
+    };
+
+  return (
+    <button
+      type="button"
+      aria-haspopup="true"
+      aria-expanded={open}
+      onClick={onToggle}
+      onMouseEnter={relay('mouseenter')}
+      onMouseLeave={relay('mouseleave')}
+      onFocus={relay('focus')}
+      onBlur={relay('blur')}
+      className="flex w-full items-center gap-1 rounded-md px-3 py-1 text-sm font-medium text-gray-900 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-500"
+    >
+      <ChevronDown className="h-4 w-4 shrink-0 text-gray-500" aria-hidden="true" />
+      <span
+        ref={ref}
+        className={`min-w-0 truncate${marquee ? ' marquee' : ''}`}
+        title={label}
+      >
+        {label}
+      </span>
+    </button>
+  );
+}
+
+/** State and handlers behind {@link ProjectSwitcher}. */
+interface SwitcherState {
+  /** Whether the dropdown is open. */
+  open: boolean;
+  /** Whether the new-project dialog is open. */
+  creating: boolean;
+  /** Toggle the dropdown. */
+  toggle: () => void;
+  /** Choose a project from the dropdown and close it. */
+  choose: (id: string) => void;
+  /** Open or close the new-project dialog. */
+  setCreating: (creating: boolean) => void;
+}
+
+/**
+ * Dropdown and dialog state for the project switcher, wiring the
+ * callbacks to the registry actions passed in. Deletion lives in the
+ * drawer footer, not the dropdown.
+ *
+ * @param active - The active project, or null when none.
+ * @param switchTo - Make the given project active.
+ * @returns See {@link SwitcherState}.
+ */
+function useSwitcherState(
+  active: ProjectRecord | null,
+  switchTo: (id: string) => void,
+): SwitcherState {
+  const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  /** Choose a project from the dropdown and close it. */
+  const choose = (id: string) => {
+    switchTo(id);
+    setOpen(false);
+  };
+
+  return {
+    open,
+    creating,
+    toggle: () => setOpen((o) => !o),
+    choose,
+    setCreating,
+  };
+}
+
+/**
+ * Project switcher for the drawer header: a dropdown of recently opened
+ * projects with a full-width "New project" action opening
+ * {@link NewProjectDialog}.
+ *
+ * @param props - See {@link ProjectSwitcherProps}.
+ */
+export function ProjectSwitcher({
+  projects,
+  active,
+  switchTo,
+  create,
+}: ProjectSwitcherProps) {
+  const state = useSwitcherState(active, switchTo);
+
+  return (
+    <div className="relative min-w-0 flex-1">
+      <SwitcherButton
+        label={active?.name ?? 'Project'}
+        open={state.open}
+        onToggle={state.toggle}
+      />
+      {state.open && (
+        <SwitcherDropdown
+          projects={byRecentFirst(projects)}
+          active={active}
+          onSelect={state.choose}
+          onNew={() => state.setCreating(true)}
+        />
+      )}
+      {state.creating && (
+        <NewProjectDialog onCreate={create} onClose={() => state.setCreating(false)} />
+      )}
+    </div>
+  );
+}

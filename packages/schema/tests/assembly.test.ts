@@ -42,15 +42,15 @@ describe('validateAssembly: consistency', () => {
     expect(result.errors.some((e) => e.message.includes('duplicate'))).toBe(true);
   });
 
-  it('rejects empty block files referenced by the assembly', () => {
+  it('accepts empty block files referenced by the assembly', () => {
     const result = validateAssembly({
       assembly: '{{< include blocks/intro.qmd >}}',
-      blockFiles: { 'blocks/intro.qmd': '   ' },
+      blockFiles: { 'blocks/intro.qmd': '' },
       files: ['intro.qmd'],
     });
 
-    expect(result.valid).toBe(false);
-    expect(result.errors.some((e) => e.message.includes('empty'))).toBe(true);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
   });
 });
 

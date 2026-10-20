@@ -204,13 +204,16 @@ describe('CitekeyTooltip — CSS restyle', () => {
     expect(rule).not.toContain('#1e293b');
   });
 
-  it('has white background, dark text, and border', () => {
+  it('has white background, dark text, and border via color tokens', () => {
     const ruleMatch = css.match(/\.citekey-tooltip\s*\{([^}]*)\}/);
     expect(ruleMatch).not.toBeNull();
     const rule = ruleMatch![1];
-    expect(rule).toContain('background: #ffffff');
-    expect(rule).toContain('color: #212529');
-    expect(rule).toContain('border: 1px solid #adb5bd');
+    expect(rule).toContain('background: var(--color-white)');
+    expect(rule).toContain('color: var(--color-black)');
+    expect(rule).toContain('border: 1px solid var(--color-outline)');
+    expect(rule).not.toContain('#ffffff');
+    expect(rule).not.toContain('#212529');
+    expect(rule).not.toContain('#adb5bd');
   });
 
   it('has no ::after pseudo-element for callout arrow', () => {

@@ -3,22 +3,22 @@
 
 /* ── Palette: monochrome + error red ── */
 .milkdown {
-  --crepe-color-background: #ffffff;
-  --crepe-color-on-background: #212529;
-  --crepe-color-surface: #ffffff;
-  --crepe-color-surface-low: #f8f9fa;
-  --crepe-color-on-surface: #212529;
-  --crepe-color-on-surface-variant: #6c757d;
-  --crepe-color-outline: #adb5bd;
-  --crepe-color-primary: #212529;
-  --crepe-color-secondary: #dee2e6;
-  --crepe-color-on-secondary: #212529;
-  --crepe-color-inverse: #343a40;
-  --crepe-color-on-inverse: #f8f9fa;
-  --crepe-color-hover: #e9ecef;
-  --crepe-color-selected: #dee2e6;
-  --crepe-color-inline-code: #495057;
-  --crepe-color-error: #dc3545;
+  --crepe-color-background: var(--color-white);
+  --crepe-color-on-background: var(--color-black);
+  --crepe-color-surface: var(--color-white);
+  --crepe-color-surface-low: var(--color-surface-low);
+  --crepe-color-on-surface: var(--color-black);
+  --crepe-color-on-surface-variant: var(--color-muted);
+  --crepe-color-outline: var(--color-outline);
+  --crepe-color-primary: var(--color-black);
+  --crepe-color-secondary: var(--color-secondary);
+  --crepe-color-on-secondary: var(--color-black);
+  --crepe-color-inverse: var(--color-inverse);
+  --crepe-color-on-inverse: var(--color-surface-low);
+  --crepe-color-hover: var(--color-hover);
+  --crepe-color-selected: var(--color-secondary);
+  --crepe-color-inline-code: var(--color-inline-code);
+  --crepe-color-error: var(--color-error);
 }
 
 /* ── Fonts ── */
@@ -102,8 +102,72 @@
 
 @import "tailwindcss";
 
+/* ── Color tokens: single source of truth ── */
+/* `--color-*: initial` drops every default Tailwind color so only the
+   tokens declared here exist. Values match the pre-token rendered colors.
+   Guarded by index.css.theme.test.ts; components may only use these. */
+@theme {
+  --color-*: initial;
+
+  /* Core palette */
+  --color-black: #212529;
+  --color-white: #ffffff;
+  --color-surface-low: #f8f9fa;
+  --color-hover: #e9ecef;
+  --color-outline: #adb5bd;
+  --color-secondary: #dee2e6;
+  --color-muted: #6c757d;
+  --color-inline-code: #495057;
+  --color-inverse: #343a40;
+  --color-error: #dc3545;
+
+  /* Editor surfaces */
+  --color-selection: #d0d7de;
+  --color-active-line: #f2f2f2;
+  --color-gutter-bg: #f7f7f7;
+  --color-editor-dark: #282c34;
+  --color-slate-800: #1e293b;
+
+  /* Highlights */
+  --color-amber-100: #fef3c7;
+  --color-amber-500: #f59e0b;
+  --color-amber-800: #92400e;
+  --color-yellow-200: #fef9c3;
+
+  /* Translucent accents */
+  --color-blue-600-10: rgba(37, 99, 235, 0.1);
+  --color-blue-600-18: rgba(37, 99, 235, 0.18);
+  --color-black-08: rgba(0, 0, 0, 0.08);
+
+  /* Neutral ramp (values identical to the Tailwind defaults in use) */
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111827;
+
+  /* Accents in use */
+  --color-blue-50: #eff6ff;
+  --color-blue-600: #2563eb;
+  --color-blue-700: #1d4ed8;
+  --color-red-50: #fef2f2;
+  --color-red-300: #fca5a5;
+  --color-red-600: #dc3545;
+  --color-red-700: #b91c1c;
+  --color-red-800: #991b1b;
+  --color-green-700: #15803d;
+  --color-sky-600: #0284c7;
+  --color-stone-200: #e7e5e4;
+  --color-stone-300: #d6d3d1;
+}
+
 body {
-  @apply bg-stone-100 text-stone-900 antialiased;
+  @apply bg-surface-low text-black antialiased;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
 }
@@ -187,6 +251,29 @@ textarea {
   }
 }
 
+/* ── Marquee: scroll overflowing text right to left in a loop ── */
+/* Pair with duplicated text content so the -50% translate loops seamlessly. */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee {
+  display: inline-block;
+  white-space: nowrap;
+  animation: marquee 8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee {
+    animation: none;
+  }
+}
+
 .manuscript-editor .ProseMirror p {
   @apply my-4 text-base leading-relaxed first:mt-0 last:mb-0;
 }
@@ -218,15 +305,15 @@ textarea {
 }
 
 .manuscript-editor .ProseMirror hr {
-  @apply my-6 border-stone-300;
+  @apply my-6 border-secondary;
 }
 
 .manuscript-editor .ProseMirror blockquote {
-  @apply my-4 pl-4 text-stone-600;
+  @apply my-4 pl-4 text-muted;
 }
 
 .manuscript-editor .ProseMirror code {
-  @apply rounded bg-stone-200 px-1 py-0.5 font-mono text-sm;
+  @apply rounded bg-hover px-1 py-0.5 font-mono text-sm;
 }
 
 /* Commit dialog */
@@ -235,7 +322,7 @@ textarea {
 }
 
 .commit-dialog {
-  @apply flex w-full max-w-md flex-col gap-3 rounded-lg border border-stone-300 bg-white p-6 shadow-lg;
+  @apply flex w-full max-w-md flex-col gap-3 rounded-lg border border-secondary bg-white p-6 shadow-lg;
 }
 
 .commit-dialog h2 {
@@ -243,7 +330,7 @@ textarea {
 }
 
 .commit-dialog textarea {
-  @apply w-full rounded-md border border-stone-300 p-2 font-mono text-sm;
+  @apply w-full rounded-md border border-secondary p-2 font-mono text-sm;
 }
 
 .commit-errors {
@@ -259,11 +346,11 @@ textarea {
 }
 
 .commit-actions button {
-  @apply rounded-md border border-stone-300 px-4 py-2 text-sm;
+  @apply rounded-md border border-secondary px-4 py-2 text-sm;
 }
 
 .commit-actions button:not(:disabled):hover {
-  @apply bg-stone-100;
+  @apply bg-surface-low;
 }
 
 .commit-actions button:disabled {
@@ -473,8 +560,8 @@ textarea {
 
 /* ── Citekey inline decorations (subtle pill) ── */
 .citekey-link {
-  color: #2563eb;
-  background: rgba(37, 99, 235, 0.1);
+  color: var(--color-blue-600);
+  background: var(--color-blue-600-10);
   border-radius: 4px;
   padding: 0 4px;
   text-decoration: none;
@@ -483,7 +570,7 @@ textarea {
 }
 
 .citekey-link:hover {
-  background: rgba(37, 99, 235, 0.18);
+  background: var(--color-blue-600-18);
 }
 
 /* ── Citekey hover tooltip ── */
@@ -492,9 +579,9 @@ textarea {
   z-index: 200;
   max-width: 380px;
   padding: 10px 14px;
-  background: #ffffff;
-  color: #212529;
-  border: 1px solid #adb5bd;
+  background: var(--color-white);
+  color: var(--color-black);
+  border: 1px solid var(--color-outline);
   border-radius: 8px;
   font-size: 0.8125rem;
   line-height: 1.5;

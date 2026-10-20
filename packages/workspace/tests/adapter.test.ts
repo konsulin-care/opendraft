@@ -79,3 +79,25 @@ describe('MemoryWorkspace.listFiles', () => {
     expect(files).toEqual([]);
   });
 });
+
+describe('MemoryWorkspace.listAll', () => {
+  let workspace: MemoryWorkspace;
+
+  beforeEach(() => {
+    workspace = new MemoryWorkspace();
+  });
+
+  it('returns every stored file path, sorted', async () => {
+    await workspace.writeFile('dir/sub/c.bib', 'c');
+    await workspace.writeFile('a.md', 'a');
+    await workspace.writeFile('dir/b.yml', 'b');
+
+    const files = await workspace.listAll();
+    expect(files).toEqual(['a.md', 'dir/b.yml', 'dir/sub/c.bib']);
+  });
+
+  it('returns empty array when no files are stored', async () => {
+    const files = await workspace.listAll();
+    expect(files).toEqual([]);
+  });
+});

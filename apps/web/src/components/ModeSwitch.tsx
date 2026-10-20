@@ -3,12 +3,17 @@ import { FileCode, FileText } from 'lucide-react';
 /** Editing mode controlled by the header's mode toggle. */
 export type EditorMode = 'wysiwyg' | 'source';
 
+/** Explanation shown by the toggle when visual mode is unavailable for the file type. */
+export const VISUAL_MODE_GATE_TITLE = 'Visual mode is only available for manuscript block files';
+
 /** Props for {@link ModeSwitch}. */
 export interface ModeSwitchProps {
   /** Current editing mode; the toggle shows this mode's icon. */
   mode: EditorMode;
   /** Called with the opposite mode when the toggle is activated. */
   onSelectMode: (mode: EditorMode) => void;
+  /** When true, the toggle is disabled: visual mode is unavailable for this file. */
+  disabled?: boolean;
 }
 
 const TOGGLE =
@@ -23,11 +28,14 @@ const MODE_NAME: Record<EditorMode, string> = { wysiwyg: 'visual', source: 'sour
  * breakpoint; on smaller screens the same action lives in the header
  * overflow menu.
  *
+ * When `disabled` is set (non-markdown files), the button is disabled and
+ * its label/title explain the gate instead of naming a target mode.
+ *
  * @param props - See {@link ModeSwitchProps}.
  */
-export function ModeSwitch({ mode, onSelectMode }: ModeSwitchProps) {
+export function ModeSwitch({ mode, onSelectMode, disabled = false }: ModeSwitchProps) {
   const target: EditorMode = mode === 'wysiwyg' ? 'source' : 'wysiwyg';
-  const label = `Switch to ${MODE_NAME[target]}`;
+  const label = disabled ? VISUAL_MODE_GATE_TITLE : `Switch to ${MODE_NAME[target]}`;
   const Icon = mode === 'wysiwyg' ? FileText : FileCode;
   return (
     <div className="hidden items-center md:flex">
@@ -35,6 +43,7 @@ export function ModeSwitch({ mode, onSelectMode }: ModeSwitchProps) {
         type="button"
         aria-label={label}
         title={label}
+        disabled={disabled}
         onClick={() => onSelectMode(target)}
         className={TOGGLE}
       >

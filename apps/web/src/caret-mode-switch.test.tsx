@@ -1,10 +1,15 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryWorkspace } from '@opendraft/workspace';
 import { MilkdownProvider } from '@milkdown/react';
 import { EditorView } from '@codemirror/view';
+import { AppHeader } from './components/AppHeader';
+import { VISUAL_MODE_GATE_TITLE } from './components/ModeSwitch';
 import { ManuscriptEditor, type EditorTestApi } from './components/ManuscriptEditor';
+import { useEditorMode } from './hooks/useEditorMode';
+import { getFileCapability } from './project/file-capability';
+import { readPreferences, writePreferences } from './preferences';
 
 // jsdom does not implement Range layout APIs that CodeMirror measures on focus.
 if (!Range.prototype.getClientRects) {
@@ -14,11 +19,14 @@ if (!Range.prototype.getClientRects) {
 
 const DOC = '# Title\n\nFirst paragraph.\n\nLast paragraph here.\n';
 
+/** Manuscript block path: the only file type that mounts the visual editor. */
+const BLOCK_PATH = 'manuscripts/p/blocks/01hxyz00000000000000000000.qmd';
+
 /** Mount the editor in the given mode and capture its test API. */
 function mount(workspace: MemoryWorkspace, mode: 'wysiwyg' | 'source', onReady: (api: EditorTestApi) => void) {
   return render(
     <MilkdownProvider>
-      <ManuscriptEditor workspace={workspace} defaultValue={DOC} onEditorReady={onReady} mode={mode} />
+      <ManuscriptEditor workspace={workspace} defaultValue={DOC} path={BLOCK_PATH} onEditorReady={onReady} mode={mode} />
     </MilkdownProvider>,
   );
 }
@@ -27,7 +35,7 @@ function mount(workspace: MemoryWorkspace, mode: 'wysiwyg' | 'source', onReady: 
 function setMode(result: ReturnType<typeof render>, workspace: MemoryWorkspace, mode: 'wysiwyg' | 'source') {
   result.rerender(
     <MilkdownProvider>
-      <ManuscriptEditor workspace={workspace} defaultValue={DOC} mode={mode} />
+      <ManuscriptEditor workspace={workspace} defaultValue={DOC} path={BLOCK_PATH} mode={mode} />
     </MilkdownProvider>,
   );
 }
@@ -42,6 +50,133 @@ async function sourceView(): Promise<EditorView> {
   }, { timeout: 5000 });
   return view!;
 }
+
+/** Explanation shown by the mode switch when visual mode is unavailable. */
+const GATE_TITLE = VISUAL_MODE_GATE_TITLE;
+
+/** Wait until the mode switch is disabled and carries the gate explanation. */
+function expectGateDisabled(): HTMLButtonElement {
+  const toggle = screen.getByRole('button', { name: GATE_TITLE }) as HTMLButtonElement;
+  expect(toggle.disabled).toBe(true);
+  expect(toggle.title).toBe(GATE_TITLE);
+  return toggle;
+}
+
+/** Wait until the mode switch is re-enabled in visual mode for a rich file. */
+async function expectVisualRestored(getApi: () => EditorTestApi | null) {
+  await waitFor(() => expect(getApi()).not.toBeNull(), { timeout: 10000 });
+  await waitFor(() => expect(getApi()!.getMarkdown()).toContain('Article'), { timeout: 10000 });
+  const restored = screen.getByRole('button', { name: 'Switch to source' }) as HTMLButtonElement;
+  expect(restored.disabled).toBe(false);
+  expect(readPreferences().editorMode).toBe('wysiwyg');
+}
+
+/** Re-render the gate shell with a rich block file and wait for the editor. */
+async function openMarkdown(
+  rerender: (ui: React.ReactElement) => void,
+  workspace: MemoryWorkspace,
+  onReady: (api: EditorTestApi) => void,
+) {
+  rerender(
+    <GatedShell
+      workspace={workspace}
+      path="manuscripts/p/blocks/01hxyz00000000000000000000.qmd"
+      content="# Article\n\nBody text.\n"
+      onReady={onReady}
+    />,
+  );
+}
+
+/** Header + editor shell mirroring the App wiring for the file-capability gate. */
+function GatedShell({
+  workspace,
+  path,
+  content,
+  onReady,
+}: {
+  workspace: MemoryWorkspace;
+  path: string;
+  content: string;
+  onReady?: (api: EditorTestApi) => void;
+}) {
+  const { mode } = useEditorMode();
+  const visualAvailable = getFileCapability(path, content) === 'rich';
+  return (
+    <>
+      <AppHeader
+        fileName={path}
+        projectName="Test Project"
+        mode={mode}
+        onSelectMode={() => {}}
+        saveStatus="saved"
+        formattingToolbar
+        onToggleFormattingToolbar={() => {}}
+        onCommit={() => {}}
+        modeSwitchDisabled={!visualAvailable}
+      />
+      <MilkdownProvider>
+        <ManuscriptEditor
+          workspace={workspace}
+          defaultValue={content}
+          path={path}
+          mode={mode}
+          onEditorReady={onReady}
+        />
+      </MilkdownProvider>
+    </>
+  );
+}
+
+describe('File-type-gated editing mode', () => {
+  let workspace: MemoryWorkspace;
+
+  beforeEach(() => {
+    workspace = new MemoryWorkspace();
+    localStorage.clear();
+    writePreferences({ formattingToolbar: true, editorMode: 'wysiwyg' });
+  });
+
+  it('gates text files to source mode and restores visual mode for markdown', async () => {
+    const bib = '@article{key,\n  title = {A Paper}\n}\n';
+    let api: EditorTestApi | null = null;
+    const onReady = (ready: EditorTestApi) => {
+      api = ready;
+    };
+    const { rerender } = render(<GatedShell workspace={workspace} path="refs.bib" content={bib} onReady={onReady} />);
+
+    // The preferred mode is wysiwyg, but a .bib file forces the source editor.
+    await waitFor(() => {
+      expect(document.querySelector('.cm-content')?.textContent).toContain('A Paper');
+    }, { timeout: 10000 });
+
+    // The mode switch is disabled and explains the gate.
+    expectGateDisabled();
+
+    // The persisted preference is not rewritten by the gate.
+    expect(readPreferences().editorMode).toBe('wysiwyg');
+
+    // Opening a manuscript block file restores the preferred visual mode and the switch.
+    api = null;
+    await openMarkdown(rerender, workspace, onReady);
+    await expectVisualRestored(() => api);
+  }, 30000);
+
+  it('never passes binary file content to either editor', async () => {
+    const binary = 'PNG\u0000BINARY\u0009MARKER';
+    render(<GatedShell workspace={workspace} path="figures/fig.png" content={binary} />);
+
+    await waitFor(() => {
+      expect(document.querySelector('.cm-editor')).not.toBeNull();
+    }, { timeout: 10000 });
+
+    // Neither the source editor nor the visual editor received the bytes.
+    expect(document.querySelector('.cm-content')?.textContent ?? '').not.toContain('MARKER');
+    expect(document.body.textContent ?? '').not.toContain('BINARY');
+
+    // Binary files are not rich: the toggle carries the gate explanation.
+    expectGateDisabled();
+  }, 30000);
+});
 
 describe('caret placement across mode switches', () => {
   let workspace: MemoryWorkspace;

@@ -12,10 +12,15 @@ export interface ToolbarButtonProps {
   disabled?: boolean;
   /** Toggle state; renders `aria-pressed` when provided. */
   pressed?: boolean;
+  /** Receives the underlying button element, e.g. for overflow measurement. */
+  measureRef?: (element: HTMLButtonElement | null) => void;
 }
 
 const BUTTON_CLASS =
   'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-gray-600 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-500 disabled:cursor-not-allowed disabled:opacity-40';
+
+/** Shared active-state style for pressed buttons and the active More trigger. */
+export const ACTIVE_CLASS = 'bg-gray-100 text-gray-900';
 
 /**
  * Icon-only toolbar button with an accessible name. Prevents the default on
@@ -31,15 +36,17 @@ export function ToolbarButton({
   onClick,
   disabled,
   pressed,
+  measureRef,
 }: ToolbarButtonProps) {
   return (
     <button
+      ref={measureRef}
       type="button"
       aria-label={label}
       title={label}
       aria-pressed={pressed}
       disabled={disabled}
-      className={BUTTON_CLASS}
+      className={pressed ? `${BUTTON_CLASS} ${ACTIVE_CLASS}` : BUTTON_CLASS}
       onMouseDown={(event) => event.preventDefault()}
       onPointerDown={(event) => event.preventDefault()}
       onClick={onClick}

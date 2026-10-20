@@ -42,4 +42,12 @@ export class MemoryWorkspace implements WorkspaceAdapter {
     }
     return files;
   }
+
+  /**
+   * List every stored file in the workspace.
+   * @returns Sorted array of all stored file paths, repo-relative.
+   */
+  async listAll(): Promise<string[]> {
+    return [...this.files.keys()].sort();
+  }
 }

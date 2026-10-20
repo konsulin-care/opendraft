@@ -23,6 +23,9 @@ This document provides a global overview of conventions. For subdirectory-specif
 - Prefer `interface` over `type` for object shapes.
 - No `any` — use `unknown` and narrow.
 - `const` over `let` where possible.
+- **Colors:** use only the tokens declared in the `@theme` block of
+  `apps/web/src/index.css` (token utilities or `var(--color-*)`). See
+  [apps/convention.md](../../apps/convention.md) for details.
 
 ## Commit Messages
 

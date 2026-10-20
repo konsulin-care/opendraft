@@ -36,7 +36,8 @@ export function collectIncludes(assembly: string): string[] {
 
 /**
  * Validate file<->include consistency of an authored assembly:
- * every include has a non-empty block file, no includes are duplicated,
+ * every include has a matching block file (empty blocks are allowed),
+ * no includes are duplicated,
  * include paths stay under blocks/, and unreferenced files are reported
  * as warnings (they are legitimate drafts).
  *
@@ -65,8 +66,6 @@ export function validateAssembly({ assembly, blockFiles, files }: AssemblyInput)
     const content = blockFiles[path];
     if (content === undefined) {
       errors.push({ path: 'assembly', message: `missing block file: ${path}` });
-    } else if (content.trim() === '') {
-      errors.push({ path: 'assembly', message: `empty block file: ${path}` });
     }
   }
 

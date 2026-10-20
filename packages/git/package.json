@@ -18,7 +18,7 @@
     "@opendraft/metadata": "workspace:*",
     "@opendraft/schema": "workspace:*",
     "@opendraft/workspace": "workspace:*",
-    "isomorphic-git": "^1.44.2"
+    "isomorphic-git": "^1.44.3"
   },
   "devDependencies": {
     "fake-indexeddb": "^6.2.6",

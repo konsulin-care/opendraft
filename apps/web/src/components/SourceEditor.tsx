@@ -1,5 +1,5 @@
 import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
-import { EditorState } from '@codemirror/state';
+import { Annotation, EditorState } from '@codemirror/state';
 import { EditorView, keymap, drawSelection, dropCursor, highlightActiveLine, highlightActiveLineGutter, highlightSpecialChars, lineNumbers, rectangularSelection, crosshairCursor } from '@codemirror/view';
 import { markdown } from '@codemirror/lang-markdown';
 import { autocompletion, completionKeymap as autocompleteCompletionKeymap, closeBrackets } from '@codemirror/autocomplete';
@@ -25,6 +25,11 @@ interface SourceEditorProps {
   onChange: (value: string) => void;
   /** Additional class for the outer container (e.g. column layout). */
   className?: string;
+  /**
+   * Syntax language for the buffer: 'markdown' for rich files, 'plain' for
+   * other text files. Changing it recreates the CodeMirror state.
+   */
+  language?: 'markdown' | 'plain';
 }
 
 /**
@@ -93,6 +98,9 @@ function makeImperativeHandle(
   };
 }
 
+/** Annotation tagging transactions that sync an external value into the view. */
+const externalSync = Annotation.define<boolean>();
+
 /** Sync external prop changes into a CodeMirror view, skipping user edits. */
 function useExternalValueSync(
   viewRef: React.MutableRefObject<EditorView | null>,
@@ -108,8 +116,12 @@ function useExternalValueSync(
     }
     const currentDoc = view.state.doc.toString();
     if (value !== currentDoc) {
+      // Tag the transaction so the update listener treats it as a programmatic
+      // sync: loading a new file's content must not fire onChange (which would
+      // schedule an autosave of the loaded content to the current path).
       view.dispatch({
         changes: { from: 0, to: currentDoc.length, insert: value },
+        annotations: externalSync.of(true),
       });
     }
   }, [value]);
@@ -118,25 +130,29 @@ function useExternalValueSync(
 /**
  * Light theme for the source editor: white background, dark foreground and a
  * neutral gray active line, matching the .manuscript-editor reading surface.
+ * Colors reference the @theme tokens in index.css so hex values live in one
+ * place; the rendered values are unchanged because the tokens hold the
+ * original hex values.
  */
 const lightEditorTheme = EditorView.theme({
-  '&': { color: '#212529', backgroundColor: '#ffffff' },
-  '.cm-content': { caretColor: '#212529' },
-  '.cm-cursor, .cm-dropCursor': { borderLeftColor: '#212529' },
-  '.cm-selectionBackground, .cm-content ::selection': { backgroundColor: '#d0d7de' },
-  '&.cm-focused .cm-selectionBackground': { backgroundColor: '#d0d7de' },
-  '.cm-activeLine': { backgroundColor: '#f2f2f2' },
-  '.cm-activeLineGutter': { backgroundColor: '#f2f2f2' },
+  '&': { color: 'var(--color-black)', backgroundColor: 'var(--color-white)' },
+  '.cm-content': { caretColor: 'var(--color-black)' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--color-black)' },
+  '.cm-selectionBackground, .cm-content ::selection': { backgroundColor: 'var(--color-selection)' },
+  '&.cm-focused .cm-selectionBackground': { backgroundColor: 'var(--color-selection)' },
+  '.cm-activeLine': { backgroundColor: 'var(--color-active-line)' },
+  '.cm-activeLineGutter': { backgroundColor: 'var(--color-active-line)' },
   '.cm-gutters': {
-    color: '#6c757d',
-    backgroundColor: '#f7f7f7',
-    borderRight: '1px solid #dee2e6',
+    color: 'var(--color-muted)',
+    backgroundColor: 'var(--color-gutter-bg)',
+    borderRight: '1px solid var(--color-secondary)',
   },
 }, { dark: false });
 
-/** Create a CodeMirror EditorState with markdown support and change tracking. */
+/** Create a CodeMirror EditorState with optional markdown support and change tracking. */
 function createState(
   value: string,
+  language: 'markdown' | 'plain',
   isInternalChangeRef: React.MutableRefObject<boolean>,
   onChange: (value: string) => void,
 ) {
@@ -165,43 +181,45 @@ function createState(
         ...autocompleteCompletionKeymap,
         ...searchSearchKeymap,
       ]),
-      markdown(),
+      ...(language === 'markdown' ? [markdown()] : []),
       // Wrap long lines within the viewport instead of scrolling horizontally.
       EditorView.lineWrapping,
       lightEditorTheme,
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       EditorView.updateListener.of((update) => {
-        if (update.docChanged) {
-          isInternalChangeRef.current = true;
-          onChange(update.state.doc.toString());
-        }
+        if (!update.docChanged) return;
+        // Programmatic external-value syncs are not user edits: never report
+        // them as changes or they would autosave loaded content to the path.
+        if (update.transactions.some((tr) => tr.annotation(externalSync))) return;
+        isInternalChangeRef.current = true;
+        onChange(update.state.doc.toString());
       }),
     ],
   });
 }
 
 /**
- * Raw markdown editor backed by CodeMirror 6 with markdown syntax
- * highlighting and a light theme matching the visual surface. Used for the
- * "source" mode
+ * Raw markdown editor backed by CodeMirror 6 with a light theme matching
+ * the visual surface. Markdown syntax highlighting is used for rich files;
+ * other text files get a plain buffer. Used for the "source" mode
  * toggle in ManuscriptEditor.
  */
 export const SourceEditor = forwardRef<SourceEditorHandle, SourceEditorProps>(
-  function SourceEditor({ value, onChange, className }, ref) {
+  function SourceEditor({ value, onChange, className, language = 'markdown' }, ref) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const viewRef = useRef<EditorView | null>(null);
     const isInternalChangeRef = useRef(false);
 
-    // Mount CodeMirror on first render.
+    // Mount CodeMirror on first render; recreate when the language changes.
     useEffect(() => {
       if (!containerRef.current) return;
       const view = new EditorView({
-        state: createState(value, isInternalChangeRef, onChange),
+        state: createState(value, language, isInternalChangeRef, onChange),
         parent: containerRef.current,
       });
       viewRef.current = view;
       return () => { view.destroy(); viewRef.current = null; };
-    }, []);
+    }, [language]);
 
     // Sync external value changes into CodeMirror.
     useExternalValueSync(viewRef, isInternalChangeRef, value);

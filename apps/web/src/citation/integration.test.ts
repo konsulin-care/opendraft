@@ -15,6 +15,7 @@ describe('citation plugin integration', () => {
       writeFile: vi.fn().mockResolvedValue(undefined),
       deleteFile: vi.fn().mockResolvedValue(undefined),
       listFiles: vi.fn().mockResolvedValue([]),
+      listAll: vi.fn().mockResolvedValue([]),
     };
 
     const plugin = createCitationPlugin(workspace);
