@@ -88,6 +88,16 @@ describe('FormattingToolbar dividers (visible groups only)', () => {
   });
 });
 
+describe('FormattingToolbar pinned Paragraph style', () => {
+  it('stays inline at visible count 1 and never appears in More', () => {
+    overflow.visibleCount = 1;
+    render(<FormattingToolbar commands={fakeCommands()} />);
+    expect(screen.getByRole('button', { name: 'Paragraph style' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'More' }));
+    expect(within(screen.getByRole('menu')).queryByRole('menuitem', { name: 'Paragraph style' })).toBeNull();
+  });
+});
+
 describe('FormattingToolbar More menu', () => {
   it('lists the hidden items by aria-label when opened', () => {
     render(<FormattingToolbar commands={fakeCommands()} />);
@@ -232,9 +242,7 @@ describe('FormattingToolbar collapse transition', () => {
       expect(wrap.querySelector('[role="toolbar"]')).not.toBeNull();
       act(() => vi.advanceTimersByTime(150));
       expect(container.querySelector('.editor-toolbar-collapse [role="toolbar"]')).toBeNull();
-    } finally {
-      vi.useRealTimers();
-    }
+    } finally { vi.useRealTimers(); }
   });
 });
 
@@ -244,20 +252,15 @@ describe('index.css responsive layout (source scan)', () => {
   const menu = readFileSync(resolve(__dirname, 'ToolbarMenu.tsx'), 'utf-8');
 
   it('transitions the toolbar collapse on max-height and opacity over 150 ms', () => {
-    expect(css).toMatch(/\.editor-toolbar-collapse\s*\{[^}]*transition:[^}]*max-height 150ms/);
-    expect(css).toMatch(/\.editor-toolbar-collapse\s*\{[^}]*transition:[^}]*opacity 150ms/);
+    expect(css).toMatch(/\.editor-toolbar-collapse\s*\{[^}]*transition:[^}]*max-height 150ms[^}]*opacity 150ms/);
   });
 
   it('collapses to zero height and transparent when closed', () => {
     const closed = css.slice(css.indexOf('.editor-toolbar-collapse.is-closed'));
-    expect(closed).toContain('max-height: 0');
-    expect(closed).toContain('opacity: 0');
+    expect(closed).toMatch(/max-height: 0[\s\S]*opacity: 0/);
   });
 
-  it('drops the transition under prefers-reduced-motion', () => {
-    const reduced = css.slice(css.indexOf('prefers-reduced-motion'));
-    expect(reduced).toMatch(/\.editor-toolbar-collapse\s*\{[^}]*transition:\s*none/);
-  });
+  it('drops the transition under prefers-reduced-motion', () => expect(css.slice(css.indexOf('prefers-reduced-motion'))).toMatch(/\.editor-toolbar-collapse\s*\{[^}]*transition:\s*none/));
 
   it('sets the editor reading column to 80% width', () => {
     expect(css).toMatch(/\.manuscript-editor \.editor\s*\{[^}]*width:\s*80%/);
