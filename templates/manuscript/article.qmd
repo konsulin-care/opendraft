@@ -3,6 +3,7 @@ metadata-files:
 - _author.yml
 - _abstract.yml
 - _frontmatter.yml
+---
 
 {{< include blocks/01jb5k7m9q2v4x6z8a0c2e4g6i.qmd >}}
 

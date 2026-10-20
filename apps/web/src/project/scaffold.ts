@@ -24,6 +24,7 @@ metadata-files:
 - _author.yml
 - _abstract.yml
 - _frontmatter.yml
+---
 
 {{< include ${blockPath} >}}
 
