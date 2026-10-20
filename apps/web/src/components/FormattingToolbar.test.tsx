@@ -151,12 +151,11 @@ describe('FormattingToolbar More menu overflow entries', () => {
     expect(screen.queryByRole('menu')).toBeNull();
   });
 
-  it('still renders the More trigger when every item fits inline', () => {
+  it('omits the More trigger when every item fits inline', () => {
     overflow.visibleCount = TOOLBAR_ITEMS.length;
     const { container } = render(<FormattingToolbar commands={fakeCommands()} />);
-    expect(inlineNames(container)).toHaveLength(TOOLBAR_ITEMS.length + 1);
-    fireEvent.click(screen.getByRole('button', { name: 'More' }));
-    expect(within(screen.getByRole('menu')).queryAllByRole('menuitem')).toHaveLength(0);
+    expect(inlineNames(container)).toHaveLength(TOOLBAR_ITEMS.length);
+    expect(screen.queryByRole('button', { name: 'More' })).toBeNull();
   });
 });
 
@@ -214,11 +213,13 @@ describe('FormattingToolbar visibility and responsiveness', () => {
     expect(on.container.querySelector('[role="toolbar"]')).not.toBeNull();
   });
 
-  it('hides below the md breakpoint via hidden md:flex classes', () => {
+  it('hides below md; row spans the 80% column and the outer wrapper keeps w-full', () => {
     const { container } = render(<FormattingToolbar commands={fakeCommands()} />);
     const toolbar = container.querySelector('[role="toolbar"]')!;
-    expect(toolbar.className).toContain('hidden');
-    expect(toolbar.className).toContain('md:flex');
+    for (const cls of ['hidden', 'md:flex', 'w-full']) expect(toolbar.className, cls).toContain(cls);
+    const row = rowOf(container).className;
+    for (const cls of ['mx-auto', 'w-[80%]', 'px-0']) expect(row, cls).toContain(cls);
+    expect(row).not.toMatch(/\b(w-full|px-2)\b/);
   });
 });
 
@@ -266,9 +267,7 @@ describe('index.css responsive layout (source scan)', () => {
     expect(css).toMatch(/\.manuscript-editor \.source-editor\s*\{[^}]*width:\s*80%/);
   });
 
-  it('fills the editor column with w-full and no lg-only visibility classes', () => {
-    expect(toolbar).toMatch(/className="[^"]*\bmx-auto\b[^"]*\bw-full\b/);
-    expect(toolbar).not.toContain('w-[80%]');
+  it('uses no lg-only visibility classes', () => {
     expect(toolbar).not.toMatch(/"[^"]*lg:/);
     expect(menu).not.toMatch(/"[^"]*lg:/);
   });

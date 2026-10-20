@@ -5,7 +5,7 @@ import type { RenderResult } from '@testing-library/react';
 import { useOverflowCount } from './use-overflow-count';
 import type { UseOverflowCountOptions } from './use-overflow-count';
 
-/** Mock ResizeObserver recorded per test so re-measures can be triggered. */
+/** Mock ResizeObserver recorded per test so resize notifications can fire. */
 class MockResizeObserver {
   static instances: MockResizeObserver[] = [];
   readonly observe = vi.fn();
@@ -27,48 +27,60 @@ class MockResizeObserver {
   }
 }
 
-/** Widths served by the `getBoundingClientRect` stub, keyed by testid. */
-interface WidthConfig {
-  row: number;
-  more: number;
-  items: number[];
+/** Rect geometry served by the `getBoundingClientRect` stub, keyed by testid. */
+interface RectConfig {
+  /** Left edge of the row, the origin item edges are measured from. */
+  rowLeft: number;
+  /** Row border-box width; jsdom applies no padding, so it equals the content width. */
+  rowWidth: number;
+  /** Width of the More trigger. */
+  moreWidth: number;
+  /** Widths of the item elements, in index order. */
+  itemWidths: number[];
 }
 
-/**
- * Width reported for an item element by its `item-<index>` testid.
- *
- * @param testid - `data-testid` of the measured element.
- * @param config - Width configuration of the current test.
- * @returns The configured item width, or 0 for unknown elements.
- */
-function itemWidth(testid: string, config: WidthConfig): number {
+/** Latest rect config so tests can mutate it between resize notifications. */
+let rects: RectConfig;
+
+/** Start of the element with the given testid, relative to the row left edge. */
+function offsetOf(testid: string, config: RectConfig): number {
   if (!testid.startsWith('item-')) return 0;
-  return config.items[Number(testid.slice('item-'.length))] ?? 0;
+  const index = Number(testid.slice('item-'.length));
+  let offset = 0;
+  for (let i = 0; i < index; i++) offset += config.itemWidths[i] ?? 0;
+  return offset;
+}
+
+/** Width of the element with the given testid. */
+function widthOf(testid: string, config: RectConfig): number {
+  if (testid === 'row') return config.rowWidth;
+  if (testid === 'more') return config.moreWidth;
+  if (testid.startsWith('item-')) return config.itemWidths[Number(testid.slice('item-'.length))] ?? 0;
+  return 0;
 }
 
 /**
- * Stub element widths: the row, the More trigger, and each item are served
- * from `config` lazily, so tests can mutate the config and re-trigger the
- * observer to simulate resizes.
- *
- * @param config - Width configuration read on every measurement.
+ * Stub element rects: the row, the More trigger, and each item are served
+ * from `rects` lazily, so tests can mutate the config and re-trigger the
+ * observer to simulate resizes. Item right edges accumulate from the row's
+ * left edge, matching real layout in one row with no padding.
  */
-function stubWidths(config: WidthConfig): void {
+function stubRects(): void {
   vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (
     this: Element,
   ) {
     const testid = (this as HTMLElement).dataset?.testid ?? '';
-    const width =
-      testid === 'row' ? config.row : testid === 'more' ? config.more : itemWidth(testid, config);
+    const left = testid === 'row' ? rects.rowLeft : rects.rowLeft + offsetOf(testid, rects);
+    const width = widthOf(testid, rects);
     return {
       width,
       height: 0,
-      x: 0,
+      x: left,
       y: 0,
       top: 0,
-      left: 0,
+      left,
       bottom: 0,
-      right: width,
+      right: left + width,
       toJSON: () => ({}),
     } as DOMRect;
   });
@@ -145,31 +157,54 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('useOverflowCount — row width drives the count', () => {
-  it('reduces the visible count when the observed row width shrinks', () => {
-    const config: WidthConfig = { row: 150, more: 32, items: [32, 32, 32, 32, 32] };
-    stubWidths(config);
+describe('useOverflowCount — content width drives the count', () => {
+  it('reduces the visible count when the row content width shrinks', () => {
+    // Edges 32..160, More 32, gap 2: at 150 the count is 3 (130 <= 150 < 162).
+    rects = { rowLeft: 10, rowWidth: 150, moreWidth: 32, itemWidths: [32, 32, 32, 32, 32] };
+    stubRects();
     const probe = renderProbe(5);
-    // 5 items at 32, gap 2, More 32: costWithMore(3) = 134 <= 150 < 168 (all fit).
     expect(probe.count()).toBe(3);
-    config.row = 100;
+    // At 100: edge 64 + 34 = 98 <= 100, but 96 + 34 = 130 > 100.
+    rects.rowWidth = 100;
     triggerResize();
     expect(probe.count()).toBe(2);
   });
 
-  it('increases the visible count when the observed row width grows', () => {
-    const config: WidthConfig = { row: 100, more: 32, items: [32, 32, 32, 32, 32] };
-    stubWidths(config);
+  it('increases the visible count when the row content width grows', () => {
+    rects = { rowLeft: 10, rowWidth: 100, moreWidth: 32, itemWidths: [32, 32, 32, 32, 32] };
+    stubRects();
     const probe = renderProbe(5);
     expect(probe.count()).toBe(2);
-    config.row = 400;
+    // At 400 the last edge (160) fits, so all items return with no More slot.
+    rects.rowWidth = 400;
     triggerResize();
     expect(probe.count()).toBe(5);
   });
 
+  it('does not re-measure item rects on resize', () => {
+    rects = { rowLeft: 10, rowWidth: 150, moreWidth: 32, itemWidths: [32, 32, 32, 32, 32] };
+    stubRects();
+    const probe = renderProbe(5);
+    expect(probe.count()).toBe(3);
+    vi.mocked(Element.prototype.getBoundingClientRect).mockClear();
+    // Items would now measure far wider, but resize only re-reads the row, so
+    // the cached edges at width 400 still give the full count.
+    rects = { rowLeft: 10, rowWidth: 400, moreWidth: 32, itemWidths: [200, 200, 200, 200, 200] };
+    triggerResize();
+    expect(probe.count()).toBe(5);
+    // The only rect read on resize belongs to the row element itself.
+    const receivers = vi.mocked(Element.prototype.getBoundingClientRect).mock.contexts;
+    const itemReads = receivers.filter(
+      (element) => String((element as HTMLElement | null)?.dataset?.testid ?? '').startsWith('item-'),
+    );
+    expect(itemReads).toHaveLength(0);
+  });
+});
+
+describe('useOverflowCount — observes the row element', () => {
   it('observes the row element and disconnects on unmount', () => {
-    const config: WidthConfig = { row: 150, more: 32, items: [32, 32, 32, 32, 32] };
-    stubWidths(config);
+    rects = { rowLeft: 10, rowWidth: 150, moreWidth: 32, itemWidths: [32, 32, 32, 32, 32] };
+    stubRects();
     const probe = renderProbe(5);
     expect(latestObserver().observe).toHaveBeenCalledWith(probe.row());
     probe.view.unmount();
@@ -178,43 +213,29 @@ describe('useOverflowCount — row width drives the count', () => {
 });
 
 describe('useOverflowCount — item set changes trigger re-measurement', () => {
-  it('re-measures item widths when the item set changes', () => {
-    const config: WidthConfig = { row: 100, more: 32, items: [32, 32, 32, 32, 32] };
-    stubWidths(config);
+  it('re-measures item edges when the item set changes', () => {
+    rects = { rowLeft: 10, rowWidth: 90, moreWidth: 32, itemWidths: [32, 32, 32, 32, 32] };
+    stubRects();
     const probe = renderProbe(5);
-    expect(probe.count()).toBe(2);
-    // Narrower items arrive with a longer list: only a re-measure sees them.
-    config.items = [16, 16, 16, 16, 16, 16];
+    // Stale edges 32..160 at 90: only 32 + 34 = 66 <= 90, so the count is 1.
+    expect(probe.count()).toBe(1);
+    // Narrower items arrive with a longer list: only a re-measure sees edges
+    // 16..96, where 48 + 34 = 82 <= 90 < 64 + 34 = 98, giving 3.
+    rects.itemWidths = [16, 16, 16, 16, 16, 16];
     probe.view.rerender(createElement(Probe, { itemCount: 6, pinned: [] }));
-    // 6 items at 16: costWithMore(3) = 86 <= 100 < 104; stale widths give 2.
-    expect(probe.count()).toBe(3);
-  });
-
-  it('does not re-measure item widths on resize or plain re-render', () => {
-    const config: WidthConfig = { row: 100, more: 32, items: [32, 32, 32, 32, 32] };
-    stubWidths(config);
-    const probe = renderProbe(5);
-    config.items = [16, 16, 16, 16, 16, 16];
-    probe.view.rerender(createElement(Probe, { itemCount: 6, pinned: [] }));
-    expect(probe.count()).toBe(3);
-    // Items shrink again, but the item set is unchanged, so the hook keeps
-    // the widths measured at the last item-set change.
-    config.items = [8, 8, 8, 8, 8, 8];
-    probe.view.rerender(createElement(Probe, { itemCount: 6, pinned: [] }));
-    triggerResize();
     expect(probe.count()).toBe(3);
   });
 });
 
 describe('useOverflowCount — no window width', () => {
   it('ignores window resize events', () => {
-    const config: WidthConfig = { row: 150, more: 32, items: [32, 32, 32, 32, 32] };
-    stubWidths(config);
+    rects = { rowLeft: 10, rowWidth: 150, moreWidth: 32, itemWidths: [32, 32, 32, 32, 32] };
+    stubRects();
     const probe = renderProbe(5);
     expect(probe.count()).toBe(3);
     // Even though the row's own measured width changed, no ResizeObserver
     // notification arrived, so the count must not move.
-    config.row = 100;
+    rects.rowWidth = 100;
     fireEvent(window, new Event('resize'));
     expect(probe.count()).toBe(3);
   });
