@@ -20,6 +20,7 @@ Prefix `od:` is used throughout all TTL files. This namespace is a URN (RFC 3986
 | `article.shacl.ttl` | SHACL shapes for article validation |
 | `registry.shacl.ttl` | SHACL shapes for registry validation |
 | `registry.ttl` | Example collection registry |
+| `protocol.manifest.json` | Pinned revision + artifact SHA-256 digests (generated; see versioning.md) |
 
 Examples and fixtures:
 
@@ -33,30 +34,40 @@ Examples and fixtures:
 
 Defines the OpenDraft ontology: classes for publications, registries, and subject assignments; properties linking them together.
 
-Reuses established vocabularies where possible:
-- **Dublin Core Terms** (`dcterms:`) — title, creator, subject, identifier, date, license, conformsTo
-- **FOAF** (`foaf:`) — Person, Organization, name
+Aligns with SPAR/OCDM (ADR-021): `od:Publication` is an `rdfs:subClassOf fabio:Expression` (one published version, version DOI), authorship follows the OpenCitations Data Model role pattern, and the 14 NISO CRediT roles are declared `pro:Role` instances.
+
+Reuses established vocabularies where possible (reference-only prefixes — no `owl:imports`):
+- **SPAR** — FaBiO (`fabio:`, Work/Expression/SubjectTerm), FRBR (`frbr:`, realizationOf/revisionOf), PRO (`pro:`, Role/RoleInTime/isHeldBy/withRole), SCoRO (`scoro:`, corresponding-author/affiliate/isEqualToRoleInTime)
+- **OpenCitations** — OCO (`oco:`, hasNext author order); OCDM identifier patterns via DataCite (`datacite:`) and Literal (`literal:`)
+- **PRISM** (`prism:`, versionIdentifier/keyword), **FRAPO** (`frapo:`, Grant), **CiTO** (`cito:`, cites), **NISO CRediT** (`credit:`)
+- **Dublin Core Terms** (`dcterms:`) — title, creator, subject, identifier, date, license, abstract
+- **FOAF** (`foaf:`) — Person, Group, Organization, name, mbox
 - **SKOS** (`skos:`) — Concept, prefLabel, ConceptScheme
 - **PROV-O** (`prov:`) — Agent (for subject assignment provenance)
 
-Custom `od:` terms cover only what existing vocabularies do not express: Git-specific provenance, registry structure, and subject assignment reification.
+Custom `od:` terms cover only what existing vocabularies do not express: Git-specific provenance, registry structure, subject assignment reification, and the author flags `od:isDeceased`/`od:onBehalfOf`.
 
 Provenance follows the **flat model** (ADR-018): scalars live directly on `od:Publication`.
 
 ### `article.shacl.ttl` — Article Validation
 
-SHACL shapes validating that an article RDF graph conforms to the protocol. See ADR-018 for the provenance model.
+SHACL shapes validating that an article RDF graph conforms to the protocol. **SHACL Core only** (no SHACL-SPARQL) and **one publication per graph** (ADR-021): the shapes assume every `pro:RoleInTime` node belongs to the single `od:Publication` in the file. See ADR-018 for the provenance model.
 
 Required properties for a valid publication:
 - `dcterms:title` (exactly 1, `xsd:string`)
-- `dcterms:creator` (at least 1)
-- `dcterms:identifier` (at least 1, DOI)
+- `dcterms:creator` (at least 1; always emitted as a shortcut for each author agent)
+- Identifier: `dcterms:identifier` or an OCDM `datacite:hasIdentifier` node
 - `od:repositoryUrl` (exactly 1, `xsd:anyURI`)
 - `od:manuscriptPath` (exactly 1)
 - `od:sourceRevision` (exactly 1, 40-char hex SHA `^[0-9a-f]{40}$`)
 - `od:protocolRevision` (exactly 1, 40-char hex SHA `^[0-9a-f]{40}$`)
+- `frbr:realizationOf` (exactly 1, qualified to a `fabio:Work`); `frbr:revisionOf` at most 1; a publication IRI may not be a `fabio:Work`
+- Authorship: at least 1 `pro:withRole pro:author` role; exactly one chain head in the `oco:hasNext` chain; each role exactly 1 `pro:isHeldBy`; person authors carry `foaf:familyName` or `foaf:name` and hold a `scoro:affiliate` role with exactly 1 named organization; `foaf:Group` authors carry `foaf:name`; at least 1 `scoro:corresponding-author` role whose holder has `foaf:mbox`
+- Role values (`pro:withRole`) restricted to the PRO/SCoRO authorship roles plus the 14 NISO CRediT IRIs
 
-Optional fields validated for structure: `dcterms:abstract` (at most 1). Subject (`od:hasSubject`) and references (`dcterms:references`) have informational, non-enforcing shapes.
+Warning severity (does not affect conformance): missing `dcterms:license`; `cito:cites` targeting a `fabio:Work` instead of a version DOI.
+
+Informational severity: `fabio:hasSubjectTerm`, `prism:keyword`, `dcterms:references`. Optional fields validated for structure: `dcterms:abstract` (at most 1).
 
 ### `registry.shacl.ttl` — Registry Validation
 
@@ -78,6 +89,8 @@ Rationale: [docs/ADR/007-protocol-artifacts.md](../docs/ADR/007-protocol-artifac
 
 Flat provenance model: [docs/ADR/018-flat-provenance-model.md](../docs/ADR/018-flat-provenance-model.md)
 
+SPAR/OCDM alignment (term mapping, Work/Expression DOIs, one-publication-per-graph, fork/publish identity rule): [docs/ADR/021-spar-ocdm-publication-metadata.md](../docs/ADR/021-spar-ocdm-publication-metadata.md)
+
 ## Protocol Commit Pinning
 
 Publications record the protocol commit SHA. Protocol artifacts are retrieved via immutable file-at-commit URLs, e.g.:
@@ -93,12 +106,14 @@ This enables independent verification: any party can retrieve the exact protocol
 Run the conformance suite (wired into pre-push and CI):
 
 ```bash
-mise run validate-ttl      # TTL syntax (rapper) over all protocol and fixture files
-mise run validate-shacl    # SHACL conformance of examples and invalid fixtures
-mise run test              # All suites: RDF, SHACL, Go, TypeScript
+mise run validate-ttl               # TTL syntax (rapper) over all protocol and fixture files
+mise run validate-shacl             # SHACL conformance of examples and fixtures
+mise run verify-protocol            # Artifacts against the committed manifest
+mise run update-protocol-manifest   # Regenerate protocol.manifest.json (clean TTL tree required)
+mise run test                       # All suites: RDF, SHACL, Go, TypeScript
 ```
 
-`test_ttl_parse.sh` validates that all protocol TTL files (core, `examples/`, invalid fixtures) parse correctly with `rapper` and that invalid TTL is rejected. `run-conformance.ts` validates every example against the SHACL shapes (expecting conform) and every invalid fixture (expecting non-conform).
+`test_ttl_parse.sh` validates that all protocol TTL files (core, `examples/`, fixtures) parse correctly with `rapper` and that invalid TTL is rejected. `run-conformance.ts` validates every file in `protocol/examples/` and `tests/conformance/fixtures/valid/` (expecting conform) and every invalid fixture in `tests/conformance/fixtures/invalid/` (expecting non-conform); only `sh:Violation` results count as failures, so warning-only graphs conform.
 
 ## Common Pitfalls
 
