@@ -7,10 +7,11 @@
  * CRediT contribution statement (only when roles exist) and the
  * publication details section collapsed by default.
  */
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode, type RefObject } from 'react';
 import { ChevronDown, ChevronRight, Info, Plus } from 'lucide-react';
 import type { MetadataAuthor } from './use-manuscript-metadata';
 import { buildByline, type BylineModel, type AffiliationEntry } from './byline-model';
+import { KeywordInput } from './KeywordInput';
 
 /** Props for {@link ArticleView}. */
 export interface ArticleViewProps {
@@ -24,18 +25,29 @@ export interface ArticleViewProps {
   frontmatter?: Record<string, unknown>;
   /** Persist a title change to _frontmatter.yml. */
   setTitle: (title: string) => void;
+  /** Abstract text; '' before the first edit. */
+  abstract?: string;
+  /** Persist an abstract change to _abstract.yml. */
+  setAbstract?: (text: string) => void;
+  /** Keywords in file order. */
+  keywords?: string[];
+  /** Persist the deduped keyword array to _frontmatter.yml. */
+  setKeywords?: (keywords: string[]) => void;
 }
 
 /** Icon size used by the section chevrons and the ORCID marker. */
 const ICON = 'inline size-4 shrink-0';
 
 /**
- * Borderless auto-grown-free title field.
+ * Borderless title input. Enter never inserts a newline; it moves the
+ * focus to the next field instead.
  *
- * @param props - See {@link ArticleViewProps}.
+ * @param props - Title, setter and the Enter handler of the field.
  * @returns The title input element.
  */
-function TitleField({ title, setTitle }: Pick<ArticleViewProps, 'title' | 'setTitle'>): ReactNode {
+function TitleField(
+  { title, setTitle, onEnter }: Pick<ArticleViewProps, 'title' | 'setTitle'> & { onEnter(): void },
+): ReactNode {
   return (
     <input
       data-testid="metadata-panel-title-input"
@@ -43,8 +55,59 @@ function TitleField({ title, setTitle }: Pick<ArticleViewProps, 'title' | 'setTi
       value={title}
       placeholder="Untitled manuscript"
       onChange={(event) => setTitle(event.target.value)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          onEnter();
+        }
+      }}
       className="min-h-11 w-full text-lg outline-none"
     />
+  );
+}
+
+/** Grow a textarea to its content height. */
+function autoGrow(el: HTMLTextAreaElement | null): void {
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = `${el.scrollHeight}px`;
+}
+
+/** Count whitespace-separated words in a text. */
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+/** Borderless auto-grown abstract textarea with a word count. */
+function AbstractField(
+  { abstract, setAbstract, textareaRef }: {
+    abstract: string;
+    setAbstract: (text: string) => void;
+    textareaRef: RefObject<HTMLTextAreaElement | null>;
+  },
+): ReactNode {
+  return (
+    <section className="mt-3">
+      <textarea
+        ref={(el) => {
+          textareaRef.current = el;
+          autoGrow(el);
+        }}
+        data-testid="metadata-abstract"
+        aria-label="Abstract"
+        value={abstract}
+        rows={2}
+        placeholder="Abstract"
+        onChange={(event) => {
+          setAbstract(event.target.value);
+          autoGrow(event.currentTarget);
+        }}
+        className="min-h-11 w-full resize-none text-sm outline-none"
+      />
+      <div data-testid="abstract-word-count" className="text-sm text-muted">
+        {countWords(abstract)} words
+      </div>
+    </section>
   );
 }
 
@@ -204,15 +267,25 @@ export function ArticleView({
   affiliations = [],
   frontmatter = {},
   setTitle,
+  abstract = '',
+  setAbstract = () => {},
+  keywords = [],
+  setKeywords = () => {},
 }: ArticleViewProps): ReactNode {
   const model = buildByline(authors, affiliations);
+  const abstractRef = useRef<HTMLTextAreaElement>(null);
   return (
     <div data-testid="metadata-article-view" className="px-4 py-3">
-      <TitleField title={title} setTitle={setTitle} />
+      <TitleField title={title} setTitle={setTitle} onEnter={() => abstractRef.current?.focus()} />
       <Byline model={model} />
       {model.collaborators.map((group) => (
         <CollaboratorItem key={group.key} group={group} />
       ))}
+      <AbstractField abstract={abstract} setAbstract={setAbstract} textareaRef={abstractRef} />
+      <section className="mt-3">
+        <h3 className="font-medium">Keywords</h3>
+        <KeywordInput keywords={keywords} onChange={setKeywords} />
+      </section>
       {model.hasContributions && (
         <section data-testid="author-contributions" className="mt-3">
           <h3 className="font-medium">Author contributions</h3>

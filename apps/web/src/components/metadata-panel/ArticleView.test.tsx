@@ -4,7 +4,7 @@
  * collaborators list, contributions and the collapsed publication
  * details section.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, type RenderResult } from '@testing-library/react';
 import { ArticleView, type ArticleViewProps } from './ArticleView';
 import type { MetadataAuthor } from './use-manuscript-metadata';
@@ -150,5 +150,48 @@ describe('ArticleView contributions and publication details', () => {
     const content = screen.getByTestId('publication-details-content');
     expect(content.textContent).toContain('CC BY 4.0');
     expect(content.textContent).toContain('2024-01-01');
+  });
+});
+
+describe('ArticleView inline editing', () => {
+  it('Enter in the title inserts no newline and focuses the abstract', () => {
+    renderView();
+    const title = screen.getByTestId('metadata-panel-title-input') as HTMLInputElement;
+    title.focus();
+    fireEvent.keyDown(title, { key: 'Enter' });
+    expect(title.value).not.toContain('\n');
+    expect(title.value).toBe('Deep Dive');
+    expect(document.activeElement).toBe(screen.getByTestId('metadata-abstract'));
+  });
+
+  it("abstract '  one two  three ' shows '3 words'", () => {
+    renderView({ abstract: '  one two  three ' });
+    expect(screen.getByTestId('abstract-word-count').textContent).toBe('3 words');
+  });
+
+  it('reports abstract edits and updates the word count', () => {
+    const setAbstract = vi.fn();
+    const { rerender } = renderView({ abstract: '', setAbstract });
+    fireEvent.change(screen.getByTestId('metadata-abstract'), {
+      target: { value: '  one two  three ' },
+    });
+    expect(setAbstract).toHaveBeenCalledWith('  one two  three ');
+    rerender(
+      <ArticleView
+        title="Deep Dive"
+        authors={AUTHORS}
+        affiliations={AFFILIATIONS}
+        setTitle={() => {}}
+        setAbstract={() => {}}
+        abstract="  one two  three "
+      />,
+    );
+    expect(screen.getByTestId('abstract-word-count').textContent).toBe('3 words');
+  });
+
+  it('renders the keyword chip input with a count', () => {
+    renderView({ keywords: ['fasting', 'keto'] });
+    expect(screen.getByTestId('keyword-count').textContent).toBe('2 keywords');
+    expect(screen.getAllByTestId('keyword-chip')).toHaveLength(2);
   });
 });
