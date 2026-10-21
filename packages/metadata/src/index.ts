@@ -3,6 +3,8 @@
  */
 
 export { compileManuscript } from './compiler.js';
+export { normalizeOrcid, normalizeRor, normalizeDoi } from './rdf/identifiers.js';
+export type { NormalizedIdentifier } from './rdf/identifiers.js';
 export type { PublicationMetadata } from './compiler.js';
 export { compileArticle } from './article-compiler.js';
 export { migrateToBlockLayout } from './migration.js';
