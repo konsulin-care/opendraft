@@ -7,6 +7,8 @@ export { normalizeOrcid, normalizeRor, normalizeDoi } from './rdf/identifiers.js
 export type { NormalizedIdentifier } from './rdf/identifiers.js';
 export { emitAuthorshipGraph } from './rdf/authorship-graph.js';
 export type { AuthorshipGraphInput } from './rdf/authorship-graph.js';
+export { compilePublicationGraph } from './rdf/publication-graph.js';
+export type { PublicationGraphInput, PublicationSubject } from './rdf/publication-graph.js';
 export type { PublicationMetadata } from './compiler.js';
 export { compileArticle } from './article-compiler.js';
 export { migrateToBlockLayout } from './migration.js';
