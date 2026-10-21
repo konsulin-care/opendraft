@@ -3,8 +3,8 @@
  * Person authors get name fields, single-name checkbox, particle/suffix,
  * live preview, comma-paste split, ORCID, degrees, email, status toggles,
  * on-behalf-of and CRediT pills; groups get a literal name and pills.
- */import { useEffect, useRef, useState, type ClipboardEvent, type ReactNode } from 'react';
-import { AlertTriangle } from 'lucide-react'; import { GroupMembers } from './GroupMembers';
+ */import { useState, type ClipboardEvent, type ReactNode } from 'react';
+import { AlertTriangle } from 'lucide-react'; import { GroupMembers } from './GroupMembers'; import { OrcidField } from './orcid';
 import type { MetadataAuthor } from './use-manuscript-metadata';
 
 /** Group entry offered by the "On behalf of" dropdown. */
@@ -74,6 +74,7 @@ interface CardEdit {
   author: MetadataAuthor; name: Record<string, string>;
   groups: GroupOption[]; focusOrcid: boolean;
   apply: (patch: Partial<MetadataAuthor>) => void;
+  onChange: (next: MetadataAuthor) => void;
 }
 
 /** Person/Group author-type toggle. */
@@ -227,21 +228,17 @@ function EmailField({ author, apply }: { author: MetadataAuthor; apply: CardEdit
 
 // Person-author body of the card.
 function PersonBody({ edit }: { edit: CardEdit }): ReactNode {
-  const { author, name, groups, focusOrcid, apply } = edit;
+  const { author, name, groups, focusOrcid, apply, onChange } = edit;
   const roles = strList(author.roles);
   const toggleRole = (slug: string): void =>
     apply({ roles: roles.includes(slug) ? roles.filter((r) => r !== slug) : [...roles, slug] });
-  const orcidRef = useRef<HTMLInputElement>(null);
-  useEffect(() => { if (focusOrcid) orcidRef.current?.focus(); }, [focusOrcid]);
   return (
     <>
       <NameFields name={name} setName={(patch) => apply({ name: patch })} />
       <div data-testid="author-preview" className="text-sm text-muted">
         Byline: {citationOf(name).byline} · Citation: {citationOf(name).citation}
       </div>
-      <input ref={orcidRef} data-testid="author-orcid" aria-label="ORCID" placeholder="0000-0000-0000-0000" className={INPUT}
-        value={typeof author.orcid === 'string' ? author.orcid : ''}
-        onChange={(event) => apply(setStr(author, 'orcid', event.target.value))} />
+      <OrcidField author={author} onChange={onChange} focus={focusOrcid} />
       <EmailField author={author} apply={apply} />
       <Degrees degrees={strList(author.degrees)} onSet={(degrees) => apply({ degrees })} />
       <StatusToggles author={author} apply={apply} />
@@ -292,8 +289,8 @@ export function AuthorCard({ author, groups = [], focusOrcid = false, onChange }
           <AlertTriangle aria-hidden className="inline size-4" /> No affiliation
         </span>
       )}
-      {group ? <GroupBody edit={{ author, name, groups, focusOrcid, apply }} />
-        : <PersonBody edit={{ author, name, groups, focusOrcid, apply }} />}
+      {group ? <GroupBody edit={{ author, name, groups, focusOrcid, apply, onChange }} />
+        : <PersonBody edit={{ author, name, groups, focusOrcid, apply, onChange }} />}
     </div>
   );
 }
