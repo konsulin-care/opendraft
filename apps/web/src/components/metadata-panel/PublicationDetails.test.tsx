@@ -49,8 +49,39 @@ async function flushWrites(): Promise<void> {
   await act(async () => { vi.advanceTimersByTime(800); });
 }
 
+/** Original `window.matchMedia` descriptor restored after each test. */
+const originalMatchMedia = Object.getOwnPropertyDescriptor(window, 'matchMedia');
+
+/**
+ * Install a `window.matchMedia` stub matching the shared breakpoint
+ * queries against a simulated viewport width.
+ *
+ * @param width - Simulated viewport width in pixels.
+ */
+function stubMatchMedia(width: number): void {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: (media: string): MediaQueryList => ({
+      media,
+      matches: media.includes('max-width')
+        ? width <= Number(/max-width: (\d+)/.exec(media)?.[1])
+        : width >= Number(/min-width: (\d+)/.exec(media)?.[1]),
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    } as unknown as MediaQueryList),
+  });
+}
+
 beforeEach(() => { vi.useFakeTimers(); });
-afterEach(() => { vi.useRealTimers(); });
+afterEach(() => {
+  vi.useRealTimers();
+  if (originalMatchMedia) Object.defineProperty(window, 'matchMedia', originalMatchMedia);
+});
 
 describe('PublicationDetails license', () => {
   it('offers the four license presets in the combobox', async () => {
@@ -131,5 +162,21 @@ describe('PublicationDetails subject', () => {
       authority: 'http://www.w3.org/2004/02/skos/core#',
       term: 'concept-distributed-scientific-publication',
     });
+  });
+});
+
+describe('PublicationDetails responsive grid', () => {
+  it('uses a two-column grid on the details container at 1280px', async () => {
+    stubMatchMedia(1280);
+    await boot();
+    const content = screen.getByTestId('publication-details-content');
+    expect(content.className).toContain('grid-cols-2');
+  });
+
+  it('stays a single column at 800px', async () => {
+    stubMatchMedia(800);
+    await boot();
+    const content = screen.getByTestId('publication-details-content');
+    expect(content.className).not.toContain('grid-cols-2');
   });
 });

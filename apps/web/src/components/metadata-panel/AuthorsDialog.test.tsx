@@ -72,8 +72,72 @@ async function flushWrites(): Promise<void> {
   await act(async () => { vi.advanceTimersByTime(800); });
 }
 
+/** Original `window.matchMedia` descriptor restored after each test. */
+const originalMatchMedia = Object.getOwnPropertyDescriptor(window, 'matchMedia');
+
+/** Simulated viewport width used by the stub. */
+let viewportWidth = 1280;
+
+/** Live stub query lists, re-evaluated when the viewport changes. */
+interface StubMql {
+  media: string;
+  matches: boolean;
+  listeners: Set<(event: MediaQueryListEvent) => void>;
+}
+
+const stubMqls: StubMql[] = [];
+
+/**
+ * Evaluate the shared breakpoint queries against a viewport width.
+ *
+ * @param media - Media query string.
+ * @param width - Viewport width in pixels.
+ * @returns Whether the query matches at that width.
+ */
+function queryMatches(media: string, width: number): boolean {
+  const max = /\(max-width: (\d+)px\)/.exec(media);
+  if (max) return width <= Number(max[1]);
+  const min = /\(min-width: (\d+)px\)/.exec(media);
+  return min ? width >= Number(min[1]) : false;
+}
+
+/** Install a width-aware `window.matchMedia` stub at the given width. */
+function stubMatchMedia(width: number): void {
+  viewportWidth = width;
+  stubMqls.length = 0;
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: (media: string): MediaQueryList => {
+      const entry: StubMql = {
+        media,
+        matches: queryMatches(media, viewportWidth),
+        listeners: new Set(),
+      };
+      stubMqls.push(entry);
+      return {
+        media,
+        get matches(): boolean { return entry.matches; },
+        onchange: null,
+        addEventListener: (_type: string, listener: (event: MediaQueryListEvent) => void): void => {
+          entry.listeners.add(listener);
+        },
+        removeEventListener: (_type: string, listener: (event: MediaQueryListEvent) => void): void => {
+          entry.listeners.delete(listener);
+        },
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      } as unknown as MediaQueryList;
+    },
+  });
+}
+
 beforeEach(() => { vi.useFakeTimers(); });
-afterEach(() => { vi.useRealTimers(); });
+afterEach(() => {
+  vi.useRealTimers();
+  if (originalMatchMedia) Object.defineProperty(window, 'matchMedia', originalMatchMedia);
+});
 
 describe('AuthorsDialog opening', () => {
   it("clicking 'Budi Lee' in the byline opens the dialog with Budi's card expanded", async () => {
@@ -147,5 +211,46 @@ describe('AuthorsDialog draft author', () => {
     await flushWrites();
     const authors = await readAuthors(ws);
     expect(authors[2]['name']).toEqual({ family: 'Dewi' });
+  });
+});
+
+describe('AuthorsDialog below 640px', () => {
+  it('expanding renders a full-screen role=dialog sheet at 375px', async () => {
+    stubMatchMedia(375);
+    await boot();
+    fireEvent.click(screen.getByTestId('byline-author-1'));
+    const dialog = screen.getByTestId('authors-dialog');
+    expect(dialog.getAttribute('role')).toBe('dialog');
+    expect(dialog.className).toContain('fixed inset-0');
+  });
+
+  it('tapping an author card pushes the sub-view; Back returns to the list', async () => {
+    stubMatchMedia(375);
+    await boot();
+    fireEvent.click(screen.getByTestId('byline-author-1'));
+    expect(screen.getByTestId('authors-back').textContent).toBe('Back');
+    expect(screen.getByTestId('author-card-1').textContent).toContain('Budi Lee');
+    expect(screen.queryByTestId('author-select-0')).toBeNull();
+    fireEvent.click(screen.getByTestId('authors-back'));
+    expect(screen.queryByTestId('authors-back')).toBeNull();
+    expect(screen.getByTestId('author-select-0').textContent).toContain('Alice Marie Smith');
+    fireEvent.click(screen.getByTestId('author-select-1'));
+    expect(screen.getByTestId('authors-back')).toBeDefined();
+    expect(screen.getByTestId('author-card-1').textContent).toContain('Budi Lee');
+    expect(screen.queryByTestId('author-select-0')).toBeNull();
+  });
+});
+
+describe('AuthorsDialog at 640px and above', () => {
+  it('renders a centered dialog with the inline card list at 800px', async () => {
+    stubMatchMedia(800);
+    await boot();
+    fireEvent.click(screen.getByTestId('byline-author-1'));
+    const dialog = screen.getByTestId('authors-dialog');
+    expect(dialog.className).not.toContain('fixed inset-0');
+    expect(dialog.parentElement?.className).toContain('justify-center');
+    expect(screen.queryByTestId('authors-back')).toBeNull();
+    expect(screen.getByTestId('author-card-1')).toBeDefined();
+    expect(screen.getByTestId('author-select-0')).toBeDefined();
   });
 });

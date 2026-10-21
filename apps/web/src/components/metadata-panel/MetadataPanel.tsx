@@ -1,6 +1,5 @@
 import {
   useCallback,
-  useEffect,
   useMemo,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -10,9 +9,7 @@ import {
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { useManuscriptMetadata, type MetadataAuthor } from './use-manuscript-metadata';
-
-/** Media query matching viewports below the 640px breakpoint. */
-const NARROW_QUERY = '(max-width: 639px)';
+import { NARROW_QUERY, useMediaQuery } from '../../hooks/use-media-query';
 
 /** localStorage key prefix for the per-project collapsed state. */
 const STORAGE_PREFIX = 'opendraft:metadata-panel';
@@ -80,23 +77,6 @@ export function initialExpanded(title: string, stored: string | null): boolean {
   if (stored === 'expanded') return true;
   if (stored === 'collapsed') return false;
   return title.trim() === '';
-}
-
-/** Track whether the viewport is below the 640px breakpoint. */
-function useNarrowViewport(): boolean {
-  const [narrow, setNarrow] = useState(
-    () => typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-      ? window.matchMedia(NARROW_QUERY).matches
-      : false,
-  );
-  useEffect(() => {
-    if (typeof window.matchMedia !== 'function') return undefined;
-    const mql = window.matchMedia(NARROW_QUERY);
-    const onChange = (event: MediaQueryListEvent): void => setNarrow(event.matches);
-    mql.addEventListener('change', onChange);
-    return () => mql.removeEventListener('change', onChange);
-  }, []);
-  return narrow;
 }
 
 /** Read the persisted state for a project; null when absent or unreadable. */
@@ -254,7 +234,7 @@ export function MetadataPanel({
   editorFocusRef,
 }: MetadataPanelProps): ReactNode {
   const { loaded, title, authors, setTitle } = useManuscriptMetadata(workspace, manuscriptRoot);
-  const narrow = useNarrowViewport();
+  const narrow = useMediaQuery(NARROW_QUERY);
   const [expanded, setExpanded] = useExpandedState(projectKey, title, loaded);
 
   const byline = useMemo(
@@ -273,12 +253,18 @@ export function MetadataPanel({
 
   if (!manuscriptRoot || !loaded) return null;
 
+  // Below 640px the expanded panel is a full-screen sheet.
+  const sheet = expanded && narrow;
   return (
     <section
       data-testid="metadata-panel"
       aria-label="Manuscript metadata"
       onKeyDown={onKeyDown}
-      className="sticky top-0 z-10 bg-white"
+      role={sheet ? 'dialog' : undefined}
+      aria-modal={sheet ? true : undefined}
+      className={sheet
+        ? 'fixed inset-0 z-30 flex flex-col overflow-y-auto bg-white'
+        : 'sticky top-0 z-10 bg-white'}
     >
       <PinnedBar
         title={title}

@@ -7,6 +7,7 @@
  */
 import { useEffect, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { WIDE_QUERY, useMediaQuery } from '../../hooks/use-media-query';
 
 /** Icon size used by the section chevron. */
 const ICON = 'inline size-4 shrink-0';
@@ -120,6 +121,7 @@ export function PublicationDetails(
   },
 ): ReactNode {
   const [open, setOpen] = useState(false);
+  const wide = useMediaQuery(WIDE_QUERY);
   const text = (key: string): string => frontmatterText(frontmatter, key);
   return (
     <section className="mt-3">
@@ -136,7 +138,10 @@ export function PublicationDetails(
         Publication details
       </button>
       {open && (
-        <div data-testid="publication-details-content" className="ml-1 space-y-1">
+        <div
+          data-testid="publication-details-content"
+          className={wide ? 'ml-1 grid grid-cols-2 gap-x-4' : 'ml-1 space-y-1'}
+        >
           <Field label="Date" testId="date-input" value={text('date')} onChange={(v) => setField('date', v)} />
           <Field
             label="License"
