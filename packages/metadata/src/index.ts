@@ -5,6 +5,8 @@
 export { compileManuscript } from './compiler.js';
 export { normalizeOrcid, normalizeRor, normalizeDoi } from './rdf/identifiers.js';
 export type { NormalizedIdentifier } from './rdf/identifiers.js';
+export { emitAuthorshipGraph } from './rdf/authorship-graph.js';
+export type { AuthorshipGraphInput } from './rdf/authorship-graph.js';
 export type { PublicationMetadata } from './compiler.js';
 export { compileArticle } from './article-compiler.js';
 export { migrateToBlockLayout } from './migration.js';
