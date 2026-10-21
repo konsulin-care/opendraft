@@ -1,0 +1,139 @@
+// @vitest-environment jsdom
+/**
+ * Author card tests: live preview, comma-paste split, the single-name
+ * checkbox, particle/suffix options, Person/Group toggle, degrees,
+ * email, status toggles, on-behalf-of, CRediT pills and the
+ * affiliation warning marker.
+ */
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { AuthorCard, type GroupOption } from './AuthorCard';
+import type { MetadataAuthor } from './use-manuscript-metadata';
+
+/** Person author with affiliation, contact, degrees and status flags. */
+const PERSON: MetadataAuthor = {
+  id: 'smith',
+  name: { given: 'Alice Marie', family: 'Smith' },
+  email: 'alice@example.edu',
+  orcid: '0000-0002-1825-0097',
+  degrees: ['PhD'],
+  corresponding: true,
+  affiliations: [{ ref: 'ui' }],
+};
+
+/** Last author handed to onChange. */
+function lastChange(onChange: ReturnType<typeof vi.fn>): MetadataAuthor {
+  return onChange.mock.calls.at(-1)?.[0] as MetadataAuthor;
+}
+
+/** Render the card with a spy onChange; returns the spy and rerender. */
+function renderCard(author: MetadataAuthor = PERSON, groups: GroupOption[] = []) {
+  const onChange = vi.fn();
+  const view = render(<AuthorCard author={author} groups={groups} onChange={onChange} />);
+  return { onChange, rerender: view.rerender, groups };
+}
+
+/** Rerender the controlled card with the author of the latest change. */
+function follow(
+  rerender: (node: ReactElement) => void,
+  onChange: ReturnType<typeof vi.fn>,
+  groups: GroupOption[] = [],
+): void {
+  rerender(<AuthorCard author={lastChange(onChange)} groups={groups} onChange={onChange} />);
+}
+
+describe('AuthorCard name editing', () => {
+  it("preview shows 'Byline: Alice Marie Smith · Citation: Smith, A. M.'", () => {
+    renderCard();
+    const preview = screen.getByTestId('author-preview').textContent ?? '';
+    expect(preview).toContain('Byline: Alice Marie Smith');
+    expect(preview).toContain('Citation: Smith, A. M.');
+  });
+
+  it("pasting 'Smith, Alice Marie' in Family sets given and family", () => {
+    const { onChange } = renderCard({ id: 'x', name: { family: '' } });
+    fireEvent.paste(screen.getByTestId('author-family'), {
+      clipboardData: { getData: () => 'Smith, Alice Marie' },
+    });
+    expect(lastChange(onChange).name).toEqual({ family: 'Smith', given: 'Alice Marie' });
+  });
+
+  it("'only one name' hides Given name and stores {family:'Dewi'}", () => {
+    const { onChange, rerender } = renderCard({ id: 'dewi', name: { given: '', family: '' } });
+    fireEvent.click(screen.getByTestId('author-single-name'));
+    follow(rerender, onChange);
+    expect(screen.queryByTestId('author-given')).toBeNull();
+    fireEvent.change(screen.getByTestId('author-family'), { target: { value: 'Dewi' } });
+    expect(lastChange(onChange).name).toEqual({ family: 'Dewi' });
+  });
+
+  it('offers particle and suffix behind More name options', () => {
+    const { onChange } = renderCard();
+    fireEvent.click(screen.getByText('More name options'));
+    fireEvent.change(screen.getByTestId('author-particle'), { target: { value: 'van' } });
+    expect(lastChange(onChange).name).toMatchObject({ particle: 'van' });
+  });
+});
+
+describe('AuthorCard person/group toggle', () => {
+  it('Group toggle stores {literal} and hides person-only fields', () => {
+    const { onChange, rerender } = renderCard();
+    fireEvent.click(screen.getByTestId('author-type-group'));
+    const group = lastChange(onChange);
+    expect(group.name).toEqual({ literal: 'Alice Marie Smith' });
+    rerender(<AuthorCard author={group} onChange={onChange} />);
+    expect(screen.queryByTestId('author-orcid')).toBeNull();
+    expect(screen.queryByTestId('author-degree-field')).toBeNull();
+    expect(screen.queryByTestId('author-corresponding')).toBeNull();
+    expect(screen.queryByTestId('author-deceased')).toBeNull();
+    expect(screen.getByTestId('author-group-name')).toBeDefined();
+    fireEvent.change(screen.getByTestId('author-group-name'), {
+      target: { value: 'WHO DWG' },
+    });
+    expect(lastChange(onChange).name).toEqual({ literal: 'WHO DWG' });
+  });
+});
+
+describe('AuthorCard fields', () => {
+  it('toggling a CRediT pill writes its slug and toggling again removes it', () => {
+    const { onChange, rerender } = renderCard();
+    fireEvent.click(screen.getByTestId('credit-writing-original-draft'));
+    expect(lastChange(onChange).roles).toEqual(['writing-original-draft']);
+    follow(rerender, onChange);
+    fireEvent.click(screen.getByTestId('credit-writing-original-draft'));
+    expect(lastChange(onChange).roles).toEqual([]);
+  });
+
+  it('a card without affiliation shows a warning marker', () => {
+    const { rerender } = renderCard({ id: 'lee', name: { given: 'Budi', family: 'Lee' } });
+    expect(screen.getByTestId('author-warning')).toBeDefined();
+    rerender(<AuthorCard author={PERSON} onChange={vi.fn()} />);
+    expect(screen.queryByTestId('author-warning')).toBeNull();
+  });
+
+  it('adds degrees as chips and writes the list', () => {
+    const { onChange, rerender } = renderCard();
+    const field = screen.getByTestId('author-degree-field');
+    fireEvent.change(field, { target: { value: 'MSc' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    follow(rerender, onChange);
+    const chips = screen.getAllByTestId('author-degree-chip');
+    expect(chips).toHaveLength(2);
+    expect(chips[1].textContent).toContain('MSc');
+    expect(lastChange(onChange).degrees).toEqual(['PhD', 'MSc']);
+  });
+
+  it('writes the email and the on-behalf-of selection', () => {
+    const groups: GroupOption[] = [{ id: 'dwg', name: 'OpenDraft Team' }];
+    const { onChange, rerender } = renderCard(
+      { id: 'dewi', name: { given: 'Dewi', family: 'Sari' } },
+      groups,
+    );
+    fireEvent.change(screen.getByTestId('author-email'), { target: { value: 'dewi@example.org' } });
+    follow(rerender, onChange, groups);
+    fireEvent.change(screen.getByTestId('author-on-behalf-of'), { target: { value: 'dwg' } });
+    expect(lastChange(onChange).email).toBe('dewi@example.org');
+    expect(lastChange(onChange)['on-behalf-of']).toBe('dwg');
+  });
+});

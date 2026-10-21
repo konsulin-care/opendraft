@@ -8,10 +8,12 @@
  * publication details section collapsed by default.
  */
 import { useRef, useState, type ReactNode, type RefObject } from 'react';
-import { ChevronDown, ChevronRight, Info, Plus } from 'lucide-react';
+import { Info, Plus } from 'lucide-react';
 import type { MetadataAuthor } from './use-manuscript-metadata';
 import { buildByline, type BylineModel, type AffiliationEntry } from './byline-model';
 import { KeywordInput } from './KeywordInput';
+import { PublicationDetails } from './PublicationDetails';
+import { AuthorsDialog } from './AuthorsDialog';
 
 /** Props for {@link ArticleView}. */
 export interface ArticleViewProps {
@@ -33,6 +35,8 @@ export interface ArticleViewProps {
   keywords?: string[];
   /** Persist the deduped keyword array to _frontmatter.yml. */
   setKeywords?: (keywords: string[]) => void;
+  /** Persist author edits to _author.yml; no-op when omitted. */
+  setAuthors?: (authors: MetadataAuthor[]) => void;
 }
 
 /** Icon size used by the section chevrons and the ORCID marker. */
@@ -129,7 +133,11 @@ function AuthorTooltip({ author, index }: { author: BylineModel['authors'][numbe
 
 /** One byline segment: name button, superscripts, ORCID marker, tooltip. */
 function BylineName(
-  { author, index }: { author: BylineModel['authors'][number]; index: number },
+  { author, index, onOpen }: {
+    author: BylineModel['authors'][number];
+    index: number;
+    onOpen: (index: number) => void;
+  },
 ): ReactNode {
   const [open, setOpen] = useState(false);
   const symbols = (author.corresponding ? '*' : '')
@@ -141,6 +149,7 @@ function BylineName(
         type="button"
         data-testid={`byline-author-${index}`}
         aria-describedby={open ? `byline-tooltip-${index}` : undefined}
+        onClick={() => onOpen(index)}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
         onMouseEnter={() => setOpen(true)}
@@ -160,18 +169,19 @@ function BylineName(
 }
 
 /** The byline row, numbered affiliations and footnotes of one model. */
-function Byline({ model }: { model: BylineModel }): ReactNode {
+function Byline({ model, onOpenName }: { model: BylineModel; onOpenName: (index: number) => void }): ReactNode {
   return (
     <div className="mt-1 text-sm" data-testid="article-byline">
       {model.authors.map((author, index) => (
         <span key={author.key}>
           {index > 0 && ', '}
-          <BylineName author={author} index={index} />
+          <BylineName author={author} index={index} onOpen={onOpenName} />
         </span>
       ))}
       <button
         type="button"
         data-testid="add-author"
+        onClick={() => onOpenName(-1)}
         className="ml-2 min-h-11 rounded text-muted hover:bg-hover"
       >
         <Plus aria-hidden className="inline size-3.5" />
@@ -212,49 +222,6 @@ function CollaboratorItem({ group }: { group: BylineModel['collaborators'][numbe
   );
 }
 
-/** Read-only field of the publication details section. */
-function DetailField({ label, value }: { label: string; value: string }): ReactNode {
-  return (
-    <div>
-      <span className="text-muted">{label}: </span>
-      <span>{value}</span>
-    </div>
-  );
-}
-
-/** Collapsed-by-default publication details section. */
-function PublicationDetails(
-  { frontmatter }: { frontmatter: Record<string, unknown> },
-): ReactNode {
-  const [open, setOpen] = useState(false);
-  const text = (key: string): string | null =>
-    typeof frontmatter[key] === 'string' ? frontmatter[key] as string : null;
-  return (
-    <section className="mt-3">
-      <button
-        type="button"
-        data-testid="publication-details-toggle"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-        className="flex min-h-11 items-center gap-1 rounded font-medium hover:bg-hover"
-      >
-        {open
-          ? <ChevronDown aria-hidden className={ICON} />
-          : <ChevronRight aria-hidden className={ICON} />}
-        Publication details
-      </button>
-      {open && (
-        <div data-testid="publication-details-content" className="ml-1 space-y-1">
-          {text('date') && <DetailField label="Date" value={text('date') as string} />}
-          {text('license') && <DetailField label="License" value={text('license') as string} />}
-          {text('copyright') && <DetailField label="Copyright" value={text('copyright') as string} />}
-          {text('funding') && <DetailField label="Funding" value={text('funding') as string} />}
-        </div>
-      )}
-    </section>
-  );
-}
-
 /**
  * Article-styled manuscript metadata view.
  *
@@ -271,13 +238,16 @@ export function ArticleView({
   setAbstract = () => {},
   keywords = [],
   setKeywords = () => {},
+  setAuthors = () => {},
 }: ArticleViewProps): ReactNode {
   const model = buildByline(authors, affiliations);
   const abstractRef = useRef<HTMLTextAreaElement>(null);
+  // Dialog target: author index, or -1 for a new draft author.
+  const [dialogIndex, setDialogIndex] = useState<number | null>(null);
   return (
     <div data-testid="metadata-article-view" className="px-4 py-3">
       <TitleField title={title} setTitle={setTitle} onEnter={() => abstractRef.current?.focus()} />
-      <Byline model={model} />
+      <Byline model={model} onOpenName={setDialogIndex} />
       {model.collaborators.map((group) => (
         <CollaboratorItem key={group.key} group={group} />
       ))}
@@ -295,6 +265,15 @@ export function ArticleView({
         </section>
       )}
       <PublicationDetails frontmatter={frontmatter} />
+      {dialogIndex !== null && (
+        <AuthorsDialog
+          authors={authors}
+          setAuthors={setAuthors}
+          initialIndex={dialogIndex >= 0 ? dialogIndex : undefined}
+          startWithDraft={dialogIndex < 0}
+          onClose={() => setDialogIndex(null)}
+        />
+      )}
     </div>
   );
 }
