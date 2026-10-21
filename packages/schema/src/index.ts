@@ -10,6 +10,13 @@ export {
   type PublishIdentityInput,
   type RepositoryMismatchRemedy,
 } from './publish-identity.js';
+export {
+  checkPublishReadiness,
+  type PublishIssue,
+  type PublishIssueLevel,
+  type PublishFileKey,
+  type PublishReadinessInput,
+} from './publish-profile.js';
 export { validateManifest, validateBlockStructure } from './manifest.js';
 export type { ManifestData } from './manifest.js';
 export { validateAssembly, collectIncludes } from './assembly.js';
