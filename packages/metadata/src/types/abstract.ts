@@ -11,6 +11,6 @@ export interface AbstractMetadata {
   /**
    * The abstract text.
    */
-  abstract: string;
+  abstract?: string;
   [k: string]: unknown;
 }

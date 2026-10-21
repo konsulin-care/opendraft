@@ -44,6 +44,45 @@ keywords:
   });
 });
 
+describe('compileManuscript — optional abstract and structured names', () => {
+  beforeEach(setupFixtures);
+  afterEach(() => {
+    if (existsSync(TEST_DIR)) rmSync(TEST_DIR, { recursive: true });
+  });
+
+  it('returns undefined abstract when _abstract.yml is empty', () => {
+    writeFileSync(join(TEST_DIR, '_abstract.yml'), `{}\n`);
+    const metadata = compileManuscript(TEST_DIR);
+    expect(metadata.abstract).toBeUndefined();
+  });
+
+  it('throws when _abstract.yml file is missing', () => {
+    rmSync(join(TEST_DIR, '_abstract.yml'));
+    expect(() => compileManuscript(TEST_DIR)).toThrow('_abstract.yml');
+  });
+
+  it('derives display name from structured name', () => {
+    writeFileSync(join(TEST_DIR, '_author.yml'), `authors:
+  - name:
+      given: Alice Marie
+      family: Smith
+`);
+    const metadata = compileManuscript(TEST_DIR);
+    expect(metadata.authors).toHaveLength(1);
+    expect(metadata.authors[0].name).toBe('Alice Marie Smith');
+  });
+
+  it('derives display name from literal name', () => {
+    writeFileSync(join(TEST_DIR, '_author.yml'), `authors:
+  - name:
+      literal: WHO DWG
+`);
+    const metadata = compileManuscript(TEST_DIR);
+    expect(metadata.authors).toHaveLength(1);
+    expect(metadata.authors[0].name).toBe('WHO DWG');
+  });
+});
+
 describe('compileManuscript — deterministic output', () => {
   beforeEach(setupFixtures);
   afterEach(() => {
