@@ -4,7 +4,7 @@
  * live preview, comma-paste split, ORCID, degrees, email, status toggles,
  * on-behalf-of and CRediT pills; groups get a literal name and pills.
  */import { useEffect, useRef, useState, type ClipboardEvent, type ReactNode } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react'; import { GroupMembers } from './GroupMembers';
 import type { MetadataAuthor } from './use-manuscript-metadata';
 
 /** Group entry offered by the "On behalf of" dropdown. */
@@ -264,6 +264,7 @@ function GroupBody({ edit }: { edit: CardEdit }): ReactNode {
           onChange={(event) => apply({ name: { literal: event.target.value } })} />
       </label>
       <EmailField author={author} apply={apply} />
+      <GroupMembers members={Array.isArray(author.members) ? author.members : []} onChange={(members) => apply({ members })} />
       <CreditPills roles={roles} onToggle={(slug) => apply({ roles: roles.includes(slug) ? roles.filter((r) => r !== slug) : [...roles, slug] })} />
     </>
   );
