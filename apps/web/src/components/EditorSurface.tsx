@@ -1,4 +1,5 @@
 import { Milkdown } from "@milkdown/react";
+import type { ReactNode } from "react";
 import { SourceEditor, type SourceEditorHandle } from "./SourceEditor";
 
 interface EditorSurfaceProps {
@@ -14,6 +15,8 @@ interface EditorSurfaceProps {
   sourceEditorRef: React.RefObject<SourceEditorHandle | null>;
   /** Syntax language for the source buffer: markdown only for rich files. */
   sourceLanguage?: 'markdown' | 'plain';
+  /** Metadata panel pinned inside the active surface's scroll container. */
+  panel?: ReactNode;
 }
 
 /**
@@ -27,11 +30,13 @@ export function EditorSurface({
   scrollContainerRef,
   sourceEditorRef,
   sourceLanguage = 'markdown',
+  panel,
 }: EditorSurfaceProps) {
   return (
     <div className="manuscript-editor" data-testid="manuscript-editor">
       <div
         ref={scrollContainerRef}
+        tabIndex={-1}
         style={{
           display: mode === "wysiwyg" ? "block" : "none",
           height: "100%",
@@ -39,15 +44,18 @@ export function EditorSurface({
           position: "relative",
         }}
       >
+        {mode === "wysiwyg" && panel}
         <Milkdown />
       </div>
       <div
+        tabIndex={-1}
         style={{
           display: mode === "source" ? "block" : "none",
           height: "100%",
           overflow: "auto",
         }}
       >
+        {mode === "source" && panel}
         <SourceEditor
           ref={sourceEditorRef}
           value={sourceMarkdown}

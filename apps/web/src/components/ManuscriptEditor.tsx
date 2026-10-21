@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useEditor } from '@milkdown/react';
 import type { Editor } from '@milkdown/kit/core';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
@@ -11,6 +11,7 @@ import { createModeSwitcher, useInitialCaret, type EditorTestApi } from '../care
 import { resolveEditorGate } from '../project/file-capability';
 import { useDebouncedSaver } from './editor/autosave';
 import { createCrepeConfig, useEditorWiring } from './crepe-config';
+import { MetadataPanel, manuscriptRootFromPath } from './metadata-panel/MetadataPanel';
 import type { SaveStatus } from './AppHeader';
 
 export type { EditorTestApi } from '../caret-mode-switch';
@@ -30,6 +31,8 @@ interface ManuscriptEditorProps {
   onSaveStatusChange?: (status: SaveStatus) => void;
   /** Formatting-toolbar visibility preference, owned by the app shell. */
   formattingToolbar?: boolean;
+  /** Project identifier used to persist metadata-panel state per project. */
+  projectId?: string;
 }
 
 interface UseManuscriptStateOptions {
@@ -44,6 +47,35 @@ interface UseManuscriptStateOptions {
 /** Props shared by the rich and source-only editor variants. */
 interface FileEditorProps extends UseManuscriptStateOptions {
   formattingToolbar: boolean;
+  projectId: string;
+}
+
+/**
+ * Render the metadata panel for files under `manuscripts/<id>/`;
+ * null for every other path.
+ *
+ * @param workspace - Workspace of the active project.
+ * @param path - Repo-relative path of the edited file.
+ * @param projectId - Project identifier for per-project panel state.
+ * @param scrollContainerRef - Editor scroll container, focused on Esc.
+ * @returns The panel element, or null when the file is outside a manuscript.
+ */
+function useMetadataPanel(
+  workspace: WorkspaceAdapter,
+  path: string,
+  projectId: string,
+  scrollContainerRef: RefObject<HTMLElement | null>,
+): ReactNode {
+  const root = useMemo(() => manuscriptRootFromPath(path), [path]);
+  if (!root) return null;
+  return (
+    <MetadataPanel
+      workspace={workspace}
+      manuscriptRoot={root}
+      projectKey={projectId}
+      editorFocusRef={scrollContainerRef}
+    />
+  );
 }
 
 /** Hook that wires up the Crepe editor, autosave, and mode sync. */
@@ -95,10 +127,11 @@ function useManuscriptState(options: UseManuscriptStateOptions) {
 }
 
 /** Rich visual editor for manuscript block files: Milkdown/Crepe + source companion. */
-function RichFileEditor({ workspace, defaultValue, path, mode, onEditorReady, onSaveStatusChange, formattingToolbar }: FileEditorProps) {
+function RichFileEditor({ workspace, defaultValue, path, mode, onEditorReady, onSaveStatusChange, formattingToolbar, projectId }: FileEditorProps) {
   const { sourceMarkdown, handleSourceChange, sourceEditorRef, scrollContainerRef } = useManuscriptState({
     workspace, defaultValue, path, mode, onEditorReady, onSaveStatusChange,
   });
+  const panel = useMetadataPanel(workspace, path, projectId, scrollContainerRef);
   return (
     <EditorFrame editorMode={mode} formattingToolbar={formattingToolbar} path={path} sourceMarkdown={sourceMarkdown} sourceEditorRef={sourceEditorRef}>
       <EditorSurface
@@ -108,6 +141,7 @@ function RichFileEditor({ workspace, defaultValue, path, mode, onEditorReady, on
         scrollContainerRef={scrollContainerRef}
         sourceEditorRef={sourceEditorRef}
         sourceLanguage="markdown"
+        panel={panel}
       />
     </EditorFrame>
   );
@@ -118,10 +152,12 @@ function RichFileEditor({ workspace, defaultValue, path, mode, onEditorReady, on
  * bibliography, ...): a CodeMirror surface that never creates a
  * Crepe/Milkdown instance, so non-block files are never rewritten.
  */
-function SourceOnlyEditor({ workspace, defaultValue, path, onSaveStatusChange, formattingToolbar }: FileEditorProps) {
+function SourceOnlyEditor({ workspace, defaultValue, path, onSaveStatusChange, formattingToolbar, projectId }: FileEditorProps) {
   const [sourceMarkdown, setSourceMarkdown] = useState(defaultValue);
   const sourceEditorRef = useRef<SourceEditorHandle | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const saver = useDebouncedSaver(workspace, path, onSaveStatusChange);
+  const panel = useMetadataPanel(workspace, path, projectId, scrollContainerRef);
 
   // Reload the buffer when the open file changes.
   useEffect(() => {
@@ -137,7 +173,8 @@ function SourceOnlyEditor({ workspace, defaultValue, path, onSaveStatusChange, f
   return (
     <EditorFrame editorMode="source" formattingToolbar={formattingToolbar} path={path} sourceMarkdown={sourceMarkdown} sourceEditorRef={sourceEditorRef}>
       <div className="manuscript-editor" data-testid="manuscript-editor">
-        <div style={{ height: '100%', overflow: 'auto' }}>
+        <div ref={scrollContainerRef} tabIndex={-1} style={{ height: '100%', overflow: 'auto' }}>
+          {panel}
           <SourceEditor ref={sourceEditorRef} value={sourceMarkdown} onChange={handleSourceChange} className="source-editor" language="plain" />
         </div>
       </div>
@@ -160,9 +197,10 @@ export function ManuscriptEditor({
   mode = 'wysiwyg',
   onSaveStatusChange,
   formattingToolbar = true,
+  projectId = 'default',
 }: ManuscriptEditorProps) {
   const { capability, content, editorMode } = resolveEditorGate(path, defaultValue, mode);
-  const shared = { workspace, defaultValue: content, path, onSaveStatusChange, formattingToolbar };
+  const shared = { workspace, defaultValue: content, path, onSaveStatusChange, formattingToolbar, projectId };
   if (capability === 'rich') {
     return <RichFileEditor {...shared} mode={editorMode} onEditorReady={onEditorReady} />;
   }
