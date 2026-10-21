@@ -10,6 +10,8 @@ import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'rea
 import { GripVertical, Plus, X } from 'lucide-react';
 import type { MetadataAuthor } from './use-manuscript-metadata';
 import { AuthorCard, type GroupOption } from './AuthorCard';
+import { AffiliationPicker } from './AffiliationPicker';
+import type { AffiliationEntry } from './byline-model';
 import { NARROW_QUERY, useMediaQuery } from '../../hooks/use-media-query';
 
 /** Props for {@link AuthorsDialog}. */
@@ -20,6 +22,10 @@ export interface AuthorsDialogProps {
   setAuthors: (authors: MetadataAuthor[]) => void;
   /** Author index to open expanded; defaults to the first author. */
   initialIndex?: number;
+  /** Affiliation registry of _author.yml feeding the picker. */
+  affiliations?: AffiliationEntry[];
+  /** Persist registry/author changes from the affiliation picker. */
+  setAffiliations?: (affiliations: AffiliationEntry[]) => void;
   /** Start with a new draft author card expanded. */
   startWithDraft?: boolean;
   /** Close the dialog. */
@@ -66,28 +72,19 @@ function displayName(author: MetadataAuthor): string {
 }
 
 // A draft is named once it has a family name (person) or a literal.
-function isNamed(author: MetadataAuthor): boolean {
-  const name = nameRecord(author);
-  return Boolean(name.family || name.literal);
-}
+const isNamed = (author: MetadataAuthor): boolean => Boolean(nameRecord(author).family || nameRecord(author).literal);
 
 // Hidden author id slugged from the display name.
-function slugOf(author: MetadataAuthor): string {
-  return displayName(author).toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-}
+const slugOf = (author: MetadataAuthor): string => displayName(author).toLowerCase()
+  .replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
 function moved(authors: MetadataAuthor[], from: number, to: number): MetadataAuthor[] {
-  const next = [...authors];
-  const [item] = next.splice(from, 1);
-  next.splice(to, 0, item);
-  return next;
+  const next = [...authors]; const [item] = next.splice(from, 1); next.splice(to, 0, item); return next;
 }
 
 // Group options for the "On behalf of" dropdown of every card.
 function groupsOf(authors: MetadataAuthor[]): GroupOption[] {
-  return authors.filter((author) => 'literal' in nameRecord(author))
-    .map((author) => ({ id: String(author.id ?? ''), name: displayName(author) }));
+  return authors.filter((a) => 'literal' in nameRecord(a)).map((a) => ({ id: String(a.id ?? ''), name: displayName(a) }));
 }
 
 // Close the dialog when Escape is pressed, from anywhere on the page.
@@ -135,9 +132,28 @@ function useAuthorOps(
   return { removed, dragFrom, move, removeAt, undo };
 }
 
+// Affiliation picker under the expanded person card: registry edits go to
+// _author.yml's affiliation registry, author edits to the author list.
+function AffiliationSection({ authors, index, affiliations, setAuthors, setAffiliations }: {
+  authors: MetadataAuthor[]; index: number; affiliations: AffiliationEntry[];
+  setAuthors(a: MetadataAuthor[]): void; setAffiliations(a: AffiliationEntry[]): void;
+}): ReactNode {
+  return (
+    <div data-testid="author-affiliation-section" className="px-2 pb-2">
+      <h3 className="text-sm font-medium">Affiliation</h3>
+      <AffiliationPicker registry={affiliations} authors={authors} authorIndex={index}
+        onApply={(change) => {
+          if (change.authors) setAuthors(change.authors);
+          if (change.registry) setAffiliations(change.registry);
+        }} />
+    </div>
+  );
+}
+
 /** One author slot: the compact row and, when selected, the expanded card. */
 function CardSlot(props: {
   author: MetadataAuthor; index: number; total: number; expanded: boolean; groups: GroupOption[];
+  section?: ReactNode;
   onExpand(): void; onChange(next: MetadataAuthor): void; onMoveUp(): void; onMoveDown(): void;
   onRemove(): void; onDragStart(): void; onDragOver(event: DragEvent): void; onDrop(): void;
 }): ReactNode {
@@ -165,6 +181,7 @@ function CardSlot(props: {
       {expanded && (
         <div data-testid={`author-card-${index}`}>
           <AuthorCard author={author} groups={groups} onChange={props.onChange} />
+          {props.section}
         </div>
       )}
     </div>
@@ -174,52 +191,23 @@ function CardSlot(props: {
 // One ordered author slot wired to the dialog operations by index.
 function BoundSlot(props: {
   authors: MetadataAuthor[]; index: number; selected: Selection; groups: GroupOption[];
-  ops: AuthorOps; setSelected(s: Selection): void; setAuthors(a: MetadataAuthor[]): void;
+  ops: AuthorOps; affiliations?: AffiliationEntry[]; setSelected(s: Selection): void;
+  setAuthors(a: MetadataAuthor[]): void; setAffiliations?(a: AffiliationEntry[]): void;
 }): ReactNode {
   const { authors, index, ops } = props;
+  const card = authors[index];
+  const section = props.selected === index && props.setAffiliations && !nameRecord(card).literal
+    ? <AffiliationSection authors={authors} index={index} affiliations={props.affiliations ?? []}
+        setAuthors={props.setAuthors} setAffiliations={props.setAffiliations} />
+    : null;
   return (
-    <CardSlot author={authors[index]} index={index} total={authors.length}
+    <CardSlot author={card} index={index} total={authors.length} section={section}
       expanded={props.selected === index} groups={props.groups} onExpand={() => props.setSelected(index)}
       onChange={(next) => props.setAuthors(authors.map((a, i) => (i === index ? next : a)))}
       onMoveUp={() => ops.move(index, index - 1)} onMoveDown={() => ops.move(index, index + 1)}
       onRemove={() => ops.removeAt(index)} onDragStart={() => { ops.dragFrom.current = index; }}
       onDragOver={(event) => event.preventDefault()}
       onDrop={() => { const s = ops.dragFrom.current; ops.dragFrom.current = null; if (s !== null && s !== index) ops.move(s, index); }} />
-  );
-}
-
-// Narrow-viewport sub-view: a Back button plus the selected card only.
-function SubView(props: { selected: Selection; slots: ReactNode[]; draftCard: ReactNode; onBack(): void }): ReactNode {
-  return (
-    <>
-      <button type="button" data-testid="authors-back" onClick={props.onBack}
-        className="mb-1 min-h-11 rounded px-2 font-medium hover:bg-hover">Back</button>
-      {props.selected === 'draft' ? props.draftCard : props.slots[props.selected as number]}
-    </>
-  );
-}
-
-// Undo toast shown after removing an author.
-function UndoToast({ name, onUndo }: { name: string; onUndo: () => void }): ReactNode {
-  return (
-    <div role="status" className="mt-2 rounded bg-surface-low p-2 text-sm">
-      Removed {name}
-      <button type="button" data-testid="author-undo" onClick={onUndo}
-        className="ml-2 min-h-11 rounded border border-secondary px-2 py-1 hover:bg-hover">
-        Undo
-      </button>
-    </div>
-  );
-}
-
-// The dialog's "Add author" button opening a fresh draft card.
-function AddAuthorButton({ onClick }: { onClick: () => void }): ReactNode {
-  return (
-    <button type="button" data-testid="add-author-dialog" onClick={onClick}
-      className="mt-2 min-h-11 rounded px-2 text-muted hover:bg-hover">
-      <Plus aria-hidden className="inline size-3.5" />
-      Add author
-    </button>
   );
 }
 
@@ -260,11 +248,7 @@ function DialogShell({ narrow, onClose, children }: {
  * @returns The dialog frame with the card list or narrow sub-view.
  */
 export function AuthorsDialog({
-  authors,
-  setAuthors,
-  initialIndex,
-  startWithDraft = false,
-  onClose,
+  authors, setAuthors, affiliations, setAffiliations, initialIndex, startWithDraft = false, onClose,
 }: AuthorsDialogProps): ReactNode {
   const [selected, setSelected] = useState<Selection>(startWithDraft ? 'draft' : initialIndex ?? 0);
   const [draft, setDraft] = useState<MetadataAuthor>(EMPTY_DRAFT);
@@ -280,20 +264,36 @@ export function AuthorsDialog({
   const startDraft = (): void => { setDraft(EMPTY_DRAFT); setSelected('draft'); };
   const narrow = useMediaQuery(NARROW_QUERY);
   const subView = narrow && selected !== null;
-  const draftCard = (
-    <div data-testid="author-card-draft"><AuthorCard author={draft} groups={groups} focusOrcid onChange={onDraftChange} /></div>
-  );
+  const draftCard = <div data-testid="author-card-draft"><AuthorCard author={draft} groups={groups} focusOrcid onChange={onDraftChange} /></div>;
   const slots = authors.map((author, index) => (
     <BoundSlot key={String(author.id ?? index)} authors={authors} index={index} selected={selected}
-      groups={groups} ops={ops} setSelected={setSelected} setAuthors={setAuthors} />
+      groups={groups} ops={ops} affiliations={affiliations} setSelected={setSelected}
+      setAuthors={setAuthors} setAffiliations={setAffiliations} />
   ));
   return (
     <DialogShell narrow={narrow} onClose={onClose}>
-      {subView && <SubView selected={selected} slots={slots} draftCard={draftCard} onBack={() => setSelected(null)} />}
+      {subView && (
+        <>
+          <button type="button" data-testid="authors-back" onClick={() => setSelected(null)}
+            className="mb-1 min-h-11 rounded px-2 font-medium hover:bg-hover">Back</button>
+          {selected === 'draft' ? draftCard : slots[selected as number]}
+        </>
+      )}
       {!subView && slots}
       {!subView && selected === 'draft' && draftCard}
-      {!subView && <AddAuthorButton onClick={startDraft} />}
-      {ops.removed && <UndoToast name={displayName(ops.removed.author)} onUndo={ops.undo} />}
+      {!subView && (
+        <button type="button" data-testid="add-author-dialog" onClick={startDraft}
+          className="mt-2 min-h-11 rounded px-2 text-muted hover:bg-hover">
+          <Plus aria-hidden className="inline size-3.5" /> Add author
+        </button>
+      )}
+      {ops.removed && (
+        <div role="status" className="mt-2 rounded bg-surface-low p-2 text-sm">
+          Removed {displayName(ops.removed.author)}
+          <button type="button" data-testid="author-undo" onClick={ops.undo}
+            className="ml-2 min-h-11 rounded border border-secondary px-2 py-1 hover:bg-hover">Undo</button>
+        </div>
+      )}
     </DialogShell>
   );
 }

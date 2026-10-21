@@ -37,6 +37,8 @@ export interface ArticleViewProps {
   setKeywords?: (keywords: string[]) => void;
   /** Persist author edits to _author.yml; no-op when omitted. */
   setAuthors?: (authors: MetadataAuthor[]) => void;
+  /** Persist affiliation registry edits to _author.yml; no-op when omitted. */
+  setAffiliations?: (affiliations: AffiliationEntry[]) => void;
   /** Persist one _frontmatter.yml field; no-op when omitted. */
   setFrontmatterField?: (key: string, value: unknown) => void;
 }
@@ -241,6 +243,7 @@ export function ArticleView({
   keywords = [],
   setKeywords = () => {},
   setAuthors = () => {},
+  setAffiliations,
   setFrontmatterField = () => {},
 }: ArticleViewProps): ReactNode {
   const model = buildByline(authors, affiliations);
@@ -269,13 +272,9 @@ export function ArticleView({
       )}
       <PublicationDetails frontmatter={frontmatter} setField={setFrontmatterField} />
       {dialogIndex !== null && (
-        <AuthorsDialog
-          authors={authors}
-          setAuthors={setAuthors}
-          initialIndex={dialogIndex >= 0 ? dialogIndex : undefined}
-          startWithDraft={dialogIndex < 0}
-          onClose={() => setDialogIndex(null)}
-        />
+        <AuthorsDialog authors={authors} setAuthors={setAuthors} affiliations={affiliations}
+          setAffiliations={setAffiliations} initialIndex={dialogIndex >= 0 ? dialogIndex : undefined}
+          startWithDraft={dialogIndex < 0} onClose={() => setDialogIndex(null)} />
       )}
     </div>
   );

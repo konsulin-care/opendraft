@@ -1,15 +1,13 @@
-import {
-  useCallback,
-  useMemo,
-  useState,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type ReactNode,
-  type RefObject,
-} from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode, RefObject } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
-import { useManuscriptMetadata, type MetadataAuthor } from './use-manuscript-metadata';
+import type { PublishIssue } from '@opendraft/schema';
+import { useManuscriptMetadata, type MetadataAuthor, type UseManuscriptMetadataResult } from './use-manuscript-metadata';
 import { NARROW_QUERY, useMediaQuery } from '../../hooks/use-media-query';
+import { ArticleView } from './ArticleView';
+import { AuthorsDialog } from './AuthorsDialog';
+import { ValidationBadge, issueFocusTarget, publishIssues } from './ValidationBadge';
 
 /** localStorage key prefix for the per-project collapsed state. */
 const STORAGE_PREFIX = 'opendraft:metadata-panel';
@@ -88,20 +86,16 @@ function readStoredState(projectKey: string): string | null {
   }
 }
 
-/** Per-project expanded decision held in state. */
+/** Per-project expanded decision held in state (internal). */
 interface ExpandedDecision {
-  /** Project the decision belongs to. */
   key: string;
-  /** Chosen expanded flag. */
   expanded: boolean;
 }
 
 /**
- * Collapsed/expanded state, decided during render once the metadata has
- * loaded and persisted per project in localStorage. Deciding in render
- * (rather than a post-commit effect) guarantees the commit that first
- * shows the panel already carries the settled state, so callers never
- * observe a collapsed frame for an expanded panel.
+ * Collapsed/expanded state decided during render once the metadata has
+ * loaded, persisted per project in localStorage. Deciding in render
+ * guarantees no collapsed frame escapes for an expanded panel.
  *
  * @param projectKey - Project identifier used for the storage key.
  * @param title - Current manuscript title.
@@ -115,8 +109,8 @@ function useExpandedState(
 ): [boolean, (next: boolean) => void] {
   const [decision, setDecision] = useState<ExpandedDecision | null>(null);
   if (loaded && (decision === null || decision.key !== projectKey)) {
-    // Render-phase state adjustment: React re-runs this component before
-    // committing, so no intermediate render with the wrong state escapes.
+    // Render-phase adjustment: React re-runs before committing, so no
+    // intermediate render with the wrong state escapes.
     setDecision({
       key: projectKey,
       expanded: initialExpanded(title, readStoredState(projectKey)),
@@ -136,46 +130,13 @@ function useExpandedState(
   return [decision?.key === projectKey ? decision.expanded : false, setPersisted];
 }
 
-/** Props for the expanded article stub (title input slot). */
-interface ExpandedProps {
-  /** Current manuscript title. */
-  title: string;
-  /** Persist a title change to _frontmatter.yml. */
-  setTitle: (title: string) => void;
-}
-
-/**
- * Expanded body of the panel. D2 ships the title input slot; the full
- * article view lands with the later metadata-panel behaviors.
- *
- * @param props - See {@link ExpandedProps}.
- */
-function ExpandedSection({ title, setTitle }: ExpandedProps): ReactNode {
-  return (
-    <div data-testid="metadata-panel-expanded" className="px-4 py-3">
-      <input
-        data-testid="metadata-panel-title-input"
-        aria-label="Manuscript title"
-        value={title}
-        placeholder="Untitled manuscript"
-        onChange={(event) => setTitle(event.target.value)}
-        className="min-h-11 w-full text-lg outline-none"
-      />
-    </div>
-  );
-}
-
-/** Props for the collapsed pinned bar. */
+/** Props for the collapsed pinned bar (internal). */
 interface PinnedBarProps {
-  /** Current manuscript title ('' shows the placeholder). */
   title: string;
-  /** Byline text: names, or 'N authors' on narrow viewports. */
   byline: string;
-  /** Whether the panel body is currently expanded. */
   expanded: boolean;
-  /** Whether the viewport is below the 640px breakpoint. */
   narrow: boolean;
-  /** Toggles the expanded state. */
+  badge?: ReactNode;
   onToggle: () => void;
 }
 
@@ -186,7 +147,7 @@ interface PinnedBarProps {
  * @param props - See {@link PinnedBarProps}.
  * @returns The bar and separator elements.
  */
-function PinnedBar({ title, byline, expanded, narrow, onToggle }: PinnedBarProps): ReactNode {
+function PinnedBar({ title, byline, expanded, narrow, badge, onToggle }: PinnedBarProps): ReactNode {
   return (
     <>
       <div className="flex items-center gap-2 px-4 py-2" data-testid="metadata-panel-bar">
@@ -203,6 +164,7 @@ function PinnedBar({ title, byline, expanded, narrow, onToggle }: PinnedBarProps
             </div>
           )}
         </div>
+        {badge}
         <button
           type="button"
           data-testid="metadata-panel-toggle"
@@ -220,31 +182,91 @@ function PinnedBar({ title, byline, expanded, narrow, onToggle }: PinnedBarProps
 }
 
 /**
- * Manuscript metadata panel rendered inside the editor scroll container.
- * Shows a pinned collapsed bar (title, byline, chevron toggle, hairline
- * separator) and expands into the article editor; the state is persisted
- * per project and Esc collapses the panel and refocuses the editor.
+ * Issue-selection focus state: the author index the dialog opens on and
+ * the field focused once the render exposing it has committed.
+ *
+ * @param expanded - Expanded flag the focus effect re-runs against.
+ * @param setExpanded - Panel setter; selecting an issue expands first.
+ * @returns The dialog index, the issue selector and the dialog close.
+ */
+function useIssueFocus(expanded: boolean, setExpanded: (next: boolean) => void): { dialogIndex: number | null; select(issue: PublishIssue): void; close(): void } {
+  const [dialogIndex, setDialogIndex] = useState<number | null>(null);
+  const [focusField, setFocusField] = useState<string | null>(null);
+  // Focus a field once the render that exposes it has committed.
+  useEffect(() => {
+    if (!focusField) return;
+    const field = document.querySelector<HTMLElement>(`[data-testid="${focusField}"]`);
+    if (!field) return;
+    field.focus();
+    setFocusField(null);
+  }, [focusField, dialogIndex, expanded]);
+  const select = useCallback((issue: PublishIssue) => {
+    setExpanded(true);
+    const target = issueFocusTarget(issue.path);
+    if (target.index !== null) setDialogIndex(target.index);
+    if (target.focus) setFocusField(target.focus);
+  }, [setExpanded]);
+  const close = useCallback(() => setDialogIndex(null), []);
+  return { dialogIndex, select, close };
+}
+
+/** Props for {@link ExpandedBody}. */
+interface ExpandedBodyProps {
+  meta: UseManuscriptMetadataResult;
+  dialogIndex: number | null;
+  onClose(): void;
+}
+
+/**
+ * Expanded panel body: the article view plus the authors dialog opened
+ * on the author an issue pointed at.
+ *
+ * @param props - See {@link ExpandedBodyProps}.
+ * @returns The expanded body element.
+ */
+function ExpandedBody({ meta, dialogIndex, onClose }: ExpandedBodyProps): ReactNode {
+  const { frontmatter } = meta;
+  const keywords = useMemo(() => (Array.isArray(frontmatter.keywords) ? frontmatter.keywords : []) as string[], [frontmatter.keywords]);
+  return (
+    <div data-testid="metadata-panel-expanded">
+      <ArticleView
+        title={meta.title} authors={meta.authors} affiliations={meta.affiliations}
+        frontmatter={frontmatter} setTitle={meta.setTitle} abstract={meta.abstract}
+        setAbstract={meta.setAbstract} keywords={keywords}
+        setKeywords={(next) => meta.setFrontmatterField('keywords', next)}
+        setAuthors={meta.setAuthors} setAffiliations={meta.setAffiliations}
+        setFrontmatterField={meta.setFrontmatterField}
+      />
+      {dialogIndex !== null && (
+        <AuthorsDialog authors={meta.authors} setAuthors={meta.setAuthors}
+          affiliations={meta.affiliations} setAffiliations={meta.setAffiliations}
+          initialIndex={dialogIndex} onClose={onClose} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Manuscript metadata panel inside the editor scroll container: pinned
+ * collapsed bar over the expanded article editor, persisted per project;
+ * Esc collapses it and refocuses the editor.
  *
  * @param props - See {@link MetadataPanelProps}.
+ * @returns The panel section, or null when outside a loaded manuscript.
  */
 export function MetadataPanel({
-  workspace,
-  manuscriptRoot,
-  projectKey,
-  editorFocusRef,
+  workspace, manuscriptRoot, projectKey, editorFocusRef,
 }: MetadataPanelProps): ReactNode {
-  const { loaded, title, authors, setTitle } = useManuscriptMetadata(workspace, manuscriptRoot);
+  const meta = useManuscriptMetadata(workspace, manuscriptRoot);
+  const { loaded, title, authors, affiliations, abstract, frontmatter } = meta;
   const narrow = useMediaQuery(NARROW_QUERY);
   const [expanded, setExpanded] = useExpandedState(projectKey, title, loaded);
-
-  const byline = useMemo(
-    () => authors.map(authorBylineName).filter(Boolean).join(', '),
-    [authors],
-  );
-  const toggle = useCallback(
-    () => setExpanded(!expanded),
-    [expanded, setExpanded],
-  );
+  const issues = useMemo(() => publishIssues({ title, authors, affiliations, abstract, frontmatter }),
+    [title, authors, affiliations, abstract, frontmatter]);
+  const byline = useMemo(() => authors.map(authorBylineName).filter(Boolean).join(', '), [authors]);
+  const issueFocus = useIssueFocus(expanded, setExpanded);
+  const toggle = useCallback(() => setExpanded(!expanded), [expanded, setExpanded]);
+  const openIssues = useCallback(() => setExpanded(true), [setExpanded]);
   const onKeyDown = useCallback((event: ReactKeyboardEvent<HTMLElement>) => {
     if (event.key !== 'Escape') return;
     setExpanded(false);
@@ -262,18 +284,12 @@ export function MetadataPanel({
       onKeyDown={onKeyDown}
       role={sheet ? 'dialog' : undefined}
       aria-modal={sheet ? true : undefined}
-      className={sheet
-        ? 'fixed inset-0 z-30 flex flex-col overflow-y-auto bg-white'
-        : 'sticky top-0 z-10 bg-white'}
+      className={sheet ? 'fixed inset-0 z-30 flex flex-col overflow-y-auto bg-white' : 'sticky top-0 z-10 bg-white'}
     >
-      <PinnedBar
-        title={title}
-        byline={narrow ? `${authors.length} authors` : byline}
-        expanded={expanded}
-        narrow={narrow}
-        onToggle={toggle}
-      />
-      {expanded && <ExpandedSection title={title} setTitle={setTitle} />}
+      <PinnedBar title={title} byline={narrow ? `${authors.length} authors` : byline}
+        expanded={expanded} narrow={narrow} onToggle={toggle}
+        badge={<ValidationBadge issues={issues} onSelect={issueFocus.select} onOpen={openIssues} />} />
+      {expanded && <ExpandedBody meta={meta} dialogIndex={issueFocus.dialogIndex} onClose={issueFocus.close} />}
     </section>
   );
 }
