@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { MemoryWorkspace } from '@opendraft/workspace';
-import { validateAssembly, validateManuscript, validateOpendraft } from '@opendraft/schema';
+import { validateAssembly, validateManuscript, validateMetadata, validateOpendraft } from '@opendraft/schema';
 import protocolManifest from '../../../../protocol/protocol.manifest.json' with { type: 'json' };
 import { OPENDRAFT_CONFIG_PATH, scaffoldProject } from './scaffold';
 
@@ -117,6 +117,31 @@ describe('templates/manuscript/article.qmd', () => {
     const scaffoldBlock = starterBlockPath(article);
 
     expect(template.replace(templateBlock, scaffoldBlock)).toBe(article);
+  });
+});
+
+describe('scaffoldProject — _author.yml', () => {
+  it('writes a starter _author.yml that validates', async () => {
+    const ws = new MemoryWorkspace();
+    await scaffoldProject(ws, { manuscriptId: 'my-paper' });
+
+    const raw = (await ws.readFile(`${MANUSCRIPT_DIR}/_author.yml`)) as string;
+    const data = parse(raw);
+    const result = validateMetadata(data, 'author');
+    expect(result.errors).toEqual([]);
+    expect(result.valid).toBe(true);
+  });
+
+  it('declares a top-level affiliation registry entry referenced by the author', async () => {
+    const ws = new MemoryWorkspace();
+    await scaffoldProject(ws, { manuscriptId: 'my-paper' });
+
+    const data = parse((await ws.readFile(`${MANUSCRIPT_DIR}/_author.yml`)) as string);
+    expect(data.affiliations).toHaveLength(1);
+    expect(data.affiliations[0].id).toBe('uni-example');
+    expect(data.authors[0].affiliations).toEqual([{ ref: 'uni-example' }]);
+    expect(data.authors[0].id).toBe('jd');
+    expect(data.authors[0].name).toEqual({ given: 'Jane', family: 'Doe' });
   });
 });
 

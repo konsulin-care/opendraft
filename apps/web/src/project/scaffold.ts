@@ -35,16 +35,22 @@ metadata-files:
 
 /** Starter author metadata, mirroring templates/manuscript/_author.yml. */
 const AUTHOR_YML = `authors:
-  - name: Jane Doe
+  - id: jd
+    name:
+      given: Jane
+      family: Doe
     orcid: "0000-0001-2345-6789"
     email: jane.doe@example.com
     corresponding: true
     affiliations:
-      - name: University Example
-        department: Computer Science
-        city: "Cambridge"
-        state: "MA"
-        country: "US"
+      - ref: uni-example
+affiliations:
+  - id: uni-example
+    name: University Example
+    department: Computer Science
+    city: "Cambridge"
+    state: "MA"
+    country: "US"
 `;
 
 /** Starter abstract, mirroring templates/manuscript/_abstract.yml. */

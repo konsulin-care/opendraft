@@ -13,6 +13,12 @@ export type {
   AuthorMetadata,
   AuthorObject,
   AffiliationObject,
+  AffiliationRef,
+  NameValue,
+  StructuredName,
+  LiteralName,
+  MemberObject,
+  RegistryAffiliation,
 } from './types/author.js';
 export type { AbstractMetadata } from './types/abstract.js';
 export type { FrontmatterMetadata } from './types/frontmatter.js';

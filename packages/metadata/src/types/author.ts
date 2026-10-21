@@ -5,6 +5,15 @@
  */
 
 /**
+ * Author name: plain string, structured name, or literal group name.
+ */
+export type NameValue = string | StructuredName | LiteralName;
+/**
+ * Registry affiliation: an affiliation object with a required id.
+ */
+export type RegistryAffiliation = AffiliationObject & {};
+
+/**
  * Schema for _author.yml — author information.
  */
 export interface AuthorMetadata {
@@ -12,13 +21,18 @@ export interface AuthorMetadata {
    * List of authors.
    */
   authors: AuthorObject[];
+  /**
+   * Registry of affiliations; authors reference entries via {ref}.
+   */
+  affiliations?: RegistryAffiliation[];
   [k: string]: unknown;
 }
 export interface AuthorObject {
+  name: NameValue;
   /**
-   * Full name of the author.
+   * Stable hidden identifier used for cross-references (affiliation refs, on-behalf-of).
    */
-  name: string;
+  id?: string;
   /**
    * Contact email for the author.
    */
@@ -54,7 +68,22 @@ export interface AuthorObject {
   /**
    * Author's roles (CRediT contributor roles).
    */
-  roles?: string[];
+  roles?: (
+    | 'conceptualization'
+    | 'data-curation'
+    | 'formal-analysis'
+    | 'funding-acquisition'
+    | 'investigation'
+    | 'methodology'
+    | 'project-administration'
+    | 'resources'
+    | 'software'
+    | 'supervision'
+    | 'validation'
+    | 'visualization'
+    | 'writing-original-draft'
+    | 'writing-review-editing'
+  )[];
   /**
    * Whether this author is the corresponding author.
    */
@@ -68,14 +97,59 @@ export interface AuthorObject {
    */
   deceased?: boolean;
   /**
-   * Identifier for referencing this author in other fields.
+   * id of the group author this author signs on behalf of.
    */
-  id?: string;
+  'on-behalf-of'?: string;
   /**
-   * Author affiliations.
+   * Author affiliations: registry refs or inline objects (legacy).
    */
-  affiliations?: AffiliationObject[];
+  affiliations?: (AffiliationRef | AffiliationObject)[];
+  /**
+   * Members of a group or consortium author.
+   */
+  members?: MemberObject[];
   [k: string]: unknown;
+}
+/**
+ * Structured personal name: family name required, given names optional.
+ */
+export interface StructuredName {
+  /**
+   * Given name(s).
+   */
+  given?: string;
+  /**
+   * Family name.
+   */
+  family: string;
+  /**
+   * Name particle such as van, de, bin.
+   */
+  particle?: string;
+  /**
+   * Name suffix such as Jr., III.
+   */
+  suffix?: string;
+  [k: string]: unknown;
+}
+/**
+ * Literal name for groups and consortia.
+ */
+export interface LiteralName {
+  /**
+   * Full literal group or consortium name.
+   */
+  literal: string;
+  [k: string]: unknown;
+}
+/**
+ * Reference to a top-level affiliation registry entry.
+ */
+export interface AffiliationRef {
+  /**
+   * id of an entry in the top-level affiliations registry.
+   */
+  ref: string;
 }
 export interface AffiliationObject {
   /**
@@ -115,13 +189,13 @@ export interface AffiliationObject {
    */
   url?: string;
   /**
-   * 16-digit International Standard Name Identifier.
+   * 16-digit International Standard Name Identifier as a string.
    */
-  isni?: number;
+  isni?: string;
   /**
-   * 4-6 digit Ringgold ID.
+   * 4-6 digit Ringgold ID as a string.
    */
-  ringgold?: number;
+  ringgold?: string;
   /**
    * Research Organization Registry (ROR) ID.
    */
@@ -130,5 +204,20 @@ export interface AffiliationObject {
    * Identifier for referencing this affiliation.
    */
   id?: string;
+  [k: string]: unknown;
+}
+/**
+ * Member of a group or consortium author.
+ */
+export interface MemberObject {
+  name: NameValue;
+  /**
+   * ORCID identifier (16 digits with hyphens, last digit may be X).
+   */
+  orcid?: string;
+  /**
+   * Member affiliations as registry refs.
+   */
+  affiliations?: AffiliationRef[];
   [k: string]: unknown;
 }
