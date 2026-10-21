@@ -43,6 +43,43 @@ describe('validateOpendraft — valid configs', () => {
   });
 });
 
+describe('validateOpendraft — publish identity fields', () => {
+  it('accepts a valid concept-doi and repository fields', () => {
+    const config = {
+      ...validConfig,
+      repository: 'https://github.com/acme/paper',
+      manuscripts: [
+        {
+          id: 'x',
+          path: 'manuscripts/x',
+          'concept-doi': '10.5555/od.x',
+          'concept-doi-repository': 'https://github.com/acme/paper',
+        },
+      ],
+    };
+    const result = validateOpendraft(config);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('rejects an invalid concept-doi', () => {
+    const config = {
+      ...validConfig,
+      manuscripts: [{ id: 'x', path: 'manuscripts/x', 'concept-doi': 'abc' }],
+    };
+    const result = validateOpendraft(config);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.path.includes('concept-doi'))).toBe(true);
+  });
+
+  it('rejects an invalid top-level repository URL', () => {
+    const config = { ...validConfig, repository: 'not-a-url' };
+    const result = validateOpendraft(config);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.path === 'repository')).toBe(true);
+  });
+});
+
 describe('validateOpendraft — invalid input', () => {
   it('rejects null input', () => {
     const result = validateOpendraft(null);
