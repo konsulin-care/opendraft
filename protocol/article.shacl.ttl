@@ -6,6 +6,7 @@
 
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix od: <urn:opendraft:ontology#> .
+@prefix fabio: <http://purl.org/spar/fabio/> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
@@ -89,8 +90,8 @@ od:PublicationInfoShape
     sh:severity sh:Info ;
 
     sh:property [
-        sh:path od:hasSubject ;
-        sh:message "Subjects may be expressed via od:hasSubject pointing to a SKOS concept." ;
+        sh:path fabio:hasSubjectTerm ;
+        sh:message "Subject terms may be expressed via fabio:hasSubjectTerm pointing to a SKOS subject term." ;
     ] ;
     sh:property [
         sh:path dcterms:references ;

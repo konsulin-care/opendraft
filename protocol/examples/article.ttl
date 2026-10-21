@@ -8,6 +8,7 @@
 
 @prefix od: <urn:opendraft:ontology#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix fabio: <http://purl.org/spar/fabio/> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 
@@ -26,10 +27,10 @@ od:example-publication
 
     # --- Optional fields (ADR-008) ---
     dcterms:abstract "A canonical example publication used to demonstrate the OpenDraft protocol." ;
-    od:hasSubject od:concept-distributed-scientific-publication ;
+    fabio:hasSubjectTerm od:concept-distributed-scientific-publication ;
     dcterms:references <https://doi.org/10.5555/example-cited-work-2025> .
 
 # A SKOS concept used as the subject of the example publication.
 od:concept-distributed-scientific-publication
-    a skos:Concept ;
+    a skos:Concept , fabio:SubjectTerm ;
     skos:prefLabel "Distributed scientific publication"@en .
