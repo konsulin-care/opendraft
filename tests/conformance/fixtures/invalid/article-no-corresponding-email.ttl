@@ -1,0 +1,45 @@
+# Invalid fixture: publication whose corresponding author has no email
+#
+# Violates protocol/article.shacl.ttl — a publication must have at
+# least one scoro:corresponding-author role whose holder has a
+# foaf:mbox. ex:alice is the corresponding author but has no mailbox.
+# Everything else conforms, so the missing email is the only defect.
+
+@prefix od: <urn:opendraft:ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix pro: <http://purl.org/spar/pro/> .
+@prefix scoro: <http://purl.org/spar/scoro/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix ex: <https://example.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:invalid-publication
+    a od:Publication ;
+    dcterms:title "Publication whose corresponding author has no email" ;
+    dcterms:creator ex:alice ;
+    dcterms:identifier <https://doi.org/10.5555/example-no-corresponding-email> ;
+    od:repositoryUrl "https://github.com/opendraft/opendraft"^^xsd:anyURI ;
+    od:manuscriptPath "manuscripts/article.qmd" ;
+    od:sourceRevision "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d" ;
+    od:protocolRevision "0000000000000000000000000000000000000000" ;
+    pro:isDocumentContextFor ex:author-role , ex:affiliate-role .
+
+ex:author-role
+    a pro:RoleInTime ;
+    pro:withRole pro:author , scoro:corresponding-author ;
+    pro:isHeldBy ex:alice .
+
+ex:affiliate-role
+    a pro:RoleInTime ;
+    pro:withRole scoro:affiliate ;
+    pro:isHeldBy ex:alice ;
+    pro:relatesToOrganization ex:org .
+
+ex:alice
+    a foaf:Person ;
+    foaf:givenName "Alice" ;
+    foaf:familyName "Smith" .
+
+ex:org
+    a foaf:Organization ;
+    foaf:name "University of Indonesia" .

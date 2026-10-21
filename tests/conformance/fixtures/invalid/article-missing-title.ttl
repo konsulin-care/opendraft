@@ -1,18 +1,45 @@
 # Invalid fixture: publication without dcterms:title
 #
 # Violates protocol/article.shacl.ttl — dcterms:title is required
-# (exactly 1, xsd:string). Parses as valid Turtle but must FAIL
-# article SHACL validation.
+# (exactly 1, xsd:string). The authorship model is otherwise fully
+# conforming (one author, one affiliate role, one corresponding author
+# with a mailbox), so the missing title is the only defect.
 
 @prefix od: <urn:opendraft:ontology#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix pro: <http://purl.org/spar/pro/> .
+@prefix scoro: <http://purl.org/spar/scoro/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix ex: <https://example.org/> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-od:invalid-publication
+ex:invalid-publication
     a od:Publication ;
-    dcterms:creator <https://orcid.org/0000-0002-1825-0097> ;
+    dcterms:creator ex:alice ;
     dcterms:identifier <https://doi.org/10.5555/example-missing-title> ;
     od:repositoryUrl "https://github.com/opendraft/opendraft"^^xsd:anyURI ;
     od:manuscriptPath "manuscripts/article.qmd" ;
     od:sourceRevision "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d" ;
-    od:protocolRevision "0000000000000000000000000000000000000000" .
+    od:protocolRevision "0000000000000000000000000000000000000000" ;
+    pro:isDocumentContextFor ex:author-role , ex:affiliate-role .
+
+ex:author-role
+    a pro:RoleInTime ;
+    pro:withRole pro:author , scoro:corresponding-author ;
+    pro:isHeldBy ex:alice .
+
+ex:affiliate-role
+    a pro:RoleInTime ;
+    pro:withRole scoro:affiliate ;
+    pro:isHeldBy ex:alice ;
+    pro:relatesToOrganization ex:org .
+
+ex:alice
+    a foaf:Person ;
+    foaf:givenName "Alice" ;
+    foaf:familyName "Smith" ;
+    foaf:mbox <mailto:alice@example.edu> .
+
+ex:org
+    a foaf:Organization ;
+    foaf:name "University of Indonesia" .

@@ -1,0 +1,58 @@
+# Invalid fixture: group author without foaf:name
+#
+# Violates protocol/article.shacl.ttl — a foaf:Group author must have
+# a foaf:name. ex:consortium holds the sole author role but carries no
+# name. The rest of the authorship structure conforms (one author-chain
+# head, one corresponding author with a mailbox, person affiliations),
+# so the missing group name is the only defect.
+
+@prefix od: <urn:opendraft:ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix pro: <http://purl.org/spar/pro/> .
+@prefix scoro: <http://purl.org/spar/scoro/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix ex: <https://example.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:invalid-publication
+    a od:Publication ;
+    dcterms:title "Publication whose group author has no name" ;
+    dcterms:creator ex:consortium ;
+    dcterms:identifier <https://doi.org/10.5555/example-group-without-name> ;
+    od:repositoryUrl "https://github.com/opendraft/opendraft"^^xsd:anyURI ;
+    od:manuscriptPath "manuscripts/article.qmd" ;
+    od:sourceRevision "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d" ;
+    od:protocolRevision "0000000000000000000000000000000000000000" ;
+    pro:isDocumentContextFor ex:group-author-role ,
+                             ex:corresponding-role ,
+                             ex:affiliate-role .
+
+ex:group-author-role
+    a pro:RoleInTime ;
+    pro:withRole pro:author ;
+    pro:isHeldBy ex:consortium .
+
+ex:corresponding-role
+    a pro:RoleInTime ;
+    pro:withRole scoro:corresponding-author ;
+    pro:isHeldBy ex:alice .
+
+ex:affiliate-role
+    a pro:RoleInTime ;
+    pro:withRole scoro:affiliate ;
+    pro:isHeldBy ex:alice ;
+    pro:relatesToOrganization ex:org .
+
+ex:consortium
+    a foaf:Group ;
+    foaf:member ex:alice .
+
+ex:alice
+    a foaf:Person ;
+    foaf:givenName "Alice" ;
+    foaf:familyName "Smith" ;
+    foaf:mbox <mailto:alice@example.edu> .
+
+ex:org
+    a foaf:Organization ;
+    foaf:name "University of Indonesia" .
