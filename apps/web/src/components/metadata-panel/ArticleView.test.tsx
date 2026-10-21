@@ -147,9 +147,9 @@ describe('ArticleView contributions and publication details', () => {
     renderView({ frontmatter: { license: 'CC BY 4.0', date: '2024-01-01' } });
     expect(screen.queryByTestId('publication-details-content')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /Publication details/ }));
-    const content = screen.getByTestId('publication-details-content');
-    expect(content.textContent).toContain('CC BY 4.0');
-    expect(content.textContent).toContain('2024-01-01');
+    expect(screen.getByTestId('publication-details-content')).toBeDefined();
+    expect((screen.getByTestId('license-input') as HTMLInputElement).value).toBe('CC BY 4.0');
+    expect((screen.getByTestId('date-input') as HTMLInputElement).value).toBe('2024-01-01');
   });
 });
 

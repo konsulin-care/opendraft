@@ -55,6 +55,8 @@ export interface UseManuscriptMetadataResult extends ManuscriptMetadata {
   setAffiliations(affiliations: MetadataAffiliation[]): void;
   /** Replace the abstract; persisted to _abstract.yml (debounced). */
   setAbstract(text: string): void;
+  /** Persist one _frontmatter.yml field; '' or undefined deletes it. */
+  setFrontmatterField(key: string, value: unknown): void;
   /** Re-read all metadata files; call after one was saved from the editor. */
   reload(): Promise<void>;
 }
@@ -154,7 +156,7 @@ function commitEdit(ctx: EditContext, file: FileKey, next: RawFile): void {
 
 /** Comment-preserving setters; unparsable bases refuse edits so broken files survive. */
 function useMetadataEdits(ctx: EditContext): Pick<
-  UseManuscriptMetadataResult, 'setTitle' | 'setAuthors' | 'setAffiliations' | 'setAbstract'
+  UseManuscriptMetadataResult, 'setTitle' | 'setAuthors' | 'setAffiliations' | 'setAbstract' | 'setFrontmatterField'
 > {
   const { rawRef } = ctx;
   const setTitle = useCallback((title: string) => {
@@ -185,7 +187,13 @@ function useMetadataEdits(ctx: EditContext): Pick<
     if (next) commitEdit(ctx, 'abstract', next);
   }, [ctx]);
 
-  return { setTitle, setAuthors, setAffiliations, setAbstract };
+  const setFrontmatterField = useCallback((key: string, value: unknown) => {
+    const next = editRaw(rawRef.current.frontmatter, (doc) => (value == null || value === ''
+      ? doc.delete(key) : doc.set(key, value)));
+    if (next) commitEdit(ctx, 'frontmatter', next);
+  }, [ctx]);
+
+  return { setTitle, setAuthors, setAffiliations, setAbstract, setFrontmatterField };
 }
 
 /** Inputs of the metadata loader sub-hook. */
@@ -261,9 +269,8 @@ export function useManuscriptMetadata(
   const { reload: reloadFiles } = useMetadataLoader({
     workspace, manuscriptRoot, rawRef, setMeta, setLoaded,
   });
-  const { setTitle, setAuthors, setAffiliations, setAbstract } = useMetadataEdits({
-    rawRef, saversRef, workspace, manuscriptRoot, setMeta, setStatus,
-  });
+  const { setTitle, setAuthors, setAffiliations, setAbstract, setFrontmatterField } =
+    useMetadataEdits({ rawRef, saversRef, workspace, manuscriptRoot, setMeta, setStatus });
 
   // Flush pending writes ahead of a path/workspace switch and on unmount.
   useEffect(() => () => {
@@ -286,6 +293,7 @@ export function useManuscriptMetadata(
     setAuthors,
     setAffiliations,
     setAbstract,
+    setFrontmatterField,
     reload,
   };
 }

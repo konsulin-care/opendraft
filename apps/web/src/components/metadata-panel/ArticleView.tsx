@@ -37,6 +37,8 @@ export interface ArticleViewProps {
   setKeywords?: (keywords: string[]) => void;
   /** Persist author edits to _author.yml; no-op when omitted. */
   setAuthors?: (authors: MetadataAuthor[]) => void;
+  /** Persist one _frontmatter.yml field; no-op when omitted. */
+  setFrontmatterField?: (key: string, value: unknown) => void;
 }
 
 /** Icon size used by the section chevrons and the ORCID marker. */
@@ -239,6 +241,7 @@ export function ArticleView({
   keywords = [],
   setKeywords = () => {},
   setAuthors = () => {},
+  setFrontmatterField = () => {},
 }: ArticleViewProps): ReactNode {
   const model = buildByline(authors, affiliations);
   const abstractRef = useRef<HTMLTextAreaElement>(null);
@@ -264,7 +267,7 @@ export function ArticleView({
           </ul>
         </section>
       )}
-      <PublicationDetails frontmatter={frontmatter} />
+      <PublicationDetails frontmatter={frontmatter} setField={setFrontmatterField} />
       {dialogIndex !== null && (
         <AuthorsDialog
           authors={authors}
