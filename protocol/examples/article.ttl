@@ -22,8 +22,28 @@
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix credit: <https://credit.niso.org/contributor-roles/> .
 @prefix prism: <http://prismstandard.org/namespaces/basic/2.0/> .
+@prefix frbr: <http://purl.org/vocab/frbr/core#> .
+@prefix cito: <http://purl.org/spar/cito/> .
+@prefix datacite: <http://purl.org/datacite/ontology/> .
+@prefix literal: <https://w3id.org/literal/> .
+@prefix frapo: <http://purl.org/spar/frapo/> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# The Work behind the manuscript: one fabio:Work per manuscript with a
+# concept DOI. Every published version realizes this Work; Work and
+# Expression never share a DOI.
+od:example-work
+    a fabio:Work ;
+    dcterms:title "Example Publication: OpenDraft Protocol" ;
+    dcterms:identifier <https://doi.org/10.5555/example-opendraft-concept> .
+
+# The previous version (v1) of this publication: an earlier
+# fabio:Expression revised by v2 below.
+od:example-publication-v1
+    a fabio:Expression ;
+    dcterms:identifier <https://doi.org/10.5555/example-opendraft-2026-v1> ;
+    prism:versionIdentifier "1" .
 
 # The publication itself. Identified by version DOI; carries full
 # provenance scalars plus the authorship document context.
@@ -39,6 +59,21 @@ od:example-publication
     od:manuscriptPath "manuscripts/distributed-scientific-publication/article.qmd" ;
     od:sourceRevision "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d" ;
     od:protocolRevision "0000000000000000000000000000000000000000" ;
+
+    # Work/version identity: v2 realizes the Work and revises v1.
+    frbr:realizationOf od:example-work ;
+    frbr:revisionOf od:example-publication-v1 ;
+    prism:versionIdentifier "2" ;
+
+    # OCDM identifier node alongside the DOI IRI.
+    datacite:hasIdentifier [
+        datacite:usesIdentifierScheme datacite:doi ;
+        literal:hasLiteralValue "10.5555/example-opendraft-2026" ;
+    ] ;
+
+    dcterms:license <http://creativecommons.org/licenses/by/4.0/> ;
+    frapo:isFundedBy od:example-grant ;
+    cito:cites <https://doi.org/10.5555/related-study-2025> ;
 
     dcterms:abstract "A canonical example publication used to demonstrate the OpenDraft protocol." ;
 
@@ -100,7 +135,11 @@ od:role-alice-rscm
     a foaf:Person ;
     foaf:givenName "Alice Marie" ;
     foaf:familyName "Smith" ;
-    foaf:mbox <mailto:alice.smith@example.edu> .
+    foaf:mbox <mailto:alice.smith@example.edu> ;
+    datacite:hasIdentifier [
+        datacite:usesIdentifierScheme datacite:orcid ;
+        literal:hasLiteralValue "0000-0002-1825-0097" ;
+    ] .
 
 # Second author: no ORCID, holds the author role on behalf of the
 # group, equal contributor, CRediT roles.
@@ -140,11 +179,24 @@ od:group-who-diabetes
 # Shared affiliation organizations, identified by ROR IRI and named.
 <https://ror.org/0116zj450>
     a foaf:Organization ;
-    foaf:name "Universitas Indonesia" .
+    foaf:name "Universitas Indonesia" ;
+    datacite:hasIdentifier [
+        datacite:usesIdentifierScheme datacite:ror ;
+        literal:hasLiteralValue "0116zj450" ;
+    ] .
 
 <https://ror.org/05dxgng32>
     a foaf:Organization ;
-    foaf:name "Research Center for Climate Science" .
+    foaf:name "Research Center for Climate Science" ;
+    datacite:hasIdentifier [
+        datacite:usesIdentifierScheme datacite:ror ;
+        literal:hasLiteralValue "05dxgng32" ;
+    ] .
+
+# FRAPO funding: the publication is funded by a grant.
+od:example-grant
+    a frapo:Grant ;
+    dcterms:title "OpenDraft Example Grant" .
 
 _:member-sari
     a foaf:Person ;

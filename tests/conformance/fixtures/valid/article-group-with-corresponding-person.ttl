@@ -4,16 +4,22 @@
 # allowed as long as at least one corresponding-author role is held by
 # a person with a foaf:mbox. The group holds the sole author role and
 # has a foaf:name; a named person acts as the corresponding author
-# with an affiliation. Edge fixture for tests/conformance only; not a
-# shipped protocol artifact.
+# with an affiliation. Realizes a distinct fabio:Work. Edge fixture
+# for tests/conformance only; not a shipped protocol artifact.
 
 @prefix od: <urn:opendraft:ontology#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix fabio: <http://purl.org/spar/fabio/> .
+@prefix frbr: <http://purl.org/vocab/frbr/core#> .
 @prefix pro: <http://purl.org/spar/pro/> .
 @prefix scoro: <http://purl.org/spar/scoro/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix ex: <https://example.org/> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:valid-group-work
+    a fabio:Work ;
+    dcterms:title "Publication authored by a group with a corresponding person" .
 
 ex:valid-publication
     a od:Publication ;
@@ -24,6 +30,7 @@ ex:valid-publication
     od:manuscriptPath "manuscripts/article.qmd" ;
     od:sourceRevision "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d" ;
     od:protocolRevision "0000000000000000000000000000000000000000" ;
+    frbr:realizationOf ex:valid-group-work ;
     pro:isDocumentContextFor ex:group-author-role ,
                              ex:corresponding-role ,
                              ex:affiliate-role .

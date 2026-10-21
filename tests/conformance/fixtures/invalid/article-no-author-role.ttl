@@ -7,6 +7,8 @@
 
 @prefix od: <urn:opendraft:ontology#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix fabio: <http://purl.org/spar/fabio/> .
+@prefix frbr: <http://purl.org/vocab/frbr/core#> .
 @prefix pro: <http://purl.org/spar/pro/> .
 @prefix scoro: <http://purl.org/spar/scoro/> .
 @prefix credit: <https://credit.niso.org/contributor-roles/> .
@@ -23,6 +25,7 @@ ex:invalid-publication
     od:manuscriptPath "manuscripts/article.qmd" ;
     od:sourceRevision "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d" ;
     od:protocolRevision "0000000000000000000000000000000000000000" ;
+    frbr:realizationOf ex:invalid-work ;
     pro:isDocumentContextFor ex:credit-role , ex:affiliate-role .
 
 ex:credit-role
@@ -45,3 +48,7 @@ ex:alice
 ex:org
     a foaf:Organization ;
     foaf:name "University of Indonesia" .
+
+ex:invalid-work
+    a fabio:Work ;
+    dcterms:title "Invalid fixture work" .

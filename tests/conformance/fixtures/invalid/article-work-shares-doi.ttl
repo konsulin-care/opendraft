@@ -1,0 +1,52 @@
+# Invalid fixture: Work IRI shares the publication IRI (shared DOI)
+#
+# Violates protocol/article.shacl.ttl — the Work IRI must differ from
+# the Publication IRI (concept DOI vs version DOI, Zenodo pattern).
+# Here the publication realizes itself: ex:shared-doi-publication is
+# typed both od:Publication and fabio:Work, so the publication IRI
+# doubles as its own Work IRI. Everything else conforms, so the shared
+# identity is the only defect.
+
+@prefix od: <urn:opendraft:ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix fabio: <http://purl.org/spar/fabio/> .
+@prefix frbr: <http://purl.org/vocab/frbr/core#> .
+@prefix pro: <http://purl.org/spar/pro/> .
+@prefix scoro: <http://purl.org/spar/scoro/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix ex: <https://example.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:shared-doi-publication
+    a od:Publication , fabio:Work ;
+    dcterms:title "Publication whose Work IRI equals its own IRI" ;
+    dcterms:creator ex:alice ;
+    dcterms:identifier <https://doi.org/10.5555/example-shared-doi> ;
+    dcterms:license <http://creativecommons.org/licenses/by/4.0/> ;
+    od:repositoryUrl "https://github.com/opendraft/opendraft"^^xsd:anyURI ;
+    od:manuscriptPath "manuscripts/article.qmd" ;
+    od:sourceRevision "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d" ;
+    od:protocolRevision "0000000000000000000000000000000000000000" ;
+    frbr:realizationOf ex:shared-doi-publication ;
+    pro:isDocumentContextFor ex:author-role , ex:affiliate-role .
+
+ex:author-role
+    a pro:RoleInTime ;
+    pro:withRole pro:author , scoro:corresponding-author ;
+    pro:isHeldBy ex:alice .
+
+ex:affiliate-role
+    a pro:RoleInTime ;
+    pro:withRole scoro:affiliate ;
+    pro:isHeldBy ex:alice ;
+    pro:relatesToOrganization ex:org .
+
+ex:alice
+    a foaf:Person ;
+    foaf:givenName "Alice" ;
+    foaf:familyName "Smith" ;
+    foaf:mbox <mailto:alice@example.edu> .
+
+ex:org
+    a foaf:Organization ;
+    foaf:name "University of Indonesia" .
