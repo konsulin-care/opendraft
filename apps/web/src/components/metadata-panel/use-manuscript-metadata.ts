@@ -22,6 +22,12 @@ export interface MetadataAuthor {
   [key: string]: unknown;
 }
 
+/** Top-level affiliation registry entry of _author.yml. */
+export interface MetadataAffiliation {
+  id?: string; name?: string; // registry id and organization name
+  [key: string]: unknown; // unknown keys pass through untouched
+}
+
 /** Read-only snapshot of the three metadata files of one manuscript. */
 export interface ManuscriptMetadata {
   /** Title from _frontmatter.yml; '' when missing or unparsable. */
@@ -32,6 +38,8 @@ export interface ManuscriptMetadata {
   abstract?: string;
   /** Parsed frontmatter map (unknown keys included, comments dropped). */
   frontmatter: Record<string, unknown>;
+  /** Top-level affiliation registry from _author.yml; [] when missing. */
+  affiliations: MetadataAffiliation[];
 }
 /** Handle returned by {@link useManuscriptMetadata}. */
 export interface UseManuscriptMetadataResult extends ManuscriptMetadata {
@@ -43,6 +51,8 @@ export interface UseManuscriptMetadataResult extends ManuscriptMetadata {
   setTitle(title: string): void;
   /** Replace the author list; persisted to _author.yml (debounced). */
   setAuthors(authors: MetadataAuthor[]): void;
+  /** Replace the affiliation registry; persisted to _author.yml (debounced). */
+  setAffiliations(affiliations: MetadataAffiliation[]): void;
   /** Replace the abstract; persisted to _abstract.yml (debounced). */
   setAbstract(text: string): void;
   /** Re-read all metadata files; call after one was saved from the editor. */
@@ -51,15 +61,15 @@ export interface UseManuscriptMetadataResult extends ManuscriptMetadata {
 
 /** Raw file state kept as the edit base; false when unparsable. */
 interface RawFile {
-  /** Original (or last-edited) file text. */
-  text: string;
+  text: string; // original (or last-edited) file text
   ok: boolean;
-  /** Parsed map, empty when missing or unparsable. */
-  data: Record<string, unknown>;
+  data: Record<string, unknown>; // parsed map, empty when missing or unparsable
 }
 
 /** Empty metadata state used before load and for unusable files. */
-const EMPTY: ManuscriptMetadata = { title: '', authors: [], frontmatter: {} };
+const EMPTY: ManuscriptMetadata = {
+  title: '', authors: [], affiliations: [], frontmatter: {},
+};
 
 /** Empty raw state for a null workspace or manuscript root. */
 function emptyRaw(): Record<FileKey, RawFile> {
@@ -74,15 +84,7 @@ function toRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
-/**
- * Read and parse one metadata file. Missing files and files the yaml
- * parser rejects both yield an empty state instead of throwing; the raw
- * text of a broken file is kept so edits never clobber it.
- *
- * @param workspace - Workspace adapter for file I/O.
- * @param path - Repo-relative path of the file.
- * @returns The raw file state.
- */
+/** Read one metadata file; missing or rejected files yield an empty state. */
 async function loadRawFile(workspace: WorkspaceAdapter, path: string): Promise<RawFile> {
   const text = await workspace.readFile(path);
   if (text === null) return { text: '', ok: true, data: {} };
@@ -100,22 +102,17 @@ function metadataFrom(
   const title = frontmatter.data['title'];
   const authors = author.data['authors'];
   const abstractText = abstract.data['abstract'];
+  const affiliations = author.data['affiliations'];
   return {
     title: typeof title === 'string' ? title : title == null ? '' : String(title),
     authors: Array.isArray(authors) ? authors as MetadataAuthor[] : [],
     abstract: typeof abstractText === 'string' ? abstractText : undefined,
     frontmatter: frontmatter.data,
+    affiliations: Array.isArray(affiliations) ? affiliations as MetadataAffiliation[] : [],
   };
 }
 
-/**
- * Apply a mutation through the yaml Document API so comments and unknown
- * keys survive the round trip.
- *
- * @param base - Raw file state to edit.
- * @param mutate - Mutation applied to the parsed document.
- * @returns The edited raw state, or null when the base is unparsable.
- */
+/** Round-trip a mutation through the yaml Document API; null when unparsable. */
 function editRaw(base: RawFile, mutate: (doc: Document.Parsed) => void): RawFile | null {
   if (!base.ok) return null;
   const doc = parseDocument(base.text);
@@ -155,16 +152,9 @@ function commitEdit(ctx: EditContext, file: FileKey, next: RawFile): void {
   saver.schedule(next.text);
 }
 
-/**
- * Create the comment-preserving edit operations. Each setter round-trips
- * the file through the yaml Document API and schedules a debounced write;
- * unparsable bases are refused so broken files are never clobbered.
- *
- * @param ctx - Shared edit wiring; see {@link EditContext}.
- * @returns The setter callbacks.
- */
+/** Comment-preserving setters; unparsable bases refuse edits so broken files survive. */
 function useMetadataEdits(ctx: EditContext): Pick<
-  UseManuscriptMetadataResult, 'setTitle' | 'setAuthors' | 'setAbstract'
+  UseManuscriptMetadataResult, 'setTitle' | 'setAuthors' | 'setAffiliations' | 'setAbstract'
 > {
   const { rawRef } = ctx;
   const setTitle = useCallback((title: string) => {
@@ -182,6 +172,12 @@ function useMetadataEdits(ctx: EditContext): Pick<
     if (next) commitEdit(ctx, 'author', next);
   }, [ctx]);
 
+  const setAffiliations = useCallback((affiliations: MetadataAffiliation[]) => {
+    const next = editRaw(rawRef.current.author, (doc) => (affiliations.length > 0
+      ? doc.set('affiliations', affiliations) : doc.delete('affiliations')));
+    if (next) commitEdit(ctx, 'author', next);
+  }, [ctx]);
+
   const setAbstract = useCallback((text: string) => {
     const next = editRaw(rawRef.current.abstract, (doc) => {
       doc.set('abstract', text);
@@ -189,7 +185,7 @@ function useMetadataEdits(ctx: EditContext): Pick<
     if (next) commitEdit(ctx, 'abstract', next);
   }, [ctx]);
 
-  return { setTitle, setAuthors, setAbstract };
+  return { setTitle, setAuthors, setAffiliations, setAbstract };
 }
 
 /** Inputs of the metadata loader sub-hook. */
@@ -265,13 +261,11 @@ export function useManuscriptMetadata(
   const { reload: reloadFiles } = useMetadataLoader({
     workspace, manuscriptRoot, rawRef, setMeta, setLoaded,
   });
-  const { setTitle, setAuthors, setAbstract } = useMetadataEdits({
+  const { setTitle, setAuthors, setAffiliations, setAbstract } = useMetadataEdits({
     rawRef, saversRef, workspace, manuscriptRoot, setMeta, setStatus,
   });
 
-  // Flush pending writes ahead of a root/workspace switch and on unmount,
-  // so an edit always lands on the file it was made in. Savers are bound to
-  // the workspace they were created with, so drop them after flushing.
+  // Flush pending writes ahead of a path/workspace switch and on unmount.
   useEffect(() => () => {
     for (const saver of saversRef.current.values()) saver.flush();
     saversRef.current.clear();
@@ -290,6 +284,7 @@ export function useManuscriptMetadata(
     status,
     setTitle,
     setAuthors,
+    setAffiliations,
     setAbstract,
     reload,
   };
