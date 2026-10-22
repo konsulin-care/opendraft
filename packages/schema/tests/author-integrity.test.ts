@@ -132,3 +132,33 @@ describe('checkAuthorIntegrity — on-behalf-of', () => {
     expect(checkAuthorIntegrity(validFile)).toEqual([]);
   });
 });
+
+describe('checkAuthorIntegrity — on-behalf-of and explicit author type', () => {
+  it('rejects on-behalf-of pointing to a literal-named author with metadata.author-type person', () => {
+    const data = {
+      authors: [
+        { name: { literal: 'Plato' }, id: 'plato', metadata: { 'author-type': 'person' } },
+        { name: { family: 'Lee' }, id: 'lee', 'on-behalf-of': 'plato' },
+      ],
+    };
+    const errors = checkAuthorIntegrity(data);
+    expect(errors).toHaveLength(1);
+    expect(errors[0].path).toBe('authors.1.on-behalf-of');
+    expect(errors[0].message).toContain('person');
+  });
+
+  it('accepts on-behalf-of targeting an explicit group author without a literal name', () => {
+    const data = {
+      affiliations: [{ id: 'ui', name: 'University of Indonesia' }],
+      authors: [
+        {
+          name: { given: 'WHO', family: 'Diabetes Work Group' },
+          id: 'who',
+          metadata: { 'author-type': 'group' },
+        },
+        { name: { family: 'Lee' }, id: 'lee', 'on-behalf-of': 'who', affiliations: [{ ref: 'ui' }] },
+      ],
+    };
+    expect(checkAuthorIntegrity(data)).toEqual([]);
+  });
+});

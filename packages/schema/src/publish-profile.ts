@@ -1,4 +1,5 @@
 import { checkAuthorIntegrity } from './author-integrity.js';
+import { isGroupAuthor } from './author-type.js';
 import { resolvePublishIdentity } from './publish-identity.js';
 
 /** Severity of a publish profile issue. */
@@ -58,10 +59,9 @@ function pushIssue(target: PublishIssue[], candidate: PublishIssue | null): void
   if (candidate) target.push(candidate);
 }
 
-/** True when the author name is not a literal (group/consortium) name. */
+/** True when the author is a person: not a group by explicit type or legacy name. */
 function isPerson(author: unknown): boolean {
-  if (!isRecord(author)) return false;
-  return !(isRecord(author.name) && typeof author.name.literal === 'string');
+  return !isGroupAuthor(author);
 }
 
 /**

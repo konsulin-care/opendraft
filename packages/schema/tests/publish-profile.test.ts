@@ -206,6 +206,30 @@ describe('checkPublishReadiness — publish: authors', () => {
   });
 });
 
+describe('checkPublishReadiness — publish: explicit author type', () => {
+  it("treats a literal-only author with author-type person as a person for the affiliation rule", () => {
+    const authors = [
+      ...authorDoc.authors,
+      { id: 'plato', name: { literal: 'Plato' }, metadata: { 'author-type': 'person' } },
+    ];
+    const issues = checkPublishReadiness(base({ author: { ...authorDoc, authors } }));
+    expect(issues).toContainEqual({
+      level: 'publish',
+      path: 'authors.3.affiliations',
+      message: 'person author has no affiliation',
+    });
+  });
+
+  it('keeps legacy literal-only authors without metadata exempt as groups', () => {
+    const authors = [
+      ...authorDoc.authors,
+      { id: 'consortium', name: { literal: 'The Consortium' } },
+    ];
+    const issues = checkPublishReadiness(base({ author: { ...authorDoc, authors } }));
+    expect(issues.filter((i) => i.message === 'person author has no affiliation')).toEqual([]);
+  });
+});
+
 describe('checkPublishReadiness — publish: repository, warnings', () => {
   it("reports a repository mismatch as level 'publish' at path 'repository'", () => {
     const issues = checkPublishReadiness(

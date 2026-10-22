@@ -1,4 +1,5 @@
 import type { ValidationError } from './types.js';
+import { isGroupAuthor } from './author-type.js';
 
 /** Shared lookup state for one integrity pass. */
 interface IntegrityContext {
@@ -23,11 +24,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  */
 function refOf(item: unknown): string | null {
   return isRecord(item) && typeof item.ref === 'string' ? item.ref : null;
-}
-
-/** True when the author name is a literal (group/consortium) name. */
-function isLiteralName(name: unknown): boolean {
-  return isRecord(name) && typeof name.literal === 'string';
 }
 
 /**
@@ -147,7 +143,7 @@ function checkBehalfOf(
     });
     return;
   }
-  if (!isLiteralName(target.name)) {
+  if (!isGroupAuthor(target)) {
     errors.push({
       path: `authors.${index}.on-behalf-of`,
       message: `on-behalf-of '${behalf}' points to a person author; target must be a group author`,
@@ -173,7 +169,8 @@ function checkAuthor(
  * Verifies that every affiliation ref (author and member) resolves to the
  * top-level affiliations registry, that author ids and registry ids are
  * unique, and that each `on-behalf-of` targets an existing group author
- * (a name with a literal/consortium form).
+ * (a name with a literal/consortium form is a group; explicit
+ * `metadata.author-type` wins).
  *
  * @param data - Parsed _author.yml content.
  * @returns One ValidationError with a dotted path per defect; empty when valid.
