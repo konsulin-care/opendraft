@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 /**
  * Validation badge tests: publish-profile driven counts, the expand-on-
- * click issue list, the issue-selection focus flow (authors dialog with
- * the affiliation picker focused) and the hidden empty state.
+ * click issue list, the issue-selection focus flow (single-form
+ * authors dialog with the affiliation picker focused) and the hidden
+ * empty state.
  */
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -107,7 +108,7 @@ it('clicking the badge expands the panel and lists the issues', async () => {
   expect(messages).toContain('missing license');
 });
 
-it('selecting the affiliation issue opens the authors dialog with the picker focused', async () => {
+it('selecting the affiliation issue opens the matching author form with the picker focused', async () => {
   await renderPanel(ISSUE_FILES);
   fireEvent.click(screen.getByTestId('validation-badge'));
   const issue = screen.getAllByTestId('validation-issue')
@@ -115,7 +116,9 @@ it('selecting the affiliation issue opens the authors dialog with the picker foc
   expect(issue).toBeDefined();
   if (issue) fireEvent.click(issue);
   expect(screen.getByTestId('authors-dialog')).toBeDefined();
-  expect(screen.getByTestId('author-select-0').getAttribute('aria-expanded')).toBe('true');
+  expect(screen.getByText('Author 1 of 1')).toBeDefined();
+  expect(screen.getByTestId('author-card-0')).toBeDefined();
+  expect(screen.queryByTestId('author-select-0')).toBeNull();
   await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('affiliation-search')));
 });
 

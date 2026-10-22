@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
 /**
  * Authors dialog tests: opening focused on the clicked byline author,
- * ordered cards, reorder via the up/down buttons and drag, remove with
- * Undo, and a draft author persisted only once it has a name.
+ * the single form with its `Author N of M` position indicator (no card
+ * list), reorder via the position select, remove with Undo, retained
+ * form content (type toggle, fields, degrees, status, on-behalf-of,
+ * CRediT, GroupMembers, affiliation section) and a draft author
+ * persisted only once it has a name.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
@@ -13,6 +16,7 @@ import { useManuscriptMetadata } from './use-manuscript-metadata';
 
 const ROOT = 'manuscripts/x';
 const FRONTMATTER = 'title: "Deep Dive"\n';
+// Two person authors and one group author: 'Author 2 of 3' opens lee.
 const AUTHOR_YML = `# author registry
 affiliations:
   - id: ui
@@ -34,6 +38,9 @@ authors:
       family: Lee
     affiliations:
       - ref: rscm
+  - id: dwg
+    name:
+      literal: OpenDraft Team
 `;
 
 /** The article view wired to the manuscript metadata hook. */
@@ -43,15 +50,17 @@ function TestPanel({ ws }: { ws: WorkspaceAdapter }) {
     <ArticleView
       title={meta.title}
       authors={meta.authors}
+      affiliations={meta.affiliations}
       setTitle={meta.setTitle}
       setAuthors={meta.setAuthors}
+      setAffiliations={meta.setAffiliations}
       setAbstract={meta.setAbstract}
       abstract={meta.abstract ?? ''}
     />
   );
 }
 
-/** Seed a memory workspace with the two-author fixture and render it. */
+/** Seed a memory workspace with the three-author fixture and render it. */
 async function boot(): Promise<WorkspaceAdapter> {
   const ws = new MemoryWorkspace();
   await ws.writeFile(`${ROOT}/_frontmatter.yml`, FRONTMATTER);
@@ -75,59 +84,23 @@ async function flushWrites(): Promise<void> {
 /** Original `window.matchMedia` descriptor restored after each test. */
 const originalMatchMedia = Object.getOwnPropertyDescriptor(window, 'matchMedia');
 
-/** Simulated viewport width used by the stub. */
+/** Simulated viewport width used by the width-aware stub. */
 let viewportWidth = 1280;
-
-/** Live stub query lists, re-evaluated when the viewport changes. */
-interface StubMql {
-  media: string;
-  matches: boolean;
-  listeners: Set<(event: MediaQueryListEvent) => void>;
-}
-
-const stubMqls: StubMql[] = [];
-
-/**
- * Evaluate the shared breakpoint queries against a viewport width.
- *
- * @param media - Media query string.
- * @param width - Viewport width in pixels.
- * @returns Whether the query matches at that width.
- */
-function queryMatches(media: string, width: number): boolean {
-  const max = /\(max-width: (\d+)px\)/.exec(media);
-  if (max) return width <= Number(max[1]);
-  const min = /\(min-width: (\d+)px\)/.exec(media);
-  return min ? width >= Number(min[1]) : false;
-}
 
 /** Install a width-aware `window.matchMedia` stub at the given width. */
 function stubMatchMedia(width: number): void {
   viewportWidth = width;
-  stubMqls.length = 0;
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
     writable: true,
     value: (media: string): MediaQueryList => {
-      const entry: StubMql = {
-        media,
-        matches: queryMatches(media, viewportWidth),
-        listeners: new Set(),
-      };
-      stubMqls.push(entry);
+      const max = /\(max-width: (\d+)px\)/.exec(media);
+      const min = /\(min-width: (\d+)px\)/.exec(media);
+      const matches = max ? viewportWidth <= Number(max[1]) : min ? viewportWidth >= Number(min[1]) : false;
       return {
-        media,
-        get matches(): boolean { return entry.matches; },
-        onchange: null,
-        addEventListener: (_type: string, listener: (event: MediaQueryListEvent) => void): void => {
-          entry.listeners.add(listener);
-        },
-        removeEventListener: (_type: string, listener: (event: MediaQueryListEvent) => void): void => {
-          entry.listeners.delete(listener);
-        },
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
+        media, matches, onchange: null,
+        addEventListener: () => {}, removeEventListener: () => {},
+        addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false,
       } as unknown as MediaQueryList;
     },
   });
@@ -139,36 +112,92 @@ afterEach(() => {
   if (originalMatchMedia) Object.defineProperty(window, 'matchMedia', originalMatchMedia);
 });
 
-describe('AuthorsDialog opening', () => {
-  it("clicking 'Budi Lee' in the byline opens the dialog with Budi's card expanded", async () => {
+describe('AuthorsDialog single form', () => {
+  it("opening author 2 of 3 shows one form with 'Author 2 of 3' and no card list", async () => {
     await boot();
     fireEvent.click(screen.getByTestId('byline-author-1'));
     expect(screen.getByTestId('authors-dialog')).toBeDefined();
+    expect(screen.getByText('Author 2 of 3')).toBeDefined();
+    const position = screen.getByTestId('author-position') as HTMLSelectElement;
+    expect(position.value).toBe('2');
     expect(screen.getByTestId('author-card-1').textContent).toContain('Budi Lee');
+    expect((screen.getByTestId('author-given') as HTMLInputElement).value).toBe('Budi');
     expect(screen.queryByTestId('author-card-0')).toBeNull();
-    expect(screen.getByTestId('author-select-0').textContent).toContain('Alice Marie Smith');
+    expect(screen.queryByTestId('author-card-2')).toBeNull();
+    for (const testid of [
+      'author-slot-0', 'author-slot-1', 'author-slot-2',
+      'author-select-0', 'author-select-1', 'author-select-2',
+      'author-move-up-1', 'author-move-down-1',
+    ]) expect(screen.queryByTestId(testid)).toBeNull();
+  });
+
+  it("choosing position 1 moves the author to the front of _author.yml", async () => {
+    const ws = await boot();
+    fireEvent.click(screen.getByTestId('byline-author-1'));
+    fireEvent.change(screen.getByTestId('author-position'), { target: { value: '1' } });
+    expect(screen.getByText('Author 1 of 3')).toBeDefined();
+    await flushWrites();
+    const authors = await readAuthors(ws);
+    expect(authors.map((author) => author['id'])).toEqual(['lee', 'smith', 'dwg']);
+  });
+
+  it('choosing the last position moves the author to the end', async () => {
+    const ws = await boot();
+    fireEvent.click(screen.getByTestId('byline-author-1'));
+    fireEvent.change(screen.getByTestId('author-position'), { target: { value: '3' } });
+    await flushWrites();
+    const authors = await readAuthors(ws);
+    expect(authors.map((author) => author['id'])).toEqual(['smith', 'dwg', 'lee']);
   });
 });
 
-describe('AuthorsDialog reorder', () => {
-  it("'Move up' on card 2 swaps the order in the written YAML", async () => {
+describe('AuthorsDialog form content', () => {
+  it('person form keeps degrees, status, on-behalf-of, CRediT, email and the affiliation section', async () => {
     const ws = await boot();
     fireEvent.click(screen.getByTestId('byline-author-1'));
-    fireEvent.click(screen.getByTestId('author-move-up-1'));
+    expect(screen.getByTestId('author-affiliation-section')).toBeDefined();
+    expect(screen.getByTestId('author-type-person').getAttribute('aria-pressed')).toBe('true');
+    const degree = screen.getByTestId('author-degree-field');
+    fireEvent.change(degree, { target: { value: 'MD' } });
+    fireEvent.keyDown(degree, { key: 'Enter' });
+    expect(screen.getByTestId('author-degree-chip').textContent).toContain('MD');
+    fireEvent.click(screen.getByTestId('author-corresponding'));
+    fireEvent.change(screen.getByTestId('author-on-behalf-of'), { target: { value: 'dwg' } });
+    fireEvent.click(screen.getByTestId('credit-conceptualization'));
+    fireEvent.change(screen.getByTestId('author-email'), { target: { value: 'budi@example.edu' } });
     await flushWrites();
     const authors = await readAuthors(ws);
-    expect(authors.map((author) => author['id'])).toEqual(['lee', 'smith']);
+    expect(authors[1]).toMatchObject({
+      degrees: ['MD'],
+      corresponding: true,
+      'on-behalf-of': 'dwg',
+      roles: ['conceptualization'],
+      email: 'budi@example.edu',
+    });
   });
 
-  it('dragging card 2 onto card 1 reorders the written YAML', async () => {
+  it('Person/Group toggle switches the form to GroupMembers and back', async () => {
     const ws = await boot();
     fireEvent.click(screen.getByTestId('byline-author-1'));
-    fireEvent.dragStart(screen.getByTestId('author-slot-1'));
-    fireEvent.dragOver(screen.getByTestId('author-slot-0'));
-    fireEvent.drop(screen.getByTestId('author-slot-0'));
+    fireEvent.click(screen.getByTestId('author-type-group'));
+    expect((screen.getByTestId('author-group-name') as HTMLInputElement).value).toBe('Budi Lee');
+    expect(screen.getByTestId('group-members')).toBeDefined();
+    expect(screen.queryByTestId('author-affiliation-section')).toBeNull();
+    fireEvent.click(screen.getByTestId('author-type-person'));
+    expect(screen.queryByTestId('group-members')).toBeNull();
+    expect((screen.getByTestId('author-family') as HTMLInputElement).value).toBe('Budi Lee');
     await flushWrites();
     const authors = await readAuthors(ws);
-    expect(authors.map((author) => author['id'])).toEqual(['lee', 'smith']);
+    expect(authors[1]['name']).toEqual({ family: 'Budi Lee' });
+  });
+
+  it('group author form shows the group name and GroupMembers without an affiliation section', async () => {
+    await boot();
+    fireEvent.click(screen.getByTestId('byline-author-2'));
+    expect(screen.getByText('Author 3 of 3')).toBeDefined();
+    expect((screen.getByTestId('author-group-name') as HTMLInputElement).value).toBe('OpenDraft Team');
+    expect(screen.getByTestId('group-members')).toBeDefined();
+    expect(screen.queryByTestId('author-affiliation-section')).toBeNull();
   });
 });
 
@@ -177,12 +206,13 @@ describe('AuthorsDialog remove and undo', () => {
     const ws = await boot();
     fireEvent.click(screen.getByTestId('byline-author-1'));
     fireEvent.click(screen.getByTestId('author-remove-1'));
-    expect(screen.queryByTestId('byline-author-1')).toBeNull();
+    expect(screen.getByTestId('article-byline').textContent).not.toContain('Budi Lee');
+    expect(screen.getByText('Author 2 of 2')).toBeDefined();
     fireEvent.click(screen.getByTestId('author-undo'));
-    expect(screen.getByTestId('byline-author-1').textContent).toContain('Budi Lee');
+    expect(screen.getByTestId('article-byline').textContent).toContain('Budi Lee');
     await flushWrites();
     const authors = await readAuthors(ws);
-    expect(authors).toHaveLength(2);
+    expect(authors).toHaveLength(3);
     expect(authors[1]['id']).toBe('lee');
   });
 });
@@ -194,12 +224,12 @@ describe('AuthorsDialog draft author', () => {
     expect(document.activeElement).toBe(screen.getByTestId('author-orcid'));
     fireEvent.change(screen.getByTestId('author-given'), { target: { value: 'Dewi' } });
     await flushWrites();
-    expect(await readAuthors(ws)).toHaveLength(2);
+    expect(await readAuthors(ws)).toHaveLength(3);
     fireEvent.change(screen.getByTestId('author-family'), { target: { value: 'Sari' } });
     await flushWrites();
     const authors = await readAuthors(ws);
-    expect(authors).toHaveLength(3);
-    expect(authors[2]).toMatchObject({ name: { given: 'Dewi', family: 'Sari' } });
+    expect(authors).toHaveLength(4);
+    expect(authors[3]).toMatchObject({ name: { given: 'Dewi', family: 'Sari' } });
   });
 
   it("'only one name' hides Given name and stores {family:'Dewi'}", async () => {
@@ -210,47 +240,34 @@ describe('AuthorsDialog draft author', () => {
     fireEvent.change(screen.getByTestId('author-family'), { target: { value: 'Dewi' } });
     await flushWrites();
     const authors = await readAuthors(ws);
-    expect(authors[2]['name']).toEqual({ family: 'Dewi' });
+    expect(authors[3]['name']).toEqual({ family: 'Dewi' });
   });
 });
 
 describe('AuthorsDialog below 640px', () => {
-  it('expanding renders a full-screen role=dialog sheet at 375px', async () => {
+  it('renders a full-screen role=dialog sheet with the single form at 375px', async () => {
     stubMatchMedia(375);
     await boot();
     fireEvent.click(screen.getByTestId('byline-author-1'));
     const dialog = screen.getByTestId('authors-dialog');
     expect(dialog.getAttribute('role')).toBe('dialog');
     expect(dialog.className).toContain('fixed inset-0');
-  });
-
-  it('tapping an author card pushes the sub-view; Back returns to the list', async () => {
-    stubMatchMedia(375);
-    await boot();
-    fireEvent.click(screen.getByTestId('byline-author-1'));
-    expect(screen.getByTestId('authors-back').textContent).toBe('Back');
-    expect(screen.getByTestId('author-card-1').textContent).toContain('Budi Lee');
-    expect(screen.queryByTestId('author-select-0')).toBeNull();
-    fireEvent.click(screen.getByTestId('authors-back'));
+    expect(screen.getByText('Author 2 of 3')).toBeDefined();
     expect(screen.queryByTestId('authors-back')).toBeNull();
-    expect(screen.getByTestId('author-select-0').textContent).toContain('Alice Marie Smith');
-    fireEvent.click(screen.getByTestId('author-select-1'));
-    expect(screen.getByTestId('authors-back')).toBeDefined();
-    expect(screen.getByTestId('author-card-1').textContent).toContain('Budi Lee');
     expect(screen.queryByTestId('author-select-0')).toBeNull();
   });
 });
 
 describe('AuthorsDialog at 640px and above', () => {
-  it('renders a centered dialog with the inline card list at 800px', async () => {
+  it('renders a centered dialog with the single form at 800px', async () => {
     stubMatchMedia(800);
     await boot();
     fireEvent.click(screen.getByTestId('byline-author-1'));
     const dialog = screen.getByTestId('authors-dialog');
     expect(dialog.className).not.toContain('fixed inset-0');
     expect(dialog.parentElement?.className).toContain('justify-center');
-    expect(screen.queryByTestId('authors-back')).toBeNull();
     expect(screen.getByTestId('author-card-1')).toBeDefined();
-    expect(screen.getByTestId('author-select-0')).toBeDefined();
+    expect(screen.queryByTestId('author-card-0')).toBeNull();
+    expect(screen.queryByTestId('author-select-0')).toBeNull();
   });
 });

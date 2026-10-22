@@ -1,13 +1,15 @@
 /**
- * Authors dialog of the manuscript metadata panel: vertical cards in
- * authorship order with the selected card expanded inline while the
- * others stay compact. Authors reorder via the up/down buttons or
- * drag, remove with an Undo toast, and a draft author is written to
- * _author.yml only once it has a family name (person) or literal name
- * (group). Escape closes; below 640px it is a full-screen sub-view.
+ * Authors dialog of the manuscript metadata panel: a single author
+ * form at a time (or the draft form for Add author) headed by an
+ * `Author N of M` position indicator whose select reorders the author.
+ * The vertical card list, author-select rows and move up/down buttons
+ * are gone; remove with an Undo toast stays, and a draft author is
+ * written to _author.yml only once it has a family name (person) or
+ * literal name (group). Escape closes; below 640px it is a full-screen
+ * sheet.
  */
-import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
-import { GripVertical, Plus, X } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Plus, X } from 'lucide-react';
 import type { MetadataAuthor } from './use-manuscript-metadata';
 import { AuthorCard, type GroupOption } from './AuthorCard';
 import { AffiliationPicker } from './AffiliationPicker';
@@ -20,13 +22,13 @@ export interface AuthorsDialogProps {
   authors: MetadataAuthor[];
   /** Persist the new author list to _author.yml. */
   setAuthors: (authors: MetadataAuthor[]) => void;
-  /** Author index to open expanded; defaults to the first author. */
+  /** Author index to open the form for; defaults to the first author. */
   initialIndex?: number;
   /** Affiliation registry of _author.yml feeding the picker. */
   affiliations?: AffiliationEntry[];
   /** Persist registry/author changes from the affiliation picker. */
   setAffiliations?: (affiliations: AffiliationEntry[]) => void;
-  /** Start with a new draft author card expanded. */
+  /** Start with a new draft author form open. */
   startWithDraft?: boolean;
   /** Close the dialog. */
   onClose: () => void;
@@ -38,16 +40,15 @@ const UNDO_MS = 8000;
 /** A person draft with no name fields filled in yet. */
 const EMPTY_DRAFT: MetadataAuthor = { name: { given: '', family: '' } };
 
-/** Expanded-card selection: an author index, the draft, or nothing. */
+/** Form selection: an author index, the draft, or nothing after a removal. */
 type Selection = number | 'draft' | null;
 
 /** Removed author held by the undo toast. */
 interface RemovedAuthor { author: MetadataAuthor; index: number; }
 
-/** Reorder/remove/undo operations shared by the card list. */
+/** Reorder/remove/undo operations of the dialog. */
 interface AuthorOps {
   removed: RemovedAuthor | null;
-  dragFrom: { current: number | null };
   move(from: number, to: number): void;
   removeAt(index: number): void;
   undo(): void;
@@ -82,7 +83,7 @@ function moved(authors: MetadataAuthor[], from: number, to: number): MetadataAut
   const next = [...authors]; const [item] = next.splice(from, 1); next.splice(to, 0, item); return next;
 }
 
-// Group options for the "On behalf of" dropdown of every card.
+// Group options for the "On behalf of" dropdown of every form.
 function groupsOf(authors: MetadataAuthor[]): GroupOption[] {
   return authors.filter((a) => 'literal' in nameRecord(a)).map((a) => ({ id: String(a.id ?? ''), name: displayName(a) }));
 }
@@ -105,7 +106,6 @@ function useAuthorOps(
   setSelected: (selection: Selection) => void,
 ): AuthorOps {
   const [removed, setRemoved] = useState<RemovedAuthor | null>(null);
-  const dragFrom = useRef<number | null>(null);
   useEffect(() => {
     if (!removed) return;
     const timer = setTimeout(() => setRemoved(null), UNDO_MS);
@@ -129,10 +129,10 @@ function useAuthorOps(
     setSelected(removed.index);
     setRemoved(null);
   };
-  return { removed, dragFrom, move, removeAt, undo };
+  return { removed, move, removeAt, undo };
 }
 
-// Affiliation picker under the expanded person card: registry edits go to
+// Affiliation picker under the open person form: registry edits go to
 // _author.yml's affiliation registry, author edits to the author list.
 function AffiliationSection({ authors, index, affiliations, setAuthors, setAffiliations }: {
   authors: MetadataAuthor[]; index: number; affiliations: AffiliationEntry[];
@@ -150,64 +150,50 @@ function AffiliationSection({ authors, index, affiliations, setAuthors, setAffil
   );
 }
 
-/** One author slot: the compact row and, when selected, the expanded card. */
-function CardSlot(props: {
-  author: MetadataAuthor; index: number; total: number; expanded: boolean; groups: GroupOption[];
-  section?: ReactNode;
-  onExpand(): void; onChange(next: MetadataAuthor): void; onMoveUp(): void; onMoveDown(): void;
-  onRemove(): void; onDragStart(): void; onDragOver(event: DragEvent): void; onDrop(): void;
+/** Form header: `Author N of M` indicator, position select and remove. */
+function PositionHeader({ index, total, onMove, onRemove }: {
+  index: number; total: number; onMove(to: number): void; onRemove(): void;
 }): ReactNode {
-  const { author, index, total, expanded, groups } = props;
-  const name = displayName(author) || 'New author';
-  const nav = 'min-h-11 rounded px-2 hover:bg-hover disabled:opacity-40';
   return (
-    <div data-testid={`author-slot-${index}`} className={expanded ? 'rounded border border-secondary' : undefined}
-      onDragStart={props.onDragStart} onDragOver={props.onDragOver} onDrop={props.onDrop}>
-      <div className="flex items-center gap-1 px-1">
-        <GripVertical aria-hidden className="size-4 shrink-0 text-muted" />
-        <button type="button" data-testid={`author-select-${index}`} aria-expanded={expanded}
-          onClick={props.onExpand} className="min-h-11 flex-1 rounded px-1 text-left hover:bg-hover">
-          {name}
-        </button>
-        <button type="button" data-testid={`author-move-up-${index}`} aria-label="Move up"
-          disabled={index === 0} onClick={props.onMoveUp} className={nav}>↑</button>
-        <button type="button" data-testid={`author-move-down-${index}`} aria-label="Move down"
-          disabled={index === total - 1} onClick={props.onMoveDown} className={nav}>↓</button>
-        <button type="button" data-testid={`author-remove-${index}`} aria-label={`Remove ${name}`}
-          onClick={props.onRemove} className={nav}>
-          <X aria-hidden className="inline size-4" />
-        </button>
-      </div>
-      {expanded && (
-        <div data-testid={`author-card-${index}`}>
-          <AuthorCard author={author} groups={groups} onChange={props.onChange} />
-          {props.section}
-        </div>
-      )}
+    <div className="flex items-center gap-2 px-2 pt-1">
+      <h3 className="text-sm font-medium">Author {index + 1} of {total}</h3>
+      <select
+        data-testid="author-position"
+        aria-label="Author position"
+        value={index + 1}
+        onChange={(event) => onMove(Number(event.target.value) - 1)}
+        className="min-h-11 rounded border border-secondary px-2 text-sm"
+      >
+        {Array.from({ length: total }, (_, i) => (
+          <option key={i + 1} value={i + 1}>{i + 1}</option>
+        ))}
+      </select>
+      <button type="button" data-testid={`author-remove-${index}`} aria-label={`Remove author ${index + 1}`}
+        onClick={onRemove} className="ml-auto min-h-11 rounded px-2 hover:bg-hover">
+        <X aria-hidden className="inline size-4" />
+      </button>
     </div>
   );
 }
 
-// One ordered author slot wired to the dialog operations by index.
-function BoundSlot(props: {
-  authors: MetadataAuthor[]; index: number; selected: Selection; groups: GroupOption[];
-  ops: AuthorOps; affiliations?: AffiliationEntry[]; setSelected(s: Selection): void;
-  setAuthors(a: MetadataAuthor[]): void; setAffiliations?(a: AffiliationEntry[]): void;
+// The single open author form: position header, editor card and the
+// affiliation section for person authors.
+function AuthorForm({ authors, index, groups, affiliations, setAuthors, setAffiliations, ops }: {
+  authors: MetadataAuthor[]; index: number; groups: GroupOption[]; affiliations?: AffiliationEntry[];
+  setAuthors(a: MetadataAuthor[]): void; setAffiliations?(a: AffiliationEntry[]): void; ops: AuthorOps;
 }): ReactNode {
-  const { authors, index, ops } = props;
-  const card = authors[index];
-  const section = props.selected === index && props.setAffiliations && !nameRecord(card).literal
-    ? <AffiliationSection authors={authors} index={index} affiliations={props.affiliations ?? []}
-        setAuthors={props.setAuthors} setAffiliations={props.setAffiliations} />
-    : null;
+  const author = authors[index];
   return (
-    <CardSlot author={card} index={index} total={authors.length} section={section}
-      expanded={props.selected === index} groups={props.groups} onExpand={() => props.setSelected(index)}
-      onChange={(next) => props.setAuthors(authors.map((a, i) => (i === index ? next : a)))}
-      onMoveUp={() => ops.move(index, index - 1)} onMoveDown={() => ops.move(index, index + 1)}
-      onRemove={() => ops.removeAt(index)} onDragStart={() => { ops.dragFrom.current = index; }}
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={() => { const s = ops.dragFrom.current; ops.dragFrom.current = null; if (s !== null && s !== index) ops.move(s, index); }} />
+    <div data-testid={`author-card-${index}`}>
+      <PositionHeader index={index} total={authors.length}
+        onMove={(to) => ops.move(index, to)} onRemove={() => ops.removeAt(index)} />
+      <AuthorCard author={author} groups={groups}
+        onChange={(next) => setAuthors(authors.map((a, i) => (i === index ? next : a)))} />
+      {setAffiliations && !nameRecord(author).literal && (
+        <AffiliationSection authors={authors} index={index} affiliations={affiliations ?? []}
+          setAuthors={setAuthors} setAffiliations={setAffiliations} />
+      )}
+    </div>
   );
 }
 
@@ -240,12 +226,14 @@ function DialogShell({ narrow, onClose, children }: {
 }
 
 /**
- * Authors dialog with ordered cards, drag/buttons reorder, remove with
- * Undo, and draft persistence gated on a non-empty family or literal
- * name. Below 640px only the selected card renders, after a Back row.
+ * Authors dialog rendering only the selected author's form (or the
+ * draft form for Add author) with the `Author N of M` position
+ * indicator that reorders the author. Remove keeps its Undo toast and
+ * draft persistence stays gated on a non-empty family or literal name.
+ * Below 640px the dialog is a full-screen sheet.
  *
  * @param props - See {@link AuthorsDialogProps}.
- * @returns The dialog frame with the card list or narrow sub-view.
+ * @returns The dialog frame with the single open form.
  */
 export function AuthorsDialog({
   authors, setAuthors, affiliations, setAffiliations, initialIndex, startWithDraft = false, onClose,
@@ -263,30 +251,23 @@ export function AuthorsDialog({
   };
   const startDraft = (): void => { setDraft(EMPTY_DRAFT); setSelected('draft'); };
   const narrow = useMediaQuery(NARROW_QUERY);
-  const subView = narrow && selected !== null;
-  const draftCard = <div data-testid="author-card-draft"><AuthorCard author={draft} groups={groups} focusOrcid onChange={onDraftChange} /></div>;
-  const slots = authors.map((author, index) => (
-    <BoundSlot key={String(author.id ?? index)} authors={authors} index={index} selected={selected}
-      groups={groups} ops={ops} affiliations={affiliations} setSelected={setSelected}
-      setAuthors={setAuthors} setAffiliations={setAffiliations} />
-  ));
+  const index = typeof selected === 'number' ? selected : null;
+  const draftCard = (
+    <div data-testid="author-card-draft">
+      <AuthorCard author={draft} groups={groups} focusOrcid onChange={onDraftChange} />
+    </div>
+  );
   return (
     <DialogShell narrow={narrow} onClose={onClose}>
-      {subView && (
-        <>
-          <button type="button" data-testid="authors-back" onClick={() => setSelected(null)}
-            className="mb-1 min-h-11 rounded px-2 font-medium hover:bg-hover">Back</button>
-          {selected === 'draft' ? draftCard : slots[selected as number]}
-        </>
+      {index !== null && authors[index] !== undefined && (
+        <AuthorForm authors={authors} index={index} groups={groups} affiliations={affiliations}
+          setAuthors={setAuthors} setAffiliations={setAffiliations} ops={ops} />
       )}
-      {!subView && slots}
-      {!subView && selected === 'draft' && draftCard}
-      {!subView && (
-        <button type="button" data-testid="add-author-dialog" onClick={startDraft}
-          className="mt-2 min-h-11 rounded px-2 text-muted hover:bg-hover">
-          <Plus aria-hidden className="inline size-3.5" /> Add author
-        </button>
-      )}
+      {selected === 'draft' && draftCard}
+      <button type="button" data-testid="add-author-dialog" onClick={startDraft}
+        className="mt-2 min-h-11 rounded px-2 text-muted hover:bg-hover">
+        <Plus aria-hidden className="inline size-3.5" /> Add author
+      </button>
       {ops.removed && (
         <div role="status" className="mt-2 rounded bg-surface-low p-2 text-sm">
           Removed {displayName(ops.removed.author)}
