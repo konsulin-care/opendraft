@@ -2,9 +2,12 @@
  * Expanded editor card for one author of the authors dialog.
  * Person authors get placeholder-only name fields, the single-name
  * checkbox storing `{ literal }` with `metadata.author-type: person`,
- * particle/suffix, comma-paste split, ORCID, degrees, email, status
- * toggles, on-behalf-of and CRediT pills; groups get a literal name
- * and pills. The Person/Group toggle writes `metadata.author-type`.
+ * particle/suffix, comma-paste split, status toggles, ORCID, degrees,
+ * email, an `affiliation` ReactNode slot rendered right after the name
+ * section, CRediT pills and the "More contact details" fields; groups
+ * get a literal name and pills. Sections render in the order Name,
+ * Affiliation, Status, Contact & identifiers, Contributions, More
+ * contact details. The Person/Group toggle writes `metadata.author-type`.
  */import { type ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react'; import { GroupMembers } from './GroupMembers'; import { OrcidField } from './orcid';
 import { Degrees, EmailField, MoreFields, setStr } from './author-fields';
@@ -21,6 +24,7 @@ export interface GroupOption {
 export interface AuthorCardProps {
   author: MetadataAuthor; // author entry being edited
   groups?: GroupOption[]; // groups usable for "On behalf of"
+  affiliation?: ReactNode; // affiliation slot rendered after the name section
   focusOrcid?: boolean; // focus the ORCID field on mount (draft authors)
   onChange: (next: MetadataAuthor) => void; // receives the full updated author
 }
@@ -59,7 +63,7 @@ const strList = (value: unknown): string[] => (Array.isArray(value) ? value.filt
 /** Shared editing context handed to the card bodies. */
 interface CardEdit {
   author: MetadataAuthor; name: Record<string, string>;
-  groups: GroupOption[]; focusOrcid: boolean;
+  groups: GroupOption[]; focusOrcid: boolean; affiliation: ReactNode;
   apply: (patch: Partial<MetadataAuthor>) => void;
   onChange: (next: MetadataAuthor) => void;
 }
@@ -115,21 +119,24 @@ function CreditPills({ roles, onToggle }: { roles: string[]; onToggle: (slug: st
   );
 }
 
-// Person-author body of the card.
+// Person-author body: Name, Affiliation slot, Status (corresponding,
+// equal contributor, deceased, on-behalf-of), Contact & identifiers
+// (ORCID, email, degrees), Contributions, More contact details.
 function PersonBody({ edit }: { edit: CardEdit }): ReactNode {
-  const { author, name, groups, focusOrcid, apply, onChange } = edit;
+  const { author, name, groups, affiliation, focusOrcid, apply, onChange } = edit;
   const roles = strList(author.roles);
   const toggleRole = (slug: string): void =>
     apply({ roles: roles.includes(slug) ? roles.filter((r) => r !== slug) : [...roles, slug] });
   return (
     <>
       <AuthorNameFields author={author} name={name} apply={apply} />
-      <OrcidField author={author} onChange={onChange} focus={focusOrcid} />
-      <EmailField author={author} apply={apply} />
-      <Degrees degrees={strList(author.degrees)} onSet={(degrees) => apply({ degrees })} />
+      {affiliation}
       <StatusToggles author={author} apply={apply} />
       <OnBehalf value={typeof author['on-behalf-of'] === 'string' ? author['on-behalf-of'] : ''} groups={groups}
         onChange={(id) => apply(setStr(author, 'on-behalf-of', id))} />
+      <OrcidField author={author} onChange={onChange} focus={focusOrcid} />
+      <EmailField author={author} apply={apply} />
+      <Degrees degrees={strList(author.degrees)} onSet={(degrees) => apply({ degrees })} />
       <CreditPills roles={roles} onToggle={toggleRole} />
       <MoreFields author={author} onChange={apply} />
     </>
@@ -159,7 +166,7 @@ function GroupBody({ edit }: { edit: CardEdit }): ReactNode {
  * @param props - See {@link AuthorCardProps}.
  * @returns The type toggle, warning marker and the person or group body.
  */
-export function AuthorCard({ author, groups = [], focusOrcid = false, onChange }: AuthorCardProps): ReactNode {
+export function AuthorCard({ author, groups = [], affiliation, focusOrcid = false, onChange }: AuthorCardProps): ReactNode {
   const name = asName(author.name);
   const group = isGroupAuthor(author);
   const apply = (patch: Partial<MetadataAuthor>): void => onChange({ ...author, ...patch });
@@ -178,8 +185,8 @@ export function AuthorCard({ author, groups = [], focusOrcid = false, onChange }
           <AlertTriangle aria-hidden className="inline size-4" /> No affiliation
         </span>
       )}
-      {group ? <GroupBody edit={{ author, name, groups, focusOrcid, apply, onChange }} />
-        : <PersonBody edit={{ author, name, groups, focusOrcid, apply, onChange }} />}
+      {group ? <GroupBody edit={{ author, name, groups, affiliation, focusOrcid, apply, onChange }} />
+        : <PersonBody edit={{ author, name, groups, affiliation, focusOrcid, apply, onChange }} />}
     </div>
   );
 }
