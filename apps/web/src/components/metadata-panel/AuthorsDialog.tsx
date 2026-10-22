@@ -1,12 +1,10 @@
 /**
  * Authors dialog of the manuscript metadata panel: a single author
  * form at a time (or the draft form for Add author) headed by an
- * `Author N of M` position indicator whose select reorders the author.
- * The vertical card list, author-select rows and move up/down buttons
- * are gone; remove with an Undo toast stays, and a draft author is
- * written to _author.yml only once it has a family name (person) or
- * literal name (group). Escape closes; below 640px it is a full-screen
- * sheet.
+ * `Author N of M` position indicator whose select reorders the author;
+ * remove keeps its Undo toast. A draft writes to _author.yml only once
+ * named, carrying buffered affiliation picks and new registry entries
+ * into the same update. Escape closes; below 640px it is a sheet.
  */
 import { useEffect, useState, type ReactNode } from 'react';
 import { Plus, X } from 'lucide-react';
@@ -40,6 +38,16 @@ const UNDO_MS = 8000;
 
 /** A person draft with no name fields filled in yet. */
 const EMPTY_DRAFT: MetadataAuthor = { name: { given: '', family: '' } };
+
+/** Change emitted by the affiliation picker: registry and/or authors. */
+interface AffilChange { registry?: AffiliationEntry[]; authors?: MetadataAuthor[]; }
+
+/** Buffered draft: the author being edited, registry picks, dirty flag. */
+interface Draft { author: MetadataAuthor; registry: AffiliationEntry[]; dirty: boolean; }
+
+// Fresh draft seeded from the current registry with nothing picked yet.
+const freshDraft = (registry: AffiliationEntry[]): Draft =>
+  ({ author: EMPTY_DRAFT, registry, dirty: false });
 
 /** Form selection: an author index, the draft, or nothing after a removal. */
 type Selection = number | 'draft' | null;
@@ -133,20 +141,15 @@ function useAuthorOps(
   return { removed, move, removeAt, undo };
 }
 
-// Affiliation picker under the open person form: registry edits go to
-// _author.yml's affiliation registry, author edits to the author list.
-function AffiliationSection({ authors, index, affiliations, setAuthors, setAffiliations }: {
-  authors: MetadataAuthor[]; index: number; affiliations: AffiliationEntry[];
-  setAuthors(a: MetadataAuthor[]): void; setAffiliations(a: AffiliationEntry[]): void;
+// Affiliation picker under the open person form; forwards its changes.
+function AffiliationSection({ authors, index, registry, onApply }: {
+  authors: MetadataAuthor[]; index: number; registry: AffiliationEntry[];
+  onApply: (change: AffilChange) => void;
 }): ReactNode {
   return (
     <div data-testid="author-affiliation-section" className="px-2 pb-2">
       <h3 className="text-sm font-medium">Affiliation</h3>
-      <AffiliationPicker registry={affiliations} authors={authors} authorIndex={index}
-        onApply={(change) => {
-          if (change.authors) setAuthors(change.authors);
-          if (change.registry) setAffiliations(change.registry);
-        }} />
+      <AffiliationPicker registry={registry} authors={authors} authorIndex={index} onApply={onApply} />
     </div>
   );
 }
@@ -184,16 +187,19 @@ function AuthorForm({ authors, index, groups, affiliations, setAuthors, setAffil
   setAuthors(a: MetadataAuthor[]): void; setAffiliations?(a: AffiliationEntry[]): void; ops: AuthorOps;
 }): ReactNode {
   const author = authors[index];
+  const onApply = (change: AffilChange): void => {
+    if (change.authors) setAuthors(change.authors);
+    if (change.registry && setAffiliations) setAffiliations(change.registry);
+  };
   return (
     <div data-testid={`author-card-${index}`}>
       <PositionHeader index={index} total={authors.length}
         onMove={(to) => ops.move(index, to)} onRemove={() => ops.removeAt(index)} />
       <AuthorCard author={author} groups={groups}
-        onChange={(next) => setAuthors(authors.map((a, i) => (i === index ? next : a)))} />
-      {setAffiliations && !isGroupAuthor(author) && (
-        <AffiliationSection authors={authors} index={index} affiliations={affiliations ?? []}
-          setAuthors={setAuthors} setAffiliations={setAffiliations} />
-      )}
+        onChange={(next) => setAuthors(authors.map((a, i) => (i === index ? next : a)))}
+        affiliation={setAffiliations && !isGroupAuthor(author)
+          ? <AffiliationSection authors={authors} index={index} registry={affiliations ?? []} onApply={onApply} />
+          : undefined} />
     </div>
   );
 }
@@ -240,22 +246,29 @@ export function AuthorsDialog({
   authors, setAuthors, affiliations, setAffiliations, initialIndex, startWithDraft = false, onClose,
 }: AuthorsDialogProps): ReactNode {
   const [selected, setSelected] = useState<Selection>(startWithDraft ? 'draft' : initialIndex ?? 0);
-  const [draft, setDraft] = useState<MetadataAuthor>(EMPTY_DRAFT);
+  const [draft, setDraft] = useState<Draft>(() => freshDraft(affiliations ?? []));
   const ops = useAuthorOps(authors, setAuthors, setSelected);
   useEscape(onClose);
   const groups = groupsOf(authors);
+  const onDraftAffiliation = (change: AffilChange): void => setDraft((d) => ({
+    author: change.authors?.[change.authors.length - 1] ?? d.author,
+    registry: change.registry ?? d.registry, dirty: d.dirty || change.registry !== undefined,
+  }));
   const onDraftChange = (next: MetadataAuthor): void => {
-    if (!isNamed(next)) { setDraft(next); return; }
+    if (!isNamed(next)) { setDraft((d) => ({ ...d, author: next })); return; }
     setAuthors([...authors, { ...next, id: slugOf(next) }]);
-    setDraft(EMPTY_DRAFT);
+    if (draft.dirty) setAffiliations?.(draft.registry);
+    setDraft(freshDraft(affiliations ?? []));
     setSelected(authors.length);
   };
-  const startDraft = (): void => { setDraft(EMPTY_DRAFT); setSelected('draft'); };
+  const startDraft = (): void => { setDraft(freshDraft(affiliations ?? [])); setSelected('draft'); };
   const narrow = useMediaQuery(NARROW_QUERY);
   const index = typeof selected === 'number' ? selected : null;
   const draftCard = (
     <div data-testid="author-card-draft">
-      <AuthorCard author={draft} groups={groups} focusOrcid onChange={onDraftChange} />
+      <AuthorCard author={draft.author} groups={groups} focusOrcid onChange={onDraftChange}
+        affiliation={<AffiliationSection authors={[...authors, draft.author]} index={authors.length}
+          registry={draft.registry} onApply={onDraftAffiliation} />} />
     </div>
   );
   return (
