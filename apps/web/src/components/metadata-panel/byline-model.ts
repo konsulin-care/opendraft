@@ -7,6 +7,7 @@
  * collaborator groups and the per-author CRediT contributions summary in
  * human-readable role labels.
  */
+import { isGroupAuthor } from '@opendraft/schema';
 import type { MetadataAuthor } from './use-manuscript-metadata';
 
 /** Affiliation registry entry from _author.yml. */
@@ -156,12 +157,12 @@ function createNumbering(): AffiliationNumbering {
   };
 }
 
-/** Map of group author id to its literal group name. */
+/** Map of group author id to its literal group name (on-behalf-of targets). */
 function collectGroupNames(authors: MetadataAuthor[]): Map<string, string> {
   const groupNames = new Map<string, string>();
   for (const author of authors) {
     const literal = asRecord(author.name).literal;
-    if (typeof author.id === 'string' && typeof literal === 'string') {
+    if (isGroupAuthor(author) && typeof author.id === 'string' && typeof literal === 'string') {
       groupNames.set(author.id, literal);
     }
   }
@@ -232,7 +233,7 @@ function buildEntry(
     onBehalfOf: typeof behalf === 'string' && ctx.groupNames.has(behalf)
       ? `on behalf of ${ctx.groupNames.get(behalf)}`
       : undefined,
-    group: typeof asRecord(author.name).literal === 'string',
+    group: isGroupAuthor(author),
     members,
   };
 }

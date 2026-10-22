@@ -139,6 +139,48 @@ describe('buildByline collaborators and on-behalf-of', () => {
   });
 });
 
+describe('buildByline explicit author type', () => {
+  const PERSON: MetadataAuthor = {
+    id: 'plato',
+    name: { literal: 'Plato' },
+    metadata: { 'author-type': 'person' },
+  };
+
+  it('renders a single-name person as a regular byline author', () => {
+    const model = buildByline([PERSON], REGISTRY);
+    expect(model.authors[0].name).toBe('Plato');
+    expect(model.authors[0].group).toBe(false);
+    expect(model.collaborators).toEqual([]);
+  });
+
+  it('does not offer a single-name person as an on-behalf-of group', () => {
+    const model = buildByline(
+      [PERSON, {
+        id: 'lee',
+        name: { given: 'Budi', family: 'Lee' },
+        'on-behalf-of': 'plato',
+      }],
+      REGISTRY,
+    );
+    expect(model.authors[1].onBehalfOf).toBeUndefined();
+  });
+
+  it('keeps a legacy literal-only author a group', () => {
+    const model = buildByline(
+      [{
+        id: 'dwg',
+        name: { literal: 'OpenDraft Team' },
+        members: [{ name: { given: 'Maria', family: 'Gonzalez' } }],
+      }],
+      REGISTRY,
+    );
+    expect(model.authors[0].group).toBe(true);
+    expect(model.collaborators).toEqual([{
+      key: 'dwg', name: 'OpenDraft Team', count: 1, members: ['Maria Gonzalez'],
+    }]);
+  });
+});
+
 describe('buildByline contributions', () => {
   it('summarizes each author by full name in author order', () => {
     const model = buildByline(
