@@ -1,26 +1,28 @@
 /**
- * Header and shell parts of the Authors dialog: the `Author order:`
- * position header whose select reorders the open author, and the
- * dialog frame (a full-screen sheet below 640px). The header carries
- * bottom spacing so the select does not touch the Person/Group
- * toggle, and the dialog title has no close button — Escape and
+ * Header, shell and footer parts of the Authors dialog: the
+ * `Author order:` position header whose select reorders the open
+ * author, the dialog frame (a full-screen sheet below 640px) whose
+ * body scrolls between header and footer, and the fixed footer with
+ * the Undo toast, Delete author/Discard, Add author, Done and the
+ * save indicator. The title has no close button — Escape and
  * backdrop click still close the dialog.
  */
 import { type ReactNode } from 'react';
-import { X } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
+import type { SaveStatus } from '../AppHeader';
 
 /**
  * Form header: the `Author order:` label, the position select whose
- * tooltip explains it reorders the author, the `of M` count and the
- * remove button. Bottom padding separates the header from the
- * Person/Group toggle of the card below.
+ * tooltip explains it reorders the author and the `of M` count.
+ * Bottom padding separates the header from the Person/Group toggle
+ * of the card below; deletion lives in the footer.
  *
- * @param props - Open author index, total author count, reorder and
- * remove callbacks.
+ * @param props - Open author index, total author count and the
+ * reorder callback.
  * @returns The header row rendering the position select.
  */
-export function AuthorOrderHeader({ index, total, onMove, onRemove }: {
-  index: number; total: number; onMove(to: number): void; onRemove(): void;
+export function AuthorOrderHeader({ index, total, onMove }: {
+  index: number; total: number; onMove(to: number): void;
 }): ReactNode {
   return (
     <div data-testid="author-position-header" className="flex items-center gap-2 px-2 pt-1 pb-3">
@@ -38,32 +40,32 @@ export function AuthorOrderHeader({ index, total, onMove, onRemove }: {
         ))}
       </select>
       <span className="text-sm">of {total}</span>
-      <button type="button" data-testid={`author-remove-${index}`} aria-label={`Remove author ${index + 1}`}
-        onClick={onRemove} className="ml-auto min-h-11 rounded px-2 hover:bg-hover">
-        <X aria-hidden className="inline size-4" />
-      </button>
     </div>
   );
 }
 
 /**
  * Dialog frame: a full-screen sheet below 640px, a centered card
- * otherwise. The title row has no close button; the backdrop click
- * closes the centered variant and Escape closes from anywhere.
+ * otherwise. The frame is a column whose middle region scrolls, so
+ * the title and the footer stay fixed; the title row has no close
+ * button, the backdrop click closes the centered variant and Escape
+ * closes from anywhere.
  *
- * @param props - Narrow viewport flag, close callback and body children.
- * @returns The dialog frame wrapping the body children.
+ * @param props - Narrow viewport flag, close callback, fixed footer
+ * and the scrolling body children.
+ * @returns The dialog frame wrapping body and footer.
  */
-export function DialogShell({ narrow, onClose, children }: {
-  narrow: boolean; onClose: () => void; children: ReactNode;
+export function DialogShell({ narrow, onClose, footer, children }: {
+  narrow: boolean; onClose: () => void; footer?: ReactNode; children: ReactNode;
 }): ReactNode {
   const frame = (
     <div role="dialog" aria-modal="true" aria-label="Authors" data-testid="authors-dialog"
       className={narrow
-        ? 'fixed inset-0 z-30 flex flex-col overflow-y-auto bg-white p-3'
-        : 'max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded border border-secondary bg-white p-3 shadow'}>
+        ? 'fixed inset-0 z-30 flex flex-col bg-white p-3'
+        : 'flex max-h-[80vh] w-full max-w-2xl flex-col rounded border border-secondary bg-white p-3 shadow'}>
       <h2 className="font-medium">Authors</h2>
-      {children}
+      <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+      {footer}
     </div>
   );
   if (narrow) return frame;
@@ -71,6 +73,56 @@ export function DialogShell({ narrow, onClose, children }: {
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-black-08"
       onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       {frame}
+    </div>
+  );
+}
+
+/**
+ * Fixed, non-scrolling footer: the Undo toast above the action row,
+ * the quiet red Delete author button (Discard on the draft) at the
+ * left, Add author and Done at the right, and the panel autosave
+ * indicator below. Below 640px Delete renders the Trash2 icon only,
+ * keeping its aria-label.
+ *
+ * @param props - Narrow viewport flag, draft flag, open author
+ * index, delete/discard, add and close callbacks, the panel save
+ * status and the Undo toast node.
+ * @returns The footer element.
+ */
+export function DialogFooter({ narrow, draft, index, onDelete, onAdd, onClose, saveStatus, toast }: {
+  narrow: boolean;
+  draft: boolean;
+  index: number | null;
+  onDelete(): void;
+  onAdd(): void;
+  onClose(): void;
+  saveStatus?: SaveStatus;
+  toast?: ReactNode;
+}): ReactNode {
+  const label = draft ? 'Discard' : 'Delete author';
+  return (
+    <div data-testid="authors-dialog-footer" className="mt-auto shrink-0 border-t border-secondary pt-2">
+      {toast}
+      <div data-testid="authors-footer-actions" className="flex items-center gap-2">
+        {(draft || index !== null) && (
+          <button type="button" data-testid={draft ? 'author-discard' : 'author-remove'} aria-label={label}
+            onClick={onDelete} className="min-h-11 rounded px-2 text-error hover:bg-hover">
+            <Trash2 aria-hidden className="inline size-4" />
+            {!narrow && <span>{label}</span>}
+          </button>
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          <button type="button" data-testid="add-author-dialog" onClick={onAdd}
+            className="min-h-11 rounded border border-secondary px-3 text-sm hover:bg-hover">
+            <Plus aria-hidden className="inline size-3.5" /> Add author
+          </button>
+          <button type="button" data-testid="authors-done" onClick={onClose}
+            className="min-h-11 rounded bg-black px-4 text-white hover:opacity-90">Done</button>
+        </div>
+      </div>
+      <div data-testid="authors-save-status" className="pt-1 text-xs text-muted">
+        {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved' : ''}
+      </div>
     </div>
   );
 }

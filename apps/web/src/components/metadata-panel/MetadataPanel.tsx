@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode, RefObject } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
-import type { PublishIssue } from '@opendraft/schema';
+import type { PublishIssue } from '@opendraft/schema'; import type { SaveStatus } from '../AppHeader';
 import { useManuscriptMetadata, type MetadataAuthor, type UseManuscriptMetadataResult } from './use-manuscript-metadata';
 import { NARROW_QUERY, useMediaQuery } from '../../hooks/use-media-query';
 import { ArticleView } from './ArticleView';
@@ -214,6 +214,7 @@ interface PanelBodyProps {
   meta: UseManuscriptMetadataResult;
   expanded: boolean;
   dialogIndex: number | null;
+  saveStatus?: SaveStatus;
   onClose(): void;
 }
 
@@ -225,7 +226,7 @@ interface PanelBodyProps {
  * @param props - See {@link PanelBodyProps}.
  * @returns The animating body wrapper element.
  */
-function PanelBody({ meta, expanded, dialogIndex, onClose }: PanelBodyProps): ReactNode {
+function PanelBody({ meta, expanded, dialogIndex, saveStatus, onClose }: PanelBodyProps): ReactNode {
   const { frontmatter } = meta;
   const keywords = useMemo(() => (Array.isArray(frontmatter.keywords) ? frontmatter.keywords : []) as string[], [frontmatter.keywords]);
   return (
@@ -241,9 +242,8 @@ function PanelBody({ meta, expanded, dialogIndex, onClose }: PanelBodyProps): Re
           setFrontmatterField={meta.setFrontmatterField}
         />
         {dialogIndex !== null && (
-          <AuthorsDialog authors={meta.authors} setAuthors={meta.setAuthors}
-            affiliations={meta.affiliations} setAffiliations={meta.setAffiliations}
-            initialIndex={dialogIndex} onClose={onClose} />
+          <AuthorsDialog authors={meta.authors} setAuthors={meta.setAuthors} affiliations={meta.affiliations}
+            setAffiliations={meta.setAffiliations} initialIndex={dialogIndex} saveStatus={saveStatus} onClose={onClose} />
         )}
       </div>
     </div>
@@ -293,7 +293,7 @@ export function MetadataPanel({
       <PinnedBar title={title} byline={narrow ? `${authors.length} authors` : byline}
         expanded={expanded} narrow={narrow} onToggle={toggle}
         badge={<ValidationBadge issues={issues} onSelect={issueFocus.select} onOpen={openIssues} />} />
-      <PanelBody meta={meta} expanded={expanded} dialogIndex={issueFocus.dialogIndex} onClose={issueFocus.close} />
+      <PanelBody meta={meta} expanded={expanded} dialogIndex={issueFocus.dialogIndex} saveStatus={meta.status} onClose={issueFocus.close} />
     </section>
   );
 }

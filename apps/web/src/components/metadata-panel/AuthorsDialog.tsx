@@ -1,19 +1,22 @@
 /**
  * Authors dialog of the manuscript metadata panel: a single author
  * form at a time (or the draft form for Add author) headed by an
- * `Author order: [ n v ] of M` select that reorders the author;
- * remove keeps its Undo toast. A draft writes to _author.yml only once
- * named, carrying buffered affiliation picks and new registry entries
- * into the same update. Escape closes; below 640px it is a sheet.
+ * `Author order: [ n v ] of M` select that reorders the author. The
+ * fixed footer holds the Undo toast, Delete author (Discard on the
+ * draft), Add author, Done and the panel save indicator; the body
+ * scrolls between header and footer. A draft writes to _author.yml
+ * only once named, carrying buffered affiliation picks and new
+ * registry entries into the same update. Escape closes; below 640px
+ * it is a sheet.
  */
 import { useEffect, useState, type ReactNode } from 'react';
-import { Plus } from 'lucide-react';
 import { isGroupAuthor } from '@opendraft/schema';
+import type { SaveStatus } from '../AppHeader';
 import type { MetadataAuthor } from './use-manuscript-metadata';
 import { AuthorCard, type GroupOption } from './AuthorCard';
 import { AffiliationPicker } from './AffiliationPicker';
 import { pruneOrphans } from './affiliation-ops';
-import { AuthorOrderHeader, DialogShell } from './authors-dialog-parts';
+import { AuthorOrderHeader, DialogFooter, DialogShell } from './authors-dialog-parts';
 import type { AffiliationEntry } from './byline-model';
 import { NARROW_QUERY, useMediaQuery } from '../../hooks/use-media-query';
 
@@ -31,6 +34,8 @@ export interface AuthorsDialogProps {
   setAffiliations?: (affiliations: AffiliationEntry[]) => void;
   /** Start with a new draft author form open. */
   startWithDraft?: boolean;
+  /** Panel autosave status rendered as the footer save indicator. */
+  saveStatus?: SaveStatus;
   /** Close the dialog. */
   onClose: () => void;
 }
@@ -53,6 +58,16 @@ const freshDraft = (registry: AffiliationEntry[]): Draft =>
 
 /** Form selection: an author index, the draft, or nothing after a removal. */
 type Selection = number | 'draft' | null;
+
+/** Draft author controls returned by {@link useDraftAuthor}. */
+interface DraftAuthor {
+  author: MetadataAuthor;
+  registry: AffiliationEntry[];
+  onAffiliation(change: AffilChange): void;
+  onChange(author: MetadataAuthor): void;
+  start(): void;
+  discard(): void;
+}
 
 /** Removed author held by the undo toast. */
 interface RemovedAuthor { author: MetadataAuthor; index: number; registry: AffiliationEntry[]; }
@@ -147,6 +162,35 @@ function useAuthorOps(
   return { removed, move, removeAt, undo };
 }
 
+// Draft author state: buffered registry picks, persisted only once the
+// draft is named (family or literal); start/discard drive the selection.
+function useDraftAuthor(wired: {
+  authors: MetadataAuthor[];
+  setAuthors: (authors: MetadataAuthor[]) => void;
+  registry: AffiliationEntry[];
+  setAffiliations?: (affiliations: AffiliationEntry[]) => void;
+  setSelected: (selection: Selection) => void;
+}): DraftAuthor {
+  const [draft, setDraft] = useState<Draft>(() => freshDraft(wired.registry));
+  const reset = (): void => setDraft(freshDraft(wired.registry));
+  const onAffiliation = (change: AffilChange): void => setDraft((d) => ({
+    author: change.authors?.[change.authors.length - 1] ?? d.author,
+    registry: change.registry ?? d.registry, dirty: d.dirty || change.registry !== undefined,
+  }));
+  const onChange = (next: MetadataAuthor): void => {
+    if (!isNamed(next)) { setDraft((d) => ({ ...d, author: next })); return; }
+    wired.setAuthors([...wired.authors, { ...next, id: slugOf(next) }]);
+    if (draft.dirty) wired.setAffiliations?.(draft.registry);
+    reset();
+    wired.setSelected(wired.authors.length);
+  };
+  return {
+    author: draft.author, registry: draft.registry, onAffiliation, onChange,
+    start: () => { reset(); wired.setSelected('draft'); },
+    discard: () => { reset(); wired.setSelected(wired.authors.length > 0 ? 0 : null); },
+  };
+}
+
 // Affiliation picker under the open person form; forwards its changes.
 function AffiliationSection({ authors, index, registry, onApply }: {
   authors: MetadataAuthor[]; index: number; registry: AffiliationEntry[];
@@ -173,8 +217,7 @@ function AuthorForm({ authors, index, groups, affiliations, setAuthors, setAffil
   };
   return (
     <div data-testid={`author-card-${index}`}>
-      <AuthorOrderHeader index={index} total={authors.length}
-        onMove={(to) => ops.move(index, to)} onRemove={() => ops.removeAt(index)} />
+      <AuthorOrderHeader index={index} total={authors.length} onMove={(to) => ops.move(index, to)} />
       <AuthorCard author={author} groups={groups}
         onChange={(next) => setAuthors(authors.map((a, i) => (i === index ? next : a)))}
         affiliation={setAffiliations && !isGroupAuthor(author)
@@ -195,52 +238,46 @@ function AuthorForm({ authors, index, groups, affiliations, setAuthors, setAffil
  * @returns The dialog frame with the single open form.
  */
 export function AuthorsDialog({
-  authors, setAuthors, affiliations, setAffiliations, initialIndex, startWithDraft = false, onClose,
+  authors, setAuthors, affiliations, setAffiliations, initialIndex, startWithDraft = false, saveStatus, onClose,
 }: AuthorsDialogProps): ReactNode {
   const [selected, setSelected] = useState<Selection>(startWithDraft ? 'draft' : initialIndex ?? 0);
-  const [draft, setDraft] = useState<Draft>(() => freshDraft(affiliations ?? []));
   const ops = useAuthorOps(authors, setAuthors, setSelected,
     { registry: affiliations ?? [], setAffiliations });
   useEscape(onClose);
   const groups = groupsOf(authors);
-  const onDraftAffiliation = (change: AffilChange): void => setDraft((d) => ({
-    author: change.authors?.[change.authors.length - 1] ?? d.author,
-    registry: change.registry ?? d.registry, dirty: d.dirty || change.registry !== undefined,
-  }));
-  const onDraftChange = (next: MetadataAuthor): void => {
-    if (!isNamed(next)) { setDraft((d) => ({ ...d, author: next })); return; }
-    setAuthors([...authors, { ...next, id: slugOf(next) }]);
-    if (draft.dirty) setAffiliations?.(draft.registry);
-    setDraft(freshDraft(affiliations ?? []));
-    setSelected(authors.length);
-  };
-  const startDraft = (): void => { setDraft(freshDraft(affiliations ?? [])); setSelected('draft'); };
-  const narrow = useMediaQuery(NARROW_QUERY); const index = typeof selected === 'number' ? selected : null;
+  const draft = useDraftAuthor({ authors, setAuthors, registry: affiliations ?? [], setAffiliations, setSelected });
+  const narrow = useMediaQuery(NARROW_QUERY);
+  const index = typeof selected === 'number' && authors[selected] !== undefined ? selected : null;
+  const draftOpen = selected === 'draft';
   const draftCard = (
     <div data-testid="author-card-draft">
-      <AuthorCard author={draft.author} groups={groups} focusOrcid onChange={onDraftChange}
+      <AuthorCard author={draft.author} groups={groups} focusOrcid onChange={draft.onChange}
         affiliation={<AffiliationSection authors={[...authors, draft.author]} index={authors.length}
-          registry={draft.registry} onApply={onDraftAffiliation} />} />
+          registry={draft.registry} onApply={draft.onAffiliation} />} />
     </div>
   );
-  return (
-    <DialogShell narrow={narrow} onClose={onClose}>
-      {index !== null && authors[index] !== undefined && (
-        <AuthorForm authors={authors} index={index} groups={groups} affiliations={affiliations}
-          setAuthors={setAuthors} setAffiliations={setAffiliations} ops={ops} />
-      )}
-      {selected === 'draft' && draftCard}
-      <button type="button" data-testid="add-author-dialog" onClick={startDraft}
-        className="mt-2 min-h-11 rounded px-2 text-muted hover:bg-hover">
-        <Plus aria-hidden className="inline size-3.5" /> Add author
-      </button>
-      {ops.removed && (
-        <div role="status" className="mt-2 rounded bg-surface-low p-2 text-sm">
+  const footer = (
+    <DialogFooter narrow={narrow} draft={draftOpen} index={index} saveStatus={saveStatus}
+      onDelete={() => {
+        if (draftOpen) draft.discard();
+        else if (index !== null) ops.removeAt(index);
+      }}
+      onAdd={draft.start} onClose={onClose}
+      toast={ops.removed ? (
+        <div role="status" className="mb-2 rounded bg-surface-low p-2 text-sm">
           Removed {displayName(ops.removed.author)}
           <button type="button" data-testid="author-undo" onClick={ops.undo}
             className="ml-2 min-h-11 rounded border border-secondary px-2 py-1 hover:bg-hover">Undo</button>
         </div>
+      ) : undefined} />
+  );
+  return (
+    <DialogShell narrow={narrow} onClose={onClose} footer={footer}>
+      {index !== null && (
+        <AuthorForm authors={authors} index={index} groups={groups} affiliations={affiliations}
+          setAuthors={setAuthors} setAffiliations={setAffiliations} ops={ops} />
       )}
+      {draftOpen && draftCard}
     </DialogShell>
   );
 }
