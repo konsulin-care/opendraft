@@ -6,7 +6,9 @@
  * multi-select listbox popover whenever the combobox is open; clicking
  * an option toggles the author's ref while the listbox stays open with
  * the query intact, and selected options show a check with
- * aria-selected. Focus with an empty query lists the registry entries
+ * aria-selected. Selected affiliations also render as removable chips
+ * below the listbox, dropping and pruning the entry on removal.
+ * Focus with an empty query lists the registry entries
  * in use; Escape and outside clicks close the list. "Create manually"
  * and "Normalize to references" are footer actions, "Independent
  * researcher" is a checkbox shown only while the author has zero
@@ -19,6 +21,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   AffiliationListbox, IndependentRow, INPUT, SearchField, useOutsideClose,
 } from './affiliation-listbox';
+import { AffiliationChips } from './affiliation-chips';
 import {
   createOps, hasInline, hasRef, nameOf, refUsage, type AffilChange,
 } from './affiliation-ops';
@@ -159,6 +162,7 @@ export function AffiliationPicker({
             && hasRef(target, String(e.id)))}
           onPickRef={ops.toggleRef} onEdit={setEditIndex} onPickOrg={ops.toggleOrg} />
       )}
+      <AffiliationChips author={target} registry={registry} onRemove={ops.toggleRef} />
       {noAffiliations && <IndependentRow onPick={() => pick(ops.addIndependent)} />}
       <button type="button" data-testid="affiliation-create-manual" onClick={() => setManual(true)} className={ROW}>
         Create manually

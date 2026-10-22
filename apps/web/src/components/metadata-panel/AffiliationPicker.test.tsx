@@ -1,11 +1,9 @@
 // @vitest-environment jsdom
 /**
- * Affiliation picker tests: debounced ROR v2 search (>=5 chars,
- * stale-abort, cache) in a multi-select listbox that keeps the query
- * intact on picks and closes on Escape and outside clicks; in-use
- * registry entries on focus; the Independent researcher checkbox
- * shown only with zero affiliations; manual create; shared-edit
- * warning; legacy "Normalize to references".
+ * Affiliation picker tests: ROR search, the multi-select listbox with
+ * in-use suggestions, removable selected chips with orphan pruning,
+ * the independent checkbox, manual create, shared-edit warning and
+ * legacy "Normalize to references".
  */
 import { useState, type ReactNode } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -77,8 +75,7 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 it('never queries ROR below five characters', async () => {
-  boot();
-  await search('univ', 600);
+  boot(); await search('univ', 600);
   expect(vi.mocked(fetch)).not.toHaveBeenCalled();
 });
 
@@ -87,11 +84,9 @@ it('queries ROR once after a 300ms debounce at five characters', async () => {
   fireEvent.change(screen.getByTestId('affiliation-search'), { target: { value: 'univer' } });
   await act(async () => { vi.advanceTimersByTime(299); });
   expect(vi.mocked(fetch)).not.toHaveBeenCalled();
-  await act(async () => { vi.advanceTimersByTime(1); });
-  expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  await act(async () => { vi.advanceTimersByTime(1); }); expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
   expect(vi.mocked(fetch).mock.calls[0]?.[0]).toBe('https://api.ror.org/v2/organizations?query=univer');
-  await act(async () => { vi.advanceTimersByTime(1000); });
-  expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  await act(async () => { vi.advanceTimersByTime(1000); }); expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
 });
 
 it('aborts the stale query when a newer one is typed', async () => {
@@ -99,17 +94,14 @@ it('aborts the stale query when a newer one is typed', async () => {
   boot();
   await search('univer');
   const stale = vi.mocked(fetch).mock.calls[0]?.[1]?.signal as AbortSignal;
-  fireEvent.change(screen.getByTestId('affiliation-search'), { target: { value: 'univers' } });
-  expect(stale.aborted).toBe(true);
+  fireEvent.change(screen.getByTestId('affiliation-search'), { target: { value: 'univers' } }); expect(stale.aborted).toBe(true);
 });
 
 it('serves a repeated query from the cache', async () => {
   boot();
-  await search('univer');
-  expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  await search('univer'); expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
   await search('', 600);
-  await search('univer');
-  expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  await search('univer'); expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
   expect(screen.getByTestId('affiliation-ror-item-0')).toBeTruthy();
 });
 
@@ -125,8 +117,7 @@ it('lists registry suggestions before ROR results', async () => {
 });
 
 it('shows no listbox before the search field is focused', () => {
-  boot();
-  expect(screen.queryByTestId('affiliation-listbox')).toBeNull();
+  boot(); expect(screen.queryByTestId('affiliation-listbox')).toBeNull();
 });
 
 it('adds a registry entry and author ref for a picked ROR result', async () => {
@@ -135,21 +126,18 @@ it('adds a registry entry and author ref for a picked ROR result', async () => {
   fireEvent.click(screen.getByTestId('affiliation-ror-item-0'));
   expect(onApply).toHaveBeenCalledWith({ registry: [UI, ROR_ENTRY],
     authors: [{ ...author(), affiliations: [{ ref: 'university-of-indonesia' }] }] });
-  expect((screen.getByTestId('affiliation-search') as HTMLInputElement).value).toBe('univer');
-  expect(screen.getByTestId('affiliation-listbox')).toBeTruthy();
+  expect((screen.getByTestId('affiliation-search') as HTMLInputElement).value).toBe('univer'); expect(screen.getByTestId('affiliation-listbox')).toBeTruthy();
 });
 
 it('closes the listbox on Escape', async () => {
   boot();
-  await search('univer');
-  fireEvent.keyDown(screen.getByTestId('affiliation-search'), { key: 'Escape' });
+  await search('univer'); fireEvent.keyDown(screen.getByTestId('affiliation-search'), { key: 'Escape' });
   expect(screen.queryByTestId('affiliation-listbox')).toBeNull();
 });
 
 it('closes the listbox on an outside mousedown', async () => {
   boot();
-  await search('univer');
-  fireEvent.mouseDown(document.body);
+  await search('univer'); fireEvent.mouseDown(document.body);
   expect(screen.queryByTestId('affiliation-listbox')).toBeNull();
 });
 
@@ -179,12 +167,10 @@ it('adds the built-in Independent researcher entry via the checkbox', () => {
 
 it('keeps the independent checkbox outside the listbox while shown', async () => {
   boot({ registry: [] });
-  const checkbox = screen.getByTestId('affiliation-independent');
-  expect(checkbox.getAttribute('type')).toBe('checkbox');
+  const checkbox = screen.getByTestId('affiliation-independent'); expect(checkbox.getAttribute('type')).toBe('checkbox');
   await search('univ');
   expect(screen.getByTestId('affiliation-listbox').contains(checkbox)).toBe(false);
 });
-
 
 it('hides the independent checkbox once the author has an affiliation', () => {
   boot({ registry: [UI], authors: [author({ affiliations: [{ ref: 'ui' }] })] });
@@ -194,8 +180,7 @@ it('hides the independent checkbox once the author has an affiliation', () => {
 it('keeps create-manual and normalize as footer actions outside the listbox', async () => {
   boot({ registry: [UI], authors: [author({ affiliations: [{ name: 'Old Institute' }] })] });
   await search('univ');
-  const listbox = screen.getByTestId('affiliation-listbox');
-  expect(listbox.contains(screen.getByTestId('affiliation-create-manual'))).toBe(false);
+  const listbox = screen.getByTestId('affiliation-listbox'); expect(listbox.contains(screen.getByTestId('affiliation-create-manual'))).toBe(false);
   expect(listbox.contains(screen.getByTestId('affiliation-normalize'))).toBe(false);
 });
 
@@ -284,5 +269,31 @@ describe('AffiliationPicker multi-select dismissal and ROR toggling', () => {
     await search('univer');
     fireEvent.click(screen.getByTestId('affiliation-ror-item-0'));
     expect(onApply).toHaveBeenCalledWith({ registry: [UI], authors: [{ ...author(), affiliations: [] }] });
+  });
+});
+
+describe('AffiliationPicker selected chips', () => {
+  it('renders a chip per referenced entry below the combobox, never for independent', () => {
+    multiBoot({ registry: [UI, { id: 'independent', name: 'Independent researcher' }],
+      authors: [author({ affiliations: [{ ref: 'ui' }, { ref: 'independent' }] })] });
+    const chip = screen.getByTestId('affiliation-chip-ui');
+    expect(chip.textContent).toContain('University of Indonesia');
+    expect(screen.getByTestId('affiliation-search').compareDocumentPosition(chip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByTestId('affiliation-chip-independent')).toBeNull();
+    expect(screen.getByTestId('affiliation-chip-remove-ui').getAttribute('aria-label')).toBe('Remove University of Indonesia');
+  });
+  it("clicking a chip's remove button drops the ref and prunes the orphaned entry", () => {
+    const { onApply } = multiBoot({ registry: [UI], authors: [author({ affiliations: [{ ref: 'ui' }] })] });
+    fireEvent.click(screen.getByLabelText('Remove University of Indonesia'));
+    expect(onApply).toHaveBeenCalledWith({ registry: [], authors: [{ ...author(), affiliations: [] }] });
+    expect(screen.queryByTestId('affiliation-chips')).toBeNull();
+  });
+  it('keeps a shared entry while another author still references it', () => {
+    const { onApply } = multiBoot({ registry: [UI], authors: [
+      author({ affiliations: [{ ref: 'ui' }] }), author({ id: 'lee', affiliations: [{ ref: 'ui' }] })] });
+    fireEvent.click(screen.getByTestId('affiliation-chip-remove-ui'));
+    expect(onApply).toHaveBeenCalledWith({ authors: [
+      { ...author(), affiliations: [] }, author({ id: 'lee', affiliations: [{ ref: 'ui' }] })] });
+    expect(onApply.mock.calls[0]?.[0].registry).toBeUndefined(); expect(screen.queryByTestId('affiliation-chip-ui')).toBeNull();
   });
 });

@@ -12,6 +12,7 @@ import { isGroupAuthor } from '@opendraft/schema';
 import type { MetadataAuthor } from './use-manuscript-metadata';
 import { AuthorCard, type GroupOption } from './AuthorCard';
 import { AffiliationPicker } from './AffiliationPicker';
+import { pruneOrphans } from './affiliation-ops';
 import type { AffiliationEntry } from './byline-model';
 import { NARROW_QUERY, useMediaQuery } from '../../hooks/use-media-query';
 
@@ -53,7 +54,7 @@ const freshDraft = (registry: AffiliationEntry[]): Draft =>
 type Selection = number | 'draft' | null;
 
 /** Removed author held by the undo toast. */
-interface RemovedAuthor { author: MetadataAuthor; index: number; }
+interface RemovedAuthor { author: MetadataAuthor; index: number; registry: AffiliationEntry[]; }
 
 /** Reorder/remove/undo operations of the dialog. */
 interface AuthorOps {
@@ -113,6 +114,7 @@ function useAuthorOps(
   authors: MetadataAuthor[],
   setAuthors: (authors: MetadataAuthor[]) => void,
   setSelected: (selection: Selection) => void,
+  wired: { registry: AffiliationEntry[]; setAffiliations?: (a: AffiliationEntry[]) => void },
 ): AuthorOps {
   const [removed, setRemoved] = useState<RemovedAuthor | null>(null);
   useEffect(() => {
@@ -126,8 +128,10 @@ function useAuthorOps(
     setSelected(to);
   };
   const removeAt = (index: number): void => {
-    setRemoved({ author: authors[index], index });
-    setAuthors(authors.filter((_, i) => i !== index));
+    const remaining = authors.filter((_, i) => i !== index);
+    setRemoved({ author: authors[index], index, registry: wired.registry });
+    setAuthors(remaining);
+    wired.setAffiliations?.(pruneOrphans(wired.registry, remaining));
     setSelected(authors.length === 1 ? null : Math.min(index, authors.length - 2));
   };
   const undo = (): void => {
@@ -135,6 +139,7 @@ function useAuthorOps(
     const restored = [...authors];
     restored.splice(removed.index, 0, removed.author);
     setAuthors(restored);
+    if (wired.registry.length !== removed.registry.length) wired.setAffiliations?.(removed.registry);
     setSelected(removed.index);
     setRemoved(null);
   };
@@ -247,7 +252,8 @@ export function AuthorsDialog({
 }: AuthorsDialogProps): ReactNode {
   const [selected, setSelected] = useState<Selection>(startWithDraft ? 'draft' : initialIndex ?? 0);
   const [draft, setDraft] = useState<Draft>(() => freshDraft(affiliations ?? []));
-  const ops = useAuthorOps(authors, setAuthors, setSelected);
+  const ops = useAuthorOps(authors, setAuthors, setSelected,
+    { registry: affiliations ?? [], setAffiliations });
   useEscape(onClose);
   const groups = groupsOf(authors);
   const onDraftAffiliation = (change: AffilChange): void => setDraft((d) => ({
@@ -262,8 +268,7 @@ export function AuthorsDialog({
     setSelected(authors.length);
   };
   const startDraft = (): void => { setDraft(freshDraft(affiliations ?? [])); setSelected('draft'); };
-  const narrow = useMediaQuery(NARROW_QUERY);
-  const index = typeof selected === 'number' ? selected : null;
+  const narrow = useMediaQuery(NARROW_QUERY); const index = typeof selected === 'number' ? selected : null;
   const draftCard = (
     <div data-testid="author-card-draft">
       <AuthorCard author={draft.author} groups={groups} focusOrcid onChange={onDraftChange}

@@ -115,6 +115,20 @@ export function removeRef(
     ? { authors: next } : { registry: remaining, authors: next };
 }
 
+/**
+ * Drop registry entries that no author references anymore.
+ *
+ * @param registry - Current affiliation registry.
+ * @param authors - Author list to measure references against.
+ * @returns The registry without orphaned entries.
+ */
+export function pruneOrphans(
+  registry: AffiliationEntry[],
+  authors: MetadataAuthor[],
+): AffiliationEntry[] {
+  return registry.filter((e) => refUsage(authors, String(e.id)) > 0);
+}
+
 /** Convert legacy inline affiliations into registry entries plus refs. */
 export function normalizeToRefs(
   authors: MetadataAuthor[],

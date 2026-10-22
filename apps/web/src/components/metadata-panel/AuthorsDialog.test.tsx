@@ -188,6 +188,18 @@ describe('AuthorsDialog remove and undo', () => {
     const authors = await readAuthors(ws);
     expect(authors).toHaveLength(3); expect(authors[1]['id']).toBe('lee');
   });
+
+  it('removing an author prunes unreferenced registry entries and Undo restores them', async () => {
+    const ws = await boot();
+    fireEvent.click(screen.getByTestId('byline-author-0'));
+    fireEvent.click(screen.getByTestId('author-remove-0'));
+    await flushWrites();
+    expect((await readAffiliations(ws)).map((a) => (a as Record<string, unknown>)['id'])).toEqual(['rscm']);
+    fireEvent.click(screen.getByTestId('author-undo'));
+    await flushWrites();
+    expect((await readAuthors(ws)).map((a) => a['id'])).toEqual(['smith', 'lee', 'dwg']);
+    expect((await readAffiliations(ws)).map((a) => (a as Record<string, unknown>)['id'])).toEqual(['ui', 'rscm']);
+  });
 });
 
 describe('AuthorsDialog draft author', () => {
