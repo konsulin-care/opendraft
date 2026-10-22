@@ -1,10 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Author card tests: placeholder-only name fields, single-name literal
- * storage with author-type metadata, comma-paste split, particle/suffix
- * options, Person/Group toggle, icon fields with light grey bottom
- * borders, degrees, email, status toggles, on-behalf-of, CRediT pills
- * and the affiliation warning marker.
+ * Author card tests: name fields, single-name literal storage, toggles,
+ * icon fields, degrees, email validation, status, CRediT pills.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -104,7 +101,6 @@ describe('AuthorCard name editing', () => {
     expect(lastChange(onChange).name).toMatchObject({ particle: 'van' });
   });
 });
-
 describe('AuthorCard person/group toggle', () => {
   it('Group toggle stores {literal} and hides person-only fields', () => {
     const { onChange, rerender } = renderCard();
@@ -124,7 +120,6 @@ describe('AuthorCard person/group toggle', () => {
     expect(lastChange(onChange).name).toEqual({ literal: 'WHO DWG' });
   });
 });
-
 describe('AuthorCard fields', () => {
   it('toggling a CRediT pill writes its slug and toggling again removes it', () => {
     const { onChange, rerender } = renderCard();
@@ -275,5 +270,31 @@ describe('AuthorCard single-name literal storage', () => {
     expect(screen.getByTestId('author-type-person').getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByPlaceholderText('Name')).toBeDefined();
     expect(screen.queryByTestId('author-group-name')).toBeNull();
+  });
+});
+
+describe('AuthorCard email validation', () => {
+  it('flags a blurred invalid email and accepts a valid one', () => {
+    const { onChange, rerender } = renderCard({ id: 'x', name: { given: 'Ada', family: 'Lovelace' } });
+    fireEvent.change(screen.getByTestId('author-email'), { target: { value: 'foo@' } });
+    expect(lastChange(onChange).email).toBe('foo@');
+    follow(rerender, onChange);
+    fireEvent.blur(screen.getByTestId('author-email'));
+    expect(screen.getByRole('alert').textContent).toContain('Not a valid email address');
+    fireEvent.change(screen.getByTestId('author-email'), { target: { value: 'ada@example.org' } });
+    follow(rerender, onChange);
+    fireEvent.blur(screen.getByTestId('author-email'));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('warns when corresponding is ticked without email and clears it once filled', () => {
+    const { onChange, rerender } = renderCard({ id: 'x', name: { given: 'Ada', family: 'Lovelace' } });
+    fireEvent.click(screen.getByTestId('author-corresponding'));
+    follow(rerender, onChange);
+    expect(screen.getByText('Corresponding author needs an email')).toBeDefined();
+    fireEvent.change(screen.getByTestId('author-email'), { target: { value: 'ada@example.org' } });
+    expect(lastChange(onChange).email).toBe('ada@example.org');
+    follow(rerender, onChange);
+    expect(screen.queryByText('Corresponding author needs an email')).toBeNull();
   });
 });

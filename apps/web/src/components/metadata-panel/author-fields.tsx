@@ -8,6 +8,7 @@
  */
 import { useState, type ComponentPropsWithRef, type ReactNode } from 'react';
 import { GraduationCap, HeartHandshake, Link, Mail, Phone, Printer, StickyNote, type LucideIcon } from 'lucide-react';
+import { EMAIL_PATTERN } from '@opendraft/schema';
 import { INPUT } from './author-name-fields';
 import type { MetadataAuthor } from './use-manuscript-metadata';
 
@@ -140,14 +141,28 @@ export interface EmailFieldProps {
 
 /**
  * Email input with a mail icon, shared by the person and group bodies.
+ * Validated on blur against {@link EMAIL_PATTERN}; an invalid value
+ * shows a non-blocking inline alert. A corresponding author without
+ * an email gets a non-blocking warning. Neither blocks onChange.
  *
  * @param props - See {@link EmailFieldProps}.
- * @returns The email icon field.
+ * @returns The email icon field plus the inline messages.
  */
 export function EmailField({ author, apply }: EmailFieldProps): ReactNode {
+  const [invalid, setInvalid] = useState(false);
+  const email = typeof author.email === 'string' ? author.email : '';
   return (
-    <IconField icon={<Mail aria-hidden className="size-4" />} testid="author-email" ariaLabel="Email" placeholder="Email"
-      value={typeof author.email === 'string' ? author.email : ''}
-      onChange={(event) => apply(setStr(author, 'email', event.target.value))} />
+    <>
+      <IconField icon={<Mail aria-hidden className="size-4" />} testid="author-email" ariaLabel="Email" placeholder="Email"
+        value={email}
+        onChange={(event) => { setInvalid(false); apply(setStr(author, 'email', event.target.value)); }}
+        onBlur={(event) => setInvalid(event.target.value !== '' && !EMAIL_PATTERN.test(event.target.value))} />
+      {invalid && (
+        <p role="alert" data-testid="author-email-error" className="text-sm text-red-700">Not a valid email address</p>
+      )}
+      {author.corresponding === true && email === '' && (
+        <p data-testid="author-email-warning" className="text-sm text-amber-800">Corresponding author needs an email</p>
+      )}
+    </>
   );
 }
