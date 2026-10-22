@@ -279,7 +279,7 @@ describe('Responsive header actions (source scan)', () => {
 
   it('keeps the mode toggle and Commit hidden below md, in the overflow menu instead', () => {
     expect(read('ModeSwitch.tsx')).toMatch(/className="[^"]*\bhidden\b[^"]*\bmd:flex\b/);
-    expect(read('AppHeader.tsx')).toMatch(/bg-gray-900 text-white hover:bg-gray-800[^\n]*hidden md:inline-flex/);
+    expect(read('AppHeader.tsx')).toMatch(/bg-black text-white hover:bg-gray-900[^\n]*hidden md:inline-flex/);
     expect(read('AppHeader.tsx')).toMatch(/className=\{COMMIT_BUTTON\}/);
     expect(read('HeaderOverflowMenu.tsx')).toMatch(/className="relative md:hidden"/);
   });

@@ -24,7 +24,7 @@ export interface AuthorCardProps {
 const INPUT = 'min-h-11 w-full outline-none';
 /** Pill styling shared by the type toggle and the CRediT pills. */
 const pillClass = (active: boolean): string =>
-  `rounded border px-2 py-1 text-sm ${active ? 'border-blue-600 bg-blue-600 text-white' : 'border-secondary bg-white hover:bg-hover'}`;
+  `rounded border px-2 py-1 text-sm ${active ? 'border-black bg-black text-white' : 'border-secondary bg-white hover:bg-hover'}`;
 
 /** The 14 CRediT roles as label/tooltip pairs; slugs derive from labels. */
 const CREDIT_ROLES: ReadonlyArray<readonly [string, string]> = [

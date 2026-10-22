@@ -109,7 +109,7 @@ function DialogFooter({
       <button
         type="submit"
         disabled={!canCreate}
-        className="rounded-md bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+        className="rounded-md bg-black px-3 py-1 text-sm text-white hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
       >
         Create
       </button>

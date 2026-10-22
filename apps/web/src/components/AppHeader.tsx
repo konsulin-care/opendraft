@@ -30,7 +30,7 @@ const ICON_BUTTON =
   'inline-flex items-center justify-center rounded-md p-2 text-gray-600 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-500';
 
 const COMMIT_BUTTON =
-  'h-9 inline-flex items-center justify-center gap-1 rounded-md p-2 bg-gray-900 text-white hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-500 hidden md:inline-flex';
+  'h-9 inline-flex items-center justify-center gap-1 rounded-md p-2 bg-black text-white hover:bg-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-500 hidden md:inline-flex';
 
 /** Props for {@link SaveIndicator}. */
 interface SaveIndicatorProps {

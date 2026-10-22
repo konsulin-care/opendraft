@@ -137,3 +137,23 @@ describe('AuthorCard fields', () => {
     expect(lastChange(onChange)['on-behalf-of']).toBe('dwg');
   });
 });
+
+describe('AuthorCard black accent', () => {
+  it('styles the active Person pill with the black token, not blue-600', () => {
+    renderCard();
+    const person = screen.getByTestId('author-type-person');
+    expect(person.className).toMatch(/\bbg-black\b/);
+    expect(person.className).toMatch(/\bborder-black\b/);
+    expect(person.className).not.toMatch(/blue-600/);
+    const inactive = screen.getByTestId('author-type-group');
+    expect(inactive.className).not.toMatch(/\bbg-black\b/);
+  });
+
+  it('styles a pressed CRediT pill with the black token, not blue-600', () => {
+    renderCard({ ...PERSON, roles: ['conceptualization'] });
+    const pill = screen.getByTestId('credit-conceptualization');
+    expect(pill.getAttribute('aria-pressed')).toBe('true');
+    expect(pill.className).toMatch(/\bbg-black\b/);
+    expect(pill.className).not.toMatch(/blue-600/);
+  });
+});
