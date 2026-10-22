@@ -108,6 +108,16 @@ export interface AuthorObject {
    * Members of a group or consortium author.
    */
   members?: MemberObject[];
+  /**
+   * Quarto-safe metadata bag for extra author keys.
+   */
+  metadata?: {
+    /**
+     * Explicit author type; when absent, a literal-only name is treated as a group.
+     */
+    'author-type'?: 'person' | 'group';
+    [k: string]: unknown;
+  };
   [k: string]: unknown;
 }
 /**

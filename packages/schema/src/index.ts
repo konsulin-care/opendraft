@@ -3,6 +3,7 @@ export { validateOpendraft } from './opendraft.js';
 export { validateManuscript } from './manuscript.js';
 export { validateMetadata, type MetadataType } from './metadata.js';
 export { checkAuthorIntegrity } from './author-integrity.js';
+export { isGroupAuthor } from './author-type.js';
 export {
   resolvePublishIdentity,
   normalizeRepositoryUrl,

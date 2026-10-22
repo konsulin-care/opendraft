@@ -189,6 +189,18 @@
           "items": {
             "$ref": "#/definitions/memberObject"
           }
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Quarto-safe metadata bag for extra author keys.",
+          "properties": {
+            "author-type": {
+              "type": "string",
+              "enum": ["person", "group"],
+              "description": "Explicit author type; when absent, a literal-only name is treated as a group."
+            }
+          },
+          "additionalProperties": true
         }
       },
       "required": ["name"],
