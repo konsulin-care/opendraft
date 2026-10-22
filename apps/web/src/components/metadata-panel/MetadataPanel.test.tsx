@@ -140,6 +140,42 @@ describe('MetadataPanel collapsed bar', () => {
   });
 });
 
+describe('MetadataPanel collapse/expand body', () => {
+  it('collapsed: bar title and byline render, body is grid-rows 0fr and aria-hidden', async () => {
+    const ws = await seededWorkspace({
+      [`${ROOT}/_frontmatter.yml`]: FRONTMATTER,
+      [`${ROOT}/_author.yml`]: AUTHORS,
+    });
+    await renderPanel(ws);
+    expect(screen.getByTestId('metadata-panel-bar-title').textContent).toBe('Deep Dive');
+    expect(screen.getByTestId('metadata-panel-byline').textContent).toContain(
+      'Alice Marie Smith, Budi Lee',
+    );
+    const body = screen.getByTestId('metadata-panel-body');
+    expect(body.className).toContain('grid-rows-[0fr]');
+    expect(body.getAttribute('aria-hidden')).toBe('true');
+    expect(body.hasAttribute('inert')).toBe(true);
+  });
+
+  it('expanded: title and byline render once in the animated body, not in the bar', async () => {
+    const ws = await seededWorkspace({
+      [`${ROOT}/_frontmatter.yml`]: FRONTMATTER,
+      [`${ROOT}/_author.yml`]: AUTHORS,
+    });
+    await renderPanel(ws);
+    fireEvent.click(screen.getByTestId('metadata-panel-toggle'));
+    expect(screen.queryByTestId('metadata-panel-bar-title')).toBeNull();
+    expect(screen.queryByTestId('metadata-panel-byline')).toBeNull();
+    expect(screen.getAllByTestId('metadata-panel-title-input')).toHaveLength(1);
+    expect(screen.getAllByTestId('article-byline')).toHaveLength(1);
+    const body = screen.getByTestId('metadata-panel-body');
+    expect(body.className).toContain('grid-rows-[1fr]');
+    expect(body.className).toMatch(/transition/);
+    expect(body.getAttribute('aria-hidden')).toBeNull();
+    expect(body.hasAttribute('inert')).toBe(false);
+  });
+});
+
 describe('MetadataPanel expanded state', () => {
   it('mounts expanded when the title is missing', async () => {
     const ws = await seededWorkspace({ [`${ROOT}/_author.yml`]: AUTHORS });

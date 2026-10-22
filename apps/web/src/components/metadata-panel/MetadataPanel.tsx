@@ -152,16 +152,15 @@ function PinnedBar({ title, byline, expanded, narrow, badge, onToggle }: PinnedB
     <>
       <div className="flex items-center gap-2 py-2" data-testid="metadata-panel-bar">
         <div className="min-w-0 flex-1">
-          <div
-            data-testid="metadata-panel-bar-title"
-            className={narrow ? 'line-clamp-2' : 'truncate'}
-          >
-            {title || 'Untitled manuscript'}
-          </div>
-          {byline && (
-            <div className="truncate text-sm text-muted" data-testid="metadata-panel-byline">
-              {byline}
-            </div>
+          {!expanded && (
+            <>
+              <div data-testid="metadata-panel-bar-title" className={narrow ? 'line-clamp-2' : 'truncate'}>
+                {title || 'Untitled manuscript'}
+              </div>
+              {byline && (
+                <div className="truncate text-sm text-muted" data-testid="metadata-panel-byline">{byline}</div>
+              )}
+            </>
           )}
         </div>
         {badge}
@@ -210,38 +209,43 @@ function useIssueFocus(expanded: boolean, setExpanded: (next: boolean) => void):
   return { dialogIndex, select, close };
 }
 
-/** Props for {@link ExpandedBody}. */
-interface ExpandedBodyProps {
+/** Props for {@link PanelBody}. */
+interface PanelBodyProps {
   meta: UseManuscriptMetadataResult;
+  expanded: boolean;
   dialogIndex: number | null;
   onClose(): void;
 }
 
 /**
- * Expanded panel body: the article view plus the authors dialog opened
- * on the author an issue pointed at.
+ * Animated panel body: the article view plus the authors dialog opened
+ * on the author an issue pointed at. A grid-rows wrapper (0fr <-> 1fr)
+ * animates open/close; collapsed it is aria-hidden and inert.
  *
- * @param props - See {@link ExpandedBodyProps}.
- * @returns The expanded body element.
+ * @param props - See {@link PanelBodyProps}.
+ * @returns The animating body wrapper element.
  */
-function ExpandedBody({ meta, dialogIndex, onClose }: ExpandedBodyProps): ReactNode {
+function PanelBody({ meta, expanded, dialogIndex, onClose }: PanelBodyProps): ReactNode {
   const { frontmatter } = meta;
   const keywords = useMemo(() => (Array.isArray(frontmatter.keywords) ? frontmatter.keywords : []) as string[], [frontmatter.keywords]);
   return (
-    <div data-testid="metadata-panel-expanded">
-      <ArticleView
-        title={meta.title} authors={meta.authors} affiliations={meta.affiliations}
-        frontmatter={frontmatter} setTitle={meta.setTitle} abstract={meta.abstract}
-        setAbstract={meta.setAbstract} keywords={keywords}
-        setKeywords={(next) => meta.setFrontmatterField('keywords', next)}
-        setAuthors={meta.setAuthors} setAffiliations={meta.setAffiliations}
-        setFrontmatterField={meta.setFrontmatterField}
-      />
-      {dialogIndex !== null && (
-        <AuthorsDialog authors={meta.authors} setAuthors={meta.setAuthors}
-          affiliations={meta.affiliations} setAffiliations={meta.setAffiliations}
-          initialIndex={dialogIndex} onClose={onClose} />
-      )}
+    <div data-testid="metadata-panel-body" aria-hidden={!expanded || undefined} inert={!expanded}
+      className={`grid transition-[grid-template-rows] duration-200 ease-out ${expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+      <div data-testid={expanded ? 'metadata-panel-expanded' : undefined} className="min-h-0 overflow-hidden">
+        <ArticleView
+          title={meta.title} authors={meta.authors} affiliations={meta.affiliations}
+          frontmatter={frontmatter} setTitle={meta.setTitle} abstract={meta.abstract}
+          setAbstract={meta.setAbstract} keywords={keywords}
+          setKeywords={(next) => meta.setFrontmatterField('keywords', next)}
+          setAuthors={meta.setAuthors} setAffiliations={meta.setAffiliations}
+          setFrontmatterField={meta.setFrontmatterField}
+        />
+        {dialogIndex !== null && (
+          <AuthorsDialog authors={meta.authors} setAuthors={meta.setAuthors}
+            affiliations={meta.affiliations} setAffiliations={meta.setAffiliations}
+            initialIndex={dialogIndex} onClose={onClose} />
+        )}
+      </div>
     </div>
   );
 }
@@ -289,7 +293,7 @@ export function MetadataPanel({
       <PinnedBar title={title} byline={narrow ? `${authors.length} authors` : byline}
         expanded={expanded} narrow={narrow} onToggle={toggle}
         badge={<ValidationBadge issues={issues} onSelect={issueFocus.select} onOpen={openIssues} />} />
-      {expanded && <ExpandedBody meta={meta} dialogIndex={issueFocus.dialogIndex} onClose={issueFocus.close} />}
+      <PanelBody meta={meta} expanded={expanded} dialogIndex={issueFocus.dialogIndex} onClose={issueFocus.close} />
     </section>
   );
 }
