@@ -89,14 +89,23 @@ describe('ArticleView byline', () => {
 });
 
 describe('ArticleView footnotes and collaborators', () => {
-  it('lists numbered affiliations and only the symbols in use', () => {
+  it('lists numbered affiliations once under the byline, footnotes with symbols only', () => {
     renderView();
+    const list = screen.getByTestId('affiliation-list').textContent ?? '';
+    expect(list).toContain('1. University of Indonesia');
+    expect(list).toContain('2. RS Pondok Indah Cempaka Putih');
     const notes = screen.getByTestId('byline-footnotes').textContent ?? '';
-    expect(notes).toContain('1. University of Indonesia');
-    expect(notes).toContain('2. RS Pondok Indah Cempaka Putih');
     expect(notes).toContain('* Corresponding author');
     expect(notes).toContain('† Equal contribution');
     expect(notes).not.toContain('‡');
+    expect(notes).not.toContain('University of Indonesia');
+  });
+
+  it('renders each affiliation name exactly once for two authors', () => {
+    renderView();
+    const text = screen.getByTestId('metadata-article-view').textContent ?? '';
+    expect(text.split('University of Indonesia')).toHaveLength(2);
+    expect(text.split('RS Pondok Indah Cempaka Putih')).toHaveLength(2);
   });
 
   it('collapses the collaborator list behind a toggle', () => {

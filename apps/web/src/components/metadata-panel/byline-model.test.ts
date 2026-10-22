@@ -68,15 +68,24 @@ describe('buildByline superscripts and affiliation order', () => {
 });
 
 describe('buildByline footnotes', () => {
-  it('lists numbered affiliations and every symbol in use', () => {
+  it('contains only the symbol lines in use, never numbered affiliations', () => {
     const model = buildByline(AUTHORS, REGISTRY);
     expect(model.footnotes).toEqual([
-      '1. University of Indonesia',
-      '2. RS Pondok Indah Cempaka Putih',
-      '3. Eijkman Institute for Molecular Biology',
       '* Corresponding author',
       '† Equal contribution',
       '‡ Deceased',
+    ]);
+    const joined = model.footnotes.join('\n');
+    expect(joined).not.toContain('University of Indonesia');
+    expect(model.footnotes.some((line) => /^\d+\./.test(line))).toBe(false);
+  });
+
+  it('keeps numbered affiliations in the affiliation list, rendered once', () => {
+    const model = buildByline(AUTHORS, REGISTRY);
+    expect(model.affiliations.map((a) => `${a.number}. ${a.name}`)).toEqual([
+      '1. University of Indonesia',
+      '2. RS Pondok Indah Cempaka Putih',
+      '3. Eijkman Institute for Molecular Biology',
     ]);
   });
 
@@ -85,7 +94,7 @@ describe('buildByline footnotes', () => {
       { id: 'a', name: { given: 'Ada', family: 'Lovelace' }, affiliations: [{ ref: 'ui' }] },
     ];
     const model = buildByline(plain, REGISTRY);
-    expect(model.footnotes).toEqual(['1. University of Indonesia']);
+    expect(model.footnotes).toEqual([]);
     expect(model.footnotes.some((line) => line.includes('†'))).toBe(false);
     expect(model.footnotes.some((line) => line.includes('‡'))).toBe(false);
     expect(model.footnotes.some((line) => line.includes('*'))).toBe(false);

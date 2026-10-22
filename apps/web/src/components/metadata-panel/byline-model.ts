@@ -248,10 +248,9 @@ function buildEntry(
   };
 }
 
-/** Footnote lines: numbered affiliations, then symbols in use only. */
-function buildFootnotes(entries: BylineAuthor[], order: BylineAffiliation[]): string[] {
+/** Footnote lines: symbols in use only; affiliations live in the list. */
+function buildFootnotes(entries: BylineAuthor[]): string[] {
   return [
-    ...order.map((entry) => `${entry.number}. ${entry.name}`),
     ...(entries.some((entry) => entry.corresponding) ? ['* Corresponding author'] : []),
     ...(entries.some((entry) => entry.equal) ? ['† Equal contribution'] : []),
     ...(entries.some((entry) => entry.deceased) ? ['‡ Deceased'] : []),
@@ -262,8 +261,8 @@ function buildFootnotes(entries: BylineAuthor[], order: BylineAffiliation[]): st
  * Build the complete byline model for a manuscript's authors.
  *
  * Affiliation superscripts are numbered by first appearance in author
- * order; footnotes contain the numbered affiliation lines plus only the
- * symbol lines (`*`, `†`, `‡`) actually in use.
+ * order; footnotes contain only the symbol lines (`*`, `†`, `‡`) actually
+ * in use — numbered affiliations render once via {@link BylineModel.affiliations}.
  *
  * @param authors - Author entries of _author.yml in file order.
  * @param affiliations - Affiliation registry entries (id + name).
@@ -280,7 +279,7 @@ export function buildByline(
   return {
     authors: entries,
     affiliations: ctx.numbering.order,
-    footnotes: buildFootnotes(entries, ctx.numbering.order),
+    footnotes: buildFootnotes(entries),
     collaborators: entries
       .filter((entry) => entry.group && entry.members.length > 0)
       .map((entry) => ({
