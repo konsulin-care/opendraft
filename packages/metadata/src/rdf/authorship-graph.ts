@@ -4,6 +4,7 @@
  * links, affiliate roles, agents with datacite identifier nodes, foaf
  * groups with members, and the dcterms:creator shortcut.
  */
+import { isGroupAuthor } from '@opendraft/schema';
 import { normalizeOrcid, normalizeRor } from './identifiers.js';
 import type {
   AffiliationObject,
@@ -88,12 +89,6 @@ function identifierNode(scheme: 'orcid' | 'ror', value: string): string {
   );
 }
 
-function groupLiteral(name: NameValue): string | null {
-  if (typeof name !== 'object' || name === null) return null;
-  const literal = name.literal;
-  return typeof literal === 'string' && literal.length > 0 ? literal : null;
-}
-
 function namePairs(name: NameValue): string[] {
   if (typeof name === 'string') return [`${FOAF}name> ${literalString(name)}`];
   if (typeof name !== 'object' || name === null) return [];
@@ -111,7 +106,7 @@ function namePairs(name: NameValue): string[] {
 }
 
 function agentTerm(author: AuthorObject, index: number): string {
-  if (groupLiteral(author.name) !== null) return `_:group-${index}`;
+  if (isGroupAuthor(author)) return `_:group-${index}`;
   const orcid = normalizeOrcid(author.orcid);
   return orcid ? termRef(orcid.iri) : `_:author-${index}`;
 }
@@ -157,7 +152,7 @@ function buildContext(input: AuthorshipGraphInput): AuthorshipContext {
   const agents = input.authors.map((author, index) => agentTerm(author, index));
   const groups = new Map<string, string>();
   input.authors.forEach((author, index) => {
-    if (author.id && groupLiteral(author.name) !== null) groups.set(author.id, agents[index]);
+    if (author.id && isGroupAuthor(author)) groups.set(author.id, agents[index]);
   });
   const equal = input.authors.flatMap((author, index) =>
     author['equal-contributor'] === true ? [index] : [],
@@ -204,7 +199,7 @@ function publicationBlock(ctx: AuthorshipContext): string {
 /** One pro:author role node with flags, chain links and CRediT roles. */
 function authorRoleBlock(author: AuthorObject, index: number, ctx: AuthorshipContext): string {
   const roleValues = [`${PRO}author>`];
-  if (groupLiteral(author.name) !== null) roleValues.push(`${SCORO}consortium-author>`);
+  if (isGroupAuthor(author)) roleValues.push(`${SCORO}consortium-author>`);
   if (author.corresponding === true) roleValues.push(`${SCORO}corresponding-author>`);
   for (const slug of author.roles ?? []) roleValues.push(`${CREDIT}${slug}>`);
   const pairs = [
@@ -233,8 +228,7 @@ function affiliateBlock(role: AffiliateRole): string {
 }
 
 function agentBlock(author: AuthorObject, index: number, ctx: AuthorshipContext): string {
-  const literal = groupLiteral(author.name);
-  if (literal !== null) return groupBlock(author, index, ctx, literal);
+  if (isGroupAuthor(author)) return groupBlock(author, index, ctx);
   const pairs = [`a ${FOAF}Person>`, ...namePairs(author.name)];
   if (author.corresponding === true && typeof author.email === 'string' && author.email.length > 0) {
     pairs.push(`${FOAF}mbox> <mailto:${author.email}>`);
@@ -245,13 +239,8 @@ function agentBlock(author: AuthorObject, index: number, ctx: AuthorshipContext)
   return block(ctx.agents[index], pairs);
 }
 
-function groupBlock(
-  author: AuthorObject,
-  index: number,
-  ctx: AuthorshipContext,
-  literal: string,
-): string {
-  const pairs = [`a ${FOAF}Group>`, `${FOAF}name> ${literalString(literal)}`];
+function groupBlock(author: AuthorObject, index: number, ctx: AuthorshipContext): string {
+  const pairs = [`a ${FOAF}Group>`, ...namePairs(author.name)];
   const members = (author.members ?? []).map((member, slot) => memberTerm(index, slot, member));
   if (members.length > 0) pairs.push(`${FOAF}member> ${members.join(' , ')}`);
   return block(ctx.agents[index], pairs);

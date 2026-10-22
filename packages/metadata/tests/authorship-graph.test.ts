@@ -85,6 +85,20 @@ async function loadFragment(turtle: string): Promise<TurtleDataset> {
   return loadTurtle(file);
 }
 
+/** Emit a one-author graph and parse it into Seen rows. */
+async function singleAuthorSeen(author: AuthorObject): Promise<Seen[]> {
+  const turtle = emitAuthorshipGraph({ publication: PUB, authors: [author] });
+  const quads = [...(await loadFragment(turtle))];
+  return quads.map((q) => ({
+    s: q.subject.value,
+    skind: q.subject.termType,
+    p: q.predicate.value,
+    o: q.object.value,
+    kind: q.object.termType,
+    datatype: q.object.termType === 'Literal' ? q.object.datatype.value : undefined,
+  }));
+}
+
 /** Follow oco:hasNext from the unique head; returns the visited chain. */
 function walkChain(authorRoles: string[]): string[] {
   const head = authorRoles.find((role) => subjects(`${OCO}hasNext`, role).length === 0);
@@ -229,5 +243,35 @@ describe('identifiers, organizations and shortcuts', () => {
     const context = values(PUB, `${PRO}isDocumentContextFor`);
     expect(context).toHaveLength(8);
     expect(chain.every((role) => context.includes(role))).toBe(true);
+  });
+});
+
+describe('single-name authors and explicit author type', () => {
+  it('emits a literal-only name with author-type person as foaf:Person', async () => {
+    const rows = await singleAuthorSeen({
+      name: { literal: 'Plato' },
+      metadata: { 'author-type': 'person' },
+    });
+    const person = rows.find((q) => q.p === RDF_TYPE && q.o === `${FOAF}Person`);
+    expect(person).toBeDefined();
+    expect(person?.skind).toBe('BlankNode');
+    expect(rows.filter((q) => q.p === RDF_TYPE && q.o === `${FOAF}Group`)).toHaveLength(0);
+    expect(rows.filter((q) => q.p === `${FOAF}name`).map((q) => q.o)).toEqual(['Plato']);
+  });
+
+  it('emits author-type group as foaf:Group with its name', async () => {
+    const rows = await singleAuthorSeen({
+      name: { literal: 'Plato Collective' },
+      metadata: { 'author-type': 'group' },
+    });
+    expect(rows.find((q) => q.p === RDF_TYPE && q.o === `${FOAF}Group`)).toBeDefined();
+    expect(rows.filter((q) => q.p === RDF_TYPE && q.o === `${FOAF}Person`)).toHaveLength(0);
+    expect(rows.filter((q) => q.p === `${FOAF}name`).map((q) => q.o)).toEqual(['Plato Collective']);
+  });
+
+  it('keeps legacy literal-only names without author-type as foaf:Group', async () => {
+    const rows = await singleAuthorSeen({ name: { literal: 'Legacy Consortium' } });
+    expect(rows.find((q) => q.p === RDF_TYPE && q.o === `${FOAF}Group`)).toBeDefined();
+    expect(rows.filter((q) => q.p === RDF_TYPE && q.o === `${FOAF}Person`)).toHaveLength(0);
   });
 });
