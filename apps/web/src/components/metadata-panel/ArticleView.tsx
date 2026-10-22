@@ -177,7 +177,7 @@ export function ArticleView({
   return (
     <div data-testid="metadata-article-view" className="py-3">
       <TitleField title={title} setTitle={setTitle} onEnter={() => abstractRef.current?.focus()} />
-      <Byline model={model} onOpenName={setDialogIndex} />
+      <Byline model={model} authors={authors} setAuthors={setAuthors} onOpenName={setDialogIndex} />
       {model.collaborators.map((group) => (
         <CollaboratorItem key={group.key} group={group} />
       ))}

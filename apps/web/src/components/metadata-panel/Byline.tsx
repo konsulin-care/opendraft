@@ -6,11 +6,15 @@
  *
  * The add-author button is a pulsing black CTA while the manuscript has
  * no authors and reverts to the muted default style once at least one
- * author exists.
+ * author exists. Name chips open the author form on click; pressing and
+ * holding a chip for the hold threshold then dropping on another chip
+ * reorders the authors — no drag handle is rendered.
  */
 import { useState, type ReactNode } from 'react';
 import { Info, Plus } from 'lucide-react';
 import type { BylineModel } from './byline-model';
+import type { MetadataAuthor } from './use-manuscript-metadata';
+import { usePressDrag } from './use-press-drag';
 
 /** Icon size used by the ORCID marker. */
 const ICON = 'inline size-4 shrink-0';
@@ -19,6 +23,10 @@ const ICON = 'inline size-4 shrink-0';
 export interface BylineProps {
   /** Derived byline model of the manuscript. */
   model: BylineModel;
+  /** Raw author entries in authorship order, used for press-drag reordering. */
+  authors: MetadataAuthor[];
+  /** Persist the reordered author array to _author.yml. */
+  setAuthors: (authors: MetadataAuthor[]) => void;
   /** Open the author form; receives the author index, or -1 for a draft. */
   onOpenName: (index: number) => void;
 }
@@ -47,10 +55,12 @@ function AuthorTooltip({ author, index }: { author: BylineModel['authors'][numbe
 
 /** One byline segment: name button, superscripts, ORCID marker, tooltip. */
 function BylineName(
-  { author, index, onOpen }: {
+  { author, index, onOpen, dragging, filterClick }: {
     author: BylineModel['authors'][number];
     index: number;
     onOpen: (index: number) => void;
+    dragging: boolean;
+    filterClick: () => boolean;
   },
 ): ReactNode {
   const [open, setOpen] = useState(false);
@@ -62,13 +72,17 @@ function BylineName(
       <button
         type="button"
         data-testid={`byline-author-${index}`}
+        data-press-index={index}
+        data-dragging={dragging || undefined}
         aria-describedby={open ? `byline-tooltip-${index}` : undefined}
-        onClick={() => onOpen(index)}
+        onClick={() => {
+          if (filterClick()) onOpen(index);
+        }}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
-        className="min-h-11 rounded px-0.5 hover:bg-hover"
+        className={`min-h-11 touch-none rounded px-0.5 hover:bg-hover${dragging ? ' opacity-50' : ''}`}
       >
         {author.name}
         {author.onBehalfOf && <span> {author.onBehalfOf}</span>}
@@ -88,13 +102,33 @@ function BylineName(
  * @param props - See {@link BylineProps}.
  * @returns The rendered byline block.
  */
-export function Byline({ model, onOpenName }: BylineProps): ReactNode {
+export function Byline({ model, authors, setAuthors, onOpenName }: BylineProps): ReactNode {
+  const drag = usePressDrag({
+    onReorder: (from, to) => {
+      const next = authors.slice();
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      setAuthors(next);
+    },
+  });
   return (
-    <div className="mt-1 text-sm" data-testid="article-byline">
+    <div
+      className="mt-1 text-sm"
+      data-testid="article-byline"
+      onPointerDown={drag.onPointerDown}
+      onPointerUp={drag.onPointerUp}
+      onPointerCancel={drag.onPointerCancel}
+    >
       {model.authors.map((author, index) => (
         <span key={author.key}>
           {index > 0 && ', '}
-          <BylineName author={author} index={index} onOpen={onOpenName} />
+          <BylineName
+            author={author}
+            index={index}
+            onOpen={onOpenName}
+            dragging={drag.dragging === index}
+            filterClick={drag.filterClick}
+          />
         </span>
       ))}
       <button
