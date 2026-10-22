@@ -56,7 +56,7 @@ function MoreNameOptions({ name, setName }: {
   );
   return (
     <>
-      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="text-sm text-muted hover:bg-hover">More name options</button>
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="text-sm text-muted hover:bg-hover">{open ? 'Hide name options' : 'More name options'}</button>
       {open && field('particle', 'Particle (e.g. van)')}
       {open && field('suffix', 'Suffix (e.g. Jr.)')}
     </>

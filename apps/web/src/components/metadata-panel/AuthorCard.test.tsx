@@ -172,6 +172,43 @@ describe('AuthorCard placeholder-only name fields', () => {
   });
 });
 
+describe('AuthorCard name options toggle label', () => {
+  it('flips More name options to Hide name options showing particle/suffix', () => {
+    renderCard();
+    const toggle = screen.getByRole('button', { name: 'More name options' });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByTestId('author-particle')).toBeNull();
+    fireEvent.click(toggle);
+    expect(screen.getByTestId('author-particle')).toBeDefined();
+    expect(screen.getByTestId('author-suffix')).toBeDefined();
+    const hide = screen.getByRole('button', { name: 'Hide name options' });
+    expect(hide.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(hide);
+    expect(screen.queryByTestId('author-particle')).toBeNull();
+    expect(screen.queryByTestId('author-suffix')).toBeNull();
+    const reopened = screen.getByRole('button', { name: 'More name options' });
+    expect(reopened.getAttribute('aria-expanded')).toBe('false');
+  });
+});
+
+describe('AuthorCard contact details toggle label', () => {
+  it('flips More contact details to Hide contact details showing the extra fields', () => {
+    renderCard();
+    const keys = ['url', 'phone', 'fax', 'note', 'acknowledgements'];
+    const toggle = screen.getByRole('button', { name: 'More contact details' });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    keys.forEach((key) => expect(screen.queryByTestId(`author-${key}`)).toBeNull());
+    fireEvent.click(toggle);
+    keys.forEach((key) => expect(screen.getByTestId(`author-${key}`)).toBeDefined());
+    const hide = screen.getByRole('button', { name: 'Hide contact details' });
+    expect(hide.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(hide);
+    keys.forEach((key) => expect(screen.queryByTestId(`author-${key}`)).toBeNull());
+    const reopened = screen.getByRole('button', { name: 'More contact details' });
+    expect(reopened.getAttribute('aria-expanded')).toBe('false');
+  });
+});
+
 describe('AuthorCard single-name literal storage', () => {
   it('ticking shows one input with placeholder Name storing a literal person', () => {
     const { onChange, rerender } = renderCard({ id: 'dewi', name: { given: '', family: '' } });

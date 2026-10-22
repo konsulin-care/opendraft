@@ -147,12 +147,12 @@ function CreditPills({ roles, onToggle }: { roles: string[]; onToggle: (slug: st
   );
 }
 
-// Collapsible "More" section: url, phone, fax, note, acknowledgements.
+// Collapsible contact section: url, phone, fax, note, acknowledgements.
 function MoreFields({ author, onChange }: { author: MetadataAuthor; onChange: (next: MetadataAuthor) => void }): ReactNode {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="text-sm text-muted hover:bg-hover">More</button>
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="text-sm text-muted hover:bg-hover">{open ? 'Hide contact details' : 'More contact details'}</button>
       {open && ['url', 'phone', 'fax', 'note', 'acknowledgements'].map((key) => (
         <input key={key} data-testid={`author-${key}`} aria-label={key} className={INPUT}
           value={typeof author[key] === 'string' ? author[key] : ''} onChange={(event) => onChange(setStr(author, key, event.target.value))} />
