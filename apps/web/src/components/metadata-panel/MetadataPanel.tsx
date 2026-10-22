@@ -150,7 +150,7 @@ interface PinnedBarProps {
 function PinnedBar({ title, byline, expanded, narrow, badge, onToggle }: PinnedBarProps): ReactNode {
   return (
     <>
-      <div className="flex items-center gap-2 px-4 py-2" data-testid="metadata-panel-bar">
+      <div className="flex items-center gap-2 py-2" data-testid="metadata-panel-bar">
         <div className="min-w-0 flex-1">
           <div
             data-testid="metadata-panel-bar-title"

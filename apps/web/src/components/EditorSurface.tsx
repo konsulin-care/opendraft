@@ -44,8 +44,10 @@ export function EditorSurface({
           position: "relative",
         }}
       >
-        {mode === "wysiwyg" && panel}
-        <Milkdown />
+        <div className="reading-column">
+          {mode === "wysiwyg" && panel}
+          <Milkdown />
+        </div>
       </div>
       <div
         tabIndex={-1}
@@ -55,14 +57,16 @@ export function EditorSurface({
           overflow: "auto",
         }}
       >
-        {mode === "source" && panel}
-        <SourceEditor
-          ref={sourceEditorRef}
-          value={sourceMarkdown}
-          onChange={onSourceChange}
-          className="source-editor"
-          language={sourceLanguage}
-        />
+        <div className="reading-column">
+          {mode === "source" && panel}
+          <SourceEditor
+            ref={sourceEditorRef}
+            value={sourceMarkdown}
+            onChange={onSourceChange}
+            className="source-editor"
+            language={sourceLanguage}
+          />
+        </div>
       </div>
     </div>
   );

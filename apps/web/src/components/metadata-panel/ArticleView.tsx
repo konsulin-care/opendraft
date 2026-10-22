@@ -251,7 +251,7 @@ export function ArticleView({
   // Dialog target: author index, or -1 for a new draft author.
   const [dialogIndex, setDialogIndex] = useState<number | null>(null);
   return (
-    <div data-testid="metadata-article-view" className="px-4 py-3">
+    <div data-testid="metadata-article-view" className="py-3">
       <TitleField title={title} setTitle={setTitle} onEnter={() => abstractRef.current?.focus()} />
       <Byline model={model} onOpenName={setDialogIndex} />
       {model.collaborators.map((group) => (
