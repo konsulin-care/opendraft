@@ -132,7 +132,7 @@ it('adds a registry entry and author ref for a picked ROR result', async () => {
     registry: [UI, ROR_ENTRY],
     authors: [{ ...author(), affiliations: [{ ref: 'university-of-indonesia' }] }],
   });
-  expect(screen.getByTestId('affiliation-search').value).toBe('');
+  expect((screen.getByTestId('affiliation-search') as HTMLInputElement).value).toBe('');
   expect(screen.queryByTestId('affiliation-listbox')).toBeNull();
 });
 

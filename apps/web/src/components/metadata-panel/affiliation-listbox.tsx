@@ -35,7 +35,13 @@ export function SearchField(props: {
       placeholder="Affiliation" className={INPUT} role="combobox"
       aria-expanded={props.open && props.query.trim() !== ''} aria-controls="affiliation-listbox"
       onFocus={props.onOpen} onChange={(event) => props.onQuery(event.target.value)}
-      onKeyDown={(event) => { if (event.key === 'Escape') props.onClose(); }} />
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape') return;
+        // While the popover is open, Escape must close only the popover;
+        // otherwise let the event bubble (the enclosing dialog closes).
+        if (props.open && props.query.trim() !== '') event.stopPropagation();
+        props.onClose();
+      }} />
   );
 }
 
