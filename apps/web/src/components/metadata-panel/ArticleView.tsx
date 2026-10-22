@@ -8,9 +8,9 @@
  * publication details section collapsed by default.
  */
 import { useRef, useState, type ReactNode, type RefObject } from 'react';
-import { Info, Plus } from 'lucide-react';
 import type { MetadataAuthor } from './use-manuscript-metadata';
 import { buildByline, type BylineModel, type AffiliationEntry } from './byline-model';
+import { Byline } from './Byline';
 import { KeywordInput } from './KeywordInput';
 import { SectionLabel } from './SectionLabel';
 import { PublicationDetails } from './PublicationDetails';
@@ -43,9 +43,6 @@ export interface ArticleViewProps {
   /** Persist one _frontmatter.yml field; no-op when omitted. */
   setFrontmatterField?: (key: string, value: unknown) => void;
 }
-
-/** Icon size used by the section chevrons and the ORCID marker. */
-const ICON = 'inline size-4 shrink-0';
 
 /**
  * Borderless title input. Enter never inserts a newline; it moves the
@@ -127,90 +124,6 @@ function AbstractField(
         className="min-h-11 w-full resize-none text-sm outline-none"
       />
     </section>
-  );
-}
-
-/** Read-only tooltip shown on hover and focus of a byline name. */
-function AuthorTooltip({ author, index }: { author: BylineModel['authors'][number]; index: number }): ReactNode {
-  return (
-    <span
-      role="tooltip"
-      id={`byline-tooltip-${index}`}
-      data-testid="byline-tooltip"
-      className="absolute left-0 top-full z-20 mt-1 w-64 rounded border bg-white p-2 text-sm shadow"
-    >
-      {author.email && <span className="block" data-testid="byline-tooltip-email">{author.email}</span>}
-      {author.orcid && <span className="block" data-testid="byline-tooltip-orcid">{author.orcid}</span>}
-      {author.roles.length > 0 && <span className="block text-muted">Roles: {author.roles.join(', ')}</span>}
-    </span>
-  );
-}
-
-/** One byline segment: name button, superscripts, ORCID marker, tooltip. */
-function BylineName(
-  { author, index, onOpen }: {
-    author: BylineModel['authors'][number];
-    index: number;
-    onOpen: (index: number) => void;
-  },
-): ReactNode {
-  const [open, setOpen] = useState(false);
-  const symbols = (author.corresponding ? '*' : '')
-    + (author.equal ? '†' : '')
-    + (author.deceased ? '‡' : '');
-  return (
-    <span className="relative inline-block">
-      <button
-        type="button"
-        data-testid={`byline-author-${index}`}
-        aria-describedby={open ? `byline-tooltip-${index}` : undefined}
-        onClick={() => onOpen(index)}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
-        className="min-h-11 rounded px-0.5 hover:bg-hover"
-      >
-        {author.name}
-        {author.onBehalfOf && <span> {author.onBehalfOf}</span>}
-        <sup data-testid={`byline-superscript-${index}`}>{author.superscript}{symbols}</sup>
-        {author.orcid && (
-          <Info aria-label={`ORCID ${author.orcid}`} data-testid={`byline-orcid-${index}`} className={ICON} />
-        )}
-      </button>
-      {open && <AuthorTooltip author={author} index={index} />}
-    </span>
-  );
-}
-
-/** The byline row, numbered affiliations and footnotes of one model. */
-function Byline({ model, onOpenName }: { model: BylineModel; onOpenName: (index: number) => void }): ReactNode {
-  return (
-    <div className="mt-1 text-sm" data-testid="article-byline">
-      {model.authors.map((author, index) => (
-        <span key={author.key}>
-          {index > 0 && ', '}
-          <BylineName author={author} index={index} onOpen={onOpenName} />
-        </span>
-      ))}
-      <button
-        type="button"
-        data-testid="add-author"
-        onClick={() => onOpenName(-1)}
-        className="ml-2 min-h-11 rounded text-muted hover:bg-hover"
-      >
-        <Plus aria-hidden className="inline size-3.5" />
-        Add author
-      </button>
-      <div className="mt-1 text-muted" data-testid="affiliation-list">
-        {model.affiliations.map((entry) => (
-          <div key={entry.id}>{entry.number}. {entry.name}</div>
-        ))}
-      </div>
-      <div className="mt-1 text-muted" data-testid="byline-footnotes">
-        {model.footnotes.map((line) => <div key={line}>{line}</div>)}
-      </div>
-    </div>
   );
 }
 
