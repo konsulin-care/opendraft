@@ -162,6 +162,40 @@ describe('ArticleView contributions and publication details', () => {
   });
 });
 
+describe('ArticleView section labels', () => {
+  it('renders Abstract, Keywords, Contributions and Publication details via one small-caps label', () => {
+    renderView({
+      authors: [
+        { id: 'smith', name: { given: 'Alice Marie', family: 'Smith' }, roles: ['writing-original-draft'] },
+      ],
+      affiliations: [],
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Publication details/ }));
+    const labels = screen.getAllByTestId('section-label');
+    expect(labels.map((el) => el.textContent)).toEqual(
+      expect.arrayContaining(['Abstract', 'Keywords', 'Contributions', 'Publication details']),
+    );
+    for (const label of labels) {
+      expect(label.className).toContain('font-variant-caps:all-small-caps');
+    }
+  });
+
+  it('places the word count in the abstract label row with a guidance placeholder', () => {
+    renderView({ abstract: 'one two three' });
+    const row = screen.getByTestId('abstract-label-row');
+    expect(row.querySelector('[data-testid="section-label"]')?.textContent).toBe('Abstract');
+    expect(row.textContent).toContain('3 words');
+    const textarea = screen.getByTestId('metadata-abstract') as HTMLTextAreaElement;
+    expect(textarea.getAttribute('placeholder')).toBe(
+      'Summarize background, objectives, methods, results, and conclusions.',
+    );
+    const parent = row.parentElement;
+    expect(parent).not.toBeNull();
+    const children = Array.from(parent?.children ?? []);
+    expect(children.indexOf(row)).toBeLessThan(children.indexOf(textarea));
+  });
+});
+
 describe('ArticleView inline editing', () => {
   it('Enter in the title inserts no newline and focuses the abstract', () => {
     renderView();

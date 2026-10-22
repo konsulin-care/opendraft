@@ -8,6 +8,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { WIDE_QUERY, useMediaQuery } from '../../hooks/use-media-query';
+import { SectionLabel } from './SectionLabel';
 
 /** Icon size used by the section chevron. */
 const ICON = 'inline size-4 shrink-0';
@@ -130,12 +131,12 @@ export function PublicationDetails(
         data-testid="publication-details-toggle"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
-        className="flex min-h-11 items-center gap-1 rounded font-medium hover:bg-hover"
+        className="flex min-h-11 items-center gap-1 rounded hover:bg-hover"
       >
         {open
           ? <ChevronDown aria-hidden className={ICON} />
           : <ChevronRight aria-hidden className={ICON} />}
-        Publication details
+        <SectionLabel>Publication details</SectionLabel>
       </button>
       {open && (
         <div

@@ -12,6 +12,7 @@ import { Info, Plus } from 'lucide-react';
 import type { MetadataAuthor } from './use-manuscript-metadata';
 import { buildByline, type BylineModel, type AffiliationEntry } from './byline-model';
 import { KeywordInput } from './KeywordInput';
+import { SectionLabel } from './SectionLabel';
 import { PublicationDetails } from './PublicationDetails';
 import { AuthorsDialog } from './AuthorsDialog';
 
@@ -86,7 +87,19 @@ function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-/** Borderless auto-grown abstract textarea with a word count. */
+/** Small-caps label row with the abstract word count, above the textarea. */
+function AbstractLabelRow({ abstract }: { abstract: string }): ReactNode {
+  return (
+    <div data-testid="abstract-label-row" className="flex items-baseline justify-between text-sm">
+      <SectionLabel>Abstract</SectionLabel>
+      <span data-testid="abstract-word-count" className="text-muted">
+        {countWords(abstract)} words
+      </span>
+    </div>
+  );
+}
+
+/** Borderless auto-grown abstract textarea with a guidance placeholder. */
 function AbstractField(
   { abstract, setAbstract, textareaRef }: {
     abstract: string;
@@ -96,6 +109,7 @@ function AbstractField(
 ): ReactNode {
   return (
     <section className="mt-3">
+      <AbstractLabelRow abstract={abstract} />
       <textarea
         ref={(el) => {
           textareaRef.current = el;
@@ -105,16 +119,13 @@ function AbstractField(
         aria-label="Abstract"
         value={abstract}
         rows={2}
-        placeholder="Abstract"
+        placeholder="Summarize background, objectives, methods, results, and conclusions."
         onChange={(event) => {
           setAbstract(event.target.value);
           autoGrow(event.currentTarget);
         }}
         className="min-h-11 w-full resize-none text-sm outline-none"
       />
-      <div data-testid="abstract-word-count" className="text-sm text-muted">
-        {countWords(abstract)} words
-      </div>
     </section>
   );
 }
@@ -259,12 +270,12 @@ export function ArticleView({
       ))}
       <AbstractField abstract={abstract} setAbstract={setAbstract} textareaRef={abstractRef} />
       <section className="mt-3">
-        <h3 className="font-medium">Keywords</h3>
+        <SectionLabel>Keywords</SectionLabel>
         <KeywordInput keywords={keywords} onChange={setKeywords} />
       </section>
       {model.hasContributions && (
         <section data-testid="author-contributions" className="mt-3">
-          <h3 className="font-medium">Author contributions</h3>
+          <SectionLabel>Contributions</SectionLabel>
           <ul className="text-sm text-muted">
             {model.contributions.map((line) => <li key={line}>{line}</li>)}
           </ul>
