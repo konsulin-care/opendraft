@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 /**
- * Publication details editor tests: license combobox presets and free
- * text, the date/copyright/funding fields and the all-or-none subject
- * group, all writing to _frontmatter.yml through the metadata hook.
+ * Publication details editor tests: the labeled grid with native date
+ * input, the license radio group (recommended preset, plain-language
+ * description, Other free text) and the subject group whose authority
+ * and term sit behind a More disclosure. Every field persists through
+ * the manuscript metadata hook into _frontmatter.yml.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
@@ -28,10 +30,10 @@ function TestPanel({ ws }: { ws: WorkspaceAdapter }) {
   );
 }
 
-/** Seed a memory workspace with the fixture frontmatter and render it. */
-async function boot(): Promise<WorkspaceAdapter> {
+/** Seed a memory workspace with the given frontmatter and render it. */
+async function boot(fm = FRONTMATTER): Promise<WorkspaceAdapter> {
   const ws = new MemoryWorkspace();
-  await ws.writeFile(`${ROOT}/_frontmatter.yml`, FRONTMATTER);
+  await ws.writeFile(`${ROOT}/_frontmatter.yml`, fm);
   render(<TestPanel ws={ws} />);
   await act(async () => {});
   fireEvent.click(screen.getByTestId('publication-details-toggle'));
@@ -49,71 +51,81 @@ async function flushWrites(): Promise<void> {
   await act(async () => { vi.advanceTimersByTime(800); });
 }
 
-/** Original `window.matchMedia` descriptor restored after each test. */
-const originalMatchMedia = Object.getOwnPropertyDescriptor(window, 'matchMedia');
-
-/**
- * Install a `window.matchMedia` stub matching the shared breakpoint
- * queries against a simulated viewport width.
- *
- * @param width - Simulated viewport width in pixels.
- */
-function stubMatchMedia(width: number): void {
-  Object.defineProperty(window, 'matchMedia', {
-    configurable: true,
-    writable: true,
-    value: (media: string): MediaQueryList => ({
-      media,
-      matches: media.includes('max-width')
-        ? width <= Number(/max-width: (\d+)/.exec(media)?.[1])
-        : width >= Number(/min-width: (\d+)/.exec(media)?.[1]),
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    } as unknown as MediaQueryList),
-  });
+/** Open the More disclosure that reveals subject authority and term. */
+function openSubjectMore(): void {
+  fireEvent.click(screen.getByTestId('subject-more-toggle'));
 }
 
 beforeEach(() => { vi.useFakeTimers(); });
-afterEach(() => {
-  vi.useRealTimers();
-  if (originalMatchMedia) Object.defineProperty(window, 'matchMedia', originalMatchMedia);
+afterEach(() => { vi.useRealTimers(); });
+
+describe('PublicationDetails layout', () => {
+  it('renders the section heading through the shared small-caps label', async () => {
+    await boot();
+    const toggle = screen.getByTestId('publication-details-toggle');
+    expect(toggle.querySelector('[data-testid="section-label"]')).not.toBeNull();
+  });
+
+  it('lays the fields out as a labeled grid with a label column', async () => {
+    await boot();
+    const content = screen.getByTestId('publication-details-content');
+    expect(content.className).toContain('grid-cols-');
+    expect(screen.getByText('Date').tagName).toBe('LABEL');
+    expect(screen.getByText('Copyright').tagName).toBe('LABEL');
+    expect(screen.getByText('Funding').tagName).toBe('LABEL');
+  });
+
+  it('uses a native date input for the date field', async () => {
+    await boot();
+    expect((screen.getByTestId('date-input') as HTMLInputElement).type).toBe('date');
+  });
 });
 
 describe('PublicationDetails license', () => {
-  it('offers the four license presets in the combobox', async () => {
+  it('renders the four presets plus Other as radios, CC BY 4.0 recommended', async () => {
     await boot();
-    const presets = screen.getAllByTestId('license-preset')
-      .map((option) => option.getAttribute('value'));
-    expect(presets).toEqual(['CC BY 4.0', 'CC BY-SA 4.0', 'CC BY-NC 4.0', 'CC0']);
+    const radios = screen.getAllByRole('radio') as HTMLInputElement[];
+    expect(radios.map((radio) => radio.value)).toEqual([
+      'CC BY 4.0', 'CC BY-SA 4.0', 'CC BY-NC 4.0', 'CC0', 'Other',
+    ]);
+    const recommended = screen.getByTestId('license-preset-cc-by-4-0').closest('label');
+    expect(recommended?.textContent).toContain('Recommended');
   });
 
-  it("selecting 'CC BY 4.0' writes license 'CC BY 4.0' to _frontmatter.yml", async () => {
+  it("selecting 'CC0' writes license 'CC0' and shows its one-sentence description", async () => {
     const ws = await boot();
-    fireEvent.change(screen.getByTestId('license-input'), { target: { value: 'CC BY 4.0' } });
+    fireEvent.click(screen.getByTestId('license-preset-cc0'));
     await flushWrites();
-    expect((await readFrontmatter(ws)).license).toBe('CC BY 4.0');
+    expect((await readFrontmatter(ws)).license).toBe('CC0');
+    expect(screen.getByTestId('license-description').textContent).toBe(
+      'Dedicate the work to the public domain with no conditions.',
+    );
   });
 
-  it('writes a custom license verbatim', async () => {
+  it("selecting 'Other' reveals the free-text license input", async () => {
     const ws = await boot();
-    fireEvent.change(screen.getByTestId('license-input'), {
-      target: { value: 'Custom CC-like 1.0' },
-    });
+    expect(screen.queryByTestId('license-input')).toBeNull();
+    fireEvent.click(screen.getByTestId('license-other'));
+    const input = screen.getByTestId('license-input') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'Custom CC-like 1.0' } });
     await flushWrites();
     expect((await readFrontmatter(ws)).license).toBe('Custom CC-like 1.0');
   });
 
   it('keeps unknown keys and comments when writing the license', async () => {
     const ws = await boot();
-    fireEvent.change(screen.getByTestId('license-input'), { target: { value: 'CC0' } });
+    fireEvent.click(screen.getByTestId('license-preset-cc-by-sa-4-0'));
     await flushWrites();
     const text = await ws.readFile(`${ROOT}/_frontmatter.yml`);
     expect(text).toContain('# citation settings');
     expect((parse(text ?? '') as Record<string, unknown>).custom).toBe(1);
+  });
+
+  it('preselects Other for a custom license already in the frontmatter', async () => {
+    await boot('title: "Deep Dive"\nlicense: "Custom Legacy 1.0"\n');
+    expect((screen.getByTestId('license-other') as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByTestId('license-input') as HTMLInputElement).value)
+      .toBe('Custom Legacy 1.0');
   });
 });
 
@@ -134,8 +146,19 @@ describe('PublicationDetails scalar fields', () => {
 });
 
 describe('PublicationDetails subject', () => {
+  it('hides authority and term until the More disclosure opens', async () => {
+    await boot();
+    expect(screen.getByTestId('subject-label')).toBeDefined();
+    expect(screen.queryByTestId('subject-authority')).toBeNull();
+    expect(screen.queryByTestId('subject-term')).toBeNull();
+    openSubjectMore();
+    expect(screen.getByTestId('subject-authority')).toBeDefined();
+    expect(screen.getByTestId('subject-term')).toBeDefined();
+  });
+
   it("label only shows 'authority and term required' and writes no subject", async () => {
     const ws = await boot();
+    openSubjectMore();
     fireEvent.change(screen.getByTestId('subject-label'), {
       target: { value: 'Distributed scientific publication' },
     });
@@ -146,6 +169,7 @@ describe('PublicationDetails subject', () => {
 
   it('writes subject {text, authority, term} when all three are set', async () => {
     const ws = await boot();
+    openSubjectMore();
     fireEvent.change(screen.getByTestId('subject-authority'), {
       target: { value: 'http://www.w3.org/2004/02/skos/core#' },
     });
@@ -162,21 +186,5 @@ describe('PublicationDetails subject', () => {
       authority: 'http://www.w3.org/2004/02/skos/core#',
       term: 'concept-distributed-scientific-publication',
     });
-  });
-});
-
-describe('PublicationDetails responsive grid', () => {
-  it('uses a two-column grid on the details container at 1280px', async () => {
-    stubMatchMedia(1280);
-    await boot();
-    const content = screen.getByTestId('publication-details-content');
-    expect(content.className).toContain('grid-cols-2');
-  });
-
-  it('stays a single column at 800px', async () => {
-    stubMatchMedia(800);
-    await boot();
-    const content = screen.getByTestId('publication-details-content');
-    expect(content.className).not.toContain('grid-cols-2');
   });
 });

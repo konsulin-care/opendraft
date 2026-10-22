@@ -184,7 +184,7 @@ describe('ArticleView publication details', () => {
     expect(screen.queryByTestId('publication-details-content')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /Publication details/ }));
     expect(screen.getByTestId('publication-details-content')).toBeDefined();
-    expect((screen.getByTestId('license-input') as HTMLInputElement).value).toBe('CC BY 4.0');
+    expect((screen.getByTestId('license-preset-cc-by-4-0') as HTMLInputElement).checked).toBe(true);
     expect((screen.getByTestId('date-input') as HTMLInputElement).value).toBe('2024-01-01');
   });
 });
