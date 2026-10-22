@@ -3,19 +3,25 @@
  *
  * Registry suggestions ("used by N") and ROR v2 results (300ms debounce
  * at 5 characters, stale queries abort, IndexedDB cache) render in a
- * listbox popover only while a query is open; selecting clears the query
- * and closes the list, Escape and outside clicks close it too.
- * "Create manually" and "Normalize to references" are footer actions,
- * "Independent researcher" is a checkbox shown only while the author
- * has zero affiliations. Manual entries append to the _author.yml
- * registry and add an author ref; the edit sheet warns when an entry is
- * shared by several authors; legacy inline affiliations normalize to
- * registry entries plus refs.
+ * multi-select listbox popover whenever the combobox is open; clicking
+ * an option toggles the author's ref while the listbox stays open with
+ * the query intact, and selected options show a check with
+ * aria-selected. Focus with an empty query lists the registry entries
+ * in use; Escape and outside clicks close the list. "Create manually"
+ * and "Normalize to references" are footer actions, "Independent
+ * researcher" is a checkbox shown only while the author has zero
+ * affiliations. Manual entries append to the _author.yml registry and
+ * add an author ref; the edit sheet warns when an entry is shared by
+ * several authors; legacy inline affiliations normalize to registry
+ * entries plus refs. Pure operations live in affiliation-ops.ts.
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  AffiliationListbox, IndependentRow, INPUT, nameOf, SearchField, useOutsideClose,
+  AffiliationListbox, IndependentRow, INPUT, SearchField, useOutsideClose,
 } from './affiliation-listbox';
+import {
+  createOps, hasInline, hasRef, nameOf, refUsage, type AffilChange,
+} from './affiliation-ops';
 import { searchRorOrgs, type RorOrg } from './ror-client';
 import type { AffiliationEntry } from './byline-model';
 import type { MetadataAuthor } from './use-manuscript-metadata';
@@ -25,68 +31,12 @@ export interface AffiliationPickerProps {
   registry: AffiliationEntry[]; // top-level registry of _author.yml
   authors: MetadataAuthor[]; // all authors, for refs and the shared warning
   authorIndex?: number; // author receiving picked entries (default 0)
-  onApply: (change: { registry?: AffiliationEntry[]; authors?: MetadataAuthor[] }) => void;
+  onApply: (change: AffilChange) => void;
 }
 
 const ROR_MIN_CHARS = 5; // ROR is searched only from five characters
 const ROR_DEBOUNCE_MS = 300; // debounce between the last keystroke and fetch
 const ROW = 'block min-h-11 w-full rounded px-2 text-left text-muted hover:bg-hover'; // action rows
-
-/** Slugify free text into a kebab-case registry id base; '' when empty. */
-export const slugify = (text: string): string =>
-  text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-
-/** First unused id derived from a base: base, base-2, base-3 ... */
-export function uniqueId(base: string, registry: AffiliationEntry[]): string {
-  const root = base || 'affiliation';
-  let id = root;
-  for (let n = 2; registry.some((e) => e.id === id); n += 1) id = `${root}-${n}`;
-  return id;
-}
-
-/** Append a registry ref to one author's affiliations, deduped. */
-export function withRef(author: MetadataAuthor, id: string): MetadataAuthor {
-  const list = Array.isArray(author.affiliations) ? author.affiliations : [];
-  return list.some((item) => (item as { ref?: unknown }).ref === id)
-    ? author : { ...author, affiliations: [...list, { ref: id }] };
-}
-
-/** How many authors reference one registry id. */
-export const refUsage = (authors: MetadataAuthor[], id: string): number => authors.filter(
-  (a) => Array.isArray(a.affiliations)
-    && a.affiliations.some((item) => (item as { ref?: unknown }).ref === id),
-).length;
-
-// A legacy inline affiliation: a named object without a ref.
-const isInline = (item: unknown): boolean =>
-  typeof item === 'object' && item !== null && !('ref' in item)
-  && typeof (item as { name?: unknown }).name === 'string';
-
-/** Whether any author still carries legacy inline affiliations. */
-export const hasInline = (authors: MetadataAuthor[]): boolean => authors.some(
-  (a) => Array.isArray(a.affiliations) && a.affiliations.some(isInline),
-);
-
-/** Convert legacy inline affiliations into registry entries plus refs. */
-export function normalizeToRefs(
-  authors: MetadataAuthor[],
-  registry: AffiliationEntry[],
-): { authors: MetadataAuthor[]; registry: AffiliationEntry[] } {
-  const nextRegistry = [...registry];
-  const nextAuthors = authors.map((author) => {
-    const list = Array.isArray(author.affiliations) ? author.affiliations : [];
-    if (!list.some(isInline)) return author;
-    const replaced = list.map((item) => {
-      if (!isInline(item)) return item;
-      const source = item as AffiliationEntry;
-      const entry = { ...source, id: uniqueId(slugify(nameOf(source)), nextRegistry) };
-      nextRegistry.push(entry);
-      return { ref: entry.id };
-    });
-    return { ...author, affiliations: replaced };
-  });
-  return { authors: nextAuthors, registry: nextRegistry };
-}
 
 /** Debounced ROR search wiring: aborts stale queries, fails silently. */
 function useRorResults(query: string, setResults: (items: RorOrg[]) => void): void {
@@ -107,55 +57,6 @@ function useRorResults(query: string, setResults: (items: RorOrg[]) => void): vo
     }, ROR_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [query, setResults]);
-}
-
-/** Registry/author mutations shared by the rows and sheets. */
-interface PickerOps {
-  addOrg(org: RorOrg): void;
-  addRef(id: string): void;
-  addIndependent(): void;
-  addManual(fields: { name: string; city?: string; country?: string }): void;
-  saveEntry(id: string, patch: Record<string, string>): void;
-  normalize(): void;
-}
-
-// Build the picker operations over one registry/author snapshot.
-function createOps(
-  registry: AffiliationEntry[],
-  authors: MetadataAuthor[],
-  authorIndex: number,
-  onApply: NonNullable<AffiliationPickerProps['onApply']>,
-): PickerOps {
-  const addRefTo = (id: string, nextRegistry?: AffiliationEntry[]): void => {
-    const next = authors.map((a, i) => (i === authorIndex ? withRef(a, id) : a));
-    onApply(nextRegistry ? { registry: nextRegistry, authors: next } : { authors: next });
-  };
-  return {
-    addOrg: (org) => {
-      const reused = registry.find((e) => e.ror === org.ror && e.ror);
-      if (reused) { addRefTo(String(reused.id)); return; }
-      const entry: AffiliationEntry = {
-        id: uniqueId(slugify(org.name), registry), name: org.name,
-        ...(org.city ? { city: org.city } : {}), ...(org.country ? { country: org.country } : {}),
-        ror: org.ror,
-      };
-      addRefTo(entry.id, [...registry, entry]);
-    },
-    addRef: (id) => addRefTo(id),
-    addIndependent: () => {
-      const id = 'independent';
-      addRefTo(id, registry.some((e) => e.id === id)
-        ? undefined : [...registry, { id, name: 'Independent researcher' }]);
-    },
-    addManual: (fields) => {
-      const entry: AffiliationEntry = { id: uniqueId(slugify(fields.name), registry), ...fields };
-      addRefTo(entry.id, [...registry, entry]);
-    },
-    saveEntry: (id, patch) => onApply({
-      registry: registry.map((e) => (e.id === id ? { ...e, ...patch } : e)),
-    }),
-    normalize: () => onApply(normalizeToRefs(authors, registry)),
-  };
 }
 
 // Name/city/country fields shared by the manual form and the edit sheet.
@@ -223,8 +124,8 @@ function EditSheet(props: {
  * Pick or edit an affiliation for one author.
  *
  * @param props - See {@link AffiliationPickerProps}.
- * @returns The combobox field, suggestion listbox, independent checkbox,
- *   footer actions and sheets.
+ * @returns The combobox field, multi-select suggestion listbox,
+ *   independent checkbox, footer actions and sheets.
  */
 export function AffiliationPicker({
   registry, authors, authorIndex = 0, onApply,
@@ -241,20 +142,22 @@ export function AffiliationPicker({
   const ops = createOps(registry, authors, authorIndex, onApply);
   const pick = (apply: () => void): void => { apply(); setQuery(''); close(); };
   const q = query.trim().toLowerCase();
+  const target = authors[authorIndex];
   const suggestions = registry
     .map((entry, index) => ({ entry, index, usage: refUsage(authors, String(entry.id)) }))
-    .filter(({ entry }) => nameOf(entry).toLowerCase().includes(q));
+    .filter(({ entry, usage }) => (q === '' ? usage > 0 : nameOf(entry).toLowerCase().includes(q)));
   const editing = editIndex === null ? null : registry[editIndex] ?? null;
-  const target = authors[authorIndex];
   const noAffiliations = !Array.isArray(target?.affiliations) || target.affiliations.length === 0;
   return (
     <div ref={rootRef} data-testid="affiliation-picker" className="space-y-1">
       <SearchField query={query} open={open} onOpen={() => setOpen(true)} onClose={close}
         onQuery={(text) => { setQuery(text); setEditIndex(null); setOpen(true); }} />
-      {open && q !== '' && (
+      {open && (
         <AffiliationListbox registry={suggestions} ror={ror}
-          onPickRef={(id) => pick(() => ops.addRef(id))} onEdit={setEditIndex}
-          onPickOrg={(org) => pick(() => ops.addOrg(org))} />
+          isSelected={(id) => hasRef(target, id)}
+          isRorSelected={(org) => registry.some((e) => e.ror && e.ror === org.ror
+            && hasRef(target, String(e.id)))}
+          onPickRef={ops.toggleRef} onEdit={setEditIndex} onPickOrg={ops.toggleOrg} />
       )}
       {noAffiliations && <IndependentRow onPick={() => pick(ops.addIndependent)} />}
       <button type="button" data-testid="affiliation-create-manual" onClick={() => setManual(true)} className={ROW}>
