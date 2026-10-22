@@ -2,8 +2,9 @@
 /**
  * Author card tests: placeholder-only name fields, single-name literal
  * storage with author-type metadata, comma-paste split, particle/suffix
- * options, Person/Group toggle, degrees, email, status toggles,
- * on-behalf-of, CRediT pills and the affiliation warning marker.
+ * options, Person/Group toggle, icon fields with light grey bottom
+ * borders, degrees, email, status toggles, on-behalf-of, CRediT pills
+ * and the affiliation warning marker.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -42,6 +43,40 @@ function follow(
 ): void {
   rerender(<AuthorCard author={lastChange(onChange)} groups={groups} onChange={onChange} />);
 }
+
+/** Assert one field renders an icon, placeholder, aria-label and border-b. */
+function expectIconField(testid: string, badge?: string): void {
+  const input = screen.getByTestId(testid) as HTMLInputElement;
+  const classes = input.className.split(/\s+/);
+  expect(input.placeholder).not.toBe('');
+  expect(input.getAttribute('aria-label')).toBeTruthy();
+  expect(classes).toContain('border-b');
+  expect(classes).toContain('border-secondary');
+  const leading = input.parentElement?.firstElementChild ?? null;
+  if (badge) expect(leading?.textContent).toContain(badge);
+  else expect(leading?.querySelector('svg')).not.toBeNull();
+}
+
+describe('AuthorCard icon fields', () => {
+  it('ORCID, email and degree show an icon, placeholder, aria-label and border', () => {
+    renderCard();
+    expectIconField('author-orcid', 'iD');
+    expectIconField('author-email');
+    expectIconField('author-degree-field');
+  });
+
+  it('name inputs carry the light grey bottom border', () => {
+    renderCard();
+    expect(screen.getByTestId('author-given').className.split(/\s+/)).toContain('border-b');
+    expect(screen.getByTestId('author-family').className.split(/\s+/)).toContain('border-b');
+  });
+
+  it('url, phone, fax, note and acknowledgements render icons and placeholders', () => {
+    renderCard();
+    fireEvent.click(screen.getByRole('button', { name: 'More contact details' }));
+    ['url', 'phone', 'fax', 'note', 'acknowledgements'].forEach((key) => expectIconField(`author-${key}`));
+  });
+});
 
 describe('AuthorCard name editing', () => {
   it("pasting 'Smith, Alice Marie' in Family sets given and family", () => {

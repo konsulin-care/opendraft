@@ -4,6 +4,7 @@
  * given/family names from pub.orcid.org with silent network fallback.
  */
 import { createElement, useEffect, useRef, useState, type ReactNode } from 'react';
+import { IconField } from './author-fields';
 import type { MetadataAuthor } from './use-manuscript-metadata';
 
 /** Given and family names read from an ORCID person record. */
@@ -21,8 +22,9 @@ export interface OrcidFieldProps {
 
 /** Pasted orcid.org URL prefixes that normalize away. */
 const URL_PREFIX = /^(?:https?:\/\/)?(?:www\.)?orcid\.org\//i;
-/** Borderless, touch-sized input styling shared with the author card. */
-const INPUT = 'min-h-11 w-full outline-none';
+
+/** Green text badge standing in for the ORCID icon lucide lacks. */
+const ORCID_BADGE = 'text-sm font-bold text-green-700';
 
 // Keep at most 16 digits plus an optional trailing checksum X.
 function bareDigits(value: string): string {
@@ -134,7 +136,7 @@ async function fillFromRecord(author: MetadataAuthor, text: string, onChange: (n
 // Loose createElement cast: the typed overload rejects data-testid
 // props and this file stays .ts (no JSX) to keep the field colocated.
 const h = createElement as unknown as (
-  type: string, props?: Record<string, unknown>, ...children: ReactNode[]
+  type: unknown, props?: Record<string, unknown>, ...children: ReactNode[]
 ) => ReactNode;
 
 /**
@@ -162,9 +164,10 @@ export function OrcidField({ author, onChange, focus = false }: OrcidFieldProps)
     else if (!display) onChange(withOrcid(author, ''));
   };
   return h('div', { className: 'space-y-1' },
-    h('input', {
-      ref: inputRef, 'data-testid': 'author-orcid', 'aria-label': 'ORCID',
-      placeholder: '0000-0000-0000-0000', className: INPUT, value: text,
+    h(IconField, {
+      ref: inputRef, testid: 'author-orcid', ariaLabel: 'ORCID',
+      icon: h('span', { className: ORCID_BADGE }, 'iD'),
+      placeholder: '0000-0000-0000-0000', value: text,
       onChange: (event: { target: { value: string } }) => handle(event.target.value),
     }),
     invalid && h('span', { 'data-testid': 'author-orcid-error', role: 'alert', className: 'block text-sm text-amber-800' },

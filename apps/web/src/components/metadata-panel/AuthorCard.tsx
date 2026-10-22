@@ -5,8 +5,9 @@
  * particle/suffix, comma-paste split, ORCID, degrees, email, status
  * toggles, on-behalf-of and CRediT pills; groups get a literal name
  * and pills. The Person/Group toggle writes `metadata.author-type`.
- */import { useState, type ReactNode } from 'react';
+ */import { type ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react'; import { GroupMembers } from './GroupMembers'; import { OrcidField } from './orcid';
+import { Degrees, EmailField, MoreFields, setStr } from './author-fields';
 import { isGroupAuthor } from '@opendraft/schema';
 import { AuthorNameFields, authorTypeMetadata, INPUT } from './author-name-fields';
 import type { MetadataAuthor } from './use-manuscript-metadata';
@@ -55,13 +56,6 @@ const displayName = (name: Record<string, string>): string => name.literal
 // Non-empty strings of a YAML array value.
 const strList = (value: unknown): string[] => (Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []);
 
-// Set or delete one string field of the author.
-function setStr(author: MetadataAuthor, key: string, value: string): MetadataAuthor {
-  const next = { ...author };
-  if (value) next[key] = value;
-  else delete next[key];
-  return next;
-}
 /** Shared editing context handed to the card bodies. */
 interface CardEdit {
   author: MetadataAuthor; name: Record<string, string>;
@@ -76,32 +70,6 @@ function TypeToggle({ group, onSet }: { group: boolean; onSet: (group: boolean) 
     <div className="flex gap-1" role="group" aria-label="Author type">
       <button type="button" data-testid="author-type-person" aria-pressed={!group} onClick={() => onSet(false)} className={pillClass(!group)}>Person</button>
       <button type="button" data-testid="author-type-group" aria-pressed={group} onClick={() => onSet(true)} className={pillClass(group)}>Group</button>
-    </div>
-  );
-}
-
-// Degrees chips with an add field.
-function Degrees({ degrees, onSet }: { degrees: string[]; onSet: (degrees: string[]) => void }): ReactNode {
-  const [text, setText] = useState('');
-  const add = (): void => {
-    const value = text.trim();
-    if (value && !degrees.includes(value)) onSet([...degrees, value]);
-    setText('');
-  };
-  return (
-    <div>
-      <div className="flex flex-wrap gap-1">
-        {degrees.map((degree, index) => (
-          <span key={degree} data-testid="author-degree-chip" className="rounded bg-surface-low px-2 py-0.5 text-sm">
-            {degree}
-            <button type="button" data-testid={`author-degree-remove-${index}`} aria-label={`Remove ${degree}`}
-              onClick={() => onSet(degrees.filter((d) => d !== degree))}>×</button>
-          </span>
-        ))}
-      </div>
-      <input data-testid="author-degree-field" aria-label="Degree" value={text} placeholder="Add degree" className={INPUT}
-        onChange={(event) => setText(event.target.value)}
-        onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); add(); } }} />
     </div>
   );
 }
@@ -144,27 +112,6 @@ function CreditPills({ roles, onToggle }: { roles: string[]; onToggle: (slug: st
         );
       })}
     </div>
-  );
-}
-
-// Collapsible contact section: url, phone, fax, note, acknowledgements.
-function MoreFields({ author, onChange }: { author: MetadataAuthor; onChange: (next: MetadataAuthor) => void }): ReactNode {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="text-sm text-muted hover:bg-hover">{open ? 'Hide contact details' : 'More contact details'}</button>
-      {open && ['url', 'phone', 'fax', 'note', 'acknowledgements'].map((key) => (
-        <input key={key} data-testid={`author-${key}`} aria-label={key} className={INPUT}
-          value={typeof author[key] === 'string' ? author[key] : ''} onChange={(event) => onChange(setStr(author, key, event.target.value))} />
-      ))}
-    </>
-  );
-}
-// Email input shared by the person and group bodies.
-function EmailField({ author, apply }: { author: MetadataAuthor; apply: CardEdit['apply'] }): ReactNode {
-  return (
-    <input data-testid="author-email" aria-label="Email" className={INPUT} value={typeof author.email === 'string' ? author.email : ''}
-      onChange={(event) => apply(setStr(author, 'email', event.target.value))} />
   );
 }
 

@@ -11,8 +11,8 @@
 import { useState, type ClipboardEvent, type ReactNode } from 'react';
 import type { MetadataAuthor } from './use-manuscript-metadata';
 
-/** Shared borderless, touch-sized input styling. */
-export const INPUT = 'min-h-11 w-full outline-none';
+/** Shared touch-sized input styling with the light grey bottom border. */
+export const INPUT = 'min-h-11 w-full outline-none border-b border-secondary';
 
 /** Props for {@link AuthorNameFields}. */
 export interface AuthorNameFieldsProps {
