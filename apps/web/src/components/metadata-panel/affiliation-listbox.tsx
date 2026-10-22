@@ -9,8 +9,8 @@
  * actions. The search field is an ARIA combobox that closes the
  * popover on Escape (without closing the dialog while open); the
  * picker also closes it on any mousedown outside the root.
- * "Independent researcher" is a checkbox rendered only while the
- * author has zero affiliations.
+ * "Independent researcher" is a controlled checkbox rendered only
+ * while the author has no non-independent affiliation.
  */
 import { Check } from 'lucide-react';
 import { useEffect, type ReactNode, type RefObject } from 'react';
@@ -49,14 +49,18 @@ export function SearchField(props: {
 /**
  * Independent-researcher checkbox below the combobox.
  *
- * @param props - `onPick` applies the built-in independent affiliation.
- * @returns A checkbox row rendered only while the author has no affiliations.
+ * @param props - `checked` reflects the author's `independent` ref;
+ *   `onChange` reports the next checkbox state.
+ * @returns A controlled checkbox row rendered only while the author
+ *   has no other affiliation.
  */
-export function IndependentRow({ onPick }: { onPick(): void }): ReactNode {
+export function IndependentRow(props: {
+  checked: boolean; onChange(next: boolean): void;
+}): ReactNode {
   return (
     <label className="flex min-h-11 items-center gap-2 rounded px-2 text-sm hover:bg-hover">
-      <input type="checkbox" data-testid="affiliation-independent"
-        onChange={(event) => { if (event.target.checked) onPick(); }} />
+      <input type="checkbox" data-testid="affiliation-independent" checked={props.checked}
+        onChange={(event) => props.onChange(event.target.checked)} />
       Independent researcher
     </label>
   );

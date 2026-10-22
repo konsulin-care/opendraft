@@ -8,11 +8,14 @@
  * the query intact, and selected options show a check with
  * aria-selected. Selected affiliations also render as removable chips
  * below the listbox, dropping and pruning the entry on removal.
- * Focus with an empty query lists the registry entries
- * in use; Escape and outside clicks close the list. "Create manually"
- * and "Normalize to references" are footer actions, "Independent
- * researcher" is a checkbox shown only while the author has zero
- * affiliations. Manual entries append to the _author.yml registry and
+ * Focus with an empty query lists the registry entries in use; Escape
+ * and outside clicks close the list. "Create manually" and "Normalize
+ * to references" are footer actions. "Independent researcher" is a
+ * controlled checkbox checked while the author references the built-in
+ * entry: checking hides the combobox, listbox and create action;
+ * unchecking removes the ref (pruning the entry when unused) and shows
+ * them again; the row is hidden while the author has any other
+ * affiliation. Manual entries append to the _author.yml registry and
  * add an author ref; the edit sheet warns when an entry is shared by
  * several authors; legacy inline affiliations normalize to registry
  * entries plus refs. Pure operations live in affiliation-ops.ts.
@@ -20,10 +23,12 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   AffiliationListbox, IndependentRow, INPUT, SearchField, useOutsideClose,
+  type RegistrySuggestion,
 } from './affiliation-listbox';
 import { AffiliationChips } from './affiliation-chips';
 import {
-  createOps, hasInline, hasRef, nameOf, refUsage, type AffilChange,
+  createOps, hasInline, hasRef, nameOf, refUsage,
+  type AffilChange, type PickerOps,
 } from './affiliation-ops';
 import { searchRorOrgs, type RorOrg } from './ror-client';
 import type { AffiliationEntry } from './byline-model';
@@ -60,6 +65,17 @@ function useRorResults(query: string, setResults: (items: RorOrg[]) => void): vo
     }, ROR_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [query, setResults]);
+}
+
+// Registry suggestions for the current query: name matches, or the
+// entries in use while the query is empty.
+function suggestionsOf(
+  registry: AffiliationEntry[], authors: MetadataAuthor[], query: string,
+): RegistrySuggestion[] {
+  const q = query.trim().toLowerCase();
+  return registry
+    .map((entry, index) => ({ entry, index, usage: refUsage(authors, String(entry.id)) }))
+    .filter(({ entry, usage }) => (q === '' ? usage > 0 : nameOf(entry).toLowerCase().includes(q)));
 }
 
 // Name/city/country fields shared by the manual form and the edit sheet.
@@ -123,6 +139,40 @@ function EditSheet(props: {
   );
 }
 
+/** Props for {@link PickerActions}. */
+interface PickerActionsProps {
+  authors: MetadataAuthor[]; // inline-affiliation detection and edit usage
+  ops: PickerOps; // manual create and entry editing
+  manual: boolean; // manual-create sheet open
+  editing: AffiliationEntry | null; // entry being edited, if any
+  showCreate: boolean; // hidden while the author is independent
+  onManual: (open: boolean) => void; // open/close the manual sheet
+  onSaved: () => void; // clear the edit state after save/close
+}
+
+// Footer actions: manual create, entry editing, legacy normalization.
+function PickerActions(props: PickerActionsProps): ReactNode {
+  return (
+    <>
+      {props.showCreate && (
+        <button type="button" data-testid="affiliation-create-manual" onClick={() => props.onManual(true)} className={ROW}>
+          Create manually
+        </button>
+      )}
+      {props.manual && <ManualForm onCreate={(f) => { props.ops.addManual(f); props.onManual(false); }}
+        onClose={() => props.onManual(false)} />}
+      {props.editing && <EditSheet entry={props.editing} usage={refUsage(props.authors, String(props.editing.id))}
+        onSave={(patch) => { props.ops.saveEntry(String(props.editing.id), patch); props.onSaved(); }}
+        onClose={props.onSaved} />}
+      {hasInline(props.authors) && (
+        <button type="button" data-testid="affiliation-normalize" onClick={props.ops.normalize} className={ROW}>
+          Normalize to references
+        </button>
+      )}
+    </>
+  );
+}
+
 /**
  * Pick or edit an affiliation for one author.
  *
@@ -143,40 +193,37 @@ export function AffiliationPicker({
   useRorResults(query, setRor);
   useOutsideClose(rootRef, open, close);
   const ops = createOps(registry, authors, authorIndex, onApply);
-  const pick = (apply: () => void): void => { apply(); setQuery(''); close(); };
-  const q = query.trim().toLowerCase();
   const target = authors[authorIndex];
-  const suggestions = registry
-    .map((entry, index) => ({ entry, index, usage: refUsage(authors, String(entry.id)) }))
-    .filter(({ entry, usage }) => (q === '' ? usage > 0 : nameOf(entry).toLowerCase().includes(q)));
+  const independent = hasRef(target, 'independent');
+  const hasOther = Array.isArray(target?.affiliations) && target.affiliations.some(
+    (item) => (item as { ref?: unknown }).ref !== 'independent');
+  // While the author carries other affiliations the checkbox is hidden, so a
+  // lingering independent ref must not hide the combobox either.
+  const solo = !hasOther && independent; // checkbox visible and checked
+  const toggleIndependent = (next: boolean): void => {
+    (next ? ops.addIndependent : () => ops.toggleRef('independent'))();
+    setQuery(''); setManual(false); close();
+  };
   const editing = editIndex === null ? null : registry[editIndex] ?? null;
-  const noAffiliations = !Array.isArray(target?.affiliations) || target.affiliations.length === 0;
   return (
     <div ref={rootRef} data-testid="affiliation-picker" className="space-y-1">
-      <SearchField query={query} open={open} onOpen={() => setOpen(true)} onClose={close}
-        onQuery={(text) => { setQuery(text); setEditIndex(null); setOpen(true); }} />
-      {open && (
-        <AffiliationListbox registry={suggestions} ror={ror}
-          isSelected={(id) => hasRef(target, id)}
-          isRorSelected={(org) => registry.some((e) => e.ror && e.ror === org.ror
-            && hasRef(target, String(e.id)))}
-          onPickRef={ops.toggleRef} onEdit={setEditIndex} onPickOrg={ops.toggleOrg} />
+      {!solo && (
+        <>
+          <SearchField query={query} open={open} onOpen={() => setOpen(true)} onClose={close}
+            onQuery={(text) => { setQuery(text); setEditIndex(null); setOpen(true); }} />
+          {open && (
+            <AffiliationListbox registry={suggestionsOf(registry, authors, query)} ror={ror}
+              isSelected={(id) => hasRef(target, id)}
+              isRorSelected={(org) => registry.some((e) => e.ror && e.ror === org.ror
+                && hasRef(target, String(e.id)))}
+              onPickRef={ops.toggleRef} onEdit={setEditIndex} onPickOrg={ops.toggleOrg} />
+          )}
+        </>
       )}
       <AffiliationChips author={target} registry={registry} onRemove={ops.toggleRef} />
-      {noAffiliations && <IndependentRow onPick={() => pick(ops.addIndependent)} />}
-      <button type="button" data-testid="affiliation-create-manual" onClick={() => setManual(true)} className={ROW}>
-        Create manually
-      </button>
-      {manual && <ManualForm onCreate={(f) => { ops.addManual(f); setManual(false); }}
-        onClose={() => setManual(false)} />}
-      {editing && <EditSheet entry={editing} usage={refUsage(authors, String(editing.id))}
-        onSave={(patch) => { ops.saveEntry(String(editing.id), patch); setEditIndex(null); }}
-        onClose={() => setEditIndex(null)} />}
-      {hasInline(authors) && (
-        <button type="button" data-testid="affiliation-normalize" onClick={ops.normalize} className={ROW}>
-          Normalize to references
-        </button>
-      )}
+      {!hasOther && <IndependentRow checked={independent} onChange={toggleIndependent} />}
+      <PickerActions authors={authors} ops={ops} manual={manual} editing={editing}
+        showCreate={!solo} onManual={setManual} onSaved={() => setEditIndex(null)} />
     </div>
   );
 }
