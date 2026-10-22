@@ -116,7 +116,7 @@ it('selecting the affiliation issue opens the matching author form with the pick
   expect(issue).toBeDefined();
   if (issue) fireEvent.click(issue);
   expect(screen.getByTestId('authors-dialog')).toBeDefined();
-  expect(screen.getByText('Author 1 of 1')).toBeDefined();
+  expect(screen.getByTestId('author-position-header').textContent).toMatch(/^Author order:.*of 1$/);
   expect(screen.getByTestId('author-card-0')).toBeDefined();
   expect(screen.queryByTestId('author-select-0')).toBeNull();
   await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('affiliation-search')));

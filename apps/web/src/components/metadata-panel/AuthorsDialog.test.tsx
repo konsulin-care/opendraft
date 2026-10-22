@@ -18,7 +18,7 @@ import { useManuscriptMetadata } from './use-manuscript-metadata';
 
 const ROOT = 'manuscripts/x';
 const FRONTMATTER = 'title: "Deep Dive"\n';
-// Two person authors and one group author: 'Author 2 of 3' opens lee.
+// Two person authors and one group author: the Author order header opens lee at 2 of 3.
 const AUTHOR_YML = `# author registry
 affiliations:
   - { id: ui, name: University of Indonesia }
@@ -100,12 +100,16 @@ afterEach(() => {
 });
 
 describe('AuthorsDialog single form', () => {
-  it("opening author 2 of 3 shows one form with 'Author 2 of 3' and no card list", async () => {
+  it('opening author 2 of 3 shows the Author order header and no card list', async () => {
     await boot();
     fireEvent.click(screen.getByTestId('byline-author-1'));
-    expect(screen.getByTestId('authors-dialog')).toBeDefined(); expect(screen.getByText('Author 2 of 3')).toBeDefined();
-    const position = screen.getByTestId('author-position') as HTMLSelectElement;
+    expect(screen.getByTestId('authors-dialog')).toBeDefined();
+    const header = screen.getByTestId('author-position-header'); const position = screen.getByTestId('author-position') as HTMLSelectElement;
+    expect(screen.getByText('Author order:')).toBeDefined(); expect(header.textContent).toMatch(/^Author order:.*of 3$/);
     expect(position.value).toBe('2');
+    expect(position.getAttribute('aria-label')).toBe('Author order');
+    expect(position.getAttribute('title')).toBe("Changes this author's position in the author list");
+    expect(header.className).toContain('pb-3'); expect(screen.queryByTestId('authors-close')).toBeNull();
     expect(screen.getByTestId('author-card-1')).toBeDefined();
     expect((screen.getByTestId('author-given') as HTMLInputElement).value).toBe('Budi');
     expect((screen.getByTestId('author-family') as HTMLInputElement).value).toBe('Lee');
@@ -120,7 +124,7 @@ describe('AuthorsDialog single form', () => {
     const ws = await boot();
     fireEvent.click(screen.getByTestId('byline-author-1'));
     fireEvent.change(screen.getByTestId('author-position'), { target: { value: '1' } });
-    expect(screen.getByText('Author 1 of 3')).toBeDefined();
+    expect((screen.getByTestId('author-position') as HTMLSelectElement).value).toBe('1');
     await flushWrites();
     expect((await readAuthors(ws)).map((author) => author['id'])).toEqual(['lee', 'smith', 'dwg']);
   });
@@ -128,8 +132,7 @@ describe('AuthorsDialog single form', () => {
   it('choosing the last position moves the author to the end', async () => {
     const ws = await boot();
     fireEvent.click(screen.getByTestId('byline-author-1'));
-    fireEvent.change(screen.getByTestId('author-position'), { target: { value: '3' } });
-    await flushWrites();
+    fireEvent.change(screen.getByTestId('author-position'), { target: { value: '3' } }); await flushWrites();
     expect((await readAuthors(ws)).map((author) => author['id'])).toEqual(['smith', 'dwg', 'lee']);
   });
 });
@@ -169,8 +172,7 @@ describe('AuthorsDialog form content', () => {
   it('group author form shows the group name and GroupMembers without an affiliation section', async () => {
     await boot();
     fireEvent.click(screen.getByTestId('byline-author-2'));
-    expect(screen.getByText('Author 3 of 3')).toBeDefined();
-    expect((screen.getByTestId('author-group-name') as HTMLInputElement).value).toBe('OpenDraft Team');
+    expect((screen.getByTestId('author-position') as HTMLSelectElement).value).toBe('3'); expect((screen.getByTestId('author-group-name') as HTMLInputElement).value).toBe('OpenDraft Team');
     expect(screen.getByTestId('group-members')).toBeDefined(); expect(screen.queryByTestId('author-affiliation-section')).toBeNull();
   });
 });
@@ -180,8 +182,7 @@ describe('AuthorsDialog remove and undo', () => {
     const ws = await boot();
     fireEvent.click(screen.getByTestId('byline-author-1'));
     fireEvent.click(screen.getByTestId('author-remove-1'));
-    expect(screen.getByTestId('article-byline').textContent).not.toContain('Budi Lee');
-    expect(screen.getByText('Author 2 of 2')).toBeDefined();
+    expect(screen.getByTestId('article-byline').textContent).not.toContain('Budi Lee'); expect(screen.getByText('of 2')).toBeDefined();
     fireEvent.click(screen.getByTestId('author-undo'));
     expect(screen.getByTestId('article-byline').textContent).toContain('Budi Lee');
     await flushWrites();
@@ -193,8 +194,7 @@ describe('AuthorsDialog remove and undo', () => {
     const ws = await boot();
     fireEvent.click(screen.getByTestId('byline-author-0'));
     fireEvent.click(screen.getByTestId('author-remove-0'));
-    await flushWrites();
-    expect((await readAffiliations(ws)).map((a) => (a as Record<string, unknown>)['id'])).toEqual(['rscm']);
+    await flushWrites(); expect((await readAffiliations(ws)).map((a) => (a as Record<string, unknown>)['id'])).toEqual(['rscm']);
     fireEvent.click(screen.getByTestId('author-undo'));
     await flushWrites();
     expect((await readAuthors(ws)).map((a) => a['id'])).toEqual(['smith', 'lee', 'dwg']);
@@ -281,8 +281,7 @@ describe('AuthorsDialog viewport handling', () => {
     fireEvent.click(screen.getByTestId('byline-author-1'));
     const dialog = screen.getByTestId('authors-dialog');
     expect(dialog.getAttribute('role')).toBe('dialog'); expect(dialog.className).toContain('fixed inset-0');
-    expect(screen.getByText('Author 2 of 3')).toBeDefined();
-    expect(screen.queryByTestId('authors-back')).toBeNull(); expect(screen.queryByTestId('author-select-0')).toBeNull();
+    expect(screen.getByText('of 3')).toBeDefined(); expect(screen.queryByTestId('authors-back')).toBeNull(); expect(screen.queryByTestId('author-select-0')).toBeNull();
   });
 
   it('renders a centered dialog with the single form at 800px', async () => {

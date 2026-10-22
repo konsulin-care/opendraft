@@ -1,18 +1,19 @@
 /**
  * Authors dialog of the manuscript metadata panel: a single author
  * form at a time (or the draft form for Add author) headed by an
- * `Author N of M` position indicator whose select reorders the author;
+ * `Author order: [ n v ] of M` select that reorders the author;
  * remove keeps its Undo toast. A draft writes to _author.yml only once
  * named, carrying buffered affiliation picks and new registry entries
  * into the same update. Escape closes; below 640px it is a sheet.
  */
 import { useEffect, useState, type ReactNode } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { isGroupAuthor } from '@opendraft/schema';
 import type { MetadataAuthor } from './use-manuscript-metadata';
 import { AuthorCard, type GroupOption } from './AuthorCard';
 import { AffiliationPicker } from './AffiliationPicker';
 import { pruneOrphans } from './affiliation-ops';
+import { AuthorOrderHeader, DialogShell } from './authors-dialog-parts';
 import type { AffiliationEntry } from './byline-model';
 import { NARROW_QUERY, useMediaQuery } from '../../hooks/use-media-query';
 
@@ -159,32 +160,6 @@ function AffiliationSection({ authors, index, registry, onApply }: {
   );
 }
 
-/** Form header: `Author N of M` indicator, position select and remove. */
-function PositionHeader({ index, total, onMove, onRemove }: {
-  index: number; total: number; onMove(to: number): void; onRemove(): void;
-}): ReactNode {
-  return (
-    <div className="flex items-center gap-2 px-2 pt-1">
-      <h3 className="text-sm font-medium">Author {index + 1} of {total}</h3>
-      <select
-        data-testid="author-position"
-        aria-label="Author position"
-        value={index + 1}
-        onChange={(event) => onMove(Number(event.target.value) - 1)}
-        className="min-h-11 rounded border border-secondary px-2 text-sm"
-      >
-        {Array.from({ length: total }, (_, i) => (
-          <option key={i + 1} value={i + 1}>{i + 1}</option>
-        ))}
-      </select>
-      <button type="button" data-testid={`author-remove-${index}`} aria-label={`Remove author ${index + 1}`}
-        onClick={onRemove} className="ml-auto min-h-11 rounded px-2 hover:bg-hover">
-        <X aria-hidden className="inline size-4" />
-      </button>
-    </div>
-  );
-}
-
 // The single open author form: position header, editor card and the
 // affiliation section for person authors.
 function AuthorForm({ authors, index, groups, affiliations, setAuthors, setAffiliations, ops }: {
@@ -198,7 +173,7 @@ function AuthorForm({ authors, index, groups, affiliations, setAuthors, setAffil
   };
   return (
     <div data-testid={`author-card-${index}`}>
-      <PositionHeader index={index} total={authors.length}
+      <AuthorOrderHeader index={index} total={authors.length}
         onMove={(to) => ops.move(index, to)} onRemove={() => ops.removeAt(index)} />
       <AuthorCard author={author} groups={groups}
         onChange={(next) => setAuthors(authors.map((a, i) => (i === index ? next : a)))}
@@ -209,38 +184,10 @@ function AuthorForm({ authors, index, groups, affiliations, setAuthors, setAffil
   );
 }
 
-// Dialog frame: full-screen sheet below 640px, centered card otherwise.
-function DialogShell({ narrow, onClose, children }: {
-  narrow: boolean; onClose: () => void; children: ReactNode;
-}): ReactNode {
-  const frame = (
-    <div role="dialog" aria-modal="true" aria-label="Authors" data-testid="authors-dialog"
-      className={narrow
-        ? 'fixed inset-0 z-30 flex flex-col overflow-y-auto bg-white p-3'
-        : 'max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded border border-secondary bg-white p-3 shadow'}>
-      <div className="flex items-center justify-between">
-        <h2 className="font-medium">Authors</h2>
-        <button type="button" data-testid="authors-close" aria-label="Close" onClick={onClose}
-          className="min-h-11 rounded hover:bg-hover">
-          <X aria-hidden className="inline size-4" />
-        </button>
-      </div>
-      {children}
-    </div>
-  );
-  if (narrow) return frame;
-  return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black-08"
-      onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      {frame}
-    </div>
-  );
-}
-
 /**
  * Authors dialog rendering only the selected author's form (or the
- * draft form for Add author) with the `Author N of M` position
- * indicator that reorders the author. Remove keeps its Undo toast and
+ * draft form for Add author) with the `Author order: [n] of M` select
+ * that reorders the author. Remove keeps its Undo toast and
  * draft persistence stays gated on a non-empty family or literal name.
  * Below 640px the dialog is a full-screen sheet.
  *
