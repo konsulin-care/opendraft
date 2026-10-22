@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 /**
- * Author card tests: live preview, comma-paste split, the single-name
- * checkbox, particle/suffix options, Person/Group toggle, degrees,
- * email, status toggles, on-behalf-of, CRediT pills and the
- * affiliation warning marker.
+ * Author card tests: placeholder-only name fields, single-name literal
+ * storage with author-type metadata, comma-paste split, particle/suffix
+ * options, Person/Group toggle, degrees, email, status toggles,
+ * on-behalf-of, CRediT pills and the affiliation warning marker.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -44,13 +44,6 @@ function follow(
 }
 
 describe('AuthorCard name editing', () => {
-  it("preview shows 'Byline: Alice Marie Smith · Citation: Smith, A. M.'", () => {
-    renderCard();
-    const preview = screen.getByTestId('author-preview').textContent ?? '';
-    expect(preview).toContain('Byline: Alice Marie Smith');
-    expect(preview).toContain('Citation: Smith, A. M.');
-  });
-
   it("pasting 'Smith, Alice Marie' in Family sets given and family", () => {
     const { onChange } = renderCard({ id: 'x', name: { family: '' } });
     fireEvent.paste(screen.getByTestId('author-family'), {
@@ -59,13 +52,14 @@ describe('AuthorCard name editing', () => {
     expect(lastChange(onChange).name).toEqual({ family: 'Smith', given: 'Alice Marie' });
   });
 
-  it("'only one name' hides Given name and stores {family:'Dewi'}", () => {
+  it("'only one name' hides Given and stores {literal} with author-type person", () => {
     const { onChange, rerender } = renderCard({ id: 'dewi', name: { given: '', family: '' } });
     fireEvent.click(screen.getByTestId('author-single-name'));
     follow(rerender, onChange);
     expect(screen.queryByTestId('author-given')).toBeNull();
-    fireEvent.change(screen.getByTestId('author-family'), { target: { value: 'Dewi' } });
-    expect(lastChange(onChange).name).toEqual({ family: 'Dewi' });
+    fireEvent.change(screen.getByPlaceholderText('Name'), { target: { value: 'Dewi' } });
+    expect(lastChange(onChange).name).toEqual({ literal: 'Dewi' });
+    expect(lastChange(onChange).metadata).toMatchObject({ 'author-type': 'person' });
   });
 
   it('offers particle and suffix behind More name options', () => {
@@ -82,6 +76,7 @@ describe('AuthorCard person/group toggle', () => {
     fireEvent.click(screen.getByTestId('author-type-group'));
     const group = lastChange(onChange);
     expect(group.name).toEqual({ literal: 'Alice Marie Smith' });
+    expect(group.metadata).toMatchObject({ 'author-type': 'group' });
     rerender(<AuthorCard author={group} onChange={onChange} />);
     expect(screen.queryByTestId('author-orcid')).toBeNull();
     expect(screen.queryByTestId('author-degree-field')).toBeNull();
@@ -155,5 +150,58 @@ describe('AuthorCard black accent', () => {
     expect(pill.getAttribute('aria-pressed')).toBe('true');
     expect(pill.className).toMatch(/\bbg-black\b/);
     expect(pill.className).not.toMatch(/blue-600/);
+  });
+});
+
+describe('AuthorCard placeholder-only name fields', () => {
+  it('renders no visible given/family labels, only placeholders and aria-labels', () => {
+    renderCard();
+    expect(screen.queryByText('Given name(s)')).toBeNull();
+    expect(screen.queryByText('Family name')).toBeNull();
+    const given = screen.getByTestId('author-given') as HTMLInputElement;
+    expect(given.placeholder).toBe('Given name(s)');
+    expect(given.getAttribute('aria-label')).toBe('Given name(s)');
+    const family = screen.getByTestId('author-family') as HTMLInputElement;
+    expect(family.placeholder).toBe('Family name');
+    expect(family.getAttribute('aria-label')).toBe('Family name');
+  });
+
+  it('keeps no author-preview testid (byline preview removed)', () => {
+    renderCard();
+    expect(screen.queryByTestId('author-preview')).toBeNull();
+  });
+});
+
+describe('AuthorCard single-name literal storage', () => {
+  it('ticking shows one input with placeholder Name storing a literal person', () => {
+    const { onChange, rerender } = renderCard({ id: 'dewi', name: { given: '', family: '' } });
+    fireEvent.click(screen.getByTestId('author-single-name'));
+    follow(rerender, onChange);
+    expect(screen.queryByTestId('author-given')).toBeNull();
+    const single = screen.getByPlaceholderText('Name') as HTMLInputElement;
+    expect(single.getAttribute('aria-label')).toBe('Name');
+    fireEvent.change(single, { target: { value: 'Dewi' } });
+    expect(lastChange(onChange).name).toEqual({ literal: 'Dewi' });
+    expect(lastChange(onChange).metadata).toMatchObject({ 'author-type': 'person' });
+  });
+
+  it('unticking restores given/family with the literal as family', () => {
+    const { onChange, rerender } = renderCard({
+      id: 'plato', name: { literal: 'Plato' }, metadata: { 'author-type': 'person' },
+    });
+    expect((screen.getByTestId('author-single-name') as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByTestId('author-single-name'));
+    expect(lastChange(onChange).name).toEqual({ given: '', family: 'Plato' });
+    expect(lastChange(onChange).metadata).toMatchObject({ 'author-type': 'person' });
+    follow(rerender, onChange);
+    expect(screen.getByTestId('author-given')).toBeDefined();
+    expect((screen.getByTestId('author-family') as HTMLInputElement).value).toBe('Plato');
+  });
+
+  it('renders a literal name with author-type person as a person card', () => {
+    renderCard({ id: 'plato', name: { literal: 'Plato' }, metadata: { 'author-type': 'person' } });
+    expect(screen.getByTestId('author-type-person').getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByPlaceholderText('Name')).toBeDefined();
+    expect(screen.queryByTestId('author-group-name')).toBeNull();
   });
 });

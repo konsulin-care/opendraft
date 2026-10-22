@@ -1,10 +1,14 @@
 /**
  * Expanded editor card for one author of the authors dialog.
- * Person authors get name fields, single-name checkbox, particle/suffix,
- * live preview, comma-paste split, ORCID, degrees, email, status toggles,
- * on-behalf-of and CRediT pills; groups get a literal name and pills.
- */import { useState, type ClipboardEvent, type ReactNode } from 'react';
+ * Person authors get placeholder-only name fields, the single-name
+ * checkbox storing `{ literal }` with `metadata.author-type: person`,
+ * particle/suffix, comma-paste split, ORCID, degrees, email, status
+ * toggles, on-behalf-of and CRediT pills; groups get a literal name
+ * and pills. The Person/Group toggle writes `metadata.author-type`.
+ */import { useState, type ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react'; import { GroupMembers } from './GroupMembers'; import { OrcidField } from './orcid';
+import { isGroupAuthor } from '@opendraft/schema';
+import { AuthorNameFields, authorTypeMetadata, INPUT } from './author-name-fields';
 import type { MetadataAuthor } from './use-manuscript-metadata';
 
 /** Group entry offered by the "On behalf of" dropdown. */
@@ -20,8 +24,6 @@ export interface AuthorCardProps {
   onChange: (next: MetadataAuthor) => void; // receives the full updated author
 }
 
-/** Shared borderless, touch-sized input styling. */
-const INPUT = 'min-h-11 w-full outline-none';
 /** Pill styling shared by the type toggle and the CRediT pills. */
 const pillClass = (active: boolean): string =>
   `rounded border px-2 py-1 text-sm ${active ? 'border-black bg-black text-white' : 'border-secondary bg-white hover:bg-hover'}`;
@@ -50,15 +52,6 @@ function asName(name: unknown): Record<string, string> {
 const displayName = (name: Record<string, string>): string => name.literal
   || [name.given, name.particle, name.family, name.suffix].filter(Boolean).join(' ');
 
-// Live preview parts: the byline name and the short-citation form.
-function citationOf(name: Record<string, string>): { byline: string; citation: string } {
-  const family = name.family || name.literal || '';
-  const given = (name.given ?? '').trim().split(/\s+/).filter(Boolean);
-  const initials = given.length > 0 ? `${given.map((w) => w.charAt(0).toUpperCase()).join('. ')}.`
-    : `${family.charAt(0).toUpperCase()}.`;
-  return { byline: displayName(name), citation: `${family}, ${initials}` };
-}
-
 // Non-empty strings of a YAML array value.
 const strList = (value: unknown): string[] => (Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []);
 
@@ -84,57 +77,6 @@ function TypeToggle({ group, onSet }: { group: boolean; onSet: (group: boolean) 
       <button type="button" data-testid="author-type-person" aria-pressed={!group} onClick={() => onSet(false)} className={pillClass(!group)}>Person</button>
       <button type="button" data-testid="author-type-group" aria-pressed={group} onClick={() => onSet(true)} className={pillClass(group)}>Group</button>
     </div>
-  );
-}
-
-// Particle/suffix fields behind the "More name options" toggle.
-function MoreNameOptions({ name, setName }: { name: Record<string, string>; setName: (patch: Record<string, string>) => void }): ReactNode {
-  const [open, setOpen] = useState(false);
-  const field = (key: 'particle' | 'suffix', label: string): ReactNode => (
-    <label className="block text-sm">
-      {label}
-      <input data-testid={`author-${key}`} value={name[key] ?? ''} className={INPUT}
-        onChange={(event) => { const next = { ...name, [key]: event.target.value }; if (!event.target.value) delete next[key]; setName(next); }} />
-    </label>
-  );
-  return (
-    <>
-      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="text-sm text-muted hover:bg-hover">More name options</button>
-      {open && field('particle', 'Particle (e.g. van)')}
-      {open && field('suffix', 'Suffix (e.g. Jr.)')}
-    </>
-  );
-}
-
-// Given/family fields, the single-name checkbox and comma-paste split.
-function NameFields({ name, setName }: { name: Record<string, string>; setName: (patch: Record<string, string>) => void }): ReactNode {
-  const single = !('given' in name);
-  const onPaste = (event: ClipboardEvent<HTMLInputElement>): void => {
-    const text = event.clipboardData.getData('text');
-    const comma = text.indexOf(',');
-    if (comma < 0) return;
-    event.preventDefault();
-    setName({ ...name, family: text.slice(0, comma).trim(), given: text.slice(comma + 1).trim() });
-  };
-  return (
-    <>
-      {!single && (
-        <label className="block text-sm">Given name(s)
-          <input data-testid="author-given" value={name.given ?? ''} className={INPUT}
-            onChange={(event) => setName({ ...name, given: event.target.value })} />
-        </label>
-      )}
-      <label className="block text-sm">Family name
-        <input data-testid="author-family" value={name.family ?? ''} className={INPUT}
-          onChange={(event) => setName({ ...name, family: event.target.value })} onPaste={onPaste} />
-      </label>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" data-testid="author-single-name" checked={single}
-          onChange={(event) => setName(event.target.checked ? { family: name.family ?? '' } : { ...name, given: '' })} />
-        This person has only one name
-      </label>
-      <MoreNameOptions name={name} setName={setName} />
-    </>
   );
 }
 
@@ -234,10 +176,7 @@ function PersonBody({ edit }: { edit: CardEdit }): ReactNode {
     apply({ roles: roles.includes(slug) ? roles.filter((r) => r !== slug) : [...roles, slug] });
   return (
     <>
-      <NameFields name={name} setName={(patch) => apply({ name: patch })} />
-      <div data-testid="author-preview" className="text-sm text-muted">
-        Byline: {citationOf(name).byline} · Citation: {citationOf(name).citation}
-      </div>
+      <AuthorNameFields author={author} name={name} apply={apply} />
       <OrcidField author={author} onChange={onChange} focus={focusOrcid} />
       <EmailField author={author} apply={apply} />
       <Degrees degrees={strList(author.degrees)} onSet={(degrees) => apply({ degrees })} />
@@ -275,11 +214,14 @@ function GroupBody({ edit }: { edit: CardEdit }): ReactNode {
  */
 export function AuthorCard({ author, groups = [], focusOrcid = false, onChange }: AuthorCardProps): ReactNode {
   const name = asName(author.name);
-  const group = typeof name.literal === 'string';
+  const group = isGroupAuthor(author);
   const apply = (patch: Partial<MetadataAuthor>): void => onChange({ ...author, ...patch });
   const setType = (toGroup: boolean): void => {
     if (toGroup === group) return;
-    apply({ name: toGroup ? { literal: displayName(name) } : { family: name.literal ?? '' } });
+    apply({
+      name: toGroup ? { literal: displayName(name) } : { family: name.literal ?? '' },
+      metadata: authorTypeMetadata(author, toGroup ? 'group' : 'person'),
+    });
   };
   return (
     <div className="space-y-2 px-2 pb-3">

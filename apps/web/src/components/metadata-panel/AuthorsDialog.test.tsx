@@ -120,8 +120,9 @@ describe('AuthorsDialog single form', () => {
     expect(screen.getByText('Author 2 of 3')).toBeDefined();
     const position = screen.getByTestId('author-position') as HTMLSelectElement;
     expect(position.value).toBe('2');
-    expect(screen.getByTestId('author-card-1').textContent).toContain('Budi Lee');
+    expect(screen.getByTestId('author-card-1')).toBeDefined();
     expect((screen.getByTestId('author-given') as HTMLInputElement).value).toBe('Budi');
+    expect((screen.getByTestId('author-family') as HTMLInputElement).value).toBe('Lee');
     expect(screen.queryByTestId('author-card-0')).toBeNull();
     expect(screen.queryByTestId('author-card-2')).toBeNull();
     for (const testid of [
@@ -232,15 +233,20 @@ describe('AuthorsDialog draft author', () => {
     expect(authors[3]).toMatchObject({ name: { given: 'Dewi', family: 'Sari' } });
   });
 
-  it("'only one name' hides Given name and stores {family:'Dewi'}", async () => {
+  it('stores a single draft name as a literal person with author-type metadata', async () => {
     const ws = await boot();
     fireEvent.click(screen.getByTestId('add-author'));
     fireEvent.click(screen.getByTestId('author-single-name'));
     expect(screen.queryByTestId('author-given')).toBeNull();
-    fireEvent.change(screen.getByTestId('author-family'), { target: { value: 'Dewi' } });
+    expect(screen.getByPlaceholderText('Name')).toBeDefined();
+    fireEvent.change(screen.getByPlaceholderText('Name'), { target: { value: 'Dewi' } });
     await flushWrites();
     const authors = await readAuthors(ws);
-    expect(authors[3]['name']).toEqual({ family: 'Dewi' });
+    expect(authors).toHaveLength(4);
+    expect(authors[3]).toMatchObject({
+      name: { literal: 'Dewi' },
+      metadata: { 'author-type': 'person' },
+    });
   });
 });
 

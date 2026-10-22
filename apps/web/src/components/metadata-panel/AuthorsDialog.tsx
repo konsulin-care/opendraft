@@ -10,6 +10,7 @@
  */
 import { useEffect, useState, type ReactNode } from 'react';
 import { Plus, X } from 'lucide-react';
+import { isGroupAuthor } from '@opendraft/schema';
 import type { MetadataAuthor } from './use-manuscript-metadata';
 import { AuthorCard, type GroupOption } from './AuthorCard';
 import { AffiliationPicker } from './AffiliationPicker';
@@ -85,7 +86,7 @@ function moved(authors: MetadataAuthor[], from: number, to: number): MetadataAut
 
 // Group options for the "On behalf of" dropdown of every form.
 function groupsOf(authors: MetadataAuthor[]): GroupOption[] {
-  return authors.filter((a) => 'literal' in nameRecord(a)).map((a) => ({ id: String(a.id ?? ''), name: displayName(a) }));
+  return authors.filter(isGroupAuthor).map((a) => ({ id: String(a.id ?? ''), name: displayName(a) }));
 }
 
 // Close the dialog when Escape is pressed, from anywhere on the page.
@@ -189,7 +190,7 @@ function AuthorForm({ authors, index, groups, affiliations, setAuthors, setAffil
         onMove={(to) => ops.move(index, to)} onRemove={() => ops.removeAt(index)} />
       <AuthorCard author={author} groups={groups}
         onChange={(next) => setAuthors(authors.map((a, i) => (i === index ? next : a)))} />
-      {setAffiliations && !nameRecord(author).literal && (
+      {setAffiliations && !isGroupAuthor(author) && (
         <AffiliationSection authors={authors} index={index} affiliations={affiliations ?? []}
           setAuthors={setAuthors} setAffiliations={setAffiliations} />
       )}
