@@ -140,27 +140,62 @@ describe('buildByline collaborators and on-behalf-of', () => {
 });
 
 describe('buildByline contributions', () => {
-  const GROUP: MetadataAuthor[] = [
-    { id: 'dwg', name: { literal: 'OpenDraft Team' } },
-  ];
-
-  it('derives contribution lines with initials only when roles exist', () => {
-    const model = buildByline(GROUP, REGISTRY);
-    expect(model.hasContributions).toBe(false);
-    expect(model.contributions).toEqual([]);
-
-    const withRoles = buildByline(
+  it('summarizes each author by full name in author order', () => {
+    const model = buildByline(
       [
-        { id: 'smith', name: { given: 'Alice Marie', family: 'Smith' }, roles: ['writing-original-draft'] },
-        { id: 'lee', name: { given: 'Budi', family: 'Lee' }, roles: ['writing-original-draft', 'supervision'] },
+        { id: 'john', name: { given: 'John' }, roles: ['conceptualization'] },
+        {
+          id: 'jane',
+          name: { given: 'Jane', family: 'Doe' },
+          roles: ['data-curation', 'formal-analysis'],
+        },
       ],
       REGISTRY,
     );
-    expect(withRoles.hasContributions).toBe(true);
-    expect(withRoles.contributions).toEqual([
-      'Supervision: B.L.',
-      'Writing – original draft: A.M.S., B.L.',
+    expect(model.hasContributions).toBe(true);
+    expect(model.contributions).toEqual([
+      'John: Conceptualization',
+      'Jane Doe: Data curation, Formal analysis',
     ]);
+  });
+
+  it('orders role labels in canonical CRediT order', () => {
+    const model = buildByline(
+      [
+        {
+          id: 'smith',
+          name: { given: 'Alice Marie', family: 'Smith' },
+          roles: ['supervision', 'conceptualization'],
+        },
+      ],
+      REGISTRY,
+    );
+    expect(model.contributions).toEqual([
+      'Alice Marie Smith: Conceptualization, Supervision',
+    ]);
+  });
+});
+
+describe('buildByline contributions edge cases', () => {
+  it('uses the group literal name and skips authors without roles', () => {
+    const model = buildByline(
+      [
+        { id: 'dwg', name: { literal: 'OpenDraft Team' } },
+        { id: 'lee', name: { given: 'Budi', family: 'Lee' }, roles: ['software'] },
+      ],
+      REGISTRY,
+    );
+    expect(model.hasContributions).toBe(true);
+    expect(model.contributions).toEqual(['Budi Lee: Software']);
+  });
+
+  it('emits no lines and flags no contributions when no author has roles', () => {
+    const model = buildByline(
+      [{ id: 'plain', name: { given: 'Ada', family: 'Lovelace' } }],
+      REGISTRY,
+    );
+    expect(model.hasContributions).toBe(false);
+    expect(model.contributions).toEqual([]);
   });
 });
 

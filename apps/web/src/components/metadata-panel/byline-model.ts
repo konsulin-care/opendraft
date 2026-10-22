@@ -4,8 +4,8 @@
  * Derives per-author byline segments (affiliation superscripts numbered
  * by first appearance, symbol flags, ORCID, on-behalf-of phrasing), the
  * numbered affiliation list, footnotes limited to symbols in use, the
- * collaborator groups and the CRediT contribution statement with derived
- * initials.
+ * collaborator groups and the per-author CRediT contributions summary in
+ * human-readable role labels.
  */
 import type { MetadataAuthor } from './use-manuscript-metadata';
 
@@ -82,17 +82,6 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
-/** Structured name parts of an author; empty strings when absent. */
-function nameParts(name: unknown): { given: string; family: string } {
-  if (typeof name === 'string') return { given: '', family: name };
-  const record = asRecord(name);
-  if (typeof record.literal === 'string') return { given: '', family: record.literal };
-  return {
-    given: typeof record.given === 'string' ? record.given : '',
-    family: typeof record.family === 'string' ? record.family : '',
-  };
-}
-
 /**
  * Derive an author's display name: literal for groups, otherwise given
  * names then family name (with optional particle and suffix).
@@ -125,20 +114,20 @@ export function initials(given: string, family: string): string {
   return `${letters.join('.')}.`;
 }
 
-/** CRediT contribution lines with derived initials, in canonical order. */
+/** One author's CRediT roles as human-readable labels in canonical order. */
+function roleLabels(author: MetadataAuthor): string[] {
+  const roles = Array.isArray(author.roles) ? author.roles : [];
+  return CREDIT_ROLES
+    .filter(([slug]) => roles.includes(slug))
+    .map(([, label]) => label);
+}
+
+/** CRediT contributions summary: one line per author, in author order. */
 function buildContributions(authors: MetadataAuthor[]): string[] {
   const lines: string[] = [];
-  for (const [slug, label] of CREDIT_ROLES) {
-    const names = authors
-      .filter((author) => Array.isArray(author.roles) && author.roles.includes(slug))
-      .map((author) => {
-        const parts = nameParts(author.name);
-        const literal = asRecord(author.name).literal;
-        return typeof literal === 'string'
-          ? literal
-          : initials(parts.given, parts.family || parts.given);
-      });
-    if (names.length > 0) lines.push(`${label}: ${names.join(', ')}`);
+  for (const author of authors) {
+    const labels = roleLabels(author);
+    if (labels.length > 0) lines.push(`${authorDisplayName(author)}: ${labels.join(', ')}`);
   }
   return lines;
 }

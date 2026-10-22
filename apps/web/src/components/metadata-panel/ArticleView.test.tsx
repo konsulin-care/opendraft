@@ -5,7 +5,7 @@
  * details section.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, type RenderResult } from '@testing-library/react';
+import { fireEvent, render, screen, within, type RenderResult } from '@testing-library/react';
 import { ArticleView, type ArticleViewProps } from './ArticleView';
 import type { MetadataAuthor } from './use-manuscript-metadata';
 
@@ -132,26 +132,53 @@ describe('ArticleView footnotes and collaborators', () => {
   });
 });
 
-describe('ArticleView contributions and publication details', () => {
+describe('ArticleView contributions', () => {
   it('renders no Author contributions when no author has roles', () => {
     renderView();
     expect(screen.queryByTestId('author-contributions')).toBeNull();
     expect(screen.queryByText(/Author contributions/)).toBeNull();
   });
 
-  it('renders the contribution statement with derived initials when roles exist', () => {
+  it('renders per-author contribution lines by full name when roles exist', () => {
+    renderView({
+      authors: [
+        { id: 'john', name: { given: 'John' }, roles: ['conceptualization'] },
+        {
+          id: 'jane',
+          name: { given: 'Jane', family: 'Doe' },
+          roles: ['data-curation', 'formal-analysis'],
+        },
+      ],
+      affiliations: [],
+    });
+    const lines = within(screen.getByTestId('author-contributions'))
+      .getAllByRole('listitem')
+      .map((item) => item.textContent);
+    expect(lines).toEqual([
+      'John: Conceptualization',
+      'Jane Doe: Data curation, Formal analysis',
+    ]);
+  });
+
+  it('renders the contributions section read-only directly after Keywords', () => {
     renderView({
       authors: [
         {
           id: 'smith',
           name: { given: 'Alice Marie', family: 'Smith' },
-          roles: ['writing-original-draft'],
+          roles: ['conceptualization'],
         },
       ],
+      affiliations: [],
     });
-    expect(screen.getByTestId('author-contributions').textContent).toContain('A.M.S.');
+    const keywordsSection = screen.getByTestId('keyword-input').closest('section');
+    const contributions = screen.getByTestId('author-contributions');
+    expect(keywordsSection?.nextElementSibling).toBe(contributions);
+    expect(contributions.querySelector('button, input, textarea, select')).toBeNull();
   });
+});
 
+describe('ArticleView publication details', () => {
   it('keeps the publication details content hidden until clicked', () => {
     renderView({ frontmatter: { license: 'CC BY 4.0', date: '2024-01-01' } });
     expect(screen.queryByTestId('publication-details-content')).toBeNull();

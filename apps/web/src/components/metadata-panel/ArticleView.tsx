@@ -4,8 +4,9 @@
  * An article-styled editor surface: borderless title, byline with
  * affiliation superscripts, symbols and hover/focus tooltip, numbered
  * affiliation list with footnotes, collaborators toggle, abstract,
- * CRediT contribution statement (only when roles exist) and the
- * publication details section collapsed by default.
+ * CRediT contributions summary (one read-only line per author, only
+ * when roles exist) and the publication details section collapsed by
+ * default.
  */
 import { useRef, useState, type ReactNode, type RefObject } from 'react';
 import type { MetadataAuthor } from './use-manuscript-metadata';
