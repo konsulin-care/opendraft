@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 /**
- * Affiliation picker tests: registry suggestions listed first with
- * "used by N", debounced ROR v2 search only at >=5 characters with
- * stale-abort and cache reuse, registry ref reuse, Independent
- * researcher, manual create, shared-edit warning and the legacy inline
- * "Normalize to references" flow.
+ * Affiliation picker tests: debounced ROR v2 search (>=5 chars,
+ * stale-abort, cache) in a listbox popover that closes on selection,
+ * Escape and outside clicks; registry ref reuse; the Independent
+ * researcher checkbox shown only with zero affiliations; manual
+ * create; shared-edit warning; legacy "Normalize to references".
  */
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
@@ -109,11 +109,19 @@ it('serves a repeated query from the cache', async () => {
 it('lists registry suggestions before ROR results', async () => {
   boot();
   await search('univer');
+  const listbox = screen.getByTestId('affiliation-listbox');
   const registryRow = screen.getByTestId('affiliation-registry-item-0');
   const rorRow = screen.getByTestId('affiliation-ror-item-0');
+  expect(listbox.contains(registryRow)).toBe(true);
+  expect(listbox.contains(rorRow)).toBe(true);
   expect(registryRow.textContent).toContain('used by 0');
   expect(registryRow.compareDocumentPosition(rorRow) & Node.DOCUMENT_POSITION_FOLLOWING)
     .toBeTruthy();
+});
+
+it('shows no listbox before a query is typed', () => {
+  boot();
+  expect(screen.queryByTestId('affiliation-listbox')).toBeNull();
 });
 
 it('adds a registry entry and author ref for a picked ROR result', async () => {
@@ -124,10 +132,27 @@ it('adds a registry entry and author ref for a picked ROR result', async () => {
     registry: [UI, ROR_ENTRY],
     authors: [{ ...author(), affiliations: [{ ref: 'university-of-indonesia' }] }],
   });
+  expect(screen.getByTestId('affiliation-search').value).toBe('');
+  expect(screen.queryByTestId('affiliation-listbox')).toBeNull();
 });
 
-it('reuses an existing registry entry with a ref only', () => {
+it('closes the listbox on Escape', async () => {
+  boot();
+  await search('univer');
+  fireEvent.keyDown(screen.getByTestId('affiliation-search'), { key: 'Escape' });
+  expect(screen.queryByTestId('affiliation-listbox')).toBeNull();
+});
+
+it('closes the listbox on an outside mousedown', async () => {
+  boot();
+  await search('univer');
+  fireEvent.mouseDown(document.body);
+  expect(screen.queryByTestId('affiliation-listbox')).toBeNull();
+});
+
+it('reuses an existing registry entry with a ref only', async () => {
   const { onApply } = boot();
+  await search('univ');
   fireEvent.click(screen.getByTestId('affiliation-registry-item-0'));
   expect(onApply).toHaveBeenCalledWith({
     authors: [{ ...author(), affiliations: [{ ref: 'ui' }] }],
@@ -135,23 +160,48 @@ it('reuses an existing registry entry with a ref only', () => {
   expect(onApply.mock.calls[0]?.[0].registry).toBeUndefined();
 });
 
-it('warns when the edited affiliation is shared by two authors', () => {
+it('warns when the edited affiliation is shared by two authors', async () => {
   boot({
     registry: [UI],
     authors: [author({ affiliations: [{ ref: 'ui' }] }), author({ id: 'lee', affiliations: [{ ref: 'ui' }] })],
   });
+  await search('univ');
   fireEvent.click(screen.getByTestId('affiliation-edit-0'));
   expect(screen.getByTestId('affiliation-shared-warning').textContent)
     .toContain('Shared by 2 authors');
 });
 
-it('adds the built-in Independent researcher entry', () => {
+it('adds the built-in Independent researcher entry via the checkbox', () => {
   const { onApply } = boot({ registry: [] });
   fireEvent.click(screen.getByTestId('affiliation-independent'));
   expect(onApply).toHaveBeenCalledWith({
     registry: [{ id: 'independent', name: 'Independent researcher' }],
     authors: [{ ...author(), affiliations: [{ ref: 'independent' }] }],
   });
+});
+
+it('keeps the independent checkbox outside the listbox while shown', async () => {
+  boot({ registry: [] });
+  const checkbox = screen.getByTestId('affiliation-independent');
+  expect(checkbox.getAttribute('type')).toBe('checkbox');
+  await search('univ');
+  expect(screen.getByTestId('affiliation-listbox').contains(checkbox)).toBe(false);
+});
+
+it('hides the independent checkbox once the author has an affiliation', () => {
+  boot({ registry: [UI], authors: [author({ affiliations: [{ ref: 'ui' }] })] });
+  expect(screen.queryByTestId('affiliation-independent')).toBeNull();
+});
+
+it('keeps create-manual and normalize as footer actions outside the listbox', async () => {
+  boot({
+    registry: [UI],
+    authors: [author({ affiliations: [{ name: 'Old Institute' }] })],
+  });
+  await search('univ');
+  const listbox = screen.getByTestId('affiliation-listbox');
+  expect(listbox.contains(screen.getByTestId('affiliation-create-manual'))).toBe(false);
+  expect(listbox.contains(screen.getByTestId('affiliation-normalize'))).toBe(false);
 });
 
 it('creates a registry entry from the manual form', () => {

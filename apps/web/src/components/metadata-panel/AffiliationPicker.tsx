@@ -1,14 +1,21 @@
 /**
  * Affiliation picker of the manuscript metadata panel.
  *
- * Registry suggestions come first ("used by N"), then ROR v2 results
- * fetched after a 300ms debounce at 5 characters — stale queries abort
- * and land in an IndexedDB cache. "Independent researcher", manual
- * entries append to the _author.yml registry and add an author ref; the
- * edit sheet warns when an entry is shared by several authors; legacy
- * inline affiliations normalize to registry entries plus refs.
+ * Registry suggestions ("used by N") and ROR v2 results (300ms debounce
+ * at 5 characters, stale queries abort, IndexedDB cache) render in a
+ * listbox popover only while a query is open; selecting clears the query
+ * and closes the list, Escape and outside clicks close it too.
+ * "Create manually" and "Normalize to references" are footer actions,
+ * "Independent researcher" is a checkbox shown only while the author
+ * has zero affiliations. Manual entries append to the _author.yml
+ * registry and add an author ref; the edit sheet warns when an entry is
+ * shared by several authors; legacy inline affiliations normalize to
+ * registry entries plus refs.
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  AffiliationListbox, IndependentRow, INPUT, nameOf, SearchField, useOutsideClose,
+} from './affiliation-listbox';
 import { searchRorOrgs, type RorOrg } from './ror-client';
 import type { AffiliationEntry } from './byline-model';
 import type { MetadataAuthor } from './use-manuscript-metadata';
@@ -23,12 +30,7 @@ export interface AffiliationPickerProps {
 
 const ROR_MIN_CHARS = 5; // ROR is searched only from five characters
 const ROR_DEBOUNCE_MS = 300; // debounce between the last keystroke and fetch
-const INPUT = 'min-h-11 w-full outline-none'; // borderless, touch-sized input
 const ROW = 'block min-h-11 w-full rounded px-2 text-left text-muted hover:bg-hover'; // action rows
-
-/** Lowercase display name of a registry entry. */
-const nameOf = (entry: AffiliationEntry): string =>
-  typeof entry.name === 'string' ? entry.name : String(entry.id ?? '');
 
 /** Slugify free text into a kebab-case registry id base; '' when empty. */
 export const slugify = (text: string): string =>
@@ -156,34 +158,6 @@ function createOps(
   };
 }
 
-// Registry suggestion row: pick target plus edit affordance.
-function RegistryRow(props: {
-  entry: AffiliationEntry; index: number; usage: number; onPick(): void; onEdit(): void;
-}): ReactNode {
-  return (
-    <div className="flex items-center gap-1">
-      <button type="button" data-testid={`affiliation-registry-item-${props.index}`} onClick={props.onPick}
-        className="min-h-11 flex-1 rounded px-2 text-left hover:bg-hover">
-        {nameOf(props.entry)}<span className="text-muted"> used by {props.usage}</span>
-      </button>
-      <button type="button" data-testid={`affiliation-edit-${props.index}`} onClick={props.onEdit}
-        className="min-h-11 rounded px-2 text-muted hover:bg-hover">Edit</button>
-    </div>
-  );
-}
-
-// One ROR suggestion row with city and country.
-function RorRow({ org, index, onPick }: { org: RorOrg; index: number; onPick(): void }): ReactNode {
-  return (
-    <button type="button" data-testid={`affiliation-ror-item-${index}`} onClick={onPick}
-      className="block min-h-11 w-full rounded px-2 text-left hover:bg-hover">
-      {org.name}
-      {org.city ? <span className="text-muted">, {org.city}</span> : null}
-      {org.country ? <span className="text-muted"> · {org.country}</span> : null}
-    </button>
-  );
-}
-
 // Name/city/country fields shared by the manual form and the edit sheet.
 function EntryFields(props: {
   prefix: string; entry: Record<string, string>; set: (patch: Record<string, string>) => void;
@@ -249,38 +223,40 @@ function EditSheet(props: {
  * Pick or edit an affiliation for one author.
  *
  * @param props - See {@link AffiliationPickerProps}.
- * @returns The search field, suggestion lists, action buttons and sheets.
+ * @returns The combobox field, suggestion listbox, independent checkbox,
+ *   footer actions and sheets.
  */
 export function AffiliationPicker({
   registry, authors, authorIndex = 0, onApply,
 }: AffiliationPickerProps): ReactNode {
   const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
   const [ror, setRor] = useState<RorOrg[]>([]);
   const [manual, setManual] = useState(false);
   const [editIndex, setEditIndex] = useState<number | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const close = (): void => { setOpen(false); setEditIndex(null); };
   useRorResults(query, setRor);
+  useOutsideClose(rootRef, open, close);
   const ops = createOps(registry, authors, authorIndex, onApply);
+  const pick = (apply: () => void): void => { apply(); setQuery(''); close(); };
   const q = query.trim().toLowerCase();
-  const matches = registry
-    .map((entry, index) => ({ entry, index }))
+  const suggestions = registry
+    .map((entry, index) => ({ entry, index, usage: refUsage(authors, String(entry.id)) }))
     .filter(({ entry }) => nameOf(entry).toLowerCase().includes(q));
   const editing = editIndex === null ? null : registry[editIndex] ?? null;
+  const target = authors[authorIndex];
+  const noAffiliations = !Array.isArray(target?.affiliations) || target.affiliations.length === 0;
   return (
-    <div data-testid="affiliation-picker" className="space-y-1">
-      <input data-testid="affiliation-search" aria-label="Search affiliations" value={query}
-        placeholder="Affiliation" className={INPUT}
-        onChange={(event) => { setQuery(event.target.value); setEditIndex(null); }} />
-      {matches.map(({ entry, index }) => (
-        <RegistryRow key={String(entry.id ?? index)} entry={entry} index={index}
-          usage={refUsage(authors, String(entry.id))}
-          onPick={() => ops.addRef(String(entry.id))} onEdit={() => setEditIndex(index)} />
-      ))}
-      {ror.map((org, index) => (
-        <RorRow key={org.ror} org={org} index={index} onPick={() => ops.addOrg(org)} />
-      ))}
-      <button type="button" data-testid="affiliation-independent" onClick={ops.addIndependent} className={ROW}>
-        Independent researcher
-      </button>
+    <div ref={rootRef} data-testid="affiliation-picker" className="space-y-1">
+      <SearchField query={query} open={open} onOpen={() => setOpen(true)} onClose={close}
+        onQuery={(text) => { setQuery(text); setEditIndex(null); setOpen(true); }} />
+      {open && q !== '' && (
+        <AffiliationListbox registry={suggestions} ror={ror}
+          onPickRef={(id) => pick(() => ops.addRef(id))} onEdit={setEditIndex}
+          onPickOrg={(org) => pick(() => ops.addOrg(org))} />
+      )}
+      {noAffiliations && <IndependentRow onPick={() => pick(ops.addIndependent)} />}
       <button type="button" data-testid="affiliation-create-manual" onClick={() => setManual(true)} className={ROW}>
         Create manually
       </button>
