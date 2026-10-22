@@ -35,7 +35,9 @@ export interface PublishReadinessInput {
 }
 
 const ORCID_PATTERN = /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/;
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Email format pattern shared with the web app's email field validation. */
+export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ROR_ID_PATTERN = /^[0-9a-z]{9}$/i;
 const FILE_KEYS: readonly PublishFileKey[] = ['frontmatter', 'author', 'abstract', 'opendraft'];
 
@@ -165,7 +167,7 @@ function documentIssues(
   return issues;
 }
 
-/** Publish issues derived from the authors list itself. */
+/** Publish and warning issues derived from the authors list itself. */
 function authorPublishIssues(author: unknown): PublishIssue[] {
   const data = isRecord(author) ? author : null;
   const source = data && Array.isArray(data.authors) ? data.authors : data?.author;
@@ -188,7 +190,7 @@ function authorPublishIssues(author: unknown): PublishIssue[] {
   });
   if (!hasEmail) {
     const path = flaggedNoEmail >= 0 ? `authors.${flaggedNoEmail}.email` : 'authors';
-    issues.push(issue('publish', path, 'no corresponding person with email'));
+    issues.push(issue('warning', path, 'no corresponding person with email'));
   }
   return issues;
 }
@@ -240,8 +242,8 @@ function identityIssues(input: PublishReadinessInput): PublishIssue[] {
  * Classifies issues per the publish profile table: commit-blocking (YAML parse
  * errors, missing title, broken refs, duplicate ids, invalid ORCID/email/ROR
  * format, integrity errors), publish-blocking (no authors, person author
- * without affiliation, no corresponding person with email, repository
- * mismatch) and warnings (missing license, missing abstract). Missing
+ * without affiliation, repository mismatch) and warnings (missing license,
+ * missing abstract, no corresponding person with email). Missing
  * keywords, roles, funding, subject or ORCID are never reported; groups and
  * their members are exempt from the affiliation rule. Issues are ordered
  * commit, then publish, then warning, each with a dotted field path.
@@ -268,7 +270,9 @@ export function checkPublishReadiness(input: PublishReadinessInput): PublishIssu
       const authors = Array.isArray(data.authors) ? data.authors : [];
       authors.forEach((author, index) => commit.push(...authorFormatIssues(author, index)));
     }
-    publish.push(...authorPublishIssues(input.author));
+    authorPublishIssues(input.author).forEach((found) => {
+      (found.level === 'publish' ? publish : warning).push(found);
+    });
   }
   if (!parseErrors.opendraft) {
     identityIssues(input).forEach((found) => {

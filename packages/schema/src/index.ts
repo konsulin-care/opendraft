@@ -13,6 +13,7 @@ export {
 } from './publish-identity.js';
 export {
   checkPublishReadiness,
+  EMAIL_PATTERN,
   type PublishIssue,
   type PublishIssueLevel,
   type PublishFileKey,

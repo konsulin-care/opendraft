@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { checkPublishReadiness } from '../src/publish-profile.js';
+import { checkPublishReadiness, EMAIL_PATTERN } from '../src/index.js';
 import type { PublishReadinessInput } from '../src/publish-profile.js';
 
 const frontmatter = { title: 'Fasting glucose in type 2 diabetes', license: 'CC BY 4.0' };
@@ -185,24 +185,52 @@ describe('checkPublishReadiness — publish: authors', () => {
     expect(issues.filter((i) => i.path.includes('authors.2'))).toEqual([]);
   });
 
-  it("reports no corresponding person with email when none is flagged corresponding", () => {
+  it("reports no corresponding person with email as a non-blocking 'warning' when none is flagged", () => {
     const authors = authorDoc.authors.map((a) => ({ ...a, corresponding: undefined }));
     const issues = checkPublishReadiness(base({ author: { ...authorDoc, authors } }));
     expect(issues).toContainEqual({
-      level: 'publish',
+      level: 'warning',
       path: 'authors',
       message: 'no corresponding person with email',
     });
+    expect(issues.filter((i) => i.message === 'no corresponding person with email' && i.level !== 'warning')).toEqual([]);
   });
 
   it('points at the corresponding person missing an email when one is flagged', () => {
     const authors = authorDoc.authors.map((a, i) => (i === 0 ? { ...a, email: undefined } : a));
     const issues = checkPublishReadiness(base({ author: { ...authorDoc, authors } }));
     expect(issues).toContainEqual({
-      level: 'publish',
+      level: 'warning',
       path: 'authors.0.email',
       message: 'no corresponding person with email',
     });
+  });
+});
+
+describe('checkPublishReadiness — corresponding email warning and EMAIL_PATTERN export', () => {
+  it("keeps an invalid email format at level 'commit' alongside the email warning", () => {
+    // Author 0 carries a malformed email; nobody is flagged corresponding,
+    // so the warning fires at the list level while the format stays commit.
+    const authors = authorDoc.authors.map((a, i) =>
+      i === 0 ? { ...a, email: 'foo@', corresponding: undefined } : { ...a, corresponding: undefined },
+    );
+    const issues = checkPublishReadiness(base({ author: { ...authorDoc, authors } }));
+    expect(issues).toContainEqual({
+      level: 'commit',
+      path: 'authors.0.email',
+      message: "invalid email: 'foo@'",
+    });
+    expect(issues).toContainEqual({
+      level: 'warning',
+      path: 'authors',
+      message: 'no corresponding person with email',
+    });
+  });
+
+  it('exports EMAIL_PATTERN from @opendraft/schema for shared email validation', () => {
+    expect(EMAIL_PATTERN).toBeInstanceOf(RegExp);
+    expect(EMAIL_PATTERN.test('alice@example.org')).toBe(true);
+    expect(EMAIL_PATTERN.test('foo@')).toBe(false);
   });
 });
 
