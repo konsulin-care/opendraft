@@ -3,11 +3,14 @@
  * Person authors get placeholder-only name fields, the single-name
  * checkbox storing `{ literal }` with `metadata.author-type: person`,
  * particle/suffix, comma-paste split, status toggles, ORCID, degrees,
- * email, an `affiliation` ReactNode slot rendered right after the name
- * section, CRediT pills and the "Show author details" fields; groups
- * get a literal name and pills. Sections render in the order Name,
- * Affiliation, Status, Contact & identifiers, Contributions, Show
- * author details. The Person/Group toggle writes `metadata.author-type`.
+ * email, an `affiliation` ReactNode slot rendered in its own section
+ * right after the name section, CRediT pills and the "Show author
+ * details" fields; groups get a literal name and pills. The person form
+ * wraps its content in `space-y-2` section wrappers (Name, Affiliation,
+ * Status, Contact & identifiers, Contributions) inside a `space-y-4`
+ * card, so the sections are spaced more widely than their inner rows.
+ * Sections render in that order. The Person/Group toggle writes
+ * `metadata.author-type`.
  */import { type ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react'; import { GroupMembers } from './GroupMembers'; import { OrcidField } from './orcid';
 import { Degrees, EmailField, MoreFields, setStr } from './author-fields';
@@ -66,6 +69,7 @@ interface CardEdit {
   groups: GroupOption[]; focusOrcid: boolean; affiliation: ReactNode;
   apply: (patch: Partial<MetadataAuthor>) => void;
   onChange: (next: MetadataAuthor) => void;
+  setType: (toGroup: boolean) => void;
 }
 
 /** Person/Group author-type toggle. */
@@ -123,32 +127,48 @@ function CreditPills({ roles, onToggle }: { roles: string[]; onToggle: (slug: st
 // equal contributor, deceased, on-behalf-of), Contact & identifiers
 // (ORCID, email, degrees), Contributions, Show author details.
 function PersonBody({ edit }: { edit: CardEdit }): ReactNode {
-  const { author, name, groups, affiliation, focusOrcid, apply, onChange } = edit;
+  const { author, name, groups, affiliation, focusOrcid, apply, onChange, setType } = edit;
   const roles = strList(author.roles);
   const toggleRole = (slug: string): void =>
     apply({ roles: roles.includes(slug) ? roles.filter((r) => r !== slug) : [...roles, slug] });
+  const noAffiliation = !(Array.isArray(author.affiliations) && author.affiliations.length > 0);
   return (
     <>
-      <AuthorNameFields author={author} name={name} apply={apply} />
-      {affiliation}
-      <StatusToggles author={author} apply={apply} />
-      <OnBehalf value={typeof author['on-behalf-of'] === 'string' ? author['on-behalf-of'] : ''} groups={groups}
-        onChange={(id) => apply(setStr(author, 'on-behalf-of', id))} />
-      <OrcidField author={author} onChange={onChange} focus={focusOrcid} />
-      <EmailField author={author} apply={apply} />
-      <Degrees degrees={strList(author.degrees)} onSet={(degrees) => apply({ degrees })} />
-      <CreditPills roles={roles} onToggle={toggleRole} />
-      <MoreFields author={author} onChange={apply} />
+      <section className="space-y-2">
+        <TypeToggle group={false} onSet={setType} />
+        <AuthorNameFields author={author} name={name} apply={apply} />
+        {noAffiliation && (
+          <span data-testid="author-warning" className="text-amber-800">
+            <AlertTriangle aria-hidden className="inline size-4" /> No affiliation
+          </span>
+        )}
+      </section>
+      {affiliation && <section className="space-y-2">{affiliation}</section>}
+      <section className="space-y-2">
+        <StatusToggles author={author} apply={apply} />
+        <OnBehalf value={typeof author['on-behalf-of'] === 'string' ? author['on-behalf-of'] : ''} groups={groups}
+          onChange={(id) => apply(setStr(author, 'on-behalf-of', id))} />
+      </section>
+      <section className="space-y-2">
+        <OrcidField author={author} onChange={onChange} focus={focusOrcid} />
+        <EmailField author={author} apply={apply} />
+        <Degrees degrees={strList(author.degrees)} onSet={(degrees) => apply({ degrees })} />
+      </section>
+      <section className="space-y-2">
+        <CreditPills roles={roles} onToggle={toggleRole} />
+        <MoreFields author={author} onChange={apply} />
+      </section>
     </>
   );
 }
 
 // Group-author body of the card.
 function GroupBody({ edit }: { edit: CardEdit }): ReactNode {
-  const { author, name, apply } = edit;
+  const { author, name, apply, setType } = edit;
   const roles = strList(author.roles);
   return (
-    <>
+    <section className="space-y-2">
+      <TypeToggle group onSet={setType} />
       <label className="block text-sm">Group name
         <input data-testid="author-group-name" value={name.literal ?? ''} className={INPUT}
           onChange={(event) => apply({ name: { literal: event.target.value } })} />
@@ -156,7 +176,7 @@ function GroupBody({ edit }: { edit: CardEdit }): ReactNode {
       <EmailField author={author} apply={apply} />
       <GroupMembers members={Array.isArray(author.members) ? author.members : []} onChange={(members) => apply({ members })} />
       <CreditPills roles={roles} onToggle={(slug) => apply({ roles: roles.includes(slug) ? roles.filter((r) => r !== slug) : [...roles, slug] })} />
-    </>
+    </section>
   );
 }
 
@@ -164,7 +184,8 @@ function GroupBody({ edit }: { edit: CardEdit }): ReactNode {
  * Expanded editor card for one author.
  *
  * @param props - See {@link AuthorCardProps}.
- * @returns The type toggle, warning marker and the person or group body.
+ * @returns The person or group body: five `space-y-2` sections in a
+ * `space-y-4` card for persons, one section for groups.
  */
 export function AuthorCard({ author, groups = [], affiliation, focusOrcid = false, onChange }: AuthorCardProps): ReactNode {
   const name = asName(author.name);
@@ -177,16 +198,10 @@ export function AuthorCard({ author, groups = [], affiliation, focusOrcid = fals
       metadata: authorTypeMetadata(author, toGroup ? 'group' : 'person'),
     });
   };
+  const edit: CardEdit = { author, name, groups, affiliation, focusOrcid, apply, onChange, setType };
   return (
-    <div className="space-y-2 px-2 pb-3">
-      <TypeToggle group={group} onSet={setType} />
-      {!group && !(Array.isArray(author.affiliations) && author.affiliations.length > 0) && (
-        <span data-testid="author-warning" className="text-amber-800">
-          <AlertTriangle aria-hidden className="inline size-4" /> No affiliation
-        </span>
-      )}
-      {group ? <GroupBody edit={{ author, name, groups, affiliation, focusOrcid, apply, onChange }} />
-        : <PersonBody edit={{ author, name, groups, affiliation, focusOrcid, apply, onChange }} />}
+    <div className="space-y-4 px-2 pb-3">
+      {group ? <GroupBody edit={edit} /> : <PersonBody edit={edit} />}
     </div>
   );
 }

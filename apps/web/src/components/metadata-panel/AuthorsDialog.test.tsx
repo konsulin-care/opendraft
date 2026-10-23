@@ -114,7 +114,7 @@ describe('AuthorsDialog form content', () => {
   it('person form keeps degrees, status, on-behalf-of, CRediT, email and the affiliation section', async () => {
     const ws = await boot();
     fireEvent.click(screen.getByTestId('byline-author-1'));
-    expect(screen.getByTestId('author-affiliation-section')).toBeDefined();
+    expect(screen.getByTestId('author-affiliation-section').className).not.toMatch(/\bpx-2\b/);
     expect(screen.getByTestId('author-type-person').getAttribute('aria-pressed')).toBe('true');
     const degree = screen.getByTestId('author-degree-field');
     fireEvent.change(degree, { target: { value: 'MD' } }); fireEvent.keyDown(degree, { key: 'Enter' });
