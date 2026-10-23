@@ -172,7 +172,7 @@ function PresetRadio({ preset, checked, onPick }: {
   preset: string; checked: boolean; onPick: () => void;
 }): ReactNode {
   return (
-    <label className="flex min-h-11 items-center gap-2 text-sm">
+    <label className="flex min-h-8 items-center gap-2 text-sm">
       <input
         type="radio"
         name="license-preset"
@@ -204,7 +204,7 @@ function LicenseField({ license, setField }: {
       {LICENSE_PRESETS.map((preset) => (
         <PresetRadio key={preset} preset={preset} checked={choice === preset} onPick={() => pickPreset(preset)} />
       ))}
-      <label className="flex min-h-11 items-center gap-2 text-sm">
+      <label className="flex min-h-8 items-center gap-2 text-sm">
         <input
           type="radio"
           name="license-preset"

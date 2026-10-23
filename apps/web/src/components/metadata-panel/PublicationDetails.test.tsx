@@ -129,6 +129,17 @@ describe('PublicationDetails license', () => {
   });
 });
 
+describe('PublicationDetails license spacing', () => {
+  it('uses reduced vertical spacing (min-h-8) on the license radio rows', async () => {
+    await boot();
+    for (const id of ['license-preset-cc-by-4-0', 'license-other']) {
+      const label = screen.getByTestId(id).closest('label');
+      expect(label?.className).toContain('min-h-8');
+      expect(label?.className).not.toContain('min-h-11');
+    }
+  });
+});
+
 describe('PublicationDetails scalar fields', () => {
   it('writes date, copyright and funding to _frontmatter.yml', async () => {
     const ws = await boot();
