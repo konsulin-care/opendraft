@@ -46,29 +46,36 @@ export interface ArticleViewProps {
 }
 
 /**
- * Borderless title input. Enter never inserts a newline; it moves the
- * focus to the next field instead.
+ * Borderless auto-growing title textarea that wraps long titles onto
+ * multiple lines. Enter never inserts a newline; it moves the focus to
+ * the next field instead. Typed or pasted newlines are replaced by
+ * spaces so the title stays a single logical line.
  *
  * @param props - Title, setter and the Enter handler of the field.
- * @returns The title input element.
+ * @returns The title textarea element.
  */
 function TitleField(
   { title, setTitle, onEnter }: Pick<ArticleViewProps, 'title' | 'setTitle'> & { onEnter(): void },
 ): ReactNode {
   return (
-    <input
+    <textarea
+      ref={(el) => autoGrow(el)}
       data-testid="metadata-panel-title-input"
       aria-label="Manuscript title"
       value={title}
+      rows={1}
       placeholder="Untitled manuscript"
-      onChange={(event) => setTitle(event.target.value)}
+      onChange={(event) => {
+        setTitle(event.target.value.replace(/\r?\n/g, ' '));
+        autoGrow(event.currentTarget);
+      }}
       onKeyDown={(event) => {
         if (event.key === 'Enter') {
           event.preventDefault();
           onEnter();
         }
       }}
-      className="min-h-11 w-full text-lg outline-none"
+      className="min-h-11 w-full resize-none text-lg outline-none"
     />
   );
 }

@@ -226,7 +226,7 @@ describe('ArticleView section labels', () => {
 describe('ArticleView inline editing', () => {
   it('Enter in the title inserts no newline and focuses the abstract', () => {
     renderView();
-    const title = screen.getByTestId('metadata-panel-title-input') as HTMLInputElement;
+    const title = screen.getByTestId('metadata-panel-title-input') as HTMLTextAreaElement;
     title.focus();
     fireEvent.keyDown(title, { key: 'Enter' });
     expect(title.value).not.toContain('\n');
@@ -263,5 +263,24 @@ describe('ArticleView inline editing', () => {
     renderView({ keywords: ['fasting', 'keto'] });
     expect(screen.getByTestId('keyword-count').textContent).toBe('2 keywords');
     expect(screen.getAllByTestId('keyword-chip')).toHaveLength(2);
+  });
+});
+
+describe('ArticleView title field', () => {
+  it('renders the title as a one-row auto-growing textarea that wraps', () => {
+    renderView();
+    const title = screen.getByTestId('metadata-panel-title-input') as HTMLTextAreaElement;
+    expect(title.tagName).toBe('TEXTAREA');
+    expect(title.rows).toBe(1);
+    expect(title.className).toContain('resize-none');
+  });
+
+  it('replaces typed or pasted newlines in the title with spaces', () => {
+    const setTitle = vi.fn();
+    renderView({ setTitle });
+    fireEvent.change(screen.getByTestId('metadata-panel-title-input'), {
+      target: { value: 'a\nb' },
+    });
+    expect(setTitle).toHaveBeenCalledWith('a b');
   });
 });
