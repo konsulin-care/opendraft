@@ -257,7 +257,7 @@ export function AuthorsDialog({
     </div>
   );
   const footer = (
-    <DialogFooter narrow={narrow} draft={draftOpen} index={index} saveStatus={saveStatus}
+    <DialogFooter draft={draftOpen} index={index} saveStatus={saveStatus}
       onDelete={() => {
         if (draftOpen) draft.discard();
         else if (index !== null) ops.removeAt(index);

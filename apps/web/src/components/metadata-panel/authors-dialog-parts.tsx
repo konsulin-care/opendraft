@@ -81,16 +81,15 @@ export function DialogShell({ narrow, onClose, footer, children }: {
  * Fixed, non-scrolling footer: the Undo toast above the action row,
  * the quiet red Delete author button (Discard on the draft) at the
  * left, Add author and Done at the right, and the panel autosave
- * indicator below. Below 640px Delete renders the Trash2 icon only,
- * keeping its aria-label.
+ * indicator below. Delete renders the Trash2 icon only on all
+ * viewports, with an aria-label and a matching title tooltip.
  *
- * @param props - Narrow viewport flag, draft flag, open author
- * index, delete/discard, add and close callbacks, the panel save
- * status and the Undo toast node.
+ * @param props - Draft flag, open author index, delete/discard,
+ * add and close callbacks, the panel save status and the Undo
+ * toast node.
  * @returns The footer element.
  */
-export function DialogFooter({ narrow, draft, index, onDelete, onAdd, onClose, saveStatus, toast }: {
-  narrow: boolean;
+export function DialogFooter({ draft, index, onDelete, onAdd, onClose, saveStatus, toast }: {
   draft: boolean;
   index: number | null;
   onDelete(): void;
@@ -105,10 +104,9 @@ export function DialogFooter({ narrow, draft, index, onDelete, onAdd, onClose, s
       {toast}
       <div data-testid="authors-footer-actions" className="flex items-center gap-2">
         {(draft || index !== null) && (
-          <button type="button" data-testid={draft ? 'author-discard' : 'author-remove'} aria-label={label}
+          <button type="button" data-testid={draft ? 'author-discard' : 'author-remove'} aria-label={label} title={label}
             onClick={onDelete} className="min-h-11 rounded px-2 text-error hover:bg-hover">
             <Trash2 aria-hidden className="inline size-4" />
-            {!narrow && <span>{label}</span>}
           </button>
         )}
         <div className="ml-auto flex items-center gap-2">

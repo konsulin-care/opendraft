@@ -231,7 +231,8 @@ describe('AuthorsDialog fixed footer', () => {
     const footer = screen.getByTestId('authors-dialog-footer'); const body = footer.previousElementSibling as HTMLElement;
     expect(body.className).toContain('overflow-y-auto'); expect(body.contains(footer)).toBe(false);
     expect(footer.querySelector('.lucide-trash-2')).not.toBeNull();
-    expect(screen.getByTestId('author-remove').textContent).toContain('Delete author');
+    const remove = screen.getByTestId('author-remove');
+    expect(remove.getAttribute('aria-label')).toBe('Delete author'); expect(remove.getAttribute('title')).toBe('Delete author'); expect(remove.textContent).toBe(''); expect(remove.querySelector('svg')).not.toBeNull();
     expect(Array.from(screen.getByTestId('authors-footer-actions').querySelectorAll('button'))
       .map((b) => b.getAttribute('data-testid'))).toEqual(['author-remove', 'add-author-dialog', 'authors-done']);
   });
@@ -259,12 +260,11 @@ describe('AuthorsDialog fixed footer', () => {
     render(<AuthorsDialog authors={[]} setAuthors={vi.fn()} saveStatus="saved" onClose={vi.fn()} />);
     expect(screen.getByTestId('authors-save-status').textContent).toBe('Saved');
   });
-
-  it('narrow viewport shows the icon-only delete keeping its aria-label', async () => {
+  it('icon-only delete keeps its aria-label and title on narrow viewports too', async () => {
     stubMatchMedia(375); await boot(); fireEvent.click(screen.getByTestId('byline-author-1'));
     const remove = screen.getByTestId('author-remove');
-    expect(remove.getAttribute('aria-label')).toBe('Delete author'); expect(remove.querySelector('.lucide-trash-2')).not.toBeNull();
-    expect(remove.textContent).not.toContain('Delete author');
+    expect(remove.getAttribute('aria-label')).toBe('Delete author'); expect(remove.getAttribute('title')).toBe('Delete author');
+    expect(remove.querySelector('.lucide-trash-2')).not.toBeNull(); expect(remove.textContent).toBe('');
   });
 
   it('backdrop mousedown and Escape call onClose', () => {
