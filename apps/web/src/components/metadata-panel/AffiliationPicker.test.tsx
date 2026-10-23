@@ -116,17 +116,17 @@ it('adds a registry entry and author ref for a picked ROR result', async () => {
   await search('univer');
   fireEvent.click(screen.getByTestId('affiliation-ror-item-0'));
   expect(onApply).toHaveBeenCalledWith({ registry: [UI, ROR_ENTRY], authors: [{ ...author(), affiliations: [{ ref: 'university-of-indonesia' }] }] });
-  expect((screen.getByTestId('affiliation-search') as HTMLInputElement).value).toBe('univer'); expect(screen.getByTestId('affiliation-listbox')).toBeTruthy();
+  expect((screen.getByTestId('affiliation-search') as HTMLInputElement).value).toBe(''); expect(screen.getByTestId('affiliation-listbox')).toBeTruthy();
 });
 
-it('closes the listbox on Escape', async () => {
+it('closes the listbox on Escape and clears the query', async () => {
   boot(); await search('univer'); fireEvent.keyDown(screen.getByTestId('affiliation-search'), { key: 'Escape' });
-  expect(screen.queryByTestId('affiliation-listbox')).toBeNull();
+  expect(screen.queryByTestId('affiliation-listbox')).toBeNull(); expect((screen.getByTestId('affiliation-search') as HTMLInputElement).value).toBe('');
 });
 
-it('closes the listbox on an outside mousedown', async () => {
+it('closes the listbox on an outside mousedown and clears the query', async () => {
   boot(); await search('univer'); fireEvent.mouseDown(document.body);
-  expect(screen.queryByTestId('affiliation-listbox')).toBeNull();
+  expect(screen.queryByTestId('affiliation-listbox')).toBeNull(); expect((screen.getByTestId('affiliation-search') as HTMLInputElement).value).toBe('');
 });
 
 it('reuses an existing registry entry with a ref only', async () => {
@@ -188,7 +188,7 @@ describe('AffiliationPicker multi-select', () => {
     fireEvent.click(screen.getByTestId('affiliation-registry-item-0'));
     expect(onApply).toHaveBeenCalledWith({ authors: [{ ...author(), affiliations: [{ ref: 'ui' }] }] });
     expect(screen.getByTestId('affiliation-listbox').getAttribute('aria-multiselectable')).toBe('true');
-    expect((screen.getByTestId('affiliation-search') as HTMLInputElement).value).toBe('univ');
+    expect((screen.getByTestId('affiliation-search') as HTMLInputElement).value).toBe('');
     expect(screen.getByTestId('affiliation-registry-item-0').getAttribute('aria-selected')).toBe('true');
     expect(screen.getByTestId('affiliation-check-0')).toBeTruthy();
   });
@@ -231,7 +231,7 @@ describe('AffiliationPicker multi-select dismissal and ROR toggling', () => {
     await search('univer');
     fireEvent.click(screen.getByTestId('affiliation-ror-item-0'));
     expect(onApply).toHaveBeenCalledWith({ registry: [UI, ROR_ENTRY], authors: [{ ...author(), affiliations: [{ ref: 'university-of-indonesia' }] }] });
-    expect((screen.getByTestId('affiliation-search') as HTMLInputElement).value).toBe('univer');
+    expect((screen.getByTestId('affiliation-search') as HTMLInputElement).value).toBe('');
     expect(screen.getByTestId('affiliation-ror-item-0').getAttribute('aria-selected')).toBe('true');
     expect(screen.getByTestId('affiliation-registry-item-1').getAttribute('aria-selected')).toBe('true');
   });

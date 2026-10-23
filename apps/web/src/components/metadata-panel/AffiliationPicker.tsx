@@ -4,13 +4,14 @@
  * Registry suggestions ("used by N") and ROR v2 results (300ms debounce
  * at 5 characters, stale queries abort, IndexedDB cache) render in a
  * multi-select listbox popover whenever the combobox is open; clicking
- * an option toggles the author's ref while the listbox stays open with
- * the query intact, and selected options show a check with
- * aria-selected. Selected affiliations also render as removable chips
- * below the listbox, dropping and pruning the entry on removal.
- * Focus with an empty query lists the registry entries in use; Escape
- * and outside clicks close the list. "Create manually" and "Normalize
- * to references" are footer actions. "Independent researcher" is a
+ * an option toggles the author's ref while the listbox stays open and
+ * clears the search text to '' (placeholder shows), and selected
+ * options show a check with aria-selected. Selected affiliations also
+ * render as removable chips below the listbox, dropping and pruning
+ * the entry on removal. Focus with an empty query lists the registry
+ * entries in use; Escape and outside clicks close the list and clear
+ * the query. "Create manually" and "Normalize to references" are
+ * footer actions. "Independent researcher" is a
  * controlled checkbox checked while the author references the built-in
  * entry: checking hides the combobox, listbox and create action;
  * unchecking removes the ref (pruning the entry when unused) and shows
@@ -46,15 +47,16 @@ const ROR_MIN_CHARS = 5; // ROR is searched only from five characters
 const ROR_DEBOUNCE_MS = 300; // debounce between the last keystroke and fetch
 const ROW = 'block min-h-11 w-full rounded px-2 text-left text-muted hover:bg-hover'; // action rows
 
-/** Debounced ROR search wiring: aborts stale queries, fails silently. */
+/** Debounced ROR search wiring: aborts stale queries, fails silently.
+ * Short queries keep the last results; the picker clears them on close. */
 function useRorResults(query: string, setResults: (items: RorOrg[]) => void): void {
   const controllerRef = useRef<AbortController | null>(null);
   useEffect(() => {
     const q = query.trim();
     controllerRef.current?.abort();
     controllerRef.current = null;
+    if (q.length < ROR_MIN_CHARS) return undefined; // keep last results so a cleared pick keeps its row
     setResults([]);
-    if (q.length < ROR_MIN_CHARS) return undefined;
     const controller = new AbortController();
     controllerRef.current = controller;
     const timer = setTimeout(() => {
@@ -189,7 +191,9 @@ export function AffiliationPicker({
   const [manual, setManual] = useState(false);
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const close = (): void => { setOpen(false); setEditIndex(null); };
+  const close = (): void => {
+    setOpen(false); setEditIndex(null); setQuery(''); setRor([]);
+  };
   useRorResults(query, setRor);
   useOutsideClose(rootRef, open, close);
   const ops = createOps(registry, authors, authorIndex, onApply);
@@ -216,7 +220,8 @@ export function AffiliationPicker({
               isSelected={(id) => hasRef(target, id)}
               isRorSelected={(org) => registry.some((e) => e.ror && e.ror === org.ror
                 && hasRef(target, String(e.id)))}
-              onPickRef={ops.toggleRef} onEdit={setEditIndex} onPickOrg={ops.toggleOrg} />
+              onPickRef={(id) => { ops.toggleRef(id); setQuery(''); }} onEdit={setEditIndex}
+              onPickOrg={(org) => { ops.toggleOrg(org); setQuery(''); }} />
           )}
         </>
       )}
