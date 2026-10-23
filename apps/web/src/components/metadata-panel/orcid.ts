@@ -23,8 +23,8 @@ export interface OrcidFieldProps {
 /** Pasted orcid.org URL prefixes that normalize away. */
 const URL_PREFIX = /^(?:https?:\/\/)?(?:www\.)?orcid\.org\//i;
 
-/** Green text badge standing in for the ORCID icon lucide lacks. */
-const ORCID_BADGE = 'text-sm font-bold text-green-700';
+/** Muted text badge standing in for the ORCID icon lucide lacks. */
+const ORCID_BADGE = 'text-sm font-bold';
 
 // Keep at most 16 digits plus an optional trailing checksum X.
 function bareDigits(value: string): string {

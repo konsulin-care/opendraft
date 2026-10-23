@@ -155,6 +155,15 @@ describe('ORCID field input', () => {
   });
 });
 
+describe('ORCID badge color', () => {
+  it('iD badge has no green class and sits inside the muted icon wrapper', async () => {
+    await boot();
+    const badge = screen.getByText('iD');
+    expect(badge.className).not.toContain('text-green-700');
+    expect(badge.parentElement?.className).toContain('text-muted');
+  });
+});
+
 describe('Fill from ORCID', () => {
   it('writes given/family after the user accepts the confirm', async () => {
     const ws = await boot();
