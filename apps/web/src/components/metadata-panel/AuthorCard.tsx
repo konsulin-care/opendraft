@@ -4,10 +4,10 @@
  * checkbox storing `{ literal }` with `metadata.author-type: person`,
  * particle/suffix, comma-paste split, status toggles, ORCID, degrees,
  * email, an `affiliation` ReactNode slot rendered right after the name
- * section, CRediT pills and the "More contact details" fields; groups
+ * section, CRediT pills and the "Show author details" fields; groups
  * get a literal name and pills. Sections render in the order Name,
- * Affiliation, Status, Contact & identifiers, Contributions, More
- * contact details. The Person/Group toggle writes `metadata.author-type`.
+ * Affiliation, Status, Contact & identifiers, Contributions, Show
+ * author details. The Person/Group toggle writes `metadata.author-type`.
  */import { type ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react'; import { GroupMembers } from './GroupMembers'; import { OrcidField } from './orcid';
 import { Degrees, EmailField, MoreFields, setStr } from './author-fields';
@@ -121,7 +121,7 @@ function CreditPills({ roles, onToggle }: { roles: string[]; onToggle: (slug: st
 
 // Person-author body: Name, Affiliation slot, Status (corresponding,
 // equal contributor, deceased, on-behalf-of), Contact & identifiers
-// (ORCID, email, degrees), Contributions, More contact details.
+// (ORCID, email, degrees), Contributions, Show author details.
 function PersonBody({ edit }: { edit: CardEdit }): ReactNode {
   const { author, name, groups, affiliation, focusOrcid, apply, onChange } = edit;
   const roles = strList(author.roles);

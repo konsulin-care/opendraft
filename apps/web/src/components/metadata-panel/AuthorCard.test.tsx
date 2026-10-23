@@ -66,7 +66,7 @@ describe('AuthorCard icon fields', () => {
 
   it('url, phone, fax, note and acknowledgements render icons and placeholders', () => {
     renderCard();
-    fireEvent.click(screen.getByRole('button', { name: 'More contact details' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show author details' }));
     ['url', 'phone', 'fax', 'note', 'acknowledgements'].forEach((key) => expectIconField(`author-${key}`));
   });
 });
@@ -210,18 +210,18 @@ describe('AuthorCard name options toggle label', () => {
   });
 });
 
-describe('AuthorCard contact details toggle label', () => {
-  it('flips More contact details to Hide contact details showing the extra fields', () => {
+describe('AuthorCard author details toggle label', () => {
+  it("flips 'Show author details' to 'Hide author details' showing the extra fields", () => {
     renderCard();
     const keys = ['url', 'phone', 'fax', 'note', 'acknowledgements'];
-    const toggle = screen.getByRole('button', { name: 'More contact details' });
+    const toggle = screen.getByRole('button', { name: 'Show author details' });
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
     keys.forEach((key) => expect(screen.queryByTestId(`author-${key}`)).toBeNull());
     fireEvent.click(toggle); keys.forEach((key) => expect(screen.getByTestId(`author-${key}`)).toBeDefined());
-    const hide = screen.getByRole('button', { name: 'Hide contact details' });
+    const hide = screen.getByRole('button', { name: 'Hide author details' });
     expect(hide.getAttribute('aria-expanded')).toBe('true');
     fireEvent.click(hide); keys.forEach((key) => expect(screen.queryByTestId(`author-${key}`)).toBeNull());
-    const reopened = screen.getByRole('button', { name: 'More contact details' }); expect(reopened.getAttribute('aria-expanded')).toBe('false');
+    const reopened = screen.getByRole('button', { name: 'Show author details' }); expect(reopened.getAttribute('aria-expanded')).toBe('false');
   });
 });
 
@@ -281,7 +281,7 @@ describe('AuthorCard email validation', () => {
 });
 
 describe('AuthorCard section order', () => {
-  it('renders Name, Affiliation, Status, Contact, Contributions then More contact details', () => {
+  it('renders Name, Affiliation, Status, Contact, Contributions then author details', () => {
     renderCard(PERSON, [], <div data-testid="affiliation-slot" />);
     const chain: Element[] = [
       screen.getByTestId('author-given'),
@@ -291,7 +291,7 @@ describe('AuthorCard section order', () => {
       screen.getByTestId('author-email'),
       screen.getByTestId('author-degree-field'),
       screen.getByTestId('credit-conceptualization'),
-      screen.getByRole('button', { name: 'More contact details' }),
+      screen.getByRole('button', { name: 'Show author details' }),
     ];
     for (let i = 0; i < chain.length - 1; i += 1) expect(after(chain[i], chain[i + 1])).toBe(true);
     expect(after(screen.getByTestId('author-equal-contributor'), screen.getByTestId('author-orcid'))).toBe(true);

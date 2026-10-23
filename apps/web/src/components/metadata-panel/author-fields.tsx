@@ -111,17 +111,18 @@ export interface MoreFieldsProps {
 }
 
 /**
- * Collapsible contact section: url, phone, fax, note and
+ * Collapsible author details: url, phone, fax, note and
  * acknowledgements, each an icon field labelled by its own name.
+ * The toggle reads "Show author details" / "Hide author details".
  *
  * @param props - See {@link MoreFieldsProps}.
- * @returns The toggle button and the open contact fields.
+ * @returns The toggle button and the open author detail fields.
  */
 export function MoreFields({ author, onChange }: MoreFieldsProps): ReactNode {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="text-sm text-muted hover:bg-hover">{open ? 'Hide contact details' : 'More contact details'}</button>
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="text-sm text-muted hover:bg-hover">{open ? 'Hide author details' : 'Show author details'}</button>
       {open && CONTACT_FIELDS.map(([key, label, Icon]) => (
         <IconField key={key} icon={<Icon aria-hidden className="size-4" />} testid={`author-${key}`} ariaLabel={label}
           placeholder={label} value={typeof author[key] === 'string' ? author[key] : ''}
