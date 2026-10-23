@@ -6,7 +6,7 @@
  * Done, save status, narrow icon-only delete, backdrop/Escape close).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryWorkspace, type WorkspaceAdapter } from '@opendraft/workspace';
 import { parse } from 'yaml';
 import { ArticleView } from './ArticleView';
@@ -238,20 +238,15 @@ describe('AuthorsDialog fixed footer', () => {
   });
 
   it('Discard on the draft drops it without writing and returns to the first author', async () => {
-    const ws = await boot();
-    fireEvent.click(screen.getByTestId('add-author'));
-    fireEvent.change(screen.getByTestId('author-given'), { target: { value: 'Dewi' } });
-    fireEvent.click(screen.getByTestId('author-discard'));
+    const ws = await boot(); fireEvent.click(screen.getByTestId('add-author'));
+    fireEvent.change(screen.getByTestId('author-given'), { target: { value: 'Dewi' } }); fireEvent.click(screen.getByTestId('author-discard'));
     expect(screen.queryByTestId('author-card-draft')).toBeNull(); expect(screen.getByTestId('author-card-0')).toBeDefined();
     expect((screen.getByTestId('author-given') as HTMLInputElement).value).toBe('Alice Marie');
-    expect(screen.getByTestId('author-remove')).toBeDefined();
-    await flushWrites();
-    expect(await readAuthors(ws)).toHaveLength(3);
+    expect(screen.getByTestId('author-remove')).toBeDefined(); await flushWrites(); expect(await readAuthors(ws)).toHaveLength(3);
   });
 
   it('Done calls onClose and saveStatus saving renders Saving…', () => {
-    const onClose = vi.fn();
-    render(<AuthorsDialog authors={[]} setAuthors={vi.fn()} saveStatus="saving" onClose={onClose} />);
+    const onClose = vi.fn(); render(<AuthorsDialog authors={[]} setAuthors={vi.fn()} saveStatus="saving" onClose={onClose} />);
     expect(screen.getByTestId('authors-save-status').textContent).toBe('Saving…');
     fireEvent.click(screen.getByTestId('authors-done')); expect(onClose).toHaveBeenCalled();
   });
@@ -290,5 +285,15 @@ describe('AuthorsDialog viewport handling', () => {
     expect(dialog.className).not.toContain('fixed inset-0'); expect(dialog.parentElement?.className).toContain('justify-center');
     expect(screen.getByTestId('author-card-1')).toBeDefined(); expect(screen.queryByTestId('author-card-0')).toBeNull();
     expect(screen.queryByTestId('author-select-0')).toBeNull();
+  });
+});
+
+describe('AuthorsDialog affiliation section', () => {
+  it('has no heading and a bottom-bordered search with the Search affiliation placeholder', async () => {
+    await boot(); fireEvent.click(screen.getByTestId('byline-author-1'));
+    const section = screen.getByTestId('author-affiliation-section'); const search = screen.getByTestId('affiliation-search');
+    expect(within(section).queryByRole('heading', { name: 'Affiliation' })).toBeNull();
+    expect(search.className.split(/\s+/)).toEqual(expect.arrayContaining(['border-b', 'border-secondary']));
+    expect(search.getAttribute('placeholder')).toBe('Search affiliation');
   });
 });

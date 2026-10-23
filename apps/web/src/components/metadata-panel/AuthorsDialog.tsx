@@ -198,7 +198,6 @@ function AffiliationSection({ authors, index, registry, onApply }: {
 }): ReactNode {
   return (
     <div data-testid="author-affiliation-section" className="pb-2">
-      <h3 className="text-sm font-medium">Affiliation</h3>
       <AffiliationPicker registry={registry} authors={authors} authorIndex={index} onApply={onApply} />
     </div>
   );

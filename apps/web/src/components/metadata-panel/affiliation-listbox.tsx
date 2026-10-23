@@ -22,7 +22,7 @@ import type { RorOrg } from './ror-client';
 export const INPUT = 'min-h-11 w-full outline-none';
 
 /**
- * Borderless combobox input of the affiliation picker.
+ * Bottom-bordered combobox input of the affiliation picker.
  *
  * @param props - Query text, popover state and the open/query/close callbacks.
  * @returns The search input wired as an ARIA combobox.
@@ -33,7 +33,7 @@ export function SearchField(props: {
 }): ReactNode {
   return (
     <input data-testid="affiliation-search" aria-label="Search affiliations" value={props.query}
-      placeholder="Affiliation" className={INPUT} role="combobox"
+      placeholder="Search affiliation" className={`${INPUT} border-b border-secondary`} role="combobox"
       aria-expanded={props.open} aria-controls="affiliation-listbox"
       onFocus={props.onOpen} onChange={(event) => props.onQuery(event.target.value)}
       onKeyDown={(event) => {
