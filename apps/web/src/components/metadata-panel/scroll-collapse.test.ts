@@ -123,26 +123,17 @@ describe('computeCollapseProgress', () => {
 });
 
 describe('collapseReducer: explicit collapse', () => {
-  it('collapses explicitly with zero progress', () => {
-    expect(collapseReducer(INITIAL_COLLAPSE_STATE, { type: 'explicitCollapse' }))
-      .toEqual({ mode: 'explicit', progress: 0 });
-  });
-  it('keeps an explicit collapse when scrolling back to the top', () => {
+  it('collapses, stays collapsed when scrolling to the top, expands again', () => {
     const collapsed = collapseReducer(INITIAL_COLLAPSE_STATE, { type: 'explicitCollapse' });
-    expect(collapseReducer(collapsed, scrollAction(0)))
-      .toEqual({ mode: 'explicit', progress: 0 });
-  });
-  it('expands explicitly', () => {
-    const collapsed = collapseReducer(INITIAL_COLLAPSE_STATE, { type: 'explicitCollapse' });
-    expect(collapseReducer(collapsed, { type: 'explicitExpand' }))
-      .toEqual({ mode: 'expanded', progress: 0 });
+    expect(collapsed).toEqual({ mode: 'explicit', progress: 0 });
+    expect(collapseReducer(collapsed, scrollAction(0))).toEqual({ mode: 'explicit', progress: 0 });
+    expect(collapseReducer(collapsed, { type: 'explicitExpand' })).toEqual({ mode: 'expanded', progress: 0 });
   });
 });
 
 describe('collapseReducer: scroll collapse', () => {
   it('interpolates progress below full collapse', () => {
-    expect(collapseReducer(INITIAL_COLLAPSE_STATE, scrollAction(HEIGHT / 2)))
-      .toEqual({ mode: 'expanded', progress: 0.5 });
+    expect(collapseReducer(INITIAL_COLLAPSE_STATE, scrollAction(HEIGHT / 2))).toEqual({ mode: 'expanded', progress: 0.5 });
   });
 
   it('enters scroll mode once fully collapsed', () => {
@@ -154,53 +145,47 @@ describe('collapseReducer: scroll collapse', () => {
     expect(collapseReducer(collapsed, scrollAction(0)))
       .toEqual({ mode: 'expanded', progress: 0 });
   });
+
+  it('returns the same state object when mode and progress are unchanged', () => {
+    const partial = collapseReducer(INITIAL_COLLAPSE_STATE, scrollAction(HEIGHT / 2));
+    expect(collapseReducer(partial, scrollAction(HEIGHT / 2))).toBe(partial);
+  });
+
+  it('returns a new object when progress or mode changes', () => {
+    const partial = collapseReducer(INITIAL_COLLAPSE_STATE, scrollAction(HEIGHT / 2));
+    expect(collapseReducer(partial, scrollAction(HEIGHT / 4))).not.toBe(partial);
+    const full = collapseReducer(INITIAL_COLLAPSE_STATE, scrollAction(HEIGHT));
+    expect(collapseReducer(full, scrollAction(0))).not.toBe(full);
+  });
 });
 
 describe('collapseReducer: focus freeze and reduced motion', () => {
   it('leaves progress unchanged while a field in the panel has focus', () => {
     const partial = collapseReducer(INITIAL_COLLAPSE_STATE, scrollAction(HEIGHT / 2));
-    expect(collapseReducer(partial, scrollAction(HEIGHT, { focusInPanel: true })))
-      .toEqual(partial);
+    expect(collapseReducer(partial, scrollAction(HEIGHT, { focusInPanel: true }))).toEqual(partial);
   });
+  const reduced = (scrollTop: number) =>
+    collapseReducer(INITIAL_COLLAPSE_STATE, scrollAction(scrollTop, { reducedMotion: true }));
   it('snaps values to only 0 or 1 under reduced motion', () => {
     for (const scrollTop of [0, 1, 100, 399, 400, 900]) {
-      const next = collapseReducer(
-        INITIAL_COLLAPSE_STATE,
-        scrollAction(scrollTop, { reducedMotion: true }),
-      );
-      expect([0, 1]).toContain(next.progress);
+      expect([0, 1]).toContain(reduced(scrollTop).progress);
     }
   });
   it('snaps to 1 only once fully collapsed', () => {
-    const partial = collapseReducer(
-      INITIAL_COLLAPSE_STATE,
-      scrollAction(HEIGHT - 1, { reducedMotion: true }),
-    );
-    expect(partial.progress).toBe(0);
-    const done = collapseReducer(
-      INITIAL_COLLAPSE_STATE,
-      scrollAction(HEIGHT, { reducedMotion: true }),
-    );
-    expect(done.progress).toBe(1);
+    expect(reduced(HEIGHT - 1).progress).toBe(0);
+    expect(reduced(HEIGHT).progress).toBe(1);
   });
 });
 
 describe('createRafThrottle and writeCollapseProgress', () => {
-  it('coalesces repeated schedules into one frame', () => {
+  it('coalesces repeated schedules into one frame, runs again after it', () => {
     const callback = vi.fn();
     const throttle = createRafThrottle(callback);
-    throttle.schedule();
     throttle.schedule();
     throttle.schedule();
     expect(pendingFrames.length).toBe(1);
     flushFrames();
     expect(callback).toHaveBeenCalledTimes(1);
-  });
-  it('runs again for a schedule after the frame', () => {
-    const callback = vi.fn();
-    const throttle = createRafThrottle(callback);
-    throttle.schedule();
-    flushFrames();
     throttle.schedule();
     flushFrames();
     expect(callback).toHaveBeenCalledTimes(2);
@@ -262,6 +247,17 @@ describe('useScrollCollapse: scroll handling', () => {
     setScrollTop(env.scroll, HEIGHT);
     flushFrames();
     expect(result.current.state).toEqual({ mode: 'expanded', progress: 0 });
+  });
+
+  it('skips the state update when a scroll changes nothing', () => {
+    const { env, result } = renderCollapse();
+    const before = result.current;
+    setScrollTop(env.scroll, 0);
+    flushFrames();
+    expect(result.current).toBe(before);
+    setScrollTop(env.scroll, HEIGHT);
+    flushFrames();
+    expect(result.current).not.toBe(before);
   });
 });
 

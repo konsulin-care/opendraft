@@ -248,7 +248,7 @@ export function MetadataPanel({
         ? 'fixed inset-0 z-30 flex flex-col overflow-y-auto bg-white'
         : layout.overlay
           ? 'absolute inset-0 z-20 overflow-hidden bg-white'
-          : 'relative bg-white'}
+          : 'contents'}
     >
       <OverlayLayer overlay={layout.overlay}>
         <PinnedBar title={title} byline={narrow ? `${authors.length} authors` : byline}

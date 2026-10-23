@@ -206,10 +206,16 @@ describe('MetadataPanel scroll collapse', () => {
   });
   it('keeps only the bar sticky inside the editor scroll container', async () => {
     await renderPanel({ [`${ROOT}/_frontmatter.yml`]: FRONTMATTER });
-    const bar = screen.getByTestId('metadata-panel-bar');
-    expect(bar.className).toContain('sticky');
-    expect(bar.className).toContain('top-0');
-    expect(screen.getByTestId('metadata-panel').className).not.toContain('sticky');
+    // Bar and hairline share one sticky wrapper; the inline section uses
+    // display: contents so the sticky containing block is the scroll column.
+    const wrapper = screen.getByTestId('metadata-panel-bar').parentElement;
+    expect(wrapper?.className).toContain('sticky');
+    expect(wrapper?.className).toContain('top-0');
+    expect(wrapper?.querySelector('[data-testid="metadata-panel-separator"]')).not.toBeNull();
+    const panel = screen.getByTestId('metadata-panel');
+    expect(panel.className).toContain('contents');
+    expect(panel.className).not.toContain('relative');
+    expect(panel.className).not.toContain('sticky');
   });
 });
 
@@ -262,7 +268,7 @@ describe('MetadataPanel overlay', () => {
     stubBodyHeight(300);
     fireResize();
     expect(screen.queryByTestId('metadata-panel-overlay')).toBeNull();
-    expect(screen.getByTestId('metadata-panel').className).toContain('relative');
+    expect(screen.getByTestId('metadata-panel').className).toContain('contents');
     scroller.remove();
   });
   it('collapses on Escape and removes the overlay', async () => {

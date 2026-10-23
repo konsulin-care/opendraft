@@ -91,7 +91,9 @@ export function collapseReducer(state: CollapseState, action: CollapseAction): C
   if (state.mode === 'explicit') return state;
   const raw = computeCollapseProgress(action.scrollTop, action.expandedHeight);
   const progress = snapProgress(raw, action.reducedMotion === true);
-  return { mode: progress >= 1 ? 'scroll' : 'expanded', progress };
+  const mode: CollapseMode = progress >= 1 ? 'scroll' : 'expanded';
+  // Identical outcome: return the same object so the hook can skip setState.
+  return mode === state.mode && progress === state.progress ? state : { mode, progress };
 }
 
 /**
@@ -197,6 +199,8 @@ export function useScrollCollapse(options: ScrollCollapseOptions): ScrollCollaps
 
   const dispatch = useCallback((action: CollapseAction): void => {
     const next = collapseReducer(stateRef.current, action);
+    // Same object from the reducer: nothing changed, skip re-render and write.
+    if (next === stateRef.current) return;
     stateRef.current = next;
     setState(next);
     writeCollapseProgress(panelRef.current, next.progress);
@@ -206,6 +210,8 @@ export function useScrollCollapse(options: ScrollCollapseOptions): ScrollCollaps
     const scroller = scrollRef.current;
     const panel = panelRef.current;
     if (!enabled || !scroller || !panel) return undefined;
+    // Seed the CSS variable once; skipped dispatches no longer write it.
+    writeCollapseProgress(panel, stateRef.current.progress);
     const throttle = createRafThrottle(() => {
       dispatch({
         type: 'scroll',

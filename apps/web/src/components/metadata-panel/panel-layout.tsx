@@ -31,12 +31,13 @@ export interface PinnedBarProps {
 
 /**
  * Pinned bar: title, byline and chevron toggle, closed off by the 1px
- * hairline separator below it. Only the bar sticks to the top of the
- * editor scroll container; the bar text fades in with the panel's
+ * hairline separator below it. The bar and the separator share one
+ * sticky container so the hairline stays pinned under the bar for the
+ * whole scroll range; the bar text fades in with the panel's
  * `--collapse-progress` CSS variable.
  *
  * @param props - See {@link PinnedBarProps}.
- * @returns The sticky bar and separator elements.
+ * @returns The sticky wrapper containing the bar and separator.
  */
 export function PinnedBar({
   title, byline, expanded, collapseProgress, narrow, badge, onToggle,
@@ -46,9 +47,9 @@ export function PinnedBar({
   const textStyle = { opacity: expanded ? 'var(--collapse-progress, 0)' : 1 };
   const showText = !expanded || collapseProgress > 0;
   return (
-    <>
+    <div className="sticky top-0 z-10 bg-white">
       <div
-        className="sticky top-0 z-10 flex items-center gap-2 bg-white py-2"
+        className="flex items-center gap-2 py-2"
         data-testid="metadata-panel-bar"
       >
         <div className="min-w-0 flex-1">
@@ -76,7 +77,7 @@ export function PinnedBar({
         </button>
       </div>
       <div data-testid="metadata-panel-separator" className="h-px bg-secondary" />
-    </>
+    </div>
   );
 }
 

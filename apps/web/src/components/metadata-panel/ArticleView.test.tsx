@@ -1,9 +1,5 @@
 // @vitest-environment jsdom
-/**
- * Article view tests: byline rendering with tooltip, footnotes, the
- * collaborators list, contributions and the collapsed publication
- * details section.
- */
+/** Article view tests: byline, footnotes, collaborators, contributions, details, auto-grow. */
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within, type RenderResult } from '@testing-library/react';
 import { ArticleView, type ArticleViewProps } from './ArticleView';
@@ -33,12 +29,7 @@ const AUTHORS: MetadataAuthor[] = [
   },
 ];
 
-/**
- * Render the article view with defaults overridden per test.
- *
- * @param props - Property overrides for the fixture.
- * @returns The render result.
- */
+/** Render the article view with defaults overridden per test. */
 function renderView(props: Partial<ArticleViewProps> = {}): RenderResult {
   return render(
     <ArticleView
@@ -82,9 +73,7 @@ describe('ArticleView byline', () => {
       ],
       affiliations: [],
     });
-    expect(screen.getByTestId('byline-author-1').textContent).toContain(
-      'Dewi Sari on behalf of OpenDraft Team',
-    );
+    expect(screen.getByTestId('byline-author-1').textContent).toContain('Dewi Sari on behalf of OpenDraft Team');
   });
 });
 
@@ -282,5 +271,27 @@ describe('ArticleView title field', () => {
       target: { value: 'a\nb' },
     });
     expect(setTitle).toHaveBeenCalledWith('a b');
+  });
+});
+
+describe('ArticleView textarea auto-grow', () => {
+  it('keeps textarea heights on a re-render with unchanged props', () => {
+    const { rerender } = renderView();
+    const title = screen.getByTestId('metadata-panel-title-input') as HTMLTextAreaElement;
+    const abstract = screen.getByTestId('metadata-abstract') as HTMLTextAreaElement;
+    title.style.height = '42px';
+    abstract.style.height = '42px';
+    rerender(<ArticleView title="Deep Dive" authors={AUTHORS} affiliations={AFFILIATIONS}
+      setTitle={() => {}} />);
+    expect(title.style.height).toBe('42px');
+    expect(abstract.style.height).toBe('42px');
+  });
+
+  it('re-measures the textarea when its value changes via onChange', () => {
+    renderView();
+    const title = screen.getByTestId('metadata-panel-title-input') as HTMLTextAreaElement;
+    title.style.height = '42px';
+    fireEvent.change(title, { target: { value: 'Changed title' } });
+    expect(title.style.height).not.toBe('42px');
   });
 });

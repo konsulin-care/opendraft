@@ -8,7 +8,7 @@
  * when roles exist) and the publication details section collapsed by
  * default.
  */
-import { useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import type { MetadataAuthor } from './use-manuscript-metadata';
 import { buildByline, type BylineModel, type AffiliationEntry } from './byline-model';
 import { Byline } from './Byline';
@@ -57,9 +57,15 @@ export interface ArticleViewProps {
 function TitleField(
   { title, setTitle, onEnter }: Pick<ArticleViewProps, 'title' | 'setTitle'> & { onEnter(): void },
 ): ReactNode {
+  // Stable ref object: React never re-invokes it on unrelated re-renders,
+  // so the textarea is not re-measured (height reset to 'auto') each render.
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    autoGrow(textareaRef.current);
+  }, [title]);
   return (
     <textarea
-      ref={(el) => autoGrow(el)}
+      ref={textareaRef}
       data-testid="metadata-panel-title-input"
       aria-label="Manuscript title"
       value={title}
@@ -112,14 +118,16 @@ function AbstractField(
     textareaRef: RefObject<HTMLTextAreaElement | null>;
   },
 ): ReactNode {
+  // Stable ref object plus a value-change effect: re-measure only on mount
+  // and when the abstract changes, not on every unrelated re-render.
+  useEffect(() => {
+    autoGrow(textareaRef.current);
+  }, [abstract, textareaRef]);
   return (
     <section className="mt-3">
       <AbstractLabelRow abstract={abstract} />
       <textarea
-        ref={(el) => {
-          textareaRef.current = el;
-          autoGrow(el);
-        }}
+        ref={textareaRef}
         data-testid="metadata-abstract"
         aria-label="Abstract"
         value={abstract}
