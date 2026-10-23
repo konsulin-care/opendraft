@@ -295,4 +295,5 @@ describe('AffiliationPicker independent researcher', () => {
       { ...author(), affiliations: [] }, author({ id: 'lee', affiliations: [{ ref: 'independent' }] })] });
     expect(onApply.mock.calls[0]?.[0].registry).toBeUndefined();
   });
+  it('styles the independent checkbox with accent-black', () => { boot({ registry: [] }); expect(screen.getByTestId('affiliation-independent').className.split(/\s+/)).toContain('accent-black'); });
 });

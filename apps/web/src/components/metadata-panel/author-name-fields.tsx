@@ -106,7 +106,7 @@ export function AuthorNameFields({ author, name, apply }: AuthorNameFieldsProps)
           onChange={(event) => setName({ ...name, family: event.target.value })} onPaste={onPaste} />
       )}
       <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" data-testid="author-single-name" checked={single}
+        <input type="checkbox" data-testid="author-single-name" checked={single} className="accent-black"
           onChange={(event) => setSingle(event.target.checked)} />
         This person has only one name
       </label>

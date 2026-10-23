@@ -56,10 +56,7 @@ function expectIconField(testid: string, badge?: string): void {
 
 describe('AuthorCard icon fields', () => {
   it('ORCID, email and degree show an icon, placeholder, aria-label and border', () => {
-    renderCard();
-    expectIconField('author-orcid', 'iD');
-    expectIconField('author-email');
-    expectIconField('author-degree-field');
+    renderCard(); expectIconField('author-orcid', 'iD'); expectIconField('author-email'); expectIconField('author-degree-field');
   });
 
   it('name inputs carry the light grey bottom border', () => {
@@ -170,6 +167,11 @@ describe('AuthorCard black accent', () => {
     const pill = screen.getByTestId('credit-conceptualization'); expect(pill.getAttribute('aria-pressed')).toBe('true');
     expect(pill.className).toMatch(/\bbg-black\b/);
     expect(pill.className).not.toMatch(/blue-600/);
+  });
+
+  it('marks the status and single-name checkboxes with accent-black', () => {
+    renderCard();
+    ['author-corresponding', 'author-equal-contributor', 'author-deceased', 'author-single-name'].forEach((id) => expect(screen.getByTestId(id).className.split(/\s+/)).toContain('accent-black'));
   });
 });
 

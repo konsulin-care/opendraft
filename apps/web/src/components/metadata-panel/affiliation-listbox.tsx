@@ -59,7 +59,7 @@ export function IndependentRow(props: {
 }): ReactNode {
   return (
     <label className="flex min-h-11 items-center gap-2 rounded px-2 text-sm hover:bg-hover">
-      <input type="checkbox" data-testid="affiliation-independent" checked={props.checked}
+      <input type="checkbox" data-testid="affiliation-independent" checked={props.checked} className="accent-black"
         onChange={(event) => props.onChange(event.target.checked)} />
       Independent researcher
     </label>

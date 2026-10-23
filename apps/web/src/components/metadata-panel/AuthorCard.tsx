@@ -82,7 +82,7 @@ function TypeToggle({ group, onSet }: { group: boolean; onSet: (group: boolean) 
 function StatusToggles({ author, apply }: { author: MetadataAuthor; apply: CardEdit['apply'] }): ReactNode {
   const box = (key: string, label: string): ReactNode => (
     <label key={key} className="flex items-center gap-2 text-sm">
-      <input type="checkbox" data-testid={`author-${key}`} checked={author[key] === true}
+      <input type="checkbox" data-testid={`author-${key}`} checked={author[key] === true} className="accent-black"
         onChange={(event) => apply({ [key]: event.target.checked })} />
       {label}
     </label>
