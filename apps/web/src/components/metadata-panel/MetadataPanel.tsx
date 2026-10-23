@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { KeyboardEvent as ReactKeyboardEvent, ReactNode, RefObject } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import type { PublishIssue } from '@opendraft/schema'; import type { SaveStatus } from '../AppHeader';
 import { useManuscriptMetadata, type MetadataAuthor, type UseManuscriptMetadataResult } from './use-manuscript-metadata';
 import { NARROW_QUERY, useMediaQuery } from '../../hooks/use-media-query';
 import { ArticleView } from './ArticleView';
 import { AuthorsDialog } from './AuthorsDialog';
+import { OverlayLayer, PinnedBar, usePanelLayout } from './panel-layout';
 import { ValidationBadge, issueFocusTarget, publishIssues } from './ValidationBadge';
 
 /** localStorage key prefix for the per-project collapsed state. */
@@ -130,56 +130,6 @@ function useExpandedState(
   return [decision?.key === projectKey ? decision.expanded : false, setPersisted];
 }
 
-/** Props for the collapsed pinned bar (internal). */
-interface PinnedBarProps {
-  title: string;
-  byline: string;
-  expanded: boolean;
-  narrow: boolean;
-  badge?: ReactNode;
-  onToggle: () => void;
-}
-
-/**
- * Pinned collapsed bar: title, byline and chevron toggle, closed off by
- * the 1px hairline separator below it.
- *
- * @param props - See {@link PinnedBarProps}.
- * @returns The bar and separator elements.
- */
-function PinnedBar({ title, byline, expanded, narrow, badge, onToggle }: PinnedBarProps): ReactNode {
-  return (
-    <>
-      <div className="flex items-center gap-2 py-2" data-testid="metadata-panel-bar">
-        <div className="min-w-0 flex-1">
-          {!expanded && (
-            <>
-              <div data-testid="metadata-panel-bar-title" className={narrow ? 'line-clamp-2' : 'truncate'}>
-                {title || 'Untitled manuscript'}
-              </div>
-              {byline && (
-                <div className="truncate text-sm text-muted" data-testid="metadata-panel-byline">{byline}</div>
-              )}
-            </>
-          )}
-        </div>
-        {badge}
-        <button
-          type="button"
-          data-testid="metadata-panel-toggle"
-          aria-expanded={expanded}
-          aria-label={expanded ? 'Collapse manuscript metadata' : 'Expand manuscript metadata'}
-          onClick={onToggle}
-          className="flex min-h-11 min-w-11 items-center justify-center rounded hover:bg-hover"
-        >
-          {expanded ? <ChevronUp aria-hidden /> : <ChevronDown aria-hidden />}
-        </button>
-      </div>
-      <div data-testid="metadata-panel-separator" className="h-px bg-secondary" />
-    </>
-  );
-}
-
 /**
  * Issue-selection focus state: the author index the dialog opens on and
  * the field focused once the render exposing it has committed.
@@ -213,6 +163,7 @@ function useIssueFocus(expanded: boolean, setExpanded: (next: boolean) => void):
 interface PanelBodyProps {
   meta: UseManuscriptMetadataResult;
   expanded: boolean;
+  bodyRef: RefObject<HTMLDivElement | null>;
   dialogIndex: number | null;
   saveStatus?: SaveStatus;
   onClose(): void;
@@ -226,11 +177,11 @@ interface PanelBodyProps {
  * @param props - See {@link PanelBodyProps}.
  * @returns The animating body wrapper element.
  */
-function PanelBody({ meta, expanded, dialogIndex, saveStatus, onClose }: PanelBodyProps): ReactNode {
+function PanelBody({ meta, expanded, bodyRef, dialogIndex, saveStatus, onClose }: PanelBodyProps): ReactNode {
   const { frontmatter } = meta;
   const keywords = useMemo(() => (Array.isArray(frontmatter.keywords) ? frontmatter.keywords : []) as string[], [frontmatter.keywords]);
   return (
-    <div data-testid="metadata-panel-body" aria-hidden={!expanded || undefined} inert={!expanded}
+    <div ref={bodyRef} data-testid="metadata-panel-body" aria-hidden={!expanded || undefined} inert={!expanded}
       className={`grid transition-[grid-template-rows] duration-200 ease-out ${expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
       <div data-testid={expanded ? 'metadata-panel-expanded' : undefined} className="min-h-0 overflow-hidden">
         <ArticleView
@@ -251,9 +202,14 @@ function PanelBody({ meta, expanded, dialogIndex, saveStatus, onClose }: PanelBo
 }
 
 /**
- * Manuscript metadata panel inside the editor scroll container: pinned
- * collapsed bar over the expanded article editor, persisted per project;
- * Esc collapses it and refocuses the editor.
+ * Manuscript metadata panel inside the editor scroll container: a
+ * sticky pinned bar over the expanded article editor, persisted per
+ * project; Esc collapses it and refocuses the editor. Scrolling the
+ * editor container collapses the expanded panel progressively (1:1)
+ * and re-expands it at the top; scroll collapse is never persisted.
+ * When the expanded body is taller than the editor viewport the panel
+ * renders as an editor-area overlay with its own vertical scroll and
+ * scroll collapse is disabled.
  *
  * @param props - See {@link MetadataPanelProps}.
  * @returns The panel section, or null when outside a loaded manuscript.
@@ -269,31 +225,38 @@ export function MetadataPanel({
     [title, authors, affiliations, abstract, frontmatter]);
   const byline = useMemo(() => authors.map(authorBylineName).filter(Boolean).join(', '), [authors]);
   const issueFocus = useIssueFocus(expanded, setExpanded);
-  const toggle = useCallback(() => setExpanded(!expanded), [expanded, setExpanded]);
   const openIssues = useCallback(() => setExpanded(true), [setExpanded]);
-  const onKeyDown = useCallback((event: ReactKeyboardEvent<HTMLElement>) => {
-    if (event.key !== 'Escape') return;
-    setExpanded(false);
-    editorFocusRef?.current?.focus();
-  }, [editorFocusRef, setExpanded]);
-
+  const panelRef = useRef<HTMLElement | null>(null);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const fallbackScrollRef = useRef<HTMLElement | null>(null);
+  const scrollRef = editorFocusRef ?? fallbackScrollRef;
+  // Overlay detection, scroll collapse and the chevron/Escape controls.
+  const layout = usePanelLayout({ expanded, setExpanded, narrow, loaded, manuscriptRoot,
+    panelRef, bodyRef, scrollRef, editorFocusRef });
   if (!manuscriptRoot || !loaded) return null;
-
   // Below 640px the expanded panel is a full-screen sheet.
   const sheet = expanded && narrow;
   return (
     <section
+      ref={panelRef}
       data-testid="metadata-panel"
       aria-label="Manuscript metadata"
-      onKeyDown={onKeyDown}
+      onKeyDown={layout.onKeyDown}
       role={sheet ? 'dialog' : undefined}
       aria-modal={sheet ? true : undefined}
-      className={sheet ? 'fixed inset-0 z-30 flex flex-col overflow-y-auto bg-white' : 'sticky top-0 z-10 bg-white'}
+      className={sheet
+        ? 'fixed inset-0 z-30 flex flex-col overflow-y-auto bg-white'
+        : layout.overlay
+          ? 'absolute inset-0 z-20 overflow-hidden bg-white'
+          : 'relative bg-white'}
     >
-      <PinnedBar title={title} byline={narrow ? `${authors.length} authors` : byline}
-        expanded={expanded} narrow={narrow} onToggle={toggle}
-        badge={<ValidationBadge issues={issues} onSelect={issueFocus.select} onOpen={openIssues} />} />
-      <PanelBody meta={meta} expanded={expanded} dialogIndex={issueFocus.dialogIndex} saveStatus={meta.status} onClose={issueFocus.close} />
+      <OverlayLayer overlay={layout.overlay}>
+        <PinnedBar title={title} byline={narrow ? `${authors.length} authors` : byline}
+          expanded={layout.panelExpanded} collapseProgress={layout.progress} narrow={narrow} onToggle={layout.toggle}
+          badge={<ValidationBadge issues={issues} onSelect={issueFocus.select} onOpen={openIssues} />} />
+        <PanelBody meta={meta} expanded={expanded} bodyRef={bodyRef}
+          dialogIndex={issueFocus.dialogIndex} saveStatus={meta.status} onClose={issueFocus.close} />
+      </OverlayLayer>
     </section>
   );
 }

@@ -55,6 +55,7 @@ export function EditorSurface({
           display: mode === "source" ? "block" : "none",
           height: "100%",
           overflow: "auto",
+          position: "relative",
         }}
       >
         <div className="reading-column">
