@@ -120,19 +120,19 @@ describe('reading column wiring (source scan)', () => {
   /** Reads a source file relative to apps/web/src. */
   const read = (path: string): string => readFileSync(resolve(__dirname, path), 'utf-8');
 
-  it('EditorSurface renders the panel and both editor surfaces inside .reading-column', () => {
+  it('EditorSurface declares exactly one .reading-column holding the panel and both surfaces', () => {
     const surface = read('components/EditorSurface.tsx');
-    const columns = surface
-      .split('<div className="reading-column">')
-      .slice(1)
-      .map((segment) => segment.slice(0, segment.indexOf('</div>')));
+    // Exactly one reading-column declaration: one shared column, not one per mode.
+    const columns = surface.split('className="reading-column"');
     expect(columns).toHaveLength(2);
-    // Wysiwyg branch: conditional panel + Milkdown inside the column.
-    expect(columns[0]).toMatch(/mode === "wysiwyg" && panel/);
-    expect(columns[0]).toContain('<Milkdown />');
-    // Source branch: conditional panel + SourceEditor inside the column.
-    expect(columns[1]).toMatch(/mode === "source" && panel/);
-    expect(columns[1]).toContain('<SourceEditor');
+    const column = columns[1];
+    // The single column owns the panel and both mode surfaces.
+    expect(column).toContain('{panel}');
+    expect(column).toContain('<Milkdown />');
+    expect(column).toContain('<SourceEditor');
+    // No per-mode conditional panel: the panel renders exactly once.
+    expect(surface).not.toMatch(/mode\s*===\s*"[^"]*"\s*&&\s*panel/);
+    expect(surface.match(/\{\s*panel\s*\}/g)).toHaveLength(1);
   });
 
   it('FormattingToolbar row carries the shared column class, not a bespoke width', () => {
