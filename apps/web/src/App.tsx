@@ -262,7 +262,7 @@ export function App() {
   const dirName = manuscriptDirName(activePath);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <div className="flex h-dvh flex-col">
       <AppHeader
         projectName={active?.name} manuscriptDir={dirName ?? undefined}
         manuscriptName={dirName !== null ? active?.manuscriptNames?.[dirName] : undefined}

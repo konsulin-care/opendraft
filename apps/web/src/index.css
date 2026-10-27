@@ -187,21 +187,6 @@ textarea {
   background-color: white;
 }
 
-/* scroll viewport — the root wrapper that @milkdown/react renders */
-.manuscript-editor > [data-milkdown-root] {
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-/* content surface — NOT the scroll container */
-.manuscript-editor > [data-milkdown-root] > .milkdown {
-  min-height: 100%;
-  overflow: visible;
-  position: relative;
-}
-
 /* ── Shared reading column ── */
 /* One width-controlling container shared by the metadata panel, the
    manuscript editor, the source editor and the formatting toolbar row:
