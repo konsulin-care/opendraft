@@ -18,55 +18,38 @@ const originalMatchMedia = Object.getOwnPropertyDescriptor(window, 'matchMedia')
 let pendingFrames: ((time: number) => void)[] = [];
 /** Replace requestAnimationFrame with a queue tests flush manually. */
 function stubRaf(): void {
-  pendingFrames = [];
-  vi.stubGlobal('requestAnimationFrame', (cb: (time: number) => void) => { pendingFrames.push(cb); return pendingFrames.length; });
+  pendingFrames = []; vi.stubGlobal('requestAnimationFrame', (cb: (time: number) => void) => { pendingFrames.push(cb); return pendingFrames.length; });
   vi.stubGlobal('cancelAnimationFrame', (id: number) => { pendingFrames[id - 1] = () => {}; });
 }
 /** Run every queued animation frame inside act(). */
-function flushFrames(): void {
-  const frames = pendingFrames;
-  pendingFrames = [];
-  act(() => { for (const frame of frames) frame(0); });
-}
+function flushFrames(): void { const frames = pendingFrames; pendingFrames = []; act(() => { for (const frame of frames) frame(0); }); }
 /** Detached editor scroll container (clientHeight 0 unless overridden). */
 function makeScroller(clientHeight = 0): HTMLDivElement {
   const scroller = document.createElement('div');
-  scroller.tabIndex = -1;
-  document.body.appendChild(scroller);
+  scroller.tabIndex = -1; document.body.appendChild(scroller);
   if (clientHeight > 0) Object.defineProperty(scroller, 'clientHeight', { configurable: true, value: clientHeight });
   return scroller;
 }
 /** ResizeObserver stub recorded per test; `fireResize` triggers the latest. */
 class MockResizeObserver {
   static instances: MockResizeObserver[] = [];
-  readonly observe = vi.fn();
-  readonly unobserve = vi.fn();
-  readonly disconnect = vi.fn();
+  readonly observe = vi.fn(); readonly unobserve = vi.fn(); readonly disconnect = vi.fn();
   constructor(private readonly callback: ResizeObserverCallback) { MockResizeObserver.instances.push(this); }
   trigger(): void { this.callback([], this as unknown as ResizeObserver); }
 }
 /** Stub the global ResizeObserver with the recording mock. */
 function stubResizeObserver(): void { MockResizeObserver.instances = []; vi.stubGlobal('ResizeObserver', MockResizeObserver); }
 /** Fire the latest observer's resize callback inside act(). */
-function fireResize(): void {
-  const instance = MockResizeObserver.instances.at(-1);
-  if (!instance) throw new Error('ResizeObserver was not constructed');
-  act(() => instance.trigger());
-}
+function fireResize(): void { const instance = MockResizeObserver.instances.at(-1); if (!instance) throw new Error('ResizeObserver was not constructed'); act(() => instance.trigger()); }
 /** Stub the expanded body height (jsdom reports zero layout metrics). */
-function stubBodyHeight(height: number): void {
-  Object.defineProperty(screen.getByTestId('metadata-panel-body'), 'offsetHeight', { configurable: true, value: height });
-}
+function stubBodyHeight(height: number): void { Object.defineProperty(screen.getByTestId('metadata-panel-body'), 'offsetHeight', { configurable: true, value: height }); }
 /** Stub `window.matchMedia` so the narrow-viewport query matches or not. */
 function stubNarrowViewport(narrow: boolean): void {
   Object.defineProperty(window, 'matchMedia', {
     configurable: true, writable: true,
-    value: (query: string) => ({
-      matches: narrow && query.includes('639'), media: query,
-      addEventListener: () => {}, removeEventListener: () => {},
-      addListener: () => {}, removeListener: () => {},
-      onchange: null, dispatchEvent: () => false,
-    }),
+    value: (query: string) => ({ matches: narrow && query.includes('639'), media: query,
+      addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {},
+      onchange: null, dispatchEvent: () => false }),
   });
 }
 /** Seed a memory workspace with manuscript metadata files. */
@@ -79,8 +62,7 @@ async function seededWorkspace(seed: Record<string, string>): Promise<WorkspaceA
 async function renderPanel(seed: Record<string, string> = SEEDED, focusRef?: RefObject<HTMLElement | null>) {
   const ws = await seededWorkspace(seed);
   const rendered = render(<MetadataPanel workspace={ws} manuscriptRoot={ROOT} projectKey={PROJECT} editorFocusRef={focusRef} />);
-  await waitFor(() => expect(screen.getByTestId('metadata-panel')).toBeDefined());
-  return rendered;
+  await waitFor(() => expect(screen.getByTestId('metadata-panel')).toBeDefined()); return rendered;
 }
 beforeEach(() => { localStorage.clear(); stubNarrowViewport(false); });
 afterEach(() => { localStorage.clear(); vi.unstubAllGlobals(); if (originalMatchMedia) Object.defineProperty(window, 'matchMedia', originalMatchMedia); });
@@ -162,8 +144,7 @@ describe('MetadataPanel expanded state', () => {
   });
   it('collapses on Escape and focuses the editor container', async () => {
     const target = document.createElement('div');
-    target.tabIndex = -1;
-    document.body.appendChild(target);
+    target.tabIndex = -1; document.body.appendChild(target);
     await renderPanel({}, { current: target });
     expect(screen.queryByTestId('metadata-panel-expanded')).not.toBeNull();
     fireEvent.keyDown(screen.getByTestId('metadata-panel'), { key: 'Escape' });
@@ -283,6 +264,22 @@ describe('MetadataPanel overlay', () => {
     expect(screen.queryByTestId('metadata-panel-expanded')).toBeNull();
     expect(screen.queryByTestId('metadata-panel-overlay')).toBeNull();
     scroller.remove();
+  });
+});
+
+describe('MetadataPanel narrow sheet reading column', () => {
+  it('keeps the full-screen backdrop and wraps bar and body in a .reading-column on narrow viewports', async () => {
+    stubNarrowViewport(true);
+    await renderPanel({}); // Untitled manuscript starts expanded, i.e. the sheet renders.
+    const panel = screen.getByTestId('metadata-panel');
+    expect(panel.className).toContain('fixed inset-0');
+    const column = panel.querySelector('.reading-column');
+    expect(column?.querySelector('[data-testid="metadata-panel-bar"]')).not.toBeNull();
+    expect(column?.querySelector('[data-testid="metadata-panel-body"]')).not.toBeNull();
+  });
+  it('renders no .reading-column descendant on wide viewports', async () => {
+    await renderPanel({});
+    expect(screen.getByTestId('metadata-panel').querySelector('.reading-column')).toBeNull();
   });
 });
 

@@ -236,6 +236,15 @@ export function MetadataPanel({
   if (!manuscriptRoot || !loaded) return null;
   // Below 640px the expanded panel is a full-screen sheet.
   const sheet = expanded && narrow;
+  const content = (
+    <OverlayLayer overlay={layout.overlay}>
+      <PinnedBar title={title} byline={narrow ? `${authors.length} authors` : byline}
+        expanded={layout.panelExpanded} collapseProgress={layout.progress} narrow={narrow} onToggle={layout.toggle}
+        badge={<ValidationBadge issues={issues} onSelect={issueFocus.select} onOpen={openIssues} />} />
+      <PanelBody meta={meta} expanded={expanded} bodyRef={bodyRef}
+        dialogIndex={issueFocus.dialogIndex} saveStatus={meta.status} onClose={issueFocus.close} />
+    </OverlayLayer>
+  );
   return (
     <section
       ref={panelRef}
@@ -250,13 +259,7 @@ export function MetadataPanel({
           ? 'absolute inset-0 z-20 overflow-hidden bg-white'
           : 'contents'}
     >
-      <OverlayLayer overlay={layout.overlay}>
-        <PinnedBar title={title} byline={narrow ? `${authors.length} authors` : byline}
-          expanded={layout.panelExpanded} collapseProgress={layout.progress} narrow={narrow} onToggle={layout.toggle}
-          badge={<ValidationBadge issues={issues} onSelect={issueFocus.select} onOpen={openIssues} />} />
-        <PanelBody meta={meta} expanded={expanded} bodyRef={bodyRef}
-          dialogIndex={issueFocus.dialogIndex} saveStatus={meta.status} onClose={issueFocus.close} />
-      </OverlayLayer>
+      {sheet ? <div className="reading-column">{content}</div> : content}
     </section>
   );
 }
