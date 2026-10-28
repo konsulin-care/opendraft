@@ -5,6 +5,7 @@ import type { WorkspaceAdapter } from '@opendraft/workspace';
 import type { CitationState } from '../citation/types';
 import { EditorSurface } from './EditorSurface';
 import { useFocusScrollGuard } from '../hooks/useFocusScrollGuard';
+import { useSaveShortcut } from '../hooks/useSaveShortcut';
 import { SourceEditor, type SourceEditorHandle } from './SourceEditor';
 import { EditorFrame } from './editor-frame';
 import { createModeSwitcher, useInitialCaret, type EditorTestApi } from '../caret-mode-switch';
@@ -93,6 +94,8 @@ function useManuscriptState(options: UseManuscriptStateOptions) {
   // path before the new file's content loads. Declared before useEditor so
   // the flush effect runs ahead of the editor-recreation effects.
   const saver = useDebouncedSaver(workspace, path, onSaveStatusChange);
+  // Cmd/Ctrl+S flushes the pending debounced save immediately.
+  useSaveShortcut(saver);
 
   // Reset the mode state machine when the file changes: the recreated editor
   // loads the new content directly, so no content sync between the surfaces
@@ -157,6 +160,8 @@ function SourceOnlyEditor({ workspace, defaultValue, path, onSaveStatusChange, f
   const sourceEditorRef = useRef<SourceEditorHandle | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const saver = useDebouncedSaver(workspace, path, onSaveStatusChange);
+  // Cmd/Ctrl+S flushes the pending debounced save immediately.
+  useSaveShortcut(saver);
   const panel = useMetadataPanel(workspace, path, projectId, scrollContainerRef);
 
   // Reload the buffer when the open file changes.
