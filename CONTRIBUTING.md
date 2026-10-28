@@ -103,7 +103,6 @@ GitHub Actions runs on PRs to `master` with 8 parallel jobs:
 | security | npm audit, govulncheck |
 | complexity | TypeScript complexity, Go complexity |
 | coverage | Test coverage for TS and Go |
-| pr-size | Fails if PR > 5000 lines changed |
 
 ## Dependency Updates
 

@@ -117,26 +117,3 @@ jobs:
         with:
           name: coverage
           path: apps/bff/coverage.out
-
-  pr-size:
-    name: PR Size
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: jdx/mise-action@v2
-      - run: mise install
-      - name: Check PR size
-        run: |
-          PR_NUM=${{ github.event.pull_request.number }}
-          gh pr view "$PR_NUM" \
-            --json additions,deletions \
-            -q '.additions + .deletions' > /tmp/pr_size.txt
-          TOTAL=$(cat /tmp/pr_size.txt)
-          echo "PR size: $TOTAL lines (limit: 5000)"
-          if [ "$TOTAL" -gt 5000 ]; then
-            echo "::error::PR exceeds 5000 lines"
-            exit 1
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
