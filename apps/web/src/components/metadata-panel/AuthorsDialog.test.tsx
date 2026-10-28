@@ -1,9 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Authors dialog tests: single form with its position header, reorder,
- * footer delete with Undo, draft persisted once named with buffered
- * affiliation picks, and the fixed footer (Trash2 delete, Discard,
- * Done, save status, narrow icon-only delete, backdrop/Escape close).
+ * Authors dialog tests: single form with its position header, reorder, footer
+ * delete with Undo, draft persistence, fixed footer, narrow reading column.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
@@ -274,15 +272,17 @@ describe('AuthorsDialog fixed footer', () => {
 describe('AuthorsDialog viewport handling', () => {
   it('renders a full-screen role=dialog sheet with the single form at 375px', async () => {
     stubMatchMedia(375); await boot(); fireEvent.click(screen.getByTestId('byline-author-1'));
-    const dialog = screen.getByTestId('authors-dialog');
-    expect(dialog.getAttribute('role')).toBe('dialog'); expect(dialog.className).toContain('fixed inset-0');
+    const dialog = screen.getByTestId('authors-dialog'); expect(dialog.getAttribute('role')).toBe('dialog'); expect(dialog.className).toContain('fixed inset-0');
     expect(screen.getByText('of 3')).toBeDefined(); expect(screen.queryByTestId('authors-back')).toBeNull(); expect(screen.queryByTestId('author-select-0')).toBeNull();
+    const classes = dialog.className.split(/\s+/); expect(classes).toContain('py-3'); expect(classes).not.toContain('p-3');
+    const column = dialog.querySelector('.reading-column');
+    expect(column?.querySelector('h2')).not.toBeNull(); expect(column?.querySelector('.overflow-y-auto')).not.toBeNull(); expect(column?.querySelector('[data-testid="authors-dialog-footer"]')).not.toBeNull();
   });
 
   it('renders a centered dialog with the single form at 800px', async () => {
     stubMatchMedia(800); await boot(); fireEvent.click(screen.getByTestId('byline-author-1'));
     const dialog = screen.getByTestId('authors-dialog');
-    expect(dialog.className).not.toContain('fixed inset-0'); expect(dialog.parentElement?.className).toContain('justify-center');
+    expect(dialog.className).not.toContain('fixed inset-0'); expect(dialog.parentElement?.className).toContain('justify-center'); expect(dialog.querySelector('.reading-column')).toBeNull();
     expect(screen.getByTestId('author-card-1')).toBeDefined(); expect(screen.queryByTestId('author-card-0')).toBeNull();
     expect(screen.queryByTestId('author-select-0')).toBeNull();
   });

@@ -46,10 +46,14 @@ export function AuthorOrderHeader({ index, total, onMove }: {
 
 /**
  * Dialog frame: a full-screen sheet below 640px, a centered card
- * otherwise. The frame is a column whose middle region scrolls, so
- * the title and the footer stay fixed; the title row has no close
- * button, the backdrop click closes the centered variant and Escape
- * closes from anywhere.
+ * otherwise. On narrow viewports the title, the scrolling body and
+ * the footer share one centered `.reading-column` (80% of the pane,
+ * see index.css) and the frame keeps only vertical padding, so the
+ * side gutters come from the column alone; wide stays padded. The
+ * frame is a column whose middle region scrolls, so the title and
+ * the footer stay fixed; the title row has no close button, the
+ * backdrop click closes the centered variant and Escape closes
+ * from anywhere.
  *
  * @param props - Narrow viewport flag, close callback, fixed footer
  * and the scrolling body children.
@@ -58,14 +62,19 @@ export function AuthorOrderHeader({ index, total, onMove }: {
 export function DialogShell({ narrow, onClose, footer, children }: {
   narrow: boolean; onClose: () => void; footer?: ReactNode; children: ReactNode;
 }): ReactNode {
-  const frame = (
-    <div role="dialog" aria-modal="true" aria-label="Authors" data-testid="authors-dialog"
-      className={narrow
-        ? 'fixed inset-0 z-30 flex flex-col bg-white p-3'
-        : 'flex max-h-[80vh] w-full max-w-2xl flex-col rounded border border-secondary bg-white p-3 shadow'}>
+  const column = (
+    <>
       <h2 className="font-medium">Authors</h2>
       <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
       {footer}
+    </>
+  );
+  const frame = (
+    <div role="dialog" aria-modal="true" aria-label="Authors" data-testid="authors-dialog"
+      className={narrow
+        ? 'fixed inset-0 z-30 flex flex-col bg-white py-3'
+        : 'flex max-h-[80vh] w-full max-w-2xl flex-col rounded border border-secondary bg-white p-3 shadow'}>
+      {narrow ? <div className="reading-column flex min-h-0 flex-1 flex-col">{column}</div> : column}
     </div>
   );
   if (narrow) return frame;
