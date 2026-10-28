@@ -1,0 +1,70 @@
+# Invalid fixture: two heads in the oco:hasNext author chain
+#
+# Violates protocol/article.shacl.ttl — exactly one author role may
+# head the chain (no incoming oco:hasNext). Both ex:author-role-alice
+# and ex:author-role-budi have no predecessor. Everything else
+# conforms, so the two heads are the only defect.
+
+@prefix od: <urn:opendraft:ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix fabio: <http://purl.org/spar/fabio/> .
+@prefix frbr: <http://purl.org/vocab/frbr/core#> .
+@prefix pro: <http://purl.org/spar/pro/> .
+@prefix scoro: <http://purl.org/spar/scoro/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix ex: <https://example.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:invalid-publication
+    a od:Publication ;
+    dcterms:title "Publication with two author-chain heads" ;
+    dcterms:creator ex:alice , ex:budi ;
+    dcterms:identifier <https://doi.org/10.5555/example-two-author-heads> ;
+    od:repositoryUrl "https://github.com/opendraft/opendraft"^^xsd:anyURI ;
+    od:manuscriptPath "manuscripts/article.qmd" ;
+    od:sourceRevision "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d" ;
+    od:protocolRevision "0000000000000000000000000000000000000000" ;
+    frbr:realizationOf ex:invalid-work ;
+    pro:isDocumentContextFor ex:author-role-alice , ex:affiliate-role-alice ,
+                             ex:author-role-budi , ex:affiliate-role-budi .
+
+ex:author-role-alice
+    a pro:RoleInTime ;
+    pro:withRole pro:author , scoro:corresponding-author ;
+    pro:isHeldBy ex:alice .
+
+ex:affiliate-role-alice
+    a pro:RoleInTime ;
+    pro:withRole scoro:affiliate ;
+    pro:isHeldBy ex:alice ;
+    pro:relatesToOrganization ex:org .
+
+ex:author-role-budi
+    a pro:RoleInTime ;
+    pro:withRole pro:author ;
+    pro:isHeldBy ex:budi .
+
+ex:affiliate-role-budi
+    a pro:RoleInTime ;
+    pro:withRole scoro:affiliate ;
+    pro:isHeldBy ex:budi ;
+    pro:relatesToOrganization ex:org .
+
+ex:alice
+    a foaf:Person ;
+    foaf:givenName "Alice" ;
+    foaf:familyName "Smith" ;
+    foaf:mbox <mailto:alice@example.edu> .
+
+ex:budi
+    a foaf:Person ;
+    foaf:givenName "Budi" ;
+    foaf:familyName "Lee" .
+
+ex:org
+    a foaf:Organization ;
+    foaf:name "University of Indonesia" .
+
+ex:invalid-work
+    a fabio:Work ;
+    dcterms:title "Invalid fixture work" .

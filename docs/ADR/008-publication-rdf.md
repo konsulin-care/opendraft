@@ -4,8 +4,11 @@
 **Date:** 2024-01-01  
 **PROPOSAL.md:** §14  
 **Superseded in part by:** [ADR-018](018-flat-provenance-model.md)  
+**Superseded in part by:** [ADR-021](021-spar-ocdm-publication-metadata.md)  
 
 > **Supersedure note (2026-08-31):** ADR-018 replaces the reified-node provenance model with flat scalars on `od:Publication`. The clauses below describing reified `sourceRepository`/source-revision/protocol-revision nodes, the `od:SourceRepository`, `od:SourceRevision`, `od:ProtocolRevision` classes, and `od:revisionSha` are superseded. The required/optional field lists and provenance intent remain in effect.
+>
+> **Supersedure note (2026-10-21):** ADR-021 replaces the custom-term representation of the field lists below with SPAR/OCDM vocabulary: subjects as `fabio:hasSubjectTerm`, corresponding authorship as a `scoro:corresponding-author` role, CRediT roles as `pro:withRole` on authorship roles using the NISO `credit:*` IRIs, and one `od:Publication` (a `fabio:Expression`) per published version instead of a separate publication-version class. The field lists and provenance intent remain in effect; see ADR-021 for the full mapping.
 
 ## Context
 
@@ -44,3 +47,5 @@ RDF must provide sufficient provenance to reconstruct which source and protocol 
 ## References
 
 - PROPOSAL.md §14
+- [ADR-018](018-flat-provenance-model.md) — superseded in part (provenance model)
+- [ADR-021](021-spar-ocdm-publication-metadata.md) — superseded in part (subject, authorship, and CRediT representation)

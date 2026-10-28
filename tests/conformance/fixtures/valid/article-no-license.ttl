@@ -1,0 +1,54 @@
+# Valid fixture: publication without a license (warning only)
+#
+# Conforms to protocol/article.shacl.ttl — a missing dcterms:license
+# is reported as sh:Warning and does not affect conformance. The
+# authorship model, Work realization and every required field are
+# fully conforming. Edge fixture for tests/conformance only; not a
+# shipped protocol artifact.
+
+@prefix od: <urn:opendraft:ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix fabio: <http://purl.org/spar/fabio/> .
+@prefix frbr: <http://purl.org/vocab/frbr/core#> .
+@prefix pro: <http://purl.org/spar/pro/> .
+@prefix scoro: <http://purl.org/spar/scoro/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix ex: <https://example.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:valid-no-license-work
+    a fabio:Work ;
+    dcterms:title "Publication without a license" .
+
+ex:valid-no-license-publication
+    a od:Publication ;
+    dcterms:title "Publication without a license" ;
+    dcterms:creator ex:alice ;
+    dcterms:identifier <https://doi.org/10.5555/example-no-license> ;
+    od:repositoryUrl "https://github.com/opendraft/opendraft"^^xsd:anyURI ;
+    od:manuscriptPath "manuscripts/article.qmd" ;
+    od:sourceRevision "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d" ;
+    od:protocolRevision "0000000000000000000000000000000000000000" ;
+    frbr:realizationOf ex:valid-no-license-work ;
+    pro:isDocumentContextFor ex:author-role , ex:affiliate-role .
+
+ex:author-role
+    a pro:RoleInTime ;
+    pro:withRole pro:author , scoro:corresponding-author ;
+    pro:isHeldBy ex:alice .
+
+ex:affiliate-role
+    a pro:RoleInTime ;
+    pro:withRole scoro:affiliate ;
+    pro:isHeldBy ex:alice ;
+    pro:relatesToOrganization ex:org .
+
+ex:alice
+    a foaf:Person ;
+    foaf:givenName "Alice" ;
+    foaf:familyName "Smith" ;
+    foaf:mbox <mailto:alice@example.edu> .
+
+ex:org
+    a foaf:Organization ;
+    foaf:name "University of Indonesia" .

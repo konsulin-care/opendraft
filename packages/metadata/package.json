@@ -21,6 +21,7 @@
     "yaml": "^2.9.1"
   },
   "devDependencies": {
+    "@opendraft/rdf": "workspace:*",
     "json-schema-to-typescript": "^16.0.0",
     "typescript": "^6.0.3",
     "vitest": "^5.0.5"

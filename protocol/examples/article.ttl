@@ -1,35 +1,209 @@
 # OpenDraft Example Article
 #
-# A minimal valid publication demonstrating the flat provenance model
-# (ADR-018). Shows every required field declared by ADR-008 plus the
-# optional layer (abstract, subject assignment, references).
+# A canonical example publication demonstrating the OCDM authorship
+# pattern (ADR-021): author roles linked from the publication via
+# pro:isDocumentContextFor, ordered in a single oco:hasNext chain, and
+# held by agents (pro:isHeldBy). Affiliations are scoro:affiliate roles
+# relating the author to a ROR-identified organization.
+#
+# Demonstrates: an ORCID corresponding author, a non-ORCID person
+# writing on behalf of a named group, a group author with members,
+# equal contribution (scoro:isEqualToRoleInTime), affiliations shared
+# between authors, CRediT roles, keywords and a subject assignment.
 #
 # Validates clean against protocol/article.shacl.ttl.
 
 @prefix od: <urn:opendraft:ontology#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix fabio: <http://purl.org/spar/fabio/> .
+@prefix pro: <http://purl.org/spar/pro/> .
+@prefix scoro: <http://purl.org/spar/scoro/> .
+@prefix oco: <https://w3id.org/oc/ontology/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix credit: <https://credit.niso.org/contributor-roles/> .
+@prefix prism: <http://prismstandard.org/namespaces/basic/2.0/> .
+@prefix frbr: <http://purl.org/vocab/frbr/core#> .
+@prefix cito: <http://purl.org/spar/cito/> .
+@prefix datacite: <http://purl.org/datacite/ontology/> .
+@prefix literal: <https://w3id.org/literal/> .
+@prefix frapo: <http://purl.org/spar/frapo/> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-# The publication itself. Identified by DOI; carries full provenance.
+# The Work behind the manuscript: one fabio:Work per manuscript with a
+# concept DOI. Every published version realizes this Work; Work and
+# Expression never share a DOI.
+od:example-work
+    a fabio:Work ;
+    dcterms:title "Example Publication: OpenDraft Protocol" ;
+    dcterms:identifier <https://doi.org/10.5555/example-opendraft-concept> .
+
+# The previous version (v1) of this publication: an earlier
+# fabio:Expression revised by v2 below.
+od:example-publication-v1
+    a fabio:Expression ;
+    dcterms:identifier <https://doi.org/10.5555/example-opendraft-2026-v1> ;
+    prism:versionIdentifier "1" .
+
+# The publication itself. Identified by version DOI; carries full
+# provenance scalars plus the authorship document context.
 od:example-publication
     a od:Publication ;
 
-    # --- Required fields (ADR-008) ---
     dcterms:title "Example Publication: OpenDraft Protocol" ;
-    dcterms:creator <https://orcid.org/0000-0002-1825-0097> ;
+    dcterms:creator <https://orcid.org/0000-0002-1825-0097> ,
+                    _:budi-lee ,
+                    od:group-who-diabetes ;
     dcterms:identifier <https://doi.org/10.5555/example-opendraft-2026> ;
     od:repositoryUrl "https://github.com/konsulin-care/opendraft"^^xsd:anyURI ;
     od:manuscriptPath "manuscripts/distributed-scientific-publication/article.qmd" ;
     od:sourceRevision "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d" ;
     od:protocolRevision "0000000000000000000000000000000000000000" ;
 
-    # --- Optional fields (ADR-008) ---
-    dcterms:abstract "A canonical example publication used to demonstrate the OpenDraft protocol." ;
-    od:hasSubject od:concept-distributed-scientific-publication ;
-    dcterms:references <https://doi.org/10.5555/example-cited-work-2025> .
+    # Work/version identity: v2 realizes the Work and revises v1.
+    frbr:realizationOf od:example-work ;
+    frbr:revisionOf od:example-publication-v1 ;
+    prism:versionIdentifier "2" ;
 
-# A SKOS concept used as the subject of the example publication.
+    # OCDM identifier node alongside the DOI IRI.
+    datacite:hasIdentifier [
+        datacite:usesIdentifierScheme datacite:doi ;
+        literal:hasLiteralValue "10.5555/example-opendraft-2026" ;
+    ] ;
+
+    dcterms:license <http://creativecommons.org/licenses/by/4.0/> ;
+    frapo:isFundedBy od:example-grant ;
+    cito:cites <https://doi.org/10.5555/related-study-2025> ;
+
+    dcterms:abstract "A canonical example publication used to demonstrate the OpenDraft protocol." ;
+
+    # Authorship roles live in the document context of the publication.
+    pro:isDocumentContextFor od:role-alice-author ,
+                             od:role-alice-ui ,
+                             od:role-alice-rscm ,
+                             od:role-budi-author ,
+                             od:role-budi-rscm ,
+                             od:role-group-author ;
+
+    prism:keyword "distributed scientific publication" ,
+                  "research data" ;
+    fabio:hasSubjectTerm od:concept-distributed-scientific-publication ;
+    dcterms:subject od:concept-distributed-scientific-publication ;
+    od:hasAssignment _:subject-assignment .
+
+# A reified subject assignment binding the SKOS term with provenance.
+_:subject-assignment
+    a od:SubjectAssignment ;
+    od:assignedSubject od:concept-distributed-scientific-publication ;
+    od:assignedBy <https://orcid.org/0000-0002-1825-0097> ;
+    od:assignedAt "2026-01-15T09:00:00"^^xsd:dateTime .
+
 od:concept-distributed-scientific-publication
-    a skos:Concept ;
+    a skos:Concept , fabio:SubjectTerm ;
     skos:prefLabel "Distributed scientific publication"@en .
+
+# --- Author order: Alice Marie Smith, Budi Lee, WHO Diabetes Work Group ---
+
+# Head of the oco:hasNext author chain; also the corresponding author
+# and an equal contributor. Carries CRediT roles alongside the PRO and
+# SCoRO role values.
+od:role-alice-author
+    a pro:RoleInTime ;
+    pro:withRole pro:author ,
+                 scoro:corresponding-author ,
+                 credit:conceptualization ,
+                 credit:writing-original-draft ;
+    pro:isHeldBy <https://orcid.org/0000-0002-1825-0097> ;
+    scoro:isEqualToRoleInTime od:role-budi-author ;
+    oco:hasNext od:role-budi-author .
+
+# Affiliate roles: one per affiliation, each pointing at one
+# ROR-identified organization. Alice shares rscm with Budi.
+od:role-alice-ui
+    a pro:RoleInTime ;
+    pro:withRole scoro:affiliate ;
+    pro:isHeldBy <https://orcid.org/0000-0002-1825-0097> ;
+    pro:relatesToOrganization <https://ror.org/0116zj450> .
+
+od:role-alice-rscm
+    a pro:RoleInTime ;
+    pro:withRole scoro:affiliate ;
+    pro:isHeldBy <https://orcid.org/0000-0002-1825-0097> ;
+    pro:relatesToOrganization <https://ror.org/05dxgng32> .
+
+<https://orcid.org/0000-0002-1825-0097>
+    a foaf:Person ;
+    foaf:givenName "Alice Marie" ;
+    foaf:familyName "Smith" ;
+    foaf:mbox <mailto:alice.smith@example.edu> ;
+    datacite:hasIdentifier [
+        datacite:usesIdentifierScheme datacite:orcid ;
+        literal:hasLiteralValue "0000-0002-1825-0097" ;
+    ] .
+
+# Second author: no ORCID, holds the author role on behalf of the
+# group, equal contributor, CRediT roles.
+od:role-budi-author
+    a pro:RoleInTime ;
+    pro:withRole pro:author ,
+                 credit:investigation ,
+                 credit:software ;
+    pro:isHeldBy _:budi-lee ;
+    od:onBehalfOf od:group-who-diabetes ;
+    scoro:isEqualToRoleInTime od:role-alice-author ;
+    oco:hasNext od:role-group-author .
+
+od:role-budi-rscm
+    a pro:RoleInTime ;
+    pro:withRole scoro:affiliate ;
+    pro:isHeldBy _:budi-lee ;
+    pro:relatesToOrganization <https://ror.org/05dxgng32> .
+
+# An agent without an identifier is modelled as a blank node.
+_:budi-lee
+    a foaf:Person ;
+    foaf:givenName "Budi" ;
+    foaf:familyName "Lee" .
+
+# Tail of the author chain: a named group author with members.
+od:role-group-author
+    a pro:RoleInTime ;
+    pro:withRole pro:author ;
+    pro:isHeldBy od:group-who-diabetes .
+
+od:group-who-diabetes
+    a foaf:Group ;
+    foaf:name "WHO Diabetes Work Group" ;
+    foaf:member _:member-sari , _:member-dewi .
+
+# Shared affiliation organizations, identified by ROR IRI and named.
+<https://ror.org/0116zj450>
+    a foaf:Organization ;
+    foaf:name "Universitas Indonesia" ;
+    datacite:hasIdentifier [
+        datacite:usesIdentifierScheme datacite:ror ;
+        literal:hasLiteralValue "0116zj450" ;
+    ] .
+
+<https://ror.org/05dxgng32>
+    a foaf:Organization ;
+    foaf:name "Research Center for Climate Science" ;
+    datacite:hasIdentifier [
+        datacite:usesIdentifierScheme datacite:ror ;
+        literal:hasLiteralValue "05dxgng32" ;
+    ] .
+
+# FRAPO funding: the publication is funded by a grant.
+od:example-grant
+    a frapo:Grant ;
+    dcterms:title "OpenDraft Example Grant" .
+
+_:member-sari
+    a foaf:Person ;
+    foaf:givenName "Sari" ;
+    foaf:familyName "Wijaya" .
+
+_:member-dewi
+    a foaf:Person ;
+    foaf:givenName "Dewi" ;
+    foaf:familyName "Suharto" .

@@ -86,10 +86,10 @@ interface ToolbarRowProps {
  * dividers only between adjacent groups, then a More menu holding the hidden
  * tail, rendered only when at least one item is hidden (during the overflow
  * hook's first measurement pass the count is 0, so the trigger is mounted
- * and its width can be read). The row is a centered 80% column
- * (`mx-auto w-[80%] px-0`) matching the editor's reading column
- * (`.manuscript-editor .editor`, see index.css), so the icons start and end
- * within the text column's x-range at any pane width. The outer toolbar
+ * and its width can be read). The row is the shared reading column
+ * (`.reading-column`, see index.css), matching the metadata panel and
+ * editor column, so the icons start and end within the text column's
+ * x-range at any pane width. The outer toolbar
  * wrapper stays full width so the border and background span the pane.
  *
  * @param props - See {@link ToolbarRowProps}.
@@ -117,7 +117,7 @@ function ToolbarRow({ commands, disabled }: ToolbarRowProps) {
   const moreActive = hiddenFormatActive(hidden, active);
 
   return (
-    <div ref={rowRef} className="mx-auto flex w-[80%] items-center gap-0.5 px-0 py-1">
+    <div ref={rowRef} className="reading-column flex items-center gap-0.5 py-1">
       {visible.map((item, index) => (
         <Fragment key={item.key}>
           {index > 0 && visible[index - 1].group !== item.group && <Divider />}
@@ -150,7 +150,8 @@ function ToolbarRow({ commands, disabled }: ToolbarRowProps) {
  * Grouped formatting toolbar wired to an editor-agnostic {@link EditorCommands}
  * set. The outer wrapper spans the full pane (`w-full`) with a frosted-glass
  * background and a 1px stone divider to the editor below, while the inner
- * row is a centered 80% column aligned to the editor's reading column.
+ * row is the shared reading column (`.reading-column`) aligned to the
+ * editor and metadata column.
  * Items come from one
  * priority-ordered list; the first {@link useOverflowCount} items render
  * inline based on measured positions, and the rest collapse into a More

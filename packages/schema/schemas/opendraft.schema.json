@@ -33,6 +33,11 @@
       "required": ["name", "version", "repository", "commit"],
       "additionalProperties": true
     },
+    "repository": {
+      "type": "string",
+      "pattern": "^https?://",
+      "description": "Registered original project repository URL. Publishing is only allowed from this repository (fork rule)."
+    },
     "manuscripts": {
       "type": "array",
       "description": "List of manuscripts in this repository.",
@@ -46,6 +51,16 @@
           "path": {
             "type": "string",
             "description": "Relative path to the manuscript directory."
+          },
+          "concept-doi": {
+            "type": "string",
+            "pattern": "^10\\.[0-9]{4,9}/[-._;()/:A-Za-z0-9]+$",
+            "description": "Concept DOI minted for this manuscript's Work at first publish. Written once, immutable afterwards."
+          },
+          "concept-doi-repository": {
+            "type": "string",
+            "pattern": "^https?://",
+            "description": "Repository URL at which the concept DOI was minted. Written once at first publish, immutable afterwards."
           }
         },
         "required": ["id", "path"],

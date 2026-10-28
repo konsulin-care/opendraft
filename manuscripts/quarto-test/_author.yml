@@ -1,4 +1,9 @@
 authors:
-  - name: OpenDraft Team
+  - id: odt
+    name:
+      literal: OpenDraft Team
     affiliations:
-      - name: OpenDraft Project
+      - ref: opendraft-project
+affiliations:
+  - id: opendraft-project
+    name: OpenDraft Project

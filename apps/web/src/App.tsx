@@ -104,6 +104,7 @@ function EditorArea({
   workspace,
   file,
   mode,
+  projectId,
   onSaveStatusChange,
   formattingToolbar,
 }: {
@@ -113,6 +114,8 @@ function EditorArea({
   file: { path: string; text: string } | null;
   /** Active editor mode. */
   mode: EditorMode;
+  /** Project identifier for per-project metadata-panel state. */
+  projectId: string;
   /** Reports autosave status changes to the header. */
   onSaveStatusChange: (status: SaveStatus) => void;
   /** Whether the formatting toolbar is shown. */
@@ -127,6 +130,7 @@ function EditorArea({
             defaultValue={file.text}
             path={file.path}
             mode={mode}
+            projectId={projectId}
             onSaveStatusChange={onSaveStatusChange}
             formattingToolbar={formattingToolbar}
           />
@@ -258,7 +262,7 @@ export function App() {
   const dirName = manuscriptDirName(activePath);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <div className="flex h-dvh flex-col">
       <AppHeader
         projectName={active?.name} manuscriptDir={dirName ?? undefined}
         manuscriptName={dirName !== null ? active?.manuscriptNames?.[dirName] : undefined}
@@ -273,7 +277,7 @@ export function App() {
       <EditorArea
         workspace={workspace}
         file={file !== null && file.path === activePath ? file : null}
-        mode={mode}
+        mode={mode} projectId={active.id}
         onSaveStatusChange={setSaveStatus}
         formattingToolbar={formattingToolbar}
       />

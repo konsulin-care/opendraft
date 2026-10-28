@@ -1,0 +1,62 @@
+# Valid fixture: cito:cites targeting a fabio:Work (warning only)
+#
+# Conforms to protocol/article.shacl.ttl — citing the concept Work
+# instead of a specific version DOI is reported as sh:Warning and does
+# not affect conformance. The authorship model, Work realization and
+# every required field are fully conforming. Edge fixture for
+# tests/conformance only; not a shipped protocol artifact.
+
+@prefix od: <urn:opendraft:ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix fabio: <http://purl.org/spar/fabio/> .
+@prefix frbr: <http://purl.org/vocab/frbr/core#> .
+@prefix cito: <http://purl.org/spar/cito/> .
+@prefix pro: <http://purl.org/spar/pro/> .
+@prefix scoro: <http://purl.org/spar/scoro/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix ex: <https://example.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:valid-cites-work
+    a fabio:Work ;
+    dcterms:title "Publication citing a concept Work" .
+
+ex:valid-cites-work-publication
+    a od:Publication ;
+    dcterms:title "Publication citing a concept Work" ;
+    dcterms:creator ex:alice ;
+    dcterms:identifier <https://doi.org/10.5555/example-cites-work> ;
+    dcterms:license <http://creativecommons.org/licenses/by/4.0/> ;
+    od:repositoryUrl "https://github.com/opendraft/opendraft"^^xsd:anyURI ;
+    od:manuscriptPath "manuscripts/article.qmd" ;
+    od:sourceRevision "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d" ;
+    od:protocolRevision "0000000000000000000000000000000000000000" ;
+    frbr:realizationOf ex:valid-cites-work ;
+    # Cites the concept Work of another manuscript: warning, not a violation.
+    cito:cites ex:cited-work ;
+    pro:isDocumentContextFor ex:author-role , ex:affiliate-role .
+
+ex:cited-work
+    a fabio:Work ;
+    dcterms:title "Cited manuscript (concept Work)" .
+
+ex:author-role
+    a pro:RoleInTime ;
+    pro:withRole pro:author , scoro:corresponding-author ;
+    pro:isHeldBy ex:alice .
+
+ex:affiliate-role
+    a pro:RoleInTime ;
+    pro:withRole scoro:affiliate ;
+    pro:isHeldBy ex:alice ;
+    pro:relatesToOrganization ex:org .
+
+ex:alice
+    a foaf:Person ;
+    foaf:givenName "Alice" ;
+    foaf:familyName "Smith" ;
+    foaf:mbox <mailto:alice@example.edu> .
+
+ex:org
+    a foaf:Organization ;
+    foaf:name "University of Indonesia" .

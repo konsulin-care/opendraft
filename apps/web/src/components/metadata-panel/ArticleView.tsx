@@ -1,0 +1,221 @@
+/**
+ * Article view of the manuscript metadata panel.
+ *
+ * An article-styled editor surface: borderless title, byline with
+ * affiliation superscripts, symbols and hover/focus tooltip, numbered
+ * affiliation list with footnotes, collaborators toggle, abstract,
+ * CRediT contributions summary (one read-only line per author, only
+ * when roles exist) and the publication details section collapsed by
+ * default.
+ */
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import type { MetadataAuthor } from './use-manuscript-metadata';
+import { buildByline, type BylineModel, type AffiliationEntry } from './byline-model';
+import { Byline } from './Byline';
+import { KeywordInput } from './KeywordInput';
+import { SectionLabel } from './SectionLabel';
+import { PublicationDetails } from './PublicationDetails';
+import { AuthorsDialog } from './AuthorsDialog';
+
+/** Props for {@link ArticleView}. */
+export interface ArticleViewProps {
+  /** Manuscript title from _frontmatter.yml. */
+  title: string;
+  /** Author entries in authorship order. */
+  authors: MetadataAuthor[];
+  /** Affiliation registry entries for the numbered list. */
+  affiliations?: AffiliationEntry[];
+  /** Frontmatter fields shown in Publication details. */
+  frontmatter?: Record<string, unknown>;
+  /** Persist a title change to _frontmatter.yml. */
+  setTitle: (title: string) => void;
+  /** Abstract text; '' before the first edit. */
+  abstract?: string;
+  /** Persist an abstract change to _abstract.yml. */
+  setAbstract?: (text: string) => void;
+  /** Keywords in file order. */
+  keywords?: string[];
+  /** Persist the deduped keyword array to _frontmatter.yml. */
+  setKeywords?: (keywords: string[]) => void;
+  /** Persist author edits to _author.yml; no-op when omitted. */
+  setAuthors?: (authors: MetadataAuthor[]) => void;
+  /** Persist affiliation registry edits to _author.yml; no-op when omitted. */
+  setAffiliations?: (affiliations: AffiliationEntry[]) => void;
+  /** Persist one _frontmatter.yml field; no-op when omitted. */
+  setFrontmatterField?: (key: string, value: unknown) => void;
+}
+
+/**
+ * Borderless auto-growing title textarea that wraps long titles onto
+ * multiple lines. Enter never inserts a newline; it moves the focus to
+ * the next field instead. Typed or pasted newlines are replaced by
+ * spaces so the title stays a single logical line.
+ *
+ * @param props - Title, setter and the Enter handler of the field.
+ * @returns The title textarea element.
+ */
+function TitleField(
+  { title, setTitle, onEnter }: Pick<ArticleViewProps, 'title' | 'setTitle'> & { onEnter(): void },
+): ReactNode {
+  // Stable ref object: React never re-invokes it on unrelated re-renders,
+  // so the textarea is not re-measured (height reset to 'auto') each render.
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    autoGrow(textareaRef.current);
+  }, [title]);
+  return (
+    <textarea
+      ref={textareaRef}
+      data-testid="metadata-panel-title-input"
+      aria-label="Manuscript title"
+      value={title}
+      rows={1}
+      placeholder="Untitled manuscript"
+      onChange={(event) => {
+        setTitle(event.target.value.replace(/\r?\n/g, ' '));
+        autoGrow(event.currentTarget);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          onEnter();
+        }
+      }}
+      className="min-h-11 w-full resize-none text-lg outline-none"
+    />
+  );
+}
+
+/** Grow a textarea to its content height. */
+function autoGrow(el: HTMLTextAreaElement | null): void {
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = `${el.scrollHeight}px`;
+}
+
+/** Count whitespace-separated words in a text. */
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+/** Small-caps label row with the abstract word count, above the textarea. */
+function AbstractLabelRow({ abstract }: { abstract: string }): ReactNode {
+  return (
+    <div data-testid="abstract-label-row" className="flex items-baseline justify-between text-sm">
+      <SectionLabel>Abstract</SectionLabel>
+      <span data-testid="abstract-word-count" className="text-muted">
+        {countWords(abstract)} words
+      </span>
+    </div>
+  );
+}
+
+/** Borderless auto-grown abstract textarea with a guidance placeholder. */
+function AbstractField(
+  { abstract, setAbstract, textareaRef }: {
+    abstract: string;
+    setAbstract: (text: string) => void;
+    textareaRef: RefObject<HTMLTextAreaElement | null>;
+  },
+): ReactNode {
+  // Stable ref object plus a value-change effect: re-measure only on mount
+  // and when the abstract changes, not on every unrelated re-render.
+  useEffect(() => {
+    autoGrow(textareaRef.current);
+  }, [abstract, textareaRef]);
+  return (
+    <section className="mt-3">
+      <AbstractLabelRow abstract={abstract} />
+      <textarea
+        ref={textareaRef}
+        data-testid="metadata-abstract"
+        aria-label="Abstract"
+        value={abstract}
+        rows={2}
+        placeholder="Summarize background, objectives, methods, results, and conclusions."
+        onChange={(event) => {
+          setAbstract(event.target.value);
+          autoGrow(event.currentTarget);
+        }}
+        className="min-h-11 w-full resize-none text-sm outline-none"
+      />
+    </section>
+  );
+}
+
+/** Collapsible collaborators list of one group author. */
+function CollaboratorItem({ group }: { group: BylineModel['collaborators'][number] }): ReactNode {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="text-sm">
+      <button
+        type="button"
+        data-testid="collaborators-toggle"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="min-h-11 rounded text-left hover:bg-hover"
+      >
+        Collaborators: {group.name} ({group.count})
+      </button>
+      {open && (
+        <ul data-testid="collaborators-list" className="ml-4 list-disc text-muted">
+          {group.members.map((member) => <li key={member}>{member}</li>)}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Article-styled manuscript metadata view.
+ *
+ * @param props - See {@link ArticleViewProps}.
+ * @returns The rendered article view.
+ */
+export function ArticleView({
+  title,
+  authors,
+  affiliations = [],
+  frontmatter = {},
+  setTitle,
+  abstract = '',
+  setAbstract = () => {},
+  keywords = [],
+  setKeywords = () => {},
+  setAuthors = () => {},
+  setAffiliations,
+  setFrontmatterField = () => {},
+}: ArticleViewProps): ReactNode {
+  const model = buildByline(authors, affiliations);
+  const abstractRef = useRef<HTMLTextAreaElement>(null);
+  // Dialog target: author index, or -1 for a new draft author.
+  const [dialogIndex, setDialogIndex] = useState<number | null>(null);
+  return (
+    <div data-testid="metadata-article-view" className="py-3">
+      <TitleField title={title} setTitle={setTitle} onEnter={() => abstractRef.current?.focus()} />
+      <Byline model={model} authors={authors} setAuthors={setAuthors} onOpenName={setDialogIndex} />
+      {model.collaborators.map((group) => (
+        <CollaboratorItem key={group.key} group={group} />
+      ))}
+      <AbstractField abstract={abstract} setAbstract={setAbstract} textareaRef={abstractRef} />
+      <section className="mt-3">
+        <SectionLabel>Keywords</SectionLabel>
+        <KeywordInput keywords={keywords} onChange={setKeywords} />
+      </section>
+      {model.hasContributions && (
+        <section data-testid="author-contributions" className="mt-3">
+          <SectionLabel>Contributions</SectionLabel>
+          <ul className="text-sm text-muted">
+            {model.contributions.map((line) => <li key={line}>{line}</li>)}
+          </ul>
+        </section>
+      )}
+      <PublicationDetails frontmatter={frontmatter} setField={setFrontmatterField} />
+      {dialogIndex !== null && (
+        <AuthorsDialog authors={authors} setAuthors={setAuthors} affiliations={affiliations}
+          setAffiliations={setAffiliations} initialIndex={dialogIndex >= 0 ? dialogIndex : undefined}
+          startWithDraft={dialogIndex < 0} onClose={() => setDialogIndex(null)} />
+      )}
+    </div>
+  );
+}

@@ -3,10 +3,26 @@
 # Validates that an article RDF graph conforms to the OpenDraft protocol.
 # Phase 01: full required field set plus optional-field capability shapes.
 # Provenance scalars live directly on od:Publication (see ADR-018).
+# ADR-021: authorship follows the OCDM role model — every role node is
+# linked from the publication via pro:isDocumentContextFor, roles are
+# held by agents (pro:isHeldBy), and author order is an oco:hasNext
+# chain between roles carrying pro:withRole pro:author.
+# SHACL Core only (no SHACL-SPARQL); assumes one publication per graph.
 
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix od: <urn:opendraft:ontology#> .
+@prefix fabio: <http://purl.org/spar/fabio/> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix pro: <http://purl.org/spar/pro/> .
+@prefix scoro: <http://purl.org/spar/scoro/> .
+@prefix oco: <https://w3id.org/oc/ontology/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix credit: <https://credit.niso.org/contributor-roles/> .
+@prefix frbr: <http://purl.org/vocab/frbr/core#> .
+@prefix cito: <http://purl.org/spar/cito/> .
+@prefix datacite: <http://purl.org/datacite/ontology/> .
+@prefix literal: <https://w3id.org/literal/> .
+@prefix prism: <http://prismstandard.org/namespaces/basic/2.0/> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 # =============================================================================
@@ -58,11 +74,103 @@ od:PublicationShape
         sh:maxCount 1 ;
         sh:pattern "^[0-9a-f]{40}$" ;
         sh:message "A publication must have exactly one protocol revision: a 40-character hexadecimal Git commit SHA." ;
+    ] .
+    # Identifier requirement lives in od:PublicationIdentifierShape below:
+    # either dcterms:identifier or an OCDM datacite:hasIdentifier node.
+
+# =============================================================================
+# Work / Version Shape — FRBR Work–Expression model (ADR-021)
+#
+# The manuscript is a fabio:Work (concept DOI); each published version
+# is an od:Publication that realizes exactly one Work and may revise at
+# most one earlier version. A publication IRI can never double as its
+# own Work IRI (concept and version DOIs must differ).
+# =============================================================================
+
+od:PublicationWorkShape
+    a sh:NodeShape ;
+    sh:targetClass od:Publication ;
+
+    sh:property [
+        sh:path frbr:realizationOf ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:qualifiedValueShape [
+            a sh:NodeShape ;
+            sh:class fabio:Work ;
+        ] ;
+        sh:qualifiedMinCount 1 ;
+        sh:message "A publication must have exactly one frbr:realizationOf pointing to a fabio:Work." ;
     ] ;
     sh:property [
-        sh:path dcterms:identifier ;
+        sh:path frbr:revisionOf ;
+        sh:maxCount 1 ;
+        sh:message "A publication may revise at most one earlier version (frbr:revisionOf)." ;
+    ] ;
+    sh:not [
+        a sh:NodeShape ;
+        sh:class fabio:Work ;
+    ] ;
+    sh:message "A publication IRI must differ from its Work IRI: an od:Publication may not also be a fabio:Work." .
+
+# =============================================================================
+# Identifier Shape — classic dcterms:identifier or OCDM identifier nodes
+# =============================================================================
+
+od:PublicationIdentifierShape
+    a sh:NodeShape ;
+    sh:targetClass od:Publication ;
+
+    sh:property [
+        sh:path datacite:hasIdentifier ;
+        sh:node [
+            a sh:NodeShape ;
+            sh:property [
+                sh:path datacite:usesIdentifierScheme ;
+                sh:minCount 1 ;
+                sh:message "An OCDM identifier node must declare datacite:usesIdentifierScheme." ;
+            ] ;
+            sh:property [
+                sh:path literal:hasLiteralValue ;
+                sh:minCount 1 ;
+                sh:message "An OCDM identifier node must declare literal:hasLiteralValue." ;
+            ] ;
+        ] ;
+        sh:message "A datacite:hasIdentifier node must declare a scheme and a literal value." ;
+    ] ;
+    sh:or (
+        [ sh:property [ sh:path dcterms:identifier ; sh:minCount 1 ] ]
+        [ sh:property [ sh:path datacite:hasIdentifier ; sh:minCount 1 ] ]
+    ) ;
+    sh:message "A publication must declare at least one identifier: dcterms:identifier or an OCDM datacite:hasIdentifier node." .
+
+# =============================================================================
+# License and Citation Shapes — warnings (do not affect conformance)
+# =============================================================================
+
+od:PublicationLicenseShape
+    a sh:NodeShape ;
+    sh:targetClass od:Publication ;
+
+    sh:property [
+        sh:path dcterms:license ;
         sh:minCount 1 ;
-        sh:message "A publication must have at least one identifier (e.g. a DOI)." ;
+        sh:severity sh:Warning ;
+        sh:message "A publication should declare a dcterms:license." ;
+    ] .
+
+od:PublicationCitationShape
+    a sh:NodeShape ;
+    sh:targetClass od:Publication ;
+
+    sh:property [
+        sh:path cito:cites ;
+        sh:not [
+            a sh:NodeShape ;
+            sh:class fabio:Work ;
+        ] ;
+        sh:severity sh:Warning ;
+        sh:message "cito:cites should target a specific version (version DOI), not the fabio:Work concept." ;
     ] .
 
 # =============================================================================
@@ -89,10 +197,232 @@ od:PublicationInfoShape
     sh:severity sh:Info ;
 
     sh:property [
-        sh:path od:hasSubject ;
-        sh:message "Subjects may be expressed via od:hasSubject pointing to a SKOS concept." ;
+        sh:path fabio:hasSubjectTerm ;
+        sh:message "Subject terms may be expressed via fabio:hasSubjectTerm pointing to a SKOS subject term." ;
+    ] ;
+    sh:property [
+        sh:path prism:keyword ;
+        sh:message "Keywords are informational and may be expressed via prism:keyword." ;
     ] ;
     sh:property [
         sh:path dcterms:references ;
         sh:message "References may be expressed via dcterms:references." ;
+    ] .
+
+# =============================================================================
+# Authorship Shapes — OCDM author role model (ADR-021)
+#
+# Authorship roles are pro:RoleInTime nodes reachable from the
+# publication via pro:isDocumentContextFor. The author order is a single
+# oco:hasNext chain between roles carrying pro:withRole pro:author.
+# =============================================================================
+
+od:PublicationAuthorshipShape
+    a sh:NodeShape ;
+    sh:targetClass od:Publication ;
+
+    # At least one author role in the document context.
+    sh:property [
+        sh:path pro:isDocumentContextFor ;
+        sh:qualifiedValueShape [
+            sh:path pro:withRole ;
+            sh:hasValue pro:author ;
+        ] ;
+        sh:qualifiedMinCount 1 ;
+        sh:message "A publication must have at least one author role (pro:withRole pro:author)." ;
+    ] ;
+
+    # Exactly one author role heads the chain (no incoming oco:hasNext).
+    sh:property [
+        sh:path pro:isDocumentContextFor ;
+        sh:qualifiedValueShape [
+            a sh:NodeShape ;
+            sh:property [
+                sh:path pro:withRole ;
+                sh:hasValue pro:author ;
+            ] ;
+            sh:property [
+                sh:path [ sh:inversePath oco:hasNext ] ;
+                sh:maxCount 0 ;
+            ] ;
+        ] ;
+        sh:qualifiedMinCount 1 ;
+        sh:message "Exactly one author role must head the oco:hasNext author chain." ;
+    ] ;
+    sh:property [
+        sh:path pro:isDocumentContextFor ;
+        sh:qualifiedValueShape [
+            a sh:NodeShape ;
+            sh:property [
+                sh:path pro:withRole ;
+                sh:hasValue pro:author ;
+            ] ;
+            sh:property [
+                sh:path [ sh:inversePath oco:hasNext ] ;
+                sh:maxCount 0 ;
+            ] ;
+        ] ;
+        sh:qualifiedMaxCount 1 ;
+        sh:message "Exactly one author role may head the oco:hasNext author chain." ;
+    ] ;
+
+    # An author role must be held by a named agent (person or group).
+    sh:property [
+        sh:path pro:isDocumentContextFor ;
+        sh:qualifiedValueShape [
+            a sh:NodeShape ;
+            sh:property [
+                sh:path pro:withRole ;
+                sh:hasValue pro:author ;
+            ] ;
+            sh:property [
+                sh:path pro:isHeldBy ;
+                sh:not [
+                    a sh:NodeShape ;
+                    sh:or (
+                        [ sh:path foaf:familyName ; sh:minCount 1 ]
+                        [ sh:path foaf:name ; sh:minCount 1 ]
+                    ) ;
+                ] ;
+            ] ;
+        ] ;
+        sh:qualifiedMaxCount 0 ;
+        sh:message "An author role must be held by an agent with a foaf:familyName or foaf:name." ;
+    ] ;
+
+    # A person author must hold a scoro:affiliate role (groups exempt).
+    sh:property [
+        sh:path pro:isDocumentContextFor ;
+        sh:qualifiedValueShape [
+            a sh:NodeShape ;
+            sh:property [
+                sh:path pro:withRole ;
+                sh:hasValue pro:author ;
+            ] ;
+            sh:property [
+                sh:path pro:isHeldBy ;
+                sh:not [
+                    a sh:NodeShape ;
+                    sh:or (
+                        [ sh:class foaf:Group ]
+                        [ sh:property [
+                            sh:path [ sh:inversePath pro:isHeldBy ] ;
+                            sh:qualifiedValueShape [
+                                sh:path pro:withRole ;
+                                sh:hasValue scoro:affiliate ;
+                            ] ;
+                            sh:qualifiedMinCount 1 ;
+                        ] ]
+                    ) ;
+                ] ;
+            ] ;
+        ] ;
+        sh:qualifiedMaxCount 0 ;
+        sh:message "A person author must hold a scoro:affiliate role linked to an organization." ;
+    ] ;
+
+    # An affiliate role has exactly one organization with a foaf:name;
+    # no context role may be an affiliate role lacking one.
+    sh:property [
+        sh:path pro:isDocumentContextFor ;
+        sh:qualifiedValueShape [
+            a sh:NodeShape ;
+            sh:property [
+                sh:path pro:withRole ;
+                sh:hasValue scoro:affiliate ;
+            ] ;
+            sh:not [
+                a sh:NodeShape ;
+                sh:property [
+                    sh:path pro:relatesToOrganization ;
+                    sh:minCount 1 ;
+                    sh:maxCount 1 ;
+                    sh:node [
+                        sh:property [
+                            sh:path foaf:name ;
+                            sh:minCount 1 ;
+                        ] ;
+                    ] ;
+                ] ;
+            ] ;
+        ] ;
+        sh:qualifiedMaxCount 0 ;
+        sh:message "An affiliate role must have exactly one organization with a foaf:name." ;
+    ] ;
+
+    # At least one corresponding-author role whose holder has a mailbox.
+    sh:property [
+        sh:path pro:isDocumentContextFor ;
+        sh:qualifiedValueShape [
+            a sh:NodeShape ;
+            sh:property [
+                sh:path pro:withRole ;
+                sh:hasValue scoro:corresponding-author ;
+            ] ;
+            sh:property [
+                sh:path pro:isHeldBy ;
+                sh:qualifiedValueShape [
+                    sh:path foaf:mbox ;
+                    sh:minCount 1 ;
+                ] ;
+                sh:qualifiedMinCount 1 ;
+            ] ;
+        ] ;
+        sh:qualifiedMinCount 1 ;
+        sh:message "A publication must have at least one corresponding-author role whose holder has a foaf:mbox." ;
+    ] .
+
+od:AuthorshipRoleShape
+    a sh:NodeShape ;
+    sh:targetClass pro:RoleInTime ;
+
+    sh:property [
+        sh:path pro:isHeldBy ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Every authorship role must have exactly one holder (pro:isHeldBy)." ;
+    ] ;
+    sh:property [
+        sh:path oco:hasNext ;
+        sh:maxCount 1 ;
+        sh:message "A role may have at most one successor in the author chain (oco:hasNext)." ;
+    ] ;
+    sh:property [
+        sh:path [ sh:inversePath oco:hasNext ] ;
+        sh:maxCount 1 ;
+        sh:message "A role may have at most one predecessor in the author chain." ;
+    ] ;
+    sh:property [
+        sh:path pro:withRole ;
+        sh:in (
+            pro:author
+            scoro:corresponding-author
+            scoro:affiliate
+            scoro:consortium-author
+            credit:conceptualization
+            credit:data-curation
+            credit:formal-analysis
+            credit:funding-acquisition
+            credit:investigation
+            credit:methodology
+            credit:project-administration
+            credit:resources
+            credit:software
+            credit:supervision
+            credit:validation
+            credit:visualization
+            credit:writing-original-draft
+            credit:writing-review-editing
+        ) ;
+        sh:message "Role values (pro:withRole) are restricted to PRO/SCoRO authorship roles and the 14 NISO CRediT roles." ;
+    ] .
+
+od:GroupShape
+    a sh:NodeShape ;
+    sh:targetClass foaf:Group ;
+
+    sh:property [
+        sh:path foaf:name ;
+        sh:minCount 1 ;
+        sh:message "A foaf:Group author must have a foaf:name." ;
     ] .

@@ -34,33 +34,40 @@ metadata-files:
 }
 
 /** Starter author metadata, mirroring templates/manuscript/_author.yml. */
-const AUTHOR_YML = `authors:
-  - name: Jane Doe
-    orcid: "0000-0001-2345-6789"
-    email: jane.doe@example.com
-    corresponding: true
-    affiliations:
-      - name: University Example
-        department: Computer Science
-        city: "Cambridge"
-        state: "MA"
-        country: "US"
+const AUTHOR_YML = `authors: []
+affiliations: []
 `;
 
 /** Starter abstract, mirroring templates/manuscript/_abstract.yml. */
-const ABSTRACT_YML = `abstract: |
-  This paper presents your abstract here.
-  Replace this text with a concise summary of your research,
-  including background, objectives, methods, results, and conclusions.
-`;
+const ABSTRACT_YML = `abstract: ""\n`;
 
-/** Starter frontmatter, mirroring templates/manuscript/_frontmatter.yml. */
-const FRONTMATTER_YML = `title: "Article Title"
-date: 2024-01-15
+/**
+ * Build the starter frontmatter, mirroring templates/manuscript/_frontmatter.yml.
+ *
+ * @param date - Publication date as `YYYY-MM-DD` (local time).
+ * @returns Frontmatter YAML text with the given date.
+ */
+function frontmatterYml(date: string): string {
+  return `title: "Article Title"
+date: ${date}
 keywords:
   - keyword1
   - keyword2
+license: "CC BY 4.0"
 `;
+}
+
+/**
+ * Format today's date as `YYYY-MM-DD` in local time.
+ *
+ * @returns The local-date stamp for the scaffolded frontmatter.
+ */
+function todayIsoDate(): string {
+  const now = new Date();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${mm}-${dd}`;
+}
 
 /** Starter references, mirroring templates/manuscript/references.bib. */
 const REFERENCES_BIB = `@article{doe2024,
@@ -103,6 +110,6 @@ export async function scaffoldProject(ws: WorkspaceAdapter, options: ScaffoldOpt
   await ws.writeFile(`${manuscriptPath}/article.qmd`, containerArticle(blockPath));
   await ws.writeFile(`${manuscriptPath}/_author.yml`, AUTHOR_YML);
   await ws.writeFile(`${manuscriptPath}/_abstract.yml`, ABSTRACT_YML);
-  await ws.writeFile(`${manuscriptPath}/_frontmatter.yml`, FRONTMATTER_YML);
+  await ws.writeFile(`${manuscriptPath}/_frontmatter.yml`, frontmatterYml(todayIsoDate()));
   await ws.writeFile(`${manuscriptPath}/references.bib`, REFERENCES_BIB);
 }

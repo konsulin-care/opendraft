@@ -74,7 +74,7 @@ Checks are distributed across three layers based on cost and blocking behavior. 
 |-------|---------|--------|----------|
 | **pre-commit** | Fast feedback on common issues | TypeScript type-check, ESLint (with --fix), Go fmt, Go vet, Go mod tidy, TTL validation, Markdown lint, YAML lint, Large file check | Yes |
 | **pre-push** | Validate readiness for review | Full test suite, Build validation, govulncheck, Complexity analysis (TS + Go) | Yes |
-| **CI** | Comprehensive analysis + broader checks | All pre-commit/pre-push checks + npm audit, coverage, PR size check | Yes (PR merge) |
+| **CI** | Comprehensive analysis + broader checks | All pre-commit/pre-push checks + npm audit, coverage | Yes (PR merge) |
 
 #### Pre-commit Rationale
 
@@ -108,7 +108,6 @@ CI provides the final gate with 7 parallel jobs:
 | security | npm audit, govulncheck |
 | complexity | TypeScript complexity, Go complexity |
 | coverage | Test coverage for TS and Go |
-| pr-size | Fails if PR > 5000 lines changed |
 
 CI catches bypassed hooks and adds checks too expensive for local execution (coverage, npm audit).
 
@@ -140,7 +139,6 @@ Use **Renovate** for automated dependency updates.
 | Max nesting depth | ≤ 4 | ESLint (TS) |
 | Max nested callbacks | ≤ 3 | ESLint (TS) |
 | Max params | ≤ 4 | ESLint (TS) |
-| PR size | ≤ 5000 lines | GitHub Actions |
 
 ## Consequences
 

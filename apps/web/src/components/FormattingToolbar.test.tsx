@@ -213,13 +213,13 @@ describe('FormattingToolbar visibility and responsiveness', () => {
     expect(on.container.querySelector('[role="toolbar"]')).not.toBeNull();
   });
 
-  it('hides below md; row spans the 80% column and the outer wrapper keeps w-full', () => {
+  it('hides below md; row uses the shared reading column and the outer wrapper keeps w-full', () => {
     const { container } = render(<FormattingToolbar commands={fakeCommands()} />);
     const toolbar = container.querySelector('[role="toolbar"]')!;
     for (const cls of ['hidden', 'md:flex', 'w-full']) expect(toolbar.className, cls).toContain(cls);
     const row = rowOf(container).className;
-    for (const cls of ['mx-auto', 'w-[80%]', 'px-0']) expect(row, cls).toContain(cls);
-    expect(row).not.toMatch(/\b(w-full|px-2)\b/);
+    expect(row).toContain('reading-column');
+    expect(row).not.toMatch(/\b(w-\[80%\]|w-full|px-4)\b/);
   });
 });
 
@@ -262,9 +262,10 @@ describe('index.css responsive layout (source scan)', () => {
 
   it('drops the transition under prefers-reduced-motion', () => expect(css.slice(css.indexOf('prefers-reduced-motion'))).toMatch(/\.editor-toolbar-collapse\s*\{[^}]*transition:\s*none/));
 
-  it('sets the editor reading column to 80% width', () => {
-    expect(css).toMatch(/\.manuscript-editor \.editor\s*\{[^}]*width:\s*80%/);
-    expect(css).toMatch(/\.manuscript-editor \.source-editor\s*\{[^}]*width:\s*80%/);
+  it('uses one shared 80% reading column, capped, and full-width editor surfaces', () => {
+    expect(css).toMatch(/\.reading-column\s*\{[^}]*width:\s*80%[^}]*max-width:\s*48rem/);
+    expect(css).toMatch(/\.manuscript-editor \.editor\s*\{[^}]*width:\s*100%/);
+    expect(css).toMatch(/\.manuscript-editor \.source-editor\s*\{[^}]*width:\s*100%/);
   });
 
   it('uses no lg-only visibility classes', () => {
@@ -278,7 +279,7 @@ describe('Responsive header actions (source scan)', () => {
 
   it('keeps the mode toggle and Commit hidden below md, in the overflow menu instead', () => {
     expect(read('ModeSwitch.tsx')).toMatch(/className="[^"]*\bhidden\b[^"]*\bmd:flex\b/);
-    expect(read('AppHeader.tsx')).toMatch(/bg-gray-900 text-white hover:bg-gray-800[^\n]*hidden md:inline-flex/);
+    expect(read('AppHeader.tsx')).toMatch(/bg-black text-white hover:bg-gray-900[^\n]*hidden md:inline-flex/);
     expect(read('AppHeader.tsx')).toMatch(/className=\{COMMIT_BUTTON\}/);
     expect(read('HeaderOverflowMenu.tsx')).toMatch(/className="relative md:hidden"/);
   });

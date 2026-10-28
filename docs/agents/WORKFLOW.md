@@ -74,7 +74,6 @@ GitHub Actions workflow in `.github/workflows/ci.yml` runs 8 parallel jobs on PR
 | security | npm audit, govulncheck |
 | complexity | TypeScript complexity, Go complexity |
 | coverage | Test coverage for TS and Go |
-| pr-size | Fails if PR > 5000 lines changed |
 
 All jobs use Mise tasks as the single source of truth, ensuring identical checks between local hooks and CI.
 

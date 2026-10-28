@@ -8,10 +8,10 @@ describe('validateMetadata — abstract', () => {
     expect(result.errors).toEqual([]);
   });
 
-  it('rejects missing abstract', () => {
+  it('accepts missing abstract', () => {
     const result = validateMetadata({}, 'abstract');
-    expect(result.valid).toBe(false);
-    expect(result.errors.some((e) => e.path.includes('abstract'))).toBe(true);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
   });
 
   it('rejects non-string abstract', () => {

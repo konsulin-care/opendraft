@@ -4,16 +4,25 @@
 # Namespace: urn:opendraft:ontology#
 # Prefix: od:
 #
-# This ontology reuses terms from:
-#   - Dublin Core Terms (dcterms): title, creator, subject, identifier, date, license, language, conformsTo
-#   - FOAF: Person, Organization, name, givenName, familyName, mbox
-#   - SKOS: Concept, prefLabel, inScheme, ConceptScheme
-#   - PROV-O: Agent (for subject assignment provenance)
+# The protocol reuses established vocabularies instead of defining
+# custom terms where possible (SPAR/OCDM alignment, ADR-021):
+#   - SPAR: FaBiO (fabio: Expression, Work, SubjectTerm), FRBR (frbr:
+#     realizationOf, revisionOf), PRO (pro: Role, RoleInTime, isHeldBy,
+#     withRole), SCoRO (scoro: corresponding-author, affiliate)
+#   - OpenCitations: OCO (oco: hasNext for author order); OCDM patterns
+#     via the DataCite (datacite:) and Literal (literal:) ontologies
+#   - PRISM (prism: versionIdentifier, keyword), FRAPO (frapo: Grant),
+#     CiTO (cito: cites), NISO CRediT (credit: contributor roles)
+#   - Dublin Core Terms, FOAF, SKOS, PROV-O
+#
+# Prefixes for reused vocabularies are declared for reference only;
+# this ontology does NOT owl:import them (reference-only prefixes).
 #
 # Custom od: terms cover only what existing vocabularies do not express:
 #   - Git-specific provenance (source revision, protocol revision, repository URL)
 #   - Registry structure (collection vs publication registries)
 #   - Subject assignment reification (who assigned, when)
+#   - Author flags: isDeceased, onBehalfOf
 
 @prefix od: <urn:opendraft:ontology#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
@@ -24,6 +33,17 @@
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix fabio: <http://purl.org/spar/fabio/> .
+@prefix frbr: <http://purl.org/vocab/frbr/core#> .
+@prefix pro: <http://purl.org/spar/pro/> .
+@prefix scoro: <http://purl.org/spar/scoro/> .
+@prefix oco: <https://w3id.org/oc/ontology/> .
+@prefix prism: <http://prismstandard.org/namespaces/basic/2.0/> .
+@prefix frapo: <http://purl.org/spar/frapo/> .
+@prefix cito: <http://purl.org/spar/cito/> .
+@prefix datacite: <http://purl.org/datacite/ontology/> .
+@prefix literal: <https://w3id.org/literal/> .
+@prefix credit: <https://credit.niso.org/contributor-roles/> .
 
 
 # =============================================================================
@@ -32,13 +52,9 @@
 
 od:Publication
     rdf:type owl:Class ;
+    rdfs:subClassOf fabio:Expression ;
     rdfs:label "Publication" ;
-    rdfs:comment "A published article with full provenance. Identified by DOI. Carries repository URL, source revision, protocol revision, and subject assignments." .
-
-od:PublicationVersion
-    rdf:type owl:Class ;
-    rdfs:label "Publication Version" ;
-    rdfs:comment "A specific version of a publication, identified by DOI. Each version retains provenance to its source." .
+    rdfs:comment "A published version of an article: one fabio:Expression that is the sole frbr:realizationOf a fabio:Work. Identified by its version DOI. Carries repository URL, source revision, protocol revision, and subject assignments." .
 
 od:Registry
     rdf:type owl:Class ;
@@ -105,14 +121,14 @@ od:hasAssignment
     rdfs:domain od:Publication ;
     rdfs:range od:SubjectAssignment ;
     rdfs:label "has subject assignment" ;
-    rdfs:comment "Links a publication to a subject assignment. Each assignment binds one SKOS concept to the publication with provenance." .
+    rdfs:comment "Links a publication to a subject assignment. Each assignment binds one SKOS subject term to the publication with provenance." .
 
 od:assignedSubject
     rdf:type owl:ObjectProperty ;
     rdfs:domain od:SubjectAssignment ;
-    rdfs:range skos:Concept ;
+    rdfs:range fabio:SubjectTerm ;
     rdfs:label "assigned subject" ;
-    rdfs:comment "The SKOS concept that was assigned to the publication." .
+    rdfs:comment "The SKOS subject term (fabio:SubjectTerm) that was assigned to the publication." .
 
 od:assignedBy
     rdf:type owl:ObjectProperty ;
@@ -130,35 +146,22 @@ od:assignedAt
 
 
 # =============================================================================
-# PROPERTIES — Subject (subproperty of dcterms:subject)
+# PROPERTIES — Author metadata (extending PRO/FOAF)
 # =============================================================================
 
-od:hasSubject
-    rdf:type owl:ObjectProperty ;
-    rdfs:subPropertyOf dcterms:subject ;
-    rdfs:domain od:Publication ;
-    rdfs:range skos:Concept ;
-    rdfs:label "has subject" ;
-    rdfs:comment "A SKOS concept describing the subject of the publication. Subproperty of dcterms:subject for interoperability with Dublin Core consumers." .
-
-
-# =============================================================================
-# PROPERTIES — Author metadata (extending FOAF)
-# =============================================================================
-
-od:isCorrespondingAuthor
+od:isDeceased
     rdf:type owl:DatatypeProperty ;
     rdfs:domain foaf:Person ;
     rdfs:range xsd:boolean ;
-    rdfs:label "corresponding author" ;
-    rdfs:comment "True if this person is the corresponding author of the publication." .
+    rdfs:label "deceased" ;
+    rdfs:comment "True if this person is deceased. Rendered with the ‡ symbol in bylines." .
 
-od:creditRole
-    rdf:type owl:DatatypeProperty ;
-    rdfs:domain foaf:Person ;
-    rdfs:range xsd:string ;
-    rdfs:label "CRediT role" ;
-    rdfs:comment "A CRediT contributor role (e.g. 'Writing - Original Draft', 'Formal Analysis'). See https://credit.niso.org/." .
+od:onBehalfOf
+    rdf:type owl:ObjectProperty ;
+    rdfs:domain pro:RoleInTime ;
+    rdfs:range foaf:Agent ;
+    rdfs:label "on behalf of" ;
+    rdfs:comment "The agent (typically a foaf:Group or consortium) that an author role is held on behalf of." .
 
 
 # =============================================================================
@@ -178,3 +181,26 @@ od:containsPublication
     rdfs:range od:Publication ;
     rdfs:label "contains publication" ;
     rdfs:comment "A publication referenced by this publication registry." .
+
+
+# =============================================================================
+# CREDiT ALIGNMENT — the 14 NISO CRediT contributor roles (ADR-021)
+#
+# Declared as pro:Role instances so authorship role nodes can point at
+# them via pro:withRole. See https://credit.niso.org/.
+# =============================================================================
+
+credit:conceptualization a pro:Role ; rdfs:label "Conceptualization" .
+credit:data-curation a pro:Role ; rdfs:label "Data Curation" .
+credit:formal-analysis a pro:Role ; rdfs:label "Formal Analysis" .
+credit:funding-acquisition a pro:Role ; rdfs:label "Funding Acquisition" .
+credit:investigation a pro:Role ; rdfs:label "Investigation" .
+credit:methodology a pro:Role ; rdfs:label "Methodology" .
+credit:project-administration a pro:Role ; rdfs:label "Project Administration" .
+credit:resources a pro:Role ; rdfs:label "Resources" .
+credit:software a pro:Role ; rdfs:label "Software" .
+credit:supervision a pro:Role ; rdfs:label "Supervision" .
+credit:validation a pro:Role ; rdfs:label "Validation" .
+credit:visualization a pro:Role ; rdfs:label "Visualization" .
+credit:writing-original-draft a pro:Role ; rdfs:label "Writing – Original Draft" .
+credit:writing-review-editing a pro:Role ; rdfs:label "Writing – Review & Editing" .

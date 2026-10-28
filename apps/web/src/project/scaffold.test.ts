@@ -3,11 +3,19 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { MemoryWorkspace } from '@opendraft/workspace';
-import { validateAssembly, validateManuscript, validateOpendraft } from '@opendraft/schema';
+import { validateAssembly, validateManuscript, validateMetadata, validateOpendraft } from '@opendraft/schema';
 import protocolManifest from '../../../../protocol/protocol.manifest.json' with { type: 'json' };
 import { OPENDRAFT_CONFIG_PATH, scaffoldProject } from './scaffold';
 
 const MANUSCRIPT_DIR = 'manuscripts/my-paper';
+
+/** Today's date as YYYY-MM-DD in local time. */
+function todayIsoDate(): string {
+  const now = new Date();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${mm}-${dd}`;
+}
 
 /** List the file names inside the scaffolded manuscript directory. */
 async function manuscriptFiles(ws: MemoryWorkspace): Promise<string[]> {
@@ -117,6 +125,95 @@ describe('templates/manuscript/article.qmd', () => {
     const scaffoldBlock = starterBlockPath(article);
 
     expect(template.replace(templateBlock, scaffoldBlock)).toBe(article);
+  });
+});
+
+describe('scaffoldProject — _author.yml', () => {
+  it('writes a starter _author.yml that validates', async () => {
+    const ws = new MemoryWorkspace();
+    await scaffoldProject(ws, { manuscriptId: 'my-paper' });
+
+    const raw = (await ws.readFile(`${MANUSCRIPT_DIR}/_author.yml`)) as string;
+    const data = parse(raw);
+    const result = validateMetadata(data, 'author');
+    expect(result.errors).toEqual([]);
+    expect(result.valid).toBe(true);
+  });
+
+  it('starts with no authors and no affiliation registry entries', async () => {
+    const ws = new MemoryWorkspace();
+    await scaffoldProject(ws, { manuscriptId: 'my-paper' });
+
+    const data = parse((await ws.readFile(`${MANUSCRIPT_DIR}/_author.yml`)) as string);
+    expect(data.authors).toEqual([]);
+    expect(data.affiliations).toEqual([]);
+  });
+});
+
+describe('scaffoldProject — _abstract.yml', () => {
+  it('writes an empty abstract that validates', async () => {
+    const ws = new MemoryWorkspace();
+    await scaffoldProject(ws, { manuscriptId: 'my-paper' });
+
+    const raw = (await ws.readFile(`${MANUSCRIPT_DIR}/_abstract.yml`)) as string;
+    const data = parse(raw);
+    expect(data).toEqual({ abstract: '' });
+
+    const result = validateMetadata(data, 'abstract');
+    expect(result.errors).toEqual([]);
+    expect(result.valid).toBe(true);
+  });
+});
+
+describe('scaffoldProject — _frontmatter.yml', () => {
+  it("writes today's date and the CC BY 4.0 license", async () => {
+    const ws = new MemoryWorkspace();
+    await scaffoldProject(ws, { manuscriptId: 'my-paper' });
+
+    const raw = (await ws.readFile(`${MANUSCRIPT_DIR}/_frontmatter.yml`)) as string;
+    const data = parse(raw);
+    expect(data.date).toBe(todayIsoDate());
+    expect(data.license).toBe('CC BY 4.0');
+
+    const result = validateMetadata(data, 'frontmatter');
+    expect(result.errors).toEqual([]);
+    expect(result.valid).toBe(true);
+  });
+});
+
+describe('templates/manuscript — yml files mirror the scaffold', () => {
+  it('_abstract.yml mirrors the scaffolded abstract', async () => {
+    const template = readFileSync(
+      resolve(__dirname, '../../../../templates/manuscript/_abstract.yml'),
+      'utf8',
+    );
+    const ws = new MemoryWorkspace();
+    await scaffoldProject(ws, { manuscriptId: 'my-paper' });
+    const abstract = (await ws.readFile(`${MANUSCRIPT_DIR}/_abstract.yml`)) as string;
+    expect(template).toBe(abstract);
+  });
+
+  it('_author.yml mirrors the scaffolded author file', async () => {
+    const template = readFileSync(
+      resolve(__dirname, '../../../../templates/manuscript/_author.yml'),
+      'utf8',
+    );
+    const ws = new MemoryWorkspace();
+    await scaffoldProject(ws, { manuscriptId: 'my-paper' });
+    const author = (await ws.readFile(`${MANUSCRIPT_DIR}/_author.yml`)) as string;
+    expect(template).toBe(author);
+  });
+
+  it('_frontmatter.yml mirrors the scaffolded frontmatter except for the date', async () => {
+    const template = readFileSync(
+      resolve(__dirname, '../../../../templates/manuscript/_frontmatter.yml'),
+      'utf8',
+    );
+    const ws = new MemoryWorkspace();
+    await scaffoldProject(ws, { manuscriptId: 'my-paper' });
+    const frontmatter = parse((await ws.readFile(`${MANUSCRIPT_DIR}/_frontmatter.yml`)) as string);
+    // The static template cannot embed today's date; it keeps a placeholder.
+    expect(parse(template)).toEqual({ ...frontmatter, date: '2024-01-15' });
   });
 });
 

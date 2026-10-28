@@ -242,12 +242,14 @@ describe('AppHeader toolbar preference', () => {
 });
 
 describe('AppHeader commit and overflow', () => {
-  it('styles the header Commit button as a near-black filled button', () => {
+  it('styles the header Commit button with the black token', () => {
     renderHeader();
     const commit = screen.getByRole('button', { name: 'Commit' });
-    expect(commit.className).toMatch(/\bbg-gray-900\b/);
-    expect(commit.className).toMatch(/\btext-white\b/);
-    expect(commit.className).toMatch(/hover:bg-gray-800/);
+    const classes = commit.className.split(/\s+/);
+    expect(classes).toContain('bg-black');
+    expect(classes).not.toContain('bg-gray-900');
+    expect(classes).toContain('text-white');
+    expect(commit.className).toMatch(/hover:bg-gray-900/);
     expect(commit.className).not.toMatch(/\btext-gray-600\b/);
     expect(commit.className).not.toMatch(/hover:bg-gray-100/);
     expect(commit.querySelector('.lucide-git-branch')).not.toBeNull();

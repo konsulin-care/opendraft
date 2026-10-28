@@ -1,0 +1,70 @@
+# Valid fixture: group-only author list with a corresponding person
+#
+# Conforms to protocol/article.shacl.ttl — a group-only author list is
+# allowed as long as at least one corresponding-author role is held by
+# a person with a foaf:mbox. The group holds the sole author role and
+# has a foaf:name; a named person acts as the corresponding author
+# with an affiliation. Realizes a distinct fabio:Work. Edge fixture
+# for tests/conformance only; not a shipped protocol artifact.
+
+@prefix od: <urn:opendraft:ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix fabio: <http://purl.org/spar/fabio/> .
+@prefix frbr: <http://purl.org/vocab/frbr/core#> .
+@prefix pro: <http://purl.org/spar/pro/> .
+@prefix scoro: <http://purl.org/spar/scoro/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix ex: <https://example.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:valid-group-work
+    a fabio:Work ;
+    dcterms:title "Publication authored by a group with a corresponding person" .
+
+ex:valid-publication
+    a od:Publication ;
+    dcterms:title "Publication authored by a group with a corresponding person" ;
+    dcterms:creator ex:consortium ;
+    dcterms:identifier <https://doi.org/10.5555/example-group-with-corresponding-person> ;
+    od:repositoryUrl "https://github.com/opendraft/opendraft"^^xsd:anyURI ;
+    od:manuscriptPath "manuscripts/article.qmd" ;
+    od:sourceRevision "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d" ;
+    od:protocolRevision "0000000000000000000000000000000000000000" ;
+    frbr:realizationOf ex:valid-group-work ;
+    pro:isDocumentContextFor ex:group-author-role ,
+                             ex:corresponding-role ,
+                             ex:affiliate-role .
+
+# Sole head (and tail) of the oco:hasNext author chain: a named group.
+ex:group-author-role
+    a pro:RoleInTime ;
+    pro:withRole pro:author ;
+    pro:isHeldBy ex:consortium .
+
+# The corresponding author is a person with a mailbox, so the
+# group-only author list satisfies the corresponding-person rule.
+ex:corresponding-role
+    a pro:RoleInTime ;
+    pro:withRole scoro:corresponding-author ;
+    pro:isHeldBy ex:alice .
+
+ex:affiliate-role
+    a pro:RoleInTime ;
+    pro:withRole scoro:affiliate ;
+    pro:isHeldBy ex:alice ;
+    pro:relatesToOrganization ex:org .
+
+ex:consortium
+    a foaf:Group ;
+    foaf:name "Open Drafting Consortium" ;
+    foaf:member ex:alice .
+
+ex:alice
+    a foaf:Person ;
+    foaf:givenName "Alice" ;
+    foaf:familyName "Smith" ;
+    foaf:mbox <mailto:alice@example.edu> .
+
+ex:org
+    a foaf:Organization ;
+    foaf:name "University of Indonesia" .

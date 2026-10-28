@@ -187,42 +187,33 @@ textarea {
   background-color: white;
 }
 
-/* scroll viewport — the root wrapper that @milkdown/react renders */
-.manuscript-editor > [data-milkdown-root] {
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-/* content surface — NOT the scroll container */
-.manuscript-editor > [data-milkdown-root] > .milkdown {
-  min-height: 100%;
-  overflow: visible;
-  position: relative;
-}
-
-/* Reading-width column: 80% of the editor pane, centered, so side gutters
-   are always equal (10% each) at any viewport width. Border-box with no
-   horizontal padding keeps the text flush to the column on both edges. */
-.manuscript-editor .editor {
+/* ── Shared reading column ── */
+/* One width-controlling container shared by the metadata panel, the
+   manuscript editor, the source editor and the formatting toolbar row:
+   80% of the pane (side gutters always equal), capped and centered.
+   Border-box with no horizontal padding keeps text edges flush. */
+.reading-column {
   width: 80%;
+  max-width: 48rem;
   box-sizing: border-box;
   margin-inline: auto;
+  padding-inline: 0;
+}
+
+/* The manuscript editor surface fills the shared column: full width of the
+   column with no horizontal padding; vertical padding is preserved. */
+.manuscript-editor .editor {
+  width: 100%;
+  box-sizing: border-box;
   padding-block: 2rem 4rem;
   padding-inline: 0;
 }
 
-/* The formatting toolbar spans the full editor width — no reading-column cap
-   here, so no grey strip shows beside it. The toolbar keeps its button column
-   aligned to the editor's centered 80% column internally. */
-
-/* Source editor (CodeMirror) uses the same centered column, margins and
-   padding as the visual surface so source text starts at the same x-position. */
+/* Source editor (CodeMirror) uses the same full-width treatment as the
+   visual surface so source text starts at the same x-position. */
 .manuscript-editor .source-editor {
-  width: 80%;
+  width: 100%;
   box-sizing: border-box;
-  margin-inline: auto;
   padding-block: 2rem 4rem;
   padding-inline: 0;
   background: #ffffff;

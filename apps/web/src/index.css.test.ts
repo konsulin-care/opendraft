@@ -49,7 +49,7 @@ describe('index.css — block gutter removed', () => {
   });
 });
 
-describe('index.css — editor column is 80% of the editor pane', () => {
+describe('index.css — shared reading column', () => {
   /** Returns the declaration block text for a top-level selector. */
   const block = (selector: string): string => {
     const start = css.indexOf(selector);
@@ -58,29 +58,48 @@ describe('index.css — editor column is 80% of the editor pane', () => {
     return css.slice(start, end);
   };
 
+  it('.reading-column is an 80% centered border-box column with a max-width cap and no horizontal padding', () => {
+    const decl = block('.reading-column');
+    expect(decl).toMatch(/width:\s*80%/);
+    expect(decl).toMatch(/max-width:\s*48rem/);
+    expect(decl).toMatch(/margin-inline:\s*auto/);
+    expect(decl).toMatch(/box-sizing:\s*border-box/);
+    expect(decl).toMatch(/padding-inline:\s*0\s*;/);
+  });
+
   it.each(['.manuscript-editor .editor', '.manuscript-editor .source-editor'])(
-    '%s is an 80% centered border-box column with no horizontal padding',
+    '%s is full width of the column with no horizontal padding and kept vertical padding',
     (selector) => {
       const decl = block(selector);
-      expect(decl).toMatch(/width:\s*80%/);
-      expect(decl).toMatch(/margin-inline:\s*auto/);
-      expect(decl).toMatch(/box-sizing:\s*border-box/);
+      expect(decl).toMatch(/width:\s*100%/);
       expect(decl).toMatch(/padding-inline:\s*0\s*;/);
       // Vertical padding is preserved.
       expect(decl).toMatch(/padding-block:/);
     },
   );
+});
 
-  it('leaves equal 10% gutters at 375px, 1280px and 1920px viewport widths', () => {
-    const widthPct = Number(
-      block('.manuscript-editor .editor').match(/width:\s*([\d.]+)%/)![1],
-    );
+describe('index.css — editor surfaces align to the reading column', () => {
+  /** Returns the declaration block text for a top-level selector. */
+  const block = (selector: string): string => {
+    const start = css.indexOf(selector);
+    expect(start).toBeGreaterThanOrEqual(0);
+    const end = css.indexOf('}', start);
+    return css.slice(start, end);
+  };
+
+  it('leaves equal gutters at 375px and caps the column at 48rem on wide panes', () => {
+    const decl = block('.reading-column');
+    const widthPct = Number(decl.match(/width:\s*([\d.]+)%/)![1]);
+    const maxWidthPx = Number(decl.match(/max-width:\s*([\d.]+)rem/)![1]) * 16;
+    const columnAt = (viewport: number) => Math.min((viewport * widthPct) / 100, maxWidthPx);
+    expect(columnAt(375)).toBeCloseTo(375 * 0.8);
+    expect(columnAt(1920)).toBe(maxWidthPx);
     for (const viewport of [375, 1280, 1920]) {
-      const column = (viewport * widthPct) / 100;
+      const column = columnAt(viewport);
       // margin-inline: auto splits the leftover space evenly.
       const leftGutter = (viewport - column) / 2;
-      const rightGutter = leftGutter;
-      expect(leftGutter).toBeCloseTo(viewport * 0.1);
+      const rightGutter = viewport - column - leftGutter;
       expect(leftGutter).toBeCloseTo(rightGutter);
     }
   });
@@ -91,8 +110,39 @@ describe('index.css — editor column is 80% of the editor pane', () => {
     const grab = (decl: string, prop: string) =>
       decl.match(new RegExp(`${prop}:\\s*([^;]+);`))![1].trim();
     expect(grab(sourceDecl, 'width')).toBe(grab(editorDecl, 'width'));
-    expect(grab(sourceDecl, 'margin-inline')).toBe(grab(editorDecl, 'margin-inline'));
     expect(grab(sourceDecl, 'box-sizing')).toBe(grab(editorDecl, 'box-sizing'));
     expect(grab(sourceDecl, 'padding-inline')).toBe(grab(editorDecl, 'padding-inline'));
+    expect(grab(sourceDecl, 'padding-block')).toBe(grab(editorDecl, 'padding-block'));
+  });
+});
+
+describe('reading column wiring (source scan)', () => {
+  /** Reads a source file relative to apps/web/src. */
+  const read = (path: string): string => readFileSync(resolve(__dirname, path), 'utf-8');
+
+  it('EditorSurface declares exactly one .reading-column holding the panel and both surfaces', () => {
+    const surface = read('components/EditorSurface.tsx');
+    // Exactly one reading-column declaration: one shared column, not one per mode.
+    const columns = surface.split('className="reading-column"');
+    expect(columns).toHaveLength(2);
+    const column = columns[1];
+    // The single column owns the panel and both mode surfaces.
+    expect(column).toContain('{panel}');
+    expect(column).toContain('<Milkdown />');
+    expect(column).toContain('<SourceEditor');
+    // No per-mode conditional panel: the panel renders exactly once.
+    expect(surface).not.toMatch(/mode\s*===\s*"[^"]*"\s*&&\s*panel/);
+    expect(surface.match(/\{\s*panel\s*\}/g)).toHaveLength(1);
+  });
+
+  it('FormattingToolbar row carries the shared column class, not a bespoke width', () => {
+    const toolbar = read('components/FormattingToolbar.tsx');
+    expect(toolbar).toMatch(/className="reading-column[^"]*"/);
+    expect(toolbar).not.toContain('w-[80%]');
+  });
+
+  it('metadata panel bar and article view carry no px-4', () => {
+    expect(read('components/metadata-panel/MetadataPanel.tsx')).not.toContain('px-4');
+    expect(read('components/metadata-panel/ArticleView.tsx')).not.toContain('px-4');
   });
 });

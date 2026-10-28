@@ -9,13 +9,14 @@ import { parse as parseYaml } from 'yaml';
 import { validateMetadata, type MetadataType } from '@opendraft/schema';
 import { parseBibTeX } from '../../references/src/parser.js';
 import type { Reference } from '../../references/src/parser.js';
+import type { NameValue } from './types/author.js';
 
 /** Normalized publication metadata output. */
 export interface PublicationMetadata {
   /** Article title. */
   title: string;
-  /** Abstract text. */
-  abstract: string;
+  /** Abstract text; undefined when _abstract.yml has no abstract. */
+  abstract?: string;
   /** Author metadata. */
   authors: AuthorMetadata[];
   /** Publication date. */
@@ -67,6 +68,26 @@ function readAndValidateYaml(
 }
 
 /**
+ * Derive a display name from a string, structured, or literal author name.
+ *
+ * @param name - Author name value: plain string, {given, family, ...}, or {literal}.
+ * @returns Space-joined display name.
+ */
+function displayName(name: NameValue): string {
+  if (typeof name === 'string') return name;
+  if ('literal' in name && typeof name.literal === 'string') return name.literal;
+  const { given, particle, family, suffix } = name as Partial<{
+    given: string;
+    particle: string;
+    family: string;
+    suffix: string;
+  }>;
+  return [given, particle, family, suffix]
+    .filter((part): part is string => Boolean(part))
+    .join(' ');
+}
+
+/**
  * Extract and normalize author data.
  */
 function extractAuthors(data: Record<string, unknown>): AuthorMetadata[] {
@@ -77,7 +98,7 @@ function extractAuthors(data: Record<string, unknown>): AuthorMetadata[] {
 
   return authors
     .map((a) => ({
-      name: a.name as string,
+      name: displayName(a.name as NameValue),
       email: a.email as string | undefined,
       orcid: a.orcid as string | undefined,
       affiliations: Array.isArray(a.affiliations)
@@ -147,7 +168,7 @@ export function compileManuscript(dir: string): PublicationMetadata {
   const frontmatterData = readAndValidateYaml(dir, '_frontmatter.yml', 'frontmatter');
 
   const authors = extractAuthors(authorData);
-  const abstract = abstractData.abstract as string;
+  const abstract = abstractData.abstract as string | undefined;
   const title = frontmatterData.title as string;
   const date = frontmatterData.date as string | undefined;
   const keywords = Array.isArray(frontmatterData.keywords)
