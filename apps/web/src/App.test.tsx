@@ -4,12 +4,9 @@ import { render, renderHook, act, screen, waitFor, fireEvent, within } from '@te
 import { App } from './App';
 import { projectRegistry } from './hooks/useProjects';
 import { workspaceManager } from '@opendraft/workspace';
+import { EditorView } from '@codemirror/view';
 import { useEditorMode } from './hooks/useEditorMode';
-import {
-  PREFERENCES_STORAGE_KEY,
-  readPreferences,
-  writePreferences,
-} from './preferences';
+import { PREFERENCES_STORAGE_KEY, readPreferences, writePreferences } from './preferences';
 
 // @vitest-environment jsdom
 
@@ -28,8 +25,8 @@ import {
 // The project registry is also reset so each test boots the app against an
 // empty IndexedDB and triggers the auto-created starter project.
 //
-// The default file is now the scaffolded starter block
-// (manuscripts/<id>/blocks/<lowercase-ulid>.qmd), not article.qmd.
+// The default file of a freshly scaffolded project is article.qmd;
+// the scaffold ships no starter block under blocks/.
 beforeEach(async () => {
   localStorage.clear();
   for (const record of await projectRegistry.list()) {
@@ -47,10 +44,7 @@ afterEach(async () => {
 describe('App', () => {
   it('boots into the single manuscript editor', async () => {
     render(<App />);
-    await waitFor(
-      () => expect(screen.getByTestId('manuscript-editor')).toBeDefined(),
-      { timeout: 10000 },
-    );
+    await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
   });
 
   it('boots into an auto-created scaffolded project and reopens the last file', async () => {
@@ -72,6 +66,13 @@ describe('App', () => {
       workspaceManager.release(records[0].id);
     }
 
+    // Fresh boot opens article.qmd; close again so the remount starts closed.
+    fireEvent.click(screen.getByRole('button', { name: 'OpenDraft' }));
+    await waitFor(() => expect(
+      within(screen.getByTestId('project-drawer')).getByRole('treeitem', { name: 'article.qmd' }).getAttribute('aria-selected'),
+    ).toBe('true'));
+    fireEvent.click(screen.getByRole('button', { name: 'OpenDraft' }));
+
     // Opening another file is remembered; a remount reopens it.
     await projectRegistry.setLastPath(records[0].id, 'manuscripts/untitled-project/references.bib');
     unmount();
@@ -81,11 +82,9 @@ describe('App', () => {
     // The remount reopens the last file: its treeitem is selected.
     fireEvent.click(screen.getByRole('button', { name: 'OpenDraft' }));
     const drawer = screen.getByTestId('project-drawer');
-    await waitFor(() => {
-      expect(
-        within(drawer).getByRole('treeitem', { name: 'references.bib' }).getAttribute('aria-selected'),
-      ).toBe('true');
-    });
+    await waitFor(() => expect(
+      within(drawer).getByRole('treeitem', { name: 'references.bib' }).getAttribute('aria-selected'),
+    ).toBe('true'));
   });
 
 });
@@ -102,7 +101,7 @@ describe('App project drawer', () => {
     // Pinned header: the project selector.
     expect(within(drawer).getByRole('button', { name: 'Untitled project' })).toBeDefined();
 
-    // Body: a treeitem for every workspace file, ULID block names as-is.
+    // Body: a treeitem for every workspace file, basenames as-is.
     const records = await projectRegistry.list();
     const ws = await workspaceManager.get(records[0].id);
     let paths: string[];
@@ -117,13 +116,6 @@ describe('App project drawer', () => {
       const name = path.split('/').pop() as string;
       expect(within(drawer).getByRole('treeitem', { name })).toBeDefined();
     }
-    const blockName = paths
-      .map((p) => p.split('/').pop() as string)
-      .find((n) => /^[a-z0-9]{26}\.qmd$/.test(n));
-    expect(blockName).toBeDefined();
-    expect(
-      within(drawer).getByRole('treeitem', { name: blockName as string }),
-    ).toBeDefined();
 
     // Clicking a file opens its path and selects its treeitem.
     fireEvent.click(within(drawer).getByRole('treeitem', { name: 'article.qmd' }));
@@ -285,12 +277,13 @@ describe('App save status', () => {
   it('shows Saving then Saved after an edit triggers an autosave', async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
-    const paragraph = await waitFor(() => {
-      const el = document.querySelector('.ProseMirror p');
+    const cm = await waitFor(() => {
+      const el = document.querySelector('.cm-editor');
       if (!el) throw new Error('editor not ready');
       return el;
-    });
-    paragraph.appendChild(document.createTextNode('Edited manuscript text'));
+    }, { timeout: 5000 });
+    const view = EditorView.findFromDOM(cm) as EditorView;
+    act(() => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: 'Edited manuscript text' } }));
     await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Saving'), { timeout: 3000 });
     await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Saved'), { timeout: 5000 });
   });

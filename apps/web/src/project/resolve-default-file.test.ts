@@ -17,18 +17,6 @@ async function scaffoldedWorkspace(manuscriptId: string): Promise<MemoryWorkspac
 }
 
 /**
- * Resolve the scaffolded starter block path (random lowercase ULID).
- *
- * @param ws - Scaffolded workspace.
- * @returns Repo-relative path of the starter block.
- */
-async function starterBlockPath(ws: MemoryWorkspace): Promise<string> {
-  const names = await ws.listFiles('manuscripts/p/blocks');
-  expect(names).toHaveLength(1);
-  return `manuscripts/p/blocks/${names[0]}`;
-}
-
-/**
  * Build a workspace with a manuscript whose article.qmd and blocks coexist.
  *
  * @param blockNames - Filenames to create under `manuscripts/p/blocks/`.
@@ -55,29 +43,26 @@ describe('resolveDefaultFile with lastPath and opendraft.yml', () => {
     expect(result).toBe('manuscripts/p/references.bib');
   });
 
-  it('prefers the starter block over article.qmd when lastPath does not exist', async () => {
+  it('resolves a scaffolded project with no blocks to article.qmd when lastPath does not exist', async () => {
     const ws = await scaffoldedWorkspace('p');
-    const block = await starterBlockPath(ws);
 
     const result = await resolveDefaultFile(ws, 'manuscripts/p/does-not-exist.bib');
-    expect(result).toBe(block);
+    expect(result).toBe('manuscripts/p/article.qmd');
   });
 
-  it('falls back to the starter block when lastPath is null', async () => {
+  it('falls back to article.qmd when lastPath is null', async () => {
     const ws = await scaffoldedWorkspace('p');
-    const block = await starterBlockPath(ws);
 
     const result = await resolveDefaultFile(ws, null);
-    expect(result).toBe(block);
+    expect(result).toBe('manuscripts/p/article.qmd');
   });
 
   it('ignores lastPath when the file was deleted from the workspace', async () => {
     const ws = await scaffoldedWorkspace('p');
-    const block = await starterBlockPath(ws);
     await ws.deleteFile('manuscripts/p/references.bib');
 
     const result = await resolveDefaultFile(ws, 'manuscripts/p/references.bib');
-    expect(result).toBe(block);
+    expect(result).toBe('manuscripts/p/article.qmd');
   });
 
   it('uses the first manuscript id from opendraft.yml', async () => {
