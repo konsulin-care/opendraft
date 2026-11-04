@@ -1,0 +1,160 @@
+import { describe, expect, it } from 'vitest';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { MemoryWorkspace } from '@opendraft/workspace';
+import type { WorkspaceAdapter } from '@opendraft/workspace';
+import { useBlocks } from './use-blocks';
+
+/** Manuscript directory used by every fixture. */
+const DIR = 'manuscripts/demo';
+
+/** Path of the assembly under test. */
+const ARTICLE = `${DIR}/article.qmd`;
+
+/** Path of the block directory under test. */
+const BLOCKS = `${DIR}/blocks`;
+
+/**
+ * Build an assembly listing the given short names as include lines.
+ *
+ * @param shorts - Block short names in include order.
+ * @returns article.qmd text with front matter and a refs fence.
+ */
+function articleWith(...shorts: string[]): string {
+  const includes = shorts.map((short) => `{{< include blocks/${short}.qmd >}}`).join('\n\n');
+  return `---\nmetadata-files:\n- _author.yml\n---\n\n${includes}\n\n::: {#refs}\n:::\n`;
+}
+
+/**
+ * Build canonical block file text.
+ *
+ * @param title - Heading title.
+ * @param anchor - Heading anchor including the `sec-` prefix.
+ * @param type - Section type without the `deo-` prefix.
+ * @param body - Section body after the heading line.
+ * @returns Block file text opening with a canonical heading.
+ */
+function blockFile(title: string, anchor: string, type: string, body = ''): string {
+  return `# ${title} {#${anchor} .deo-${type}}\n${body}`;
+}
+
+/**
+ * Write fixture files into a fresh workspace and render the hook.
+ *
+ * @param files - Repo-relative paths mapped to file contents.
+ * @returns The workspace plus the rendered hook result.
+ */
+async function setup(files: Record<string, string>) {
+  const ws = new MemoryWorkspace();
+  for (const [path, content] of Object.entries(files)) {
+    await ws.writeFile(path, content);
+  }
+  const rendered = renderHook(() => useBlocks(ws, DIR));
+  await waitFor(() => expect(rendered.result.current.loading).toBe(false));
+  return { ws, result: rendered.result };
+}
+
+/**
+ * Read the include order back out of the assembly.
+ *
+ * @param ws - Workspace holding the fixture.
+ * @returns Block short names in assembly include order.
+ */
+async function includeOrder(ws: WorkspaceAdapter): Promise<string[]> {
+  const article = (await ws.readFile(ARTICLE)) ?? '';
+  const shorts: string[] = [];
+  for (const line of article.split('\n')) {
+    const match = /\{\{< include\s+blocks\/([a-z0-9-]+)\.qmd\s*>\}\}/.exec(line.trim());
+    if (match) shorts.push(match[1]);
+  }
+  return shorts;
+}
+
+describe('loadBlocks', () => {
+  it('returns the block list in article.qmd include order', async () => {
+    const { result } = await setup({
+      [ARTICLE]: articleWith('methods', 'intro'),
+      [`${BLOCKS}/methods.qmd`]: blockFile('Methods', 'sec-methods', 'methods'),
+      [`${BLOCKS}/intro.qmd`]: blockFile('Introduction', 'sec-intro', 'intro'),
+    });
+
+    expect(result.current.blocks.map((block) => block.short)).toEqual(['methods', 'intro']);
+    expect(result.current.blocks.map((block) => block.title)).toEqual(['Methods', 'Introduction']);
+  });
+});
+
+describe('createBlock', () => {
+  it('creates a block by writing its file and inserting the include at the position', async () => {
+    const { result, ws } = await setup({
+      [ARTICLE]: articleWith('alpha', 'beta'),
+      [`${BLOCKS}/alpha.qmd`]: blockFile('Alpha', 'sec-alpha', 'alpha'),
+      [`${BLOCKS}/beta.qmd`]: blockFile('Beta', 'sec-beta', 'beta'),
+    });
+
+    await act(async () => {
+      await result.current.createBlock(1, 'Methods');
+    });
+
+    const created = (await ws.readFile(`${BLOCKS}/methods.qmd`)) ?? '';
+    expect(created).toContain('# Methods {#sec-methods .deo-section}');
+    expect(await includeOrder(ws)).toEqual(['alpha', 'methods', 'beta']);
+    expect(result.current.blocks.map((block) => block.short)).toEqual(['alpha', 'methods', 'beta']);
+  });
+});
+
+describe('deleteBlock', () => {
+  it('deletes a block by removing its include line and deleting its file', async () => {
+    const { result, ws } = await setup({
+      [ARTICLE]: articleWith('alpha', 'beta'),
+      [`${BLOCKS}/alpha.qmd`]: blockFile('Alpha', 'sec-alpha', 'alpha'),
+      [`${BLOCKS}/beta.qmd`]: blockFile('Beta', 'sec-beta', 'beta'),
+    });
+
+    await act(async () => {
+      await result.current.deleteBlock('alpha');
+    });
+
+    expect(await ws.readFile(`${BLOCKS}/alpha.qmd`)).toBeNull();
+    expect(await includeOrder(ws)).toEqual(['beta']);
+    expect(result.current.blocks.map((block) => block.short)).toEqual(['beta']);
+  });
+});
+
+describe('renameBlock', () => {
+  it('renames the file, updates the include and rewrites @sec- refs in other blocks', async () => {
+    const { result, ws } = await setup({
+      [ARTICLE]: articleWith('intro', 'methods'),
+      [`${BLOCKS}/intro.qmd`]: blockFile('Introduction', 'sec-intro', 'intro'),
+      [`${BLOCKS}/methods.qmd`]: blockFile('Methods', 'sec-methods', 'methods', '\nSee @sec-intro for background.\n'),
+    });
+
+    await act(async () => {
+      await result.current.renameBlock('intro', 'overview');
+    });
+
+    expect(await ws.readFile(`${BLOCKS}/intro.qmd`)).toBeNull();
+    const renamed = (await ws.readFile(`${BLOCKS}/overview.qmd`)) ?? '';
+    expect(renamed).toContain('{#sec-overview');
+    expect(await includeOrder(ws)).toEqual(['overview', 'methods']);
+    const methods = (await ws.readFile(`${BLOCKS}/methods.qmd`)) ?? '';
+    expect(methods).toContain('@sec-overview');
+    expect(methods).not.toContain('@sec-intro');
+  });
+});
+
+describe('setTitle', () => {
+  it('changes a title while the file name and anchor stay unchanged', async () => {
+    const { result, ws } = await setup({
+      [ARTICLE]: articleWith('intro'),
+      [`${BLOCKS}/intro.qmd`]: blockFile('Introduction', 'sec-intro', 'intro', '\nBody.\n'),
+    });
+
+    await act(async () => {
+      await result.current.setTitle('intro', 'Background');
+    });
+
+    const retitle = (await ws.readFile(`${BLOCKS}/intro.qmd`)) ?? '';
+    expect(retitle).toContain('# Background {#sec-intro .deo-intro}');
+    expect(await ws.listFiles(BLOCKS)).toEqual(['intro.qmd']);
+    expect(await includeOrder(ws)).toEqual(['intro']);
+  });
+});
