@@ -35,11 +35,33 @@ export function collectIncludes(assembly: string): string[] {
 }
 
 /**
+ * Extract the section anchor from a block's heading line.
+ *
+ * The heading is the first line starting with `# `; its `{#label}` is the
+ * anchor. Blocks without a heading line, or headings without a label,
+ * yield null — there is no anchor contract to check.
+ *
+ * @param content - Block file content.
+ * @returns The anchor label, or null when absent.
+ */
+function headingAnchor(content: string): string | null {
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+    if (!/^#\s/.test(trimmed)) continue;
+    const match = /\{#([^}\s]+)/.exec(trimmed);
+    return match ? match[1] : null;
+  }
+  return null;
+}
+
+/**
  * Validate file<->include consistency of an authored assembly:
  * every include has a matching block file (empty blocks are allowed),
  * no includes are duplicated,
- * include paths stay under blocks/, and unreferenced files are reported
- * as warnings (they are legitimate drafts).
+ * include paths stay under blocks/,
+ * included blocks whose heading carries an anchor use `sec-<file stem>`,
+ * and unreferenced files are reported as warnings (they are legitimate
+ * drafts).
  *
  * @param input - Assembly text, block contents and directory listing.
  * @returns Validation result with separate warnings.
@@ -66,6 +88,13 @@ export function validateAssembly({ assembly, blockFiles, files }: AssemblyInput)
     const content = blockFiles[path];
     if (content === undefined) {
       errors.push({ path: 'assembly', message: `missing block file: ${path}` });
+      continue;
+    }
+
+    const anchor = headingAnchor(content);
+    const expectedAnchor = `sec-${path.replace(/^blocks\//, '').replace(/\.qmd$/, '')}`;
+    if (anchor !== null && anchor !== expectedAnchor) {
+      errors.push({ path, message: `heading anchor mismatch in ${path}: expected ${expectedAnchor}, found ${anchor}` });
     }
   }
 
