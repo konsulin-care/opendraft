@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { EditorView } from '@codemirror/view';
 import { Crepe } from '@milkdown/crepe';
-import { remarkPluginsCtx, remarkStringifyOptionsCtx, type Editor } from '@milkdown/kit/core';
+import { editorViewCtx, remarkPluginsCtx, remarkStringifyOptionsCtx, type Editor } from '@milkdown/kit/core';
 import { listenerCtx } from '@milkdown/kit/plugin/listener';
 import { $prose } from '@milkdown/kit/utils';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
@@ -10,7 +10,7 @@ import { createCitationPlugin } from '../citation/plugin';
 import type { CitationState } from '../citation/types';
 import { quartoRemarkPlugin, quartoInlineCodePlugin, quartoChunkOptionPlugin } from '../quarto-syntax';
 import { citationRemarkPlugin } from '../citation/citation-remark-plugin';
-import { createTestApi, type EditorTestApi } from '../caret-mode-switch';
+import { createTestApi, focusBlockEditor, registerBlockEditor, type EditorTestApi } from '../caret-mode-switch';
 import type { DebouncedSaver } from './editor/autosave';
 
 /** Code blocks: light yellow active line/selection via @theme tokens in index.css. */
@@ -112,10 +112,14 @@ interface EditorWiringOptions {
 }
 
 /**
- * Register autosave/plugin wiring once per editor instance. `get` is a new
+ * Register autosave/plugin wiring once per editor instance and enroll the
+ * editor in the block-editor registry: toolbar commands and caret/content
+ * sync target the most recently focused registered editor. `get` is a new
  * function every render, so it must not be a dependency; the editor-identity
  * ref guard keeps wiring to a single registration per editor instance
- * (Milkdown's markdownUpdated has no unsubscribe handle).
+ * (Milkdown's markdownUpdated has no unsubscribe handle). Registration and
+ * the focusin listener are re-applied on every effect run and removed on
+ * cleanup, so an unmounted block editor is never a command target.
  *
  * @param options - See {@link EditorWiringOptions}.
  */
@@ -124,9 +128,19 @@ export function useEditorWiring(options: EditorWiringOptions): void {
   const wiredEditorRef = useRef<Editor | null>(null);
   useEffect(() => {
     const editor = get();
-    if (!editor || editor === wiredEditorRef.current) return;
-    wiredEditorRef.current = editor;
-    editorRef.current = editor;
-    wireEditor(editor, saver, syncContent, onEditorReady);
+    if (!editor) return;
+    if (editor !== wiredEditorRef.current) {
+      wiredEditorRef.current = editor;
+      editorRef.current = editor;
+      wireEditor(editor, saver, syncContent, onEditorReady);
+    }
+    const unregister = registerBlockEditor(editor);
+    const surface = editor.action((ctx) => ctx.get(editorViewCtx));
+    const onFocus = () => focusBlockEditor(editor);
+    surface.dom.addEventListener('focusin', onFocus);
+    return () => {
+      surface.dom.removeEventListener('focusin', onFocus);
+      unregister();
+    };
   }, [loading, onEditorReady, workspace, syncContent, saver]);
 }

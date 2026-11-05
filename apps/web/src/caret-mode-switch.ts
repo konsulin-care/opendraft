@@ -15,6 +15,60 @@ interface Ref<T> {
   current: T;
 }
 
+/** Registered block editors, most recently registered last. */
+const blockEditors: Editor[] = [];
+
+/** Editor whose surface most recently received DOM focus; validated on read. */
+let focusedBlockEditor: Editor | null = null;
+
+/**
+ * Register a mounted block editor so toolbar commands and caret/content
+ * sync can target it.
+ *
+ * @param editor - The Milkdown editor of a mounted block.
+ * @returns Callback removing the editor from the registry (idempotent).
+ */
+export function registerBlockEditor(editor: Editor): () => void {
+  if (!blockEditors.includes(editor)) blockEditors.push(editor);
+  return () => unregisterBlockEditor(editor);
+}
+
+/**
+ * Remove a block editor from the registry. The focus pointer survives a
+ * remove/re-add churn of the same editor and is dropped only once no
+ * block editors remain.
+ *
+ * @param editor - The editor to remove.
+ */
+export function unregisterBlockEditor(editor: Editor): void {
+  const index = blockEditors.indexOf(editor);
+  if (index >= 0) blockEditors.splice(index, 1);
+  if (blockEditors.length === 0) focusedBlockEditor = null;
+}
+
+/**
+ * Record DOM focus on a block editor's surface as the active target.
+ *
+ * @param editor - The editor whose surface received focus.
+ */
+export function focusBlockEditor(editor: Editor): void {
+  focusedBlockEditor = editor;
+}
+
+/**
+ * The block editor toolbar commands and caret/content sync target: the
+ * most recently focused registered editor, falling back to the most
+ * recently registered one.
+ *
+ * @returns The active block editor, or undefined when none is registered.
+ */
+export function getActiveBlockEditor(): Editor | undefined {
+  if (focusedBlockEditor && blockEditors.includes(focusedBlockEditor)) {
+    return focusedBlockEditor;
+  }
+  return blockEditors[blockEditors.length - 1];
+}
+
 /** Imperative handle exposed for tests and external tools. */
 export interface EditorTestApi {
   /** Insert text at the end of the document through the editor state. */
@@ -136,7 +190,10 @@ function enterVisualMode(editor: Editor, source: SourceEditorHandle | null): voi
  * Build the callback that synchronizes content and caret when the mode changes.
  * Reads refs at call time, so the callback can be created once and reused.
  *
- * @param editorRef - Visual (Milkdown) editor ref.
+ * Reads the active (focused) block editor at call time, falling back to
+ * this instance's editor ref when no block editor is registered.
+ *
+ * @param editorRef - Visual (Milkdown) editor ref, used as the fallback.
  * @param sourceRef - Source (CodeMirror) editor handle ref.
  * @param prevModeRef - Last applied mode; updated on every call.
  * @param setSourceMarkdown - State setter for the source markdown.
@@ -149,7 +206,7 @@ export function createModeSwitcher(
   setSourceMarkdown: (md: string) => void,
 ): (mode: EditorMode) => void {
   return (newMode) => {
-    const editor = editorRef.current;
+    const editor = getActiveBlockEditor() ?? editorRef.current;
     if (!editor) return;
     if (newMode === 'source' && prevModeRef.current === 'wysiwyg') {
       setSourceMarkdown(enterSourceMode(editor, sourceRef.current));

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { MemoryWorkspace } from '@opendraft/workspace';
 import { MilkdownProvider } from '@milkdown/react';
 import { EditorView } from '@codemirror/view';
@@ -8,6 +8,7 @@ import { AppHeader } from './components/AppHeader';
 import { VISUAL_MODE_GATE_TITLE } from './components/ModeSwitch';
 import { ManuscriptEditor, type EditorTestApi } from './components/ManuscriptEditor';
 import { useEditorMode } from './hooks/useEditorMode';
+import { useEditorCommands } from './hooks/useEditorCommands';
 import { getFileCapability } from './project/file-capability';
 import { readPreferences, writePreferences } from './preferences';
 
@@ -21,6 +22,9 @@ const DOC = '# Title\n\nFirst paragraph.\n\nLast paragraph here.\n';
 
 /** Manuscript block path: the only file type that mounts the visual editor. */
 const BLOCK_PATH = 'manuscripts/p/blocks/01hxyz00000000000000000000.qmd';
+
+/** Source view getter with no surface mounted; keeps callback nesting within lint limits. */
+const noSourceView = () => null;
 
 /** Mount the editor in the given mode and capture its test API. */
 function mount(workspace: MemoryWorkspace, mode: 'wysiwyg' | 'source', onReady: (api: EditorTestApi) => void) {
@@ -224,5 +228,68 @@ describe('caret placement across mode switches', () => {
     setMode(result, workspace, 'wysiwyg');
     await waitFor(() => expect(api!.getCaret()).toBe(visualCaret), { timeout: 5000 });
     expect(api!.getMarkdown()).toContain('Last paragraph here.');
+  }, 20000);
+});
+
+describe('toolbar commands target the focused block editor', () => {
+  let workspace: MemoryWorkspace;
+
+  beforeEach(() => {
+    workspace = new MemoryWorkspace();
+  });
+
+  it('dispatches commands to the most recently focused block editor', async () => {
+    let a: EditorTestApi | null = null;
+    const first = mount(workspace, 'wysiwyg', (ready) => (a = ready));
+    await waitFor(() => expect(a).not.toBeNull(), { timeout: 10000 });
+    let b: EditorTestApi | null = null;
+    mount(workspace, 'wysiwyg', (ready) => (b = ready));
+    await waitFor(() => expect(b).not.toBeNull(), { timeout: 10000 });
+    const { result } = renderHook(() => useEditorCommands('wysiwyg', noSourceView));
+    const pm = first.container.querySelector('.ProseMirror') as HTMLElement;
+    expect(pm).not.toBeNull();
+    pm.focus();
+    const beforeA = a!.getMarkdown();
+    const beforeB = b!.getMarkdown();
+    act(() => result.current.insertCitation());
+    expect(a!.getMarkdown()).not.toBe(beforeA);
+    expect(b!.getMarkdown()).toBe(beforeB);
+  }, 20000);
+
+  it('treats commands as no-ops while no block editor is registered', () => {
+    cleanup();
+    const { result } = renderHook(() => useEditorCommands('wysiwyg', noSourceView));
+    act(() => {
+      result.current.toggleBold();
+      result.current.setHeading(1);
+    });
+    expect(result.current.activeState()).toMatchObject({ bold: false, heading: 0 });
+  });
+});
+
+describe('caret mode sync uses the focused block editor', () => {
+  let workspace: MemoryWorkspace;
+
+  beforeEach(() => {
+    workspace = new MemoryWorkspace();
+  });
+
+  it('maps the focused block caret into the source surface only', async () => {
+    let a: EditorTestApi | null = null;
+    const first = mount(workspace, 'wysiwyg', (ready) => (a = ready));
+    await waitFor(() => expect(a).not.toBeNull(), { timeout: 10000 });
+    let b: EditorTestApi | null = null;
+    mount(workspace, 'wysiwyg', (ready) => (b = ready));
+    await waitFor(() => expect(b).not.toBeNull(), { timeout: 10000 });
+    await waitFor(() => expect(a!.getCaret()).toBe(1), { timeout: 5000 });
+    a!.setCaret(Number.MAX_SAFE_INTEGER);
+    const pm = first.container.querySelector('.ProseMirror') as HTMLElement;
+    expect(pm).not.toBeNull();
+    pm.focus();
+    setMode(first, workspace, 'source');
+    const content = first.container.querySelector('.cm-content') as HTMLElement | null;
+    const view = content ? EditorView.findFromDOM(content) : null;
+    expect(view).not.toBeNull();
+    expect(view!.state.selection.main.head).toBe(DOC.trimEnd().length);
   }, 20000);
 });
