@@ -9,7 +9,8 @@ import { useSaveShortcut } from '../hooks/useSaveShortcut';
 import { SourceEditor, type SourceEditorHandle } from './SourceEditor';
 import { EditorFrame } from './editor-frame';
 import { createModeSwitcher, useInitialCaret, type EditorTestApi } from '../caret-mode-switch';
-import { resolveEditorGate } from '../project/file-capability';
+import { isManuscriptArticlePath, resolveEditorGate } from '../project/file-capability';
+import { BlockEditor } from '../block-editor/BlockEditor';
 import { useDebouncedSaver } from './editor/autosave';
 import { createCrepeConfig, useEditorWiring } from './crepe-config';
 import { MetadataPanel, manuscriptRootFromPath } from './metadata-panel/MetadataPanel';
@@ -34,6 +35,8 @@ interface ManuscriptEditorProps {
   formattingToolbar?: boolean;
   /** Project identifier used to persist metadata-panel state per project. */
   projectId?: string;
+  /** Repo-relative path of the active block file; drives expand-and-scroll in the assembly. */
+  activeBlockPath?: string;
 }
 
 interface UseManuscriptStateOptions {
@@ -187,6 +190,78 @@ function SourceOnlyEditor({ workspace, defaultValue, path, onSaveStatusChange, f
   );
 }
 
+/** Manuscript directory of an assembly path: `manuscripts/<id>`. */
+function assemblyDir(path: string): string {
+  return path.split('/').slice(0, 2).join('/');
+}
+
+/** Block short name of `activePath` when it lives under `dir/blocks/`; null otherwise. */
+function blockShortFrom(activePath: string, dir: string): string | null {
+  const prefix = `${dir}/blocks/`;
+  if (!activePath.startsWith(prefix) || !activePath.endsWith('.qmd')) return null;
+  const short = activePath.slice(prefix.length, -4);
+  return short.length > 0 && !short.includes('/') ? short : null;
+}
+
+/**
+ * Reveal the active block in the assembly: expand its container and scroll it
+ * into view, retrying briefly while the async block list loads.
+ */
+function useActiveBlockReveal(activeBlockPath: string | undefined, dir: string): void {
+  useEffect(() => {
+    const short = activeBlockPath === undefined ? null : blockShortFrom(activeBlockPath, dir);
+    if (short === null) return undefined;
+    let attempts = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const reveal = (): void => {
+      const chip = document.querySelector(`button[aria-label="Copy @sec-${short} reference"]`);
+      const section = chip === null ? null : chip.closest('section');
+      if (section === null) {
+        attempts += 1;
+        if (attempts < 40) timer = setTimeout(reveal, 50);
+        return;
+      }
+      const toggle = section.querySelector('button[aria-expanded]');
+      if (toggle instanceof HTMLElement && toggle.getAttribute('aria-expanded') === 'false') toggle.click();
+      section.scrollIntoView({ block: 'nearest' });
+    };
+    reveal();
+    return () => { if (timer !== undefined) clearTimeout(timer); };
+  }, [activeBlockPath, dir]);
+}
+
+/** Props for {@link ArticleAssembly}. */
+interface ArticleAssemblyProps extends FileEditorProps {
+  /** Repo-relative path of the active block file; drives expand-and-scroll. */
+  activeBlockPath?: string;
+}
+
+/**
+ * Assembly surface for `manuscripts/<id>/article.qmd`: the imported block
+ * editor plus an action swapping to the source-only editor for the file.
+ *
+ * @param props - See {@link ArticleAssemblyProps}.
+ * @returns The assembly markup, or the source-only editor after the swap.
+ */
+function ArticleAssembly({ workspace, defaultValue, path, mode, onSaveStatusChange, formattingToolbar, projectId, activeBlockPath }: ArticleAssemblyProps) {
+  const [editingSource, setEditingSource] = useState(false);
+  const dir = assemblyDir(path);
+  useActiveBlockReveal(activeBlockPath, dir);
+  if (editingSource) {
+    return <SourceOnlyEditor workspace={workspace} defaultValue={defaultValue} path={path} mode={mode} onSaveStatusChange={onSaveStatusChange} formattingToolbar={formattingToolbar} projectId={projectId} />;
+  }
+  return (
+    <div className="manuscript-editor" data-testid="article-assembly">
+      <div tabIndex={-1} style={{ height: '100%', overflow: 'auto' }}>
+        <button type="button" onClick={() => setEditingSource(true)} className="m-2 rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50">
+          Edit assembly source
+        </button>
+        <BlockEditor ws={workspace} dir={dir} projectKey={projectId} />
+      </div>
+    </div>
+  );
+}
+
 /**
  * Continuous editor over one workspace file, autosaved to the `path` prop.
  * The file-type gate (resolveEditorGate) mounts the Milkdown/Crepe visual
@@ -203,9 +278,14 @@ export function ManuscriptEditor({
   onSaveStatusChange,
   formattingToolbar = true,
   projectId = 'default',
+  activeBlockPath,
 }: ManuscriptEditorProps) {
   const { capability, content, editorMode } = resolveEditorGate(path, defaultValue, mode);
   const shared = { workspace, defaultValue: content, path, onSaveStatusChange, formattingToolbar, projectId };
+  // The assembly mounts the imported block editor, not the Crepe surfaces.
+  if (isManuscriptArticlePath(path)) {
+    return <ArticleAssembly {...shared} mode={editorMode} activeBlockPath={activeBlockPath} />;
+  }
   if (capability === 'rich') {
     return <RichFileEditor {...shared} mode={editorMode} onEditorReady={onEditorReady} />;
   }

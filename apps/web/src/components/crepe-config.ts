@@ -117,9 +117,13 @@ interface EditorWiringOptions {
  * sync target the most recently focused registered editor. `get` is a new
  * function every render, so it must not be a dependency; the editor-identity
  * ref guard keeps wiring to a single registration per editor instance
- * (Milkdown's markdownUpdated has no unsubscribe handle). Registration and
- * the focusin listener are re-applied on every effect run and removed on
- * cleanup, so an unmounted block editor is never a command target.
+ * (Milkdown's markdownUpdated has no unsubscribe handle). `onEditorReady` is
+ * also excluded from the deps: it may change identity on a mode-switch
+ * rerender, and re-running the effect would unregister the editor mid-commit —
+ * before the mode-sync effect reads the registry — silently switching the
+ * caret target to another block. Registration only tears down when the editor
+ * lifecycle deps change or the component unmounts, so an unmounted block
+ * editor is never a command target.
  *
  * @param options - See {@link EditorWiringOptions}.
  */
@@ -142,5 +146,5 @@ export function useEditorWiring(options: EditorWiringOptions): void {
       surface.dom.removeEventListener('focusin', onFocus);
       unregister();
     };
-  }, [loading, onEditorReady, workspace, syncContent, saver]);
+  }, [loading, workspace, syncContent, saver]);
 }

@@ -44,12 +44,13 @@ afterEach(async () => {
 describe('App', () => {
   it('boots into the single manuscript editor', async () => {
     render(<App />);
-    await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
+    // A scaffolded project opens article.qmd: the assembly branch renders.
+    await waitFor(() => expect(screen.getByTestId('article-assembly')).toBeDefined(), { timeout: 10000 });
   });
 
   it('boots into an auto-created scaffolded project and reopens the last file', async () => {
     const { unmount } = render(<App />);
-    await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
+    await waitFor(() => expect(screen.getByTestId('article-assembly')).toBeDefined(), { timeout: 10000 });
 
     // One registry record, and its od-ws-<id> database holds the scaffold.
     const records = await projectRegistry.list();
@@ -92,7 +93,7 @@ describe('App', () => {
 describe('App project drawer', () => {
   it('renders the project selector and a file tree whose files open on click', async () => {
     render(<App />);
-    await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
+    await waitFor(() => expect(screen.getByTestId('article-assembly')).toBeDefined(), { timeout: 10000 });
 
     // Open the drawer via the book icon.
     fireEvent.click(screen.getByRole('button', { name: 'OpenDraft' }));
@@ -147,7 +148,7 @@ describe('App header', () => {
 
   it('renaming the manuscript title moves the files and updates the tree and config', async () => {
     render(<App />);
-    await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
+    await waitFor(() => expect(screen.getByTestId('article-assembly')).toBeDefined(), { timeout: 10000 });
     const [record] = await projectRegistry.list();
     const ws = await workspaceManager.get(record.id);
     try {
@@ -171,7 +172,7 @@ describe('App header', () => {
 
   it('shows a single mode toggle naming the target mode', async () => {
     render(<App />);
-    await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
+    await waitFor(() => expect(screen.getByTestId('article-assembly')).toBeDefined(), { timeout: 10000 });
     const toggle = screen.getByRole('button', { name: 'Switch to source' });
     expect(toggle.getAttribute('title')).toBe('Switch to source');
     expect(toggle.querySelector('.lucide-file-text')).not.toBeNull();
@@ -183,7 +184,7 @@ describe('App header', () => {
 describe('App mode and commit', () => {
   it('switches to source mode and back via the mode toggle', async () => {
     render(<App />);
-    await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
+    await waitFor(() => expect(screen.getByTestId('article-assembly')).toBeDefined(), { timeout: 10000 });
 
     fireEvent.click(screen.getByRole('button', { name: 'Switch to source' }));
     expect(readPreferences().editorMode).toBe('source');
@@ -224,14 +225,14 @@ describe('App persisted editor mode', () => {
   it('restores a persisted source mode on a fresh mount', async () => {
     writePreferences({ formattingToolbar: true, editorMode: 'source' });
     render(<App />);
-    await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
+    await waitFor(() => expect(screen.getByTestId('article-assembly')).toBeDefined(), { timeout: 10000 });
     const toggle = screen.getByRole('button', { name: 'Switch to visual' });
     expect(toggle.querySelector('.lucide-file-code')).not.toBeNull();
   });
 
   it('persists a mode switch to opendraft:prefs', async () => {
     render(<App />);
-    await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
+    await waitFor(() => expect(screen.getByTestId('article-assembly')).toBeDefined(), { timeout: 10000 });
 
     fireEvent.click(screen.getByRole('button', { name: 'Switch to source' }));
     expect(readPreferences().editorMode).toBe('source');
@@ -276,6 +277,10 @@ describe('useEditorMode persistence', () => {
 describe('App save status', () => {
   it('shows Saving then Saved after an edit triggers an autosave', async () => {
     render(<App />);
+    await waitFor(() => expect(screen.getByTestId('article-assembly')).toBeDefined(), { timeout: 10000 });
+    // The assembly has no CodeMirror surface: open a source file first.
+    fireEvent.click(screen.getByRole('button', { name: 'OpenDraft' }));
+    fireEvent.click(within(screen.getByTestId('project-drawer')).getByRole('treeitem', { name: 'references.bib' }));
     await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
     const cm = await waitFor(() => {
       const el = document.querySelector('.cm-editor');

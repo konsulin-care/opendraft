@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { createElement } from "react";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryWorkspace } from "@opendraft/workspace";
 import { MilkdownProvider } from "@milkdown/react";
 import { EditorView } from "@codemirror/view";
@@ -18,6 +18,9 @@ vi.mock("./persistence", async (importOriginal) => {
   return { ...actual, saveFile: vi.fn().mockResolvedValue(undefined) };
 });
 const DOC_PATH = "manuscripts/p/blocks/01hxyz00000000000000000000.qmd";
+// Re-checked for T14: the entry here is the ROOT-level article.qmd, which
+// stays 'text' (assertion 3). Only manuscripts/<id>/article.qmd became rich,
+// and it is covered by the article assembly tests below instead of this list.
 const NON_BLOCK_PATHS = ["opendraft.yml", "article.qmd", "manuscript.md", "notes.qmd", "refs.bib"];
 /** Source text of the modules under test, for source-scan assertions. */
 const manuscriptSource = readFileSync(resolve(__dirname, "./components/ManuscriptEditor.tsx"), "utf8");
@@ -54,66 +57,28 @@ function renderEditor(options: {
   return { ...rendered, workspace, getApi: () => api };
 }
 describe("ManuscriptEditor crepe theme integration", () => {
-  it("does not import Crepe theme CSS in the component", () => {
-    expect(manuscriptSource).not.toMatch(/@milkdown\/crepe\/theme\/(common\/style\.css|classic\.css)/);
-  });
-  it("does not import the split prosemirror/reset sheets", () => {
-    expect(manuscriptSource).not.toMatch(/@milkdown\/crepe\/theme\/common\/(prosemirror|reset)\.css/);
-  });
-  it("imports Crepe theme CSS in index.css without a cascade layer", () => {
-    expect(css).not.toMatch(/@layer\s+crepe/); expect(css).toContain("@milkdown/crepe/theme/common/style.css"); expect(css).toContain("@milkdown/crepe/theme/classic.css");
-  });
-  it("configures a static placeholder feature", () => {
-    expect(crepeConfigSource).toContain("Crepe.Feature.Placeholder"); expect(crepeConfigSource).toContain("PLACEHOLDER_HINT"); expect(crepeConfigSource).not.toContain("pickPlaceholderHint");
-  });
-  it("configures block handle at content edge", () => {
-    expect(crepeConfigSource).toContain("Crepe.Feature.BlockEdit"); expect(crepeConfigSource).toContain("blockHandle"); expect(crepeConfigSource).toContain("shouldShow: () => false");
-  });
+  it("does not import Crepe theme CSS in the component", () => { expect(manuscriptSource).not.toMatch(/@milkdown\/crepe\/theme\/(common\/style\.css|classic\.css)/); });
+  it("does not import the split prosemirror/reset sheets", () => { expect(manuscriptSource).not.toMatch(/@milkdown\/crepe\/theme\/common\/(prosemirror|reset)\.css/); });
+  it("imports Crepe theme CSS in index.css without a cascade layer", () => { expect(css).not.toMatch(/@layer\s+crepe/); expect(css).toContain("@milkdown/crepe/theme/common/style.css"); expect(css).toContain("@milkdown/crepe/theme/classic.css"); });
+  it("configures a static placeholder feature", () => { expect(crepeConfigSource).toContain("Crepe.Feature.Placeholder"); expect(crepeConfigSource).toContain("PLACEHOLDER_HINT"); expect(crepeConfigSource).not.toContain("pickPlaceholderHint"); });
+  it("configures block handle at content edge", () => { expect(crepeConfigSource).toContain("Crepe.Feature.BlockEdit"); expect(crepeConfigSource).toContain("blockHandle"); expect(crepeConfigSource).toContain("shouldShow: () => false"); });
 });
 describe("ManuscriptEditor — block-only visual editor mount", () => {
-  it("mounts the Crepe editor for a manuscript block file", async () => {
-    const { getApi } = renderEditor({ path: DOC_PATH });
-    await waitFor(() => expect(getApi()).not.toBeNull(), { timeout: 10000 });
-    expect(document.querySelector("[data-milkdown-root]")).not.toBeNull(); expect(document.querySelector(".ProseMirror")).not.toBeNull();
-  }, 20000);
-  it.each(NON_BLOCK_PATHS)("opens %s in source mode with no Milkdown root", async (path) => {
-    const { getApi } = renderEditor({ path });
-    await waitFor(() => expect(document.querySelector(".source-editor .cm-editor")).not.toBeNull(), { timeout: 10000 });
-    // Give any lazily created Crepe instance time to mount, then assert none exists.
-    await sleep(300);
-    expect(document.querySelector("[data-milkdown-root]")).toBeNull(); expect(document.querySelector(".ProseMirror")).toBeNull(); expect(getApi()).toBeNull();
-  }, 20000);
+  it("mounts the Crepe editor for a manuscript block file", async () => { const { getApi } = renderEditor({ path: DOC_PATH }); await waitFor(() => expect(getApi()).not.toBeNull(), { timeout: 10000 }); expect(document.querySelector("[data-milkdown-root]")).not.toBeNull(); expect(document.querySelector(".ProseMirror")).not.toBeNull(); }, 20000);
+  it.each(NON_BLOCK_PATHS)("opens %s in source mode with no Milkdown root", async (path) => { const { getApi } = renderEditor({ path }); await waitFor(() => expect(document.querySelector(".source-editor .cm-editor")).not.toBeNull(), { timeout: 10000 }); // Give any lazily created Crepe instance time to mount, then assert none exists.
+    await sleep(300); expect(document.querySelector("[data-milkdown-root]")).toBeNull(); expect(document.querySelector(".ProseMirror")).toBeNull(); expect(getApi()).toBeNull(); }, 20000);
 });
 describe("ManuscriptEditor — block gutter removed", () => {
-  it("does not reference the block-gutter plugin in the editor sources", () => {
-    expect(manuscriptSource + crepeConfigSource).not.toContain("block-handle-gutter"); expect(manuscriptSource + crepeConfigSource).not.toContain("createBlockGutterPlugin");
-  });
-  it("renders no .block-gutter-container or .block-gutter-handle elements", async () => {
-    const { getApi } = renderEditor({ path: DOC_PATH });
-    await waitFor(() => expect(getApi()).not.toBeNull(), { timeout: 10000 });
-    expect(document.querySelector(".block-gutter-container, .block-gutter-handle")).toBeNull();
-  }, 20000);
+  it("does not reference the block-gutter plugin in the editor sources", () => { expect(manuscriptSource + crepeConfigSource).not.toContain("block-handle-gutter"); expect(manuscriptSource + crepeConfigSource).not.toContain("createBlockGutterPlugin"); });
+  it("renders no .block-gutter-container or .block-gutter-handle elements", async () => { const { getApi } = renderEditor({ path: DOC_PATH }); await waitFor(() => expect(getApi()).not.toBeNull(), { timeout: 10000 }); expect(document.querySelector(".block-gutter-container, .block-gutter-handle")).toBeNull(); }, 20000);
 });
 describe("ManuscriptEditor — light code block theme", () => {
-  it("imports EditorView from @codemirror/view", () => {
-    expect(crepeConfigSource).toMatch(/EditorView.*from\s+['"]@codemirror\/view['"]|@codemirror\/view.*EditorView/);
-  });
-  it("defines a lightCodeBlockTheme via EditorView.theme()", () => {
-    expect(crepeConfigSource).toMatch(/lightCodeBlockTheme\s*=\s*EditorView\.theme\(/);
-  });
-  it("sets active line and gutter backgrounds via the yellow token", () => {
-    expect(crepeConfigSource).toContain("'.cm-activeLine'"); expect(crepeConfigSource).toContain("'.cm-activeLineGutter'"); expect(crepeConfigSource).toContain("backgroundColor: 'var(--color-yellow-200)'");
-  });
-  it("sets selection backgrounds via the yellow token", () => {
-    expect(crepeConfigSource).toMatch(/\.cm-selectionBackground'.*\.cm-focused \.cm-selectionBackground/s); expect(crepeConfigSource).toContain("var(--color-yellow-200)");
-  });
-  it("uses only var(--color-*) tokens in the code block theme, no hex literals", () => {
-    const themeBlock = crepeConfigSource.match(/lightCodeBlockTheme\s*=\s*EditorView\.theme\(\{([\s\S]*?)\}\)/)?.[1];
-    expect(themeBlock).toBeDefined(); expect(themeBlock).not.toMatch(/#[0-9a-fA-F]{3,8}\b/); expect(themeBlock).toMatch(/var\(--color-[\w-]+\)/);
-  });
-  it("wires the theme into the CodeMirror feature config", () => {
-    expect(crepeConfigSource).toContain("Crepe.Feature.CodeMirror"); expect(crepeConfigSource).toContain("theme: lightCodeBlockTheme");
-  });
+  it("imports EditorView from @codemirror/view", () => { expect(crepeConfigSource).toMatch(/EditorView.*from\s+['"]@codemirror\/view['"]|@codemirror\/view.*EditorView/); });
+  it("defines a lightCodeBlockTheme via EditorView.theme()", () => { expect(crepeConfigSource).toMatch(/lightCodeBlockTheme\s*=\s*EditorView\.theme\(/); });
+  it("sets active line and gutter backgrounds via the yellow token", () => { expect(crepeConfigSource).toContain("'.cm-activeLine'"); expect(crepeConfigSource).toContain("'.cm-activeLineGutter'"); expect(crepeConfigSource).toContain("backgroundColor: 'var(--color-yellow-200)'"); });
+  it("sets selection backgrounds via the yellow token", () => { expect(crepeConfigSource).toMatch(/\.cm-selectionBackground'.*\.cm-focused \.cm-selectionBackground/s); expect(crepeConfigSource).toContain("var(--color-yellow-200)"); });
+  it("uses only var(--color-*) tokens in the code block theme, no hex literals", () => { const themeBlock = crepeConfigSource.match(/lightCodeBlockTheme\s*=\s*EditorView\.theme\(\{([\s\S]*?)\}\)/)?.[1]; expect(themeBlock).toBeDefined(); expect(themeBlock).not.toMatch(/#[0-9a-fA-F]{3,8}\b/); expect(themeBlock).toMatch(/var\(--color-[\w-]+\)/); });
+  it("wires the theme into the CodeMirror feature config", () => { expect(crepeConfigSource).toContain("Crepe.Feature.CodeMirror"); expect(crepeConfigSource).toContain("theme: lightCodeBlockTheme"); });
 });
 describe("ManuscriptEditor — effective formatting toolbar visibility", () => {
   it("hides the toolbar in source mode without changing the stored preference, and shows it again in wysiwyg", async () => {
@@ -130,13 +95,8 @@ describe("ManuscriptEditor — effective formatting toolbar visibility", () => {
   }, 20000);
 });
 describe("EditorToolbars — mobile keyboard bar and source mode", () => {
-  it("renders no keyboard bar in source mode even when the keyboard is open", () => {
-    const { container } = renderToolbars("source");
-    expect(screen.queryByRole("toolbar", { name: "Keyboard bar" })).toBeNull(); expect(container.querySelector('[aria-label="Keyboard bar"]')).toBeNull();
-  });
-  it("renders the keyboard bar in wysiwyg mode when the keyboard is open", () => {
-    renderToolbars("wysiwyg"); expect(screen.queryByRole("toolbar", { name: "Keyboard bar" })).not.toBeNull();
-  });
+  it("renders no keyboard bar in source mode even when the keyboard is open", () => { const { container } = renderToolbars("source"); expect(screen.queryByRole("toolbar", { name: "Keyboard bar" })).toBeNull(); expect(container.querySelector('[aria-label="Keyboard bar"]')).toBeNull(); });
+  it("renders the keyboard bar in wysiwyg mode when the keyboard is open", () => { renderToolbars("wysiwyg"); expect(screen.queryByRole("toolbar", { name: "Keyboard bar" })).not.toBeNull(); });
 });
 /** Render {@link ManuscriptEditor} in source mode; return workspace and view. */
 function renderSourceEditor(defaultValue: string) {
@@ -146,81 +106,28 @@ function renderSourceEditor(defaultValue: string) {
   return { ...base, view: view! };
 }
 describe("ManuscriptEditor — source editor autosave", () => {
-  it("schedules the debounced save with the new source markdown on source edits", async () => {
-    vi.mocked(saveFile).mockClear();
-    const { workspace, view } = renderSourceEditor("# Title\n\nSome text.");
-    const newMarkdown = "# Title\n\nEdited in source.";
-    act(() => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: newMarkdown } }));
-    // The save is debounced; after the window it must persist the new text.
-    await waitFor(() => expect(saveFile).toHaveBeenCalledWith(workspace, DOC_PATH, newMarkdown), { timeout: 3000 });
-  }, 20000);
-  it("saves the pending markdown on flush (unmount) instead of discarding it", async () => {
-    vi.mocked(saveFile).mockClear();
-    const { unmount, workspace, view } = renderSourceEditor("# Title\n\nSome text.");
-    const pendingMarkdown = "# Title\n\nEdited right before unmount.";
-    act(() => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: pendingMarkdown } }));
-    unmount(); // Unmount while the debounce is still pending: flush must save, not drop.
-    await waitFor(() => expect(saveFile).toHaveBeenCalledWith(workspace, DOC_PATH, pendingMarkdown));
-  }, 20000);
+  it("schedules the debounced save with the new source markdown on source edits", async () => { vi.mocked(saveFile).mockClear(); const { workspace, view } = renderSourceEditor("# Title\n\nSome text."); const newMarkdown = "# Title\n\nEdited in source."; act(() => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: newMarkdown } })); await waitFor(() => expect(saveFile).toHaveBeenCalledWith(workspace, DOC_PATH, newMarkdown), { timeout: 3000 }); }, 20000); // The save is debounced; after the window it must persist the new text.
+  it("saves the pending markdown on flush (unmount) instead of discarding it", async () => { vi.mocked(saveFile).mockClear(); const { unmount, workspace, view } = renderSourceEditor("# Title\n\nSome text."); const pendingMarkdown = "# Title\n\nEdited right before unmount."; act(() => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: pendingMarkdown } })); unmount(); await waitFor(() => expect(saveFile).toHaveBeenCalledWith(workspace, DOC_PATH, pendingMarkdown)); }, 20000); // Unmount while the debounce is still pending: flush must save, not drop.
 });
 describe("ManuscriptEditor — no autosave on load", () => {
-  it("does not write for an unedited block file after mount", async () => {
-    vi.mocked(saveFile).mockClear();
-    const { getApi } = renderEditor({ path: DOC_PATH });
-    await waitFor(() => expect(getApi()).not.toBeNull(), { timeout: 10000 });
-    // Wait past the listener debounce (200ms) and the autosave debounce (800ms).
-    await sleep(1500); expect(saveFile).not.toHaveBeenCalled();
-  }, 20000);
-  it("does not write for an unedited non-block file after mount", async () => {
-    vi.mocked(saveFile).mockClear();
-    renderEditor({ path: "opendraft.yml", defaultValue: "title: draft" });
-    await waitFor(() => expect(document.querySelector(".source-editor .cm-editor")).not.toBeNull(), { timeout: 10000 });
-    await sleep(1500); expect(saveFile).not.toHaveBeenCalled();
-  }, 20000);
+  it("does not write for an unedited block file after mount", async () => { vi.mocked(saveFile).mockClear(); const { getApi } = renderEditor({ path: DOC_PATH }); await waitFor(() => expect(getApi()).not.toBeNull(), { timeout: 10000 }); await sleep(1500); expect(saveFile).not.toHaveBeenCalled(); }, 20000); // Wait past the listener debounce (200ms) and the autosave debounce (800ms).
+  it("does not write for an unedited non-block file after mount", async () => { vi.mocked(saveFile).mockClear(); renderEditor({ path: "opendraft.yml", defaultValue: "title: draft" }); await waitFor(() => expect(document.querySelector(".source-editor .cm-editor")).not.toBeNull(), { timeout: 10000 }); await sleep(1500); expect(saveFile).not.toHaveBeenCalled(); }, 20000);
 });
 describe("ManuscriptEditor — list bullet preservation", () => {
-  it("serializes a user edit with '-' bullets, not '*'", async () => {
-    vi.mocked(saveFile).mockClear();
-    const initial = "# Title\n\n- item one\n- item two\n";
-    const { getApi } = renderEditor({ path: DOC_PATH, defaultValue: initial });
-    await waitFor(() => expect(getApi()).not.toBeNull(), { timeout: 10000 });
-    // A user-originated change: replace the document with the same list.
-    act(() => { getApi()!.setMarkdown("# Title\n\n- item one\n- item two\n"); });
-    await waitFor(() => expect(saveFile).toHaveBeenCalled(), { timeout: 5000 });
-    const markdown = vi.mocked(saveFile).mock.calls.at(-1)![2];
-    expect(markdown).toContain("- item one"); expect(markdown).toContain("- item two"); expect(markdown).not.toMatch(/^\* /m);
-  }, 20000);
+  it("serializes a user edit with '-' bullets, not '*'", async () => { vi.mocked(saveFile).mockClear(); const initial = "# Title\n\n- item one\n- item two\n"; const { getApi } = renderEditor({ path: DOC_PATH, defaultValue: initial }); await waitFor(() => expect(getApi()).not.toBeNull(), { timeout: 10000 }); act(() => { getApi()!.setMarkdown("# Title\n\n- item one\n- item two\n"); }); await waitFor(() => expect(saveFile).toHaveBeenCalled(), { timeout: 5000 }); const markdown = vi.mocked(saveFile).mock.calls.at(-1)![2]; expect(markdown).toContain("- item one"); expect(markdown).toContain("- item two"); expect(markdown).not.toMatch(/^\* /m); }, 20000); // A user-originated change: replace the document with the same list.
 });
 describe("ManuscriptEditor — citation dropdown mounting", () => {
-  it("does not import citationPluginKey (insertion moved to plugin)", () => {
-    expect(manuscriptSource + crepeConfigSource).not.toContain("citationPluginKey");
-  });
-  it("registers citation plugin via crepe.addFeature()", () => {
-    expect(crepeConfigSource).toContain("crepe.addFeature"); expect(crepeConfigSource).toContain("createCitationPlugin"); expect(crepeConfigSource).toMatch(/\$prose.*createCitationPlugin/);
-  });
-  it("no longer renders CitationDropdown in EditorSurface (rendered by plugin)", () => {
-    expect(editorSurfaceSource).not.toMatch(/<CitationDropdown|citationState|onCitationDispatch|onSelectCitekey/);
-  });
+  it("does not import citationPluginKey (insertion moved to plugin)", () => { expect(manuscriptSource + crepeConfigSource).not.toContain("citationPluginKey"); });
+  it("registers citation plugin via crepe.addFeature()", () => { expect(crepeConfigSource).toContain("crepe.addFeature"); expect(crepeConfigSource).toContain("createCitationPlugin"); expect(crepeConfigSource).toMatch(/\$prose.*createCitationPlugin/); });
+  it("no longer renders CitationDropdown in EditorSurface (rendered by plugin)", () => { expect(editorSurfaceSource).not.toMatch(/<CitationDropdown|citationState|onCitationDispatch|onSelectCitekey/); });
 });
 describe("ManuscriptEditor — @ trigger integration", () => {
-  it("does not import useCitationState (citation dispatch removed)", () => {
-    expect(manuscriptSource).not.toContain("useCitationState");
-  });
-  it("uses onStateChangeRef to wire citation plugin", () => {
-    expect(crepeConfigSource).toContain("onStateChangeRef"); expect(crepeConfigSource).toContain("createCitationPlugin"); expect(crepeConfigSource).toContain("onStateChangeRef.current");
-  });
-  it("test API module imports editorViewCtx (not a citation trigger in the component)", () => {
-    // createTestApi moved to caret-mode-switch.ts; editorViewCtx lives there for caret placement, and the component itself no longer touches it.
-    expect(caretSwitchSource).toContain("editorViewCtx"); expect(caretSwitchSource).toMatch(/editorViewCtx.*from.*['"]@milkdown\/kit\/core['"]/); expect(manuscriptSource + crepeConfigSource).not.toContain("editorViewCtx");
-  });
+  it("does not import useCitationState (citation dispatch removed)", () => { expect(manuscriptSource).not.toContain("useCitationState"); });
+  it("uses onStateChangeRef to wire citation plugin", () => { expect(crepeConfigSource).toContain("onStateChangeRef"); expect(crepeConfigSource).toContain("createCitationPlugin"); expect(crepeConfigSource).toContain("onStateChangeRef.current"); });
+  it("test API module imports editorViewCtx (not a citation trigger in the component)", () => { expect(caretSwitchSource).toContain("editorViewCtx"); expect(caretSwitchSource).toMatch(/editorViewCtx.*from.*['"]@milkdown\/kit\/core['"]/); expect(manuscriptSource).not.toContain("editorViewCtx"); }); // createTestApi moved to caret-mode-switch.ts; editorViewCtx lives there for caret placement and in crepe-config.ts for block-editor focus registration — the component itself never touches it.
 });
 describe("ManuscriptEditor — citekey insertion removed (now in plugin)", () => {
-  it.each([
-    "createSelectCitekeyHandler", "citationDispatchRef", "handleSelectCitekey",
-    "useCitationState", "onSelectCitekey", "CitationSelectHandler",
-  ])("does not contain %s", (token) => {
-    expect(manuscriptSource + crepeConfigSource).not.toContain(token);
-  });
+  it.each(["createSelectCitekeyHandler", "citationDispatchRef", "handleSelectCitekey", "useCitationState", "onSelectCitekey", "CitationSelectHandler"])("does not contain %s", (token) => { expect(manuscriptSource + crepeConfigSource).not.toContain(token); });
 });
 describe("ManuscriptEditor — editor wiring happens exactly once", () => {
   it("wires once across re-renders so one markdown update schedules one autosave", async () => {
@@ -292,4 +199,46 @@ describe("ManuscriptEditor — Cmd/Ctrl+S blocks without writing", () => {
     await waitFor(() => expect(getApi()).not.toBeNull(), { timeout: 10000 });
     expect(pressSave({ metaKey: true, code: "KeyB", key: "b" })).toBe(false);
   }, 20000);
+});
+
+describe("ManuscriptEditor — article assembly branch", () => {
+  /** Assembly path mounting the imported block editor (T14 assertion 4-6). */
+  const ARTICLE = "manuscripts/p/article.qmd";
+  /** Block directory referenced by the seeded assembly. */
+  const BLOCKS = "manuscripts/p/blocks";
+  /** Project key scoping the seeded collapse state (use-collapse-state storage). */
+  const PROJECT = "assembly-test";
+  /** Assembly source listing the given blocks in include order. */
+  const assemblyOf = (...shorts: string[]): string => `---\nmetadata-files:\n- _author.yml\n---\n\n${shorts.map((s) => `{{< include blocks/${s}.qmd >}}`).join("\n\n")}\n\n::: {#refs}\n:::\n`;
+  /** Canonical block file text with the given heading title. */
+  const blockOf = (short: string, title: string): string => `# ${title} {#sec-${short} .deo-section}\n`;
+  /**
+   * Seed the assembly workspace and render ManuscriptEditor on article.qmd.
+   * @param activeBlockPath - Initial value of the active-block signal prop.
+   * @returns The render result, seeded workspace, and an app factory for rerenders.
+   */
+  async function renderAssembly(activeBlockPath?: string) {
+    const workspace = new MemoryWorkspace(); const source = assemblyOf("intro", "methods");
+    await workspace.writeFile(ARTICLE, source); await workspace.writeFile(`${BLOCKS}/intro.qmd`, blockOf("intro", "Introduction")); await workspace.writeFile(`${BLOCKS}/methods.qmd`, blockOf("methods", "Methods"));
+    const app = (active?: string) => createElement(MilkdownProvider, null, createElement(ManuscriptEditor, { workspace, defaultValue: source, path: ARTICLE, projectId: PROJECT, activeBlockPath: active }));
+    const result = render(app(activeBlockPath)); return { ...result, workspace, app };
+  }
+  it("renders the assembly for manuscripts/<id>/article.qmd with one h1 per included block", async () => { await renderAssembly(); const headings = await screen.findAllByRole("heading", { level: 1 }); expect(headings.map((heading) => heading.textContent)).toEqual(["Introduction", "Methods"]); expect(screen.getByTestId("article-assembly")).not.toBeNull(); expect(document.querySelector("[data-milkdown-root]")).toBeNull(); expect(document.querySelector(".ProseMirror")).toBeNull(); }, 20000);
+  it("expands the active block's container and scrolls it into view", async () => {
+    // Seed intro as collapsed; blocks absent from the map start expanded.
+    localStorage.setItem(`opendraft:block-collapse:${PROJECT}`, JSON.stringify({ intro: true }));
+    const scrolled: Element[] = []; const proto = Element.prototype as unknown as { scrollIntoView?: (this: Element) => void }; const original = proto.scrollIntoView;
+    proto.scrollIntoView = function (this: Element) { scrolled.push(this); };
+    try {
+      const { rerender, app } = await renderAssembly(); await screen.findAllByRole("heading", { level: 1 });
+      const toggle = screen.getByRole("button", { name: "Introduction section" }); expect(toggle.getAttribute("aria-expanded")).toBe("false");
+      // The corresponding block file becomes active: reveal it in the assembly.
+      rerender(app("manuscripts/p/blocks/intro.qmd"));
+      await waitFor(() => expect(toggle.getAttribute("aria-expanded")).toBe("true"));
+      expect(scrolled).toContain(toggle.closest("section") as Element); expect(screen.getByRole("button", { name: "Methods section" }).getAttribute("aria-expanded")).toBe("true");
+    } finally {
+      if (original) proto.scrollIntoView = original; else delete proto.scrollIntoView; localStorage.clear();
+    }
+  }, 20000);
+  it("Edit assembly source swaps to the source-only editor with no Milkdown root", async () => { await renderAssembly(); await screen.findAllByRole("heading", { level: 1 }); expect(screen.getByTestId("article-assembly")).not.toBeNull(); fireEvent.click(screen.getByRole("button", { name: "Edit assembly source" })); await waitFor(() => expect(document.querySelector(".source-editor .cm-editor")).not.toBeNull(), { timeout: 10000 }); expect(screen.queryByTestId("article-assembly")).toBeNull(); expect(screen.getByTestId("manuscript-editor")).not.toBeNull(); expect(document.querySelector("[data-milkdown-root]")).toBeNull(); expect(document.querySelector(".ProseMirror")).toBeNull(); expect(document.querySelector(".cm-content")?.textContent).toContain("include blocks/intro.qmd"); }, 20000);
 });

@@ -98,8 +98,15 @@ as one `manuscript.md` at the workspace root:
   config-driven.
 - ADR-019's manifest/derived-assembly model is superseded for new manuscripts.
 
+> **Note (ADR-023):** The single-file manuscript editor described above is
+> superseded in part — the block editor mounts one collapsible Milkdown
+> container per section with section identity governed by ADR-023 (short
+> name, `sec-` anchor, DEO class).
+
 ## References
 
 - ADR-019: Block-Based Manuscript Editing (superseded in part)
+- ADR-023: Block Editor Section Identity (supersedes the single-file editor
+  in part)
 - Milkdown/Crepe docs and source (verified for CLI classes, parser/serializer
   pipeline, extension pattern)
