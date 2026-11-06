@@ -174,7 +174,7 @@ body {
 
 button,
 textarea {
-  @apply focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600;
+  @apply focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black;
 }
 
 /* outer fixed-height frame */

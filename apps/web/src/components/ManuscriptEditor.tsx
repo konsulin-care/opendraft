@@ -7,6 +7,7 @@ import { EditorFrame } from './editor-frame';
 import { getFileCapability } from '../project/file-capability';
 import { useDebouncedSaver } from './editor/autosave';
 import type { SaveStatus } from './AppHeader';
+import { ReadingColumn } from './ReadingColumn';
 
 export type { EditorTestApi } from '../caret-mode-switch';
 
@@ -80,7 +81,7 @@ export function ManuscriptEditor({
     >
       <div className="manuscript-editor" data-testid="manuscript-editor">
         <div ref={scrollContainerRef} tabIndex={-1} style={{ height: '100%', overflow: 'auto' }}>
-          <div className="reading-column">
+          <ReadingColumn>
             <SourceEditor
               ref={sourceEditorRef}
               value={sourceMarkdown}
@@ -88,7 +89,7 @@ export function ManuscriptEditor({
               className="source-editor"
               language="plain"
             />
-          </div>
+          </ReadingColumn>
         </div>
       </div>
     </EditorFrame>

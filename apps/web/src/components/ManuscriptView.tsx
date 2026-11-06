@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { BlockEditor } from '../block-editor/BlockEditor';
 import { useFocusScrollGuard } from '../hooks/useFocusScrollGuard';
+import { ReadingColumn } from './ReadingColumn';
 
 /** Props for {@link ManuscriptView}. */
 export interface ManuscriptViewProps {
@@ -31,9 +32,9 @@ export function ManuscriptView({ workspace, dir, projectKey }: ManuscriptViewPro
         tabIndex={-1}
         style={{ height: '100%', overflow: 'auto' }}
       >
-        <div className="reading-column">
+        <ReadingColumn>
           <BlockEditor ws={workspace} dir={dir} projectKey={projectKey} />
-        </div>
+        </ReadingColumn>
       </div>
     </div>
   );

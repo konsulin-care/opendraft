@@ -49,6 +49,15 @@ describe('index.css — block gutter removed', () => {
   });
 });
 
+describe('index.css — focus-visible outline', () => {
+  it('buttons and textareas use a black focus-visible outline instead of sky blue', () => {
+    const rule = css.match(/button,\s*textarea\s*\{[^}]*\}/s);
+    expect(rule, 'button, textarea rule must exist').not.toBeNull();
+    expect(rule![0]).toContain('focus-visible:outline-black');
+    expect(rule![0]).not.toContain('sky-600');
+  });
+});
+
 describe('index.css — shared reading column', () => {
   /** Returns the declaration block text for a top-level selector. */
   const block = (selector: string): string => {
@@ -120,14 +129,21 @@ describe('reading column wiring (source scan)', () => {
   /** Reads a source file relative to apps/web/src. */
   const read = (path: string): string => readFileSync(resolve(__dirname, path), 'utf-8');
 
-  it('ManuscriptView and ManuscriptEditor each declare exactly one .reading-column', () => {
+  it('ReadingColumn declares the shared .reading-column class exactly once', () => {
+    const column = read('components/ReadingColumn.tsx');
+    expect(column.split('className="reading-column"')).toHaveLength(2);
+  });
+
+  it('ManuscriptView and ManuscriptEditor each render their content inside ReadingColumn', () => {
     const view = read('components/ManuscriptView.tsx');
-    const viewColumns = view.split('className="reading-column"');
+    expect(view).not.toContain('className="reading-column"');
+    const viewColumns = view.split('<ReadingColumn');
     expect(viewColumns).toHaveLength(2);
     expect(viewColumns[1]).toContain('<BlockEditor');
 
     const editor = read('components/ManuscriptEditor.tsx');
-    const editorColumns = editor.split('className="reading-column"');
+    expect(editor).not.toContain('className="reading-column"');
+    const editorColumns = editor.split('<ReadingColumn');
     expect(editorColumns).toHaveLength(2);
     expect(editorColumns[1]).toContain('<SourceEditor');
     expect(editor).not.toContain('mode ===');
