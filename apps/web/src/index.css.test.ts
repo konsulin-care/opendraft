@@ -120,19 +120,17 @@ describe('reading column wiring (source scan)', () => {
   /** Reads a source file relative to apps/web/src. */
   const read = (path: string): string => readFileSync(resolve(__dirname, path), 'utf-8');
 
-  it('EditorSurface declares exactly one .reading-column holding the panel and both surfaces', () => {
-    const surface = read('components/EditorSurface.tsx');
-    // Exactly one reading-column declaration: one shared column, not one per mode.
-    const columns = surface.split('className="reading-column"');
-    expect(columns).toHaveLength(2);
-    const column = columns[1];
-    // The single column owns the panel and both mode surfaces.
-    expect(column).toContain('{panel}');
-    expect(column).toContain('<Milkdown />');
-    expect(column).toContain('<SourceEditor');
-    // No per-mode conditional panel: the panel renders exactly once.
-    expect(surface).not.toMatch(/mode\s*===\s*"[^"]*"\s*&&\s*panel/);
-    expect(surface.match(/\{\s*panel\s*\}/g)).toHaveLength(1);
+  it('ManuscriptView and ManuscriptEditor each declare exactly one .reading-column', () => {
+    const view = read('components/ManuscriptView.tsx');
+    const viewColumns = view.split('className="reading-column"');
+    expect(viewColumns).toHaveLength(2);
+    expect(viewColumns[1]).toContain('<BlockEditor');
+
+    const editor = read('components/ManuscriptEditor.tsx');
+    const editorColumns = editor.split('className="reading-column"');
+    expect(editorColumns).toHaveLength(2);
+    expect(editorColumns[1]).toContain('<SourceEditor');
+    expect(editor).not.toContain('mode ===');
   });
 
   it('FormattingToolbar row carries the shared column class, not a bespoke width', () => {

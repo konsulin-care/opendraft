@@ -16,44 +16,51 @@ describe('preferences', () => {
     localStorage.clear();
   });
 
-  it('returns the default (toolbar true, wysiwyg) when the key is missing', () => {
+  it('returns the default (toolbar true) when the key is missing', () => {
     const prefs = readPreferences();
     expect(prefs.v).toBe(PREFERENCES_VERSION);
     expect(prefs.formattingToolbar).toBe(true);
-    expect(prefs.editorMode).toBe('wysiwyg');
   });
 
   it('persists a v2 write so a fresh read returns the stored values', () => {
-    writePreferences({ formattingToolbar: false, editorMode: 'source' });
+    writePreferences({ formattingToolbar: false });
     expect(readPreferences().formattingToolbar).toBe(false);
-    expect(readPreferences().editorMode).toBe('source');
 
-    writePreferences({ formattingToolbar: true, editorMode: 'wysiwyg' });
+    writePreferences({ formattingToolbar: true });
     expect(readPreferences().formattingToolbar).toBe(true);
-    expect(readPreferences().editorMode).toBe('wysiwyg');
   });
 
-  it('writes under the opendraft:prefs key as { v: 2, formattingToolbar, editorMode }', () => {
-    writePreferences({ formattingToolbar: false, editorMode: 'source' });
+  it('writes under the opendraft:prefs key as { v: 2, formattingToolbar }', () => {
+    writePreferences({ formattingToolbar: false });
     const raw = localStorage.getItem(PREFERENCES_STORAGE_KEY);
     expect(raw).not.toBeNull();
     expect(JSON.parse(raw as string)).toEqual({
       v: 2,
       formattingToolbar: false,
-      editorMode: 'source',
     });
   });
 
-  it('preserves the stored editorMode when a write omits it', () => {
-    writePreferences({ formattingToolbar: true, editorMode: 'source' });
-    writePreferences({ formattingToolbar: false });
-    const prefs = readPreferences();
-    expect(prefs.formattingToolbar).toBe(false);
-    expect(prefs.editorMode).toBe('source');
+  it('carries no editorMode field anywhere in the payload', () => {
+    writePreferences({ formattingToolbar: true });
+    const stored = JSON.parse(localStorage.getItem(PREFERENCES_STORAGE_KEY) as string);
+    expect(Object.keys(stored)).toEqual(['v', 'formattingToolbar']);
+    expect('editorMode' in readPreferences()).toBe(false);
   });
 });
 
-describe('preferences v1 migration', () => {
+/** Seed a legacy v1 payload and assert the migrated read. */
+function expectV1Migration(formattingToolbar: boolean): void {
+  localStorage.setItem(
+    PREFERENCES_STORAGE_KEY,
+    JSON.stringify({ v: 1, formattingToolbar }),
+  );
+  expect(readPreferences()).toEqual({
+    v: 2,
+    formattingToolbar,
+  });
+}
+
+describe('preferences legacy migration', () => {
   beforeEach(() => {
     localStorage.clear();
   });
@@ -63,16 +70,8 @@ describe('preferences v1 migration', () => {
     localStorage.clear();
   });
 
-  it('migrates a v1 payload preserving formattingToolbar and defaulting editorMode to wysiwyg', () => {
-    localStorage.setItem(
-      PREFERENCES_STORAGE_KEY,
-      JSON.stringify({ v: 1, formattingToolbar: false }),
-    );
-    expect(readPreferences()).toEqual({
-      v: 2,
-      formattingToolbar: false,
-      editorMode: 'wysiwyg',
-    });
+  it('migrates a v1 payload preserving formattingToolbar', () => {
+    expectV1Migration(false);
   });
 
   it('migrates a v1 payload with formattingToolbar true', () => {
@@ -83,11 +82,10 @@ describe('preferences v1 migration', () => {
     expect(readPreferences()).toEqual({
       v: 2,
       formattingToolbar: true,
-      editorMode: 'wysiwyg',
     });
   });
 
-  it('reads back a v2 payload with all fields', () => {
+  it('migrates a v2 payload still carrying a leftover editorMode field', () => {
     localStorage.setItem(
       PREFERENCES_STORAGE_KEY,
       JSON.stringify({ v: 2, formattingToolbar: false, editorMode: 'source' }),
@@ -95,7 +93,17 @@ describe('preferences v1 migration', () => {
     expect(readPreferences()).toEqual({
       v: 2,
       formattingToolbar: false,
-      editorMode: 'source',
+    });
+  });
+
+  it('reads back a v2 payload with all fields', () => {
+    localStorage.setItem(
+      PREFERENCES_STORAGE_KEY,
+      JSON.stringify({ v: 2, formattingToolbar: false }),
+    );
+    expect(readPreferences()).toEqual({
+      v: 2,
+      formattingToolbar: false,
     });
   });
 });
@@ -117,34 +125,22 @@ describe('preferences fallbacks', () => {
       prefs = readPreferences();
     }).not.toThrow();
     expect(prefs?.formattingToolbar).toBe(true);
-    expect(prefs?.editorMode).toBe('wysiwyg');
   });
 
   it('falls back to the default for a future version without throwing', () => {
     localStorage.setItem(
       PREFERENCES_STORAGE_KEY,
-      JSON.stringify({ v: 3, formattingToolbar: false, editorMode: 'source' }),
+      JSON.stringify({ v: 3, formattingToolbar: false }),
     );
     expect(readPreferences().formattingToolbar).toBe(true);
-    expect(readPreferences().editorMode).toBe('wysiwyg');
   });
 
   it('falls back to the default for an invalid shape without throwing', () => {
     localStorage.setItem(
       PREFERENCES_STORAGE_KEY,
-      JSON.stringify({ v: 2, formattingToolbar: 'yes', editorMode: 'source' }),
+      JSON.stringify({ v: 2, formattingToolbar: 'yes' }),
     );
     expect(readPreferences().formattingToolbar).toBe(true);
-    expect(readPreferences().editorMode).toBe('wysiwyg');
-  });
-
-  it('falls back to the default for an unknown editorMode', () => {
-    localStorage.setItem(
-      PREFERENCES_STORAGE_KEY,
-      JSON.stringify({ v: 2, formattingToolbar: false, editorMode: 'vim' }),
-    );
-    expect(readPreferences().formattingToolbar).toBe(true);
-    expect(readPreferences().editorMode).toBe('wysiwyg');
   });
 });
 
@@ -167,7 +163,6 @@ describe('preferences with unavailable storage', () => {
       prefs = readPreferences();
     }).not.toThrow();
     expect(prefs?.formattingToolbar).toBe(true);
-    expect(prefs?.editorMode).toBe('wysiwyg');
   });
 
   it('does not throw when localStorage writes throw', () => {
@@ -175,7 +170,7 @@ describe('preferences with unavailable storage', () => {
       throw new Error('storage disabled');
     });
     expect(() => {
-      writePreferences({ formattingToolbar: false, editorMode: 'source' });
+      writePreferences({ formattingToolbar: false });
     }).not.toThrow();
   });
 });

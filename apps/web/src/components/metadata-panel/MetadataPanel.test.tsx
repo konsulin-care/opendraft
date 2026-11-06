@@ -284,13 +284,13 @@ describe('MetadataPanel narrow sheet reading column', () => {
 });
 
 describe('MetadataPanel editor integration', () => {
-  it('renders for a manuscript path and not for opendraft.yml', async () => {
+  it('is never rendered by the source-only editor', async () => {
     const ws = await seededWorkspace(SEEDED);
-    const { unmount } = render(<ManuscriptEditor workspace={ws} defaultValue="key: value" path="manuscripts/x/blocks/A.qmd" mode="source" projectId={PROJECT} />);
-    await waitFor(() => expect(screen.getByTestId('metadata-panel')).toBeDefined());
-    expect(screen.getByTestId('metadata-panel-byline').textContent).toContain('Alice Marie Smith, Budi Lee');
+    const { unmount } = render(<ManuscriptEditor workspace={ws} defaultValue="key: value" path="manuscripts/x/blocks/A.qmd" />);
+    await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined());
+    expect(screen.queryByTestId('metadata-panel')).toBeNull();
     unmount();
-    render(<ManuscriptEditor workspace={ws} defaultValue="key: value" path="opendraft.yml" mode="source" projectId={PROJECT} />);
+    render(<ManuscriptEditor workspace={ws} defaultValue="key: value" path="opendraft.yml" />);
     await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined());
     expect(screen.queryByTestId('metadata-panel')).toBeNull();
   });

@@ -71,7 +71,6 @@ describe('FormattingToolbar dividers (visible groups only)', () => {
     // Between Redo and Paragraph style, and between Paragraph style and Bold.
     expect(dividerIndexes).toEqual([2, 4]);
   });
-
   it('renders one divider between the two visible groups, none for empty groups', () => {
     overflow.visibleCount = 1;
     const { container } = render(<FormattingToolbar commands={fakeCommands()} />);
@@ -138,7 +137,6 @@ describe('FormattingToolbar More menu overflow entries', () => {
       expect(item.querySelector('svg')?.getAttribute('class')).toContain(icon);
     }
   });
-
   it('portals to document.body and closes after selecting an item', () => {
     const commands = fakeCommands();
     const { container } = render(<FormattingToolbar commands={commands} />);
@@ -259,7 +257,6 @@ describe('index.css responsive layout (source scan)', () => {
     const closed = css.slice(css.indexOf('.editor-toolbar-collapse.is-closed'));
     expect(closed).toMatch(/max-height: 0[\s\S]*opacity: 0/);
   });
-
   it('drops the transition under prefers-reduced-motion', () => expect(css.slice(css.indexOf('prefers-reduced-motion'))).toMatch(/\.editor-toolbar-collapse\s*\{[^}]*transition:\s*none/));
 
   it('uses one shared 80% reading column, capped, and full-width editor surfaces', () => {
@@ -277,11 +274,15 @@ describe('index.css responsive layout (source scan)', () => {
 describe('Responsive header actions (source scan)', () => {
   const read = (name: string) => readFileSync(resolve(__dirname, name), 'utf-8');
 
-  it('keeps the mode toggle and Commit hidden below md, in the overflow menu instead', () => {
-    expect(read('ModeSwitch.tsx')).toMatch(/className="[^"]*\bhidden\b[^"]*\bmd:flex\b/);
+  it('keeps the Commit button hidden below md, in the overflow menu instead', () => {
     expect(read('AppHeader.tsx')).toMatch(/bg-black text-white hover:bg-gray-900[^\n]*hidden md:inline-flex/);
     expect(read('AppHeader.tsx')).toMatch(/className=\{COMMIT_BUTTON\}/);
     expect(read('HeaderOverflowMenu.tsx')).toMatch(/className="relative md:hidden"/);
+  });
+
+  it('renders no mode switch anywhere in the header sources', () => {
+    expect(read('AppHeader.tsx')).not.toContain('ModeSwitch');
+    expect(read('HeaderOverflowMenu.tsx')).not.toContain('onSelectMode');
   });
 });
 

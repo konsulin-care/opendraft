@@ -2,7 +2,6 @@ import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useToolbarPreference } from './useToolbarPreference';
 import { PREFERENCES_STORAGE_KEY, readPreferences, writePreferences } from '../preferences';
-import type { EditorMode } from '../preferences';
 
 /**
  * Dispatch a keydown event on window.
@@ -37,13 +36,11 @@ function mockPlatform(platform: string): void {
 
 /**
  * Press Ctrl+\ twice via the bound shortcut and assert the stored
- * formattingToolbar flips each time while the stored editorMode is preserved.
- *
- * @param mode - Editor mode to pre-store before pressing the shortcut.
+ * formattingToolbar flips each time.
  */
-function expectShortcutFlipsStored(mode: EditorMode): void {
+function expectShortcutFlipsStored(): void {
   mockPlatform('Linux x86_64');
-  writePreferences({ formattingToolbar: true, editorMode: mode });
+  writePreferences({ formattingToolbar: true });
   const { result } = renderHook(() => useToolbarPreference());
   expect(result.current.formattingToolbar).toBe(true);
 
@@ -54,7 +51,6 @@ function expectShortcutFlipsStored(mode: EditorMode): void {
   expect(readPreferences()).toEqual({
     v: 2,
     formattingToolbar: false,
-    editorMode: mode,
   });
 
   act(() => {
@@ -64,7 +60,6 @@ function expectShortcutFlipsStored(mode: EditorMode): void {
   expect(readPreferences()).toEqual({
     v: 2,
     formattingToolbar: true,
-    editorMode: mode,
   });
 }
 
@@ -102,7 +97,6 @@ describe('useToolbarPreference preference and toggle', () => {
     ).toEqual({
       v: 2,
       formattingToolbar: false,
-      editorMode: 'wysiwyg',
     });
 
     act(() => {
@@ -156,12 +150,8 @@ describe('useToolbarPreference Mod+\\ shortcut', () => {
   });
 });
 
-describe('useToolbarPreference shortcut across editor modes', () => {
-  it('flips the stored preference in wysiwyg mode', () => {
-    expectShortcutFlipsStored('wysiwyg');
-  });
-
-  it('flips the stored preference in source mode and preserves editorMode', () => {
-    expectShortcutFlipsStored('source');
+describe('useToolbarPreference shortcut', () => {
+  it('flips the stored preference twice in a row', () => {
+    expectShortcutFlipsStored();
   });
 });

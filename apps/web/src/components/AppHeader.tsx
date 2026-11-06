@@ -10,12 +10,8 @@ import type { LucideIcon } from 'lucide-react';
 import type { RefObject } from 'react';
 import { APP_BAR_HEIGHT } from './app-bar-layout';
 import { PROJECT_DRAWER_ID } from './project-drawer/ProjectDrawer';
-import { ModeSwitch } from './ModeSwitch';
-import type { EditorMode } from './ModeSwitch';
 import { HeaderOverflowMenu } from './HeaderOverflowMenu';
 import { InlineEditField } from './InlineEditField';
-
-export type { EditorMode } from './ModeSwitch';
 
 /** Autosave state shown in the header. */
 export type SaveStatus = 'saved' | 'saving' | 'error';
@@ -55,37 +51,23 @@ function SaveIndicator({ status }: SaveIndicatorProps) {
 
 /** Props for {@link HeaderActions}. */
 interface HeaderActionsProps {
-  /** Current editing mode. */
-  mode: EditorMode;
-  /** Called when the user picks an editing mode. */
-  onSelectMode: (mode: EditorMode) => void;
   /** Whether the formatting toolbar is currently shown. */
   formattingToolbar: boolean;
   /** Called when the formatting-toolbar toggle is activated. */
   onToggleFormattingToolbar: () => void;
   /** Called when the Commit action is activated. */
   onCommit: () => void;
-  /** Disables the mode switch when visual mode is unavailable for the file. */
-  modeSwitchDisabled?: boolean;
 }
 
 /**
- * Right-hand header controls: mode switch, toolbar toggle, Commit, and the
- * overflow menu that replaces the first two on small screens.
+ * Right-hand header controls: the toolbar toggle, Commit, and the
+ * overflow menu that carries Commit on small screens.
  *
  * @param props - See {@link HeaderActionsProps}.
  */
-function HeaderActions({
-  mode,
-  onSelectMode,
-  formattingToolbar,
-  onToggleFormattingToolbar,
-  onCommit,
-  modeSwitchDisabled = false,
-}: HeaderActionsProps) {
+function HeaderActions({ formattingToolbar, onToggleFormattingToolbar, onCommit }: HeaderActionsProps) {
   return (
     <div className="flex items-center gap-1">
-      <ModeSwitch mode={mode} onSelectMode={onSelectMode} disabled={modeSwitchDisabled} />
       <button
         type="button"
         aria-label="Formatting toolbar"
@@ -106,7 +88,7 @@ function HeaderActions({
         <GitBranch className="h-4 w-4" aria-hidden="true" />
         <span className="hidden md:inline text-xs">Commit</span>
       </button>
-      <HeaderOverflowMenu mode={mode} onSelectMode={onSelectMode} onCommit={onCommit} />
+      <HeaderOverflowMenu onCommit={onCommit} />
     </div>
   );
 }
@@ -130,10 +112,10 @@ export interface AppHeaderProps {
   onRenameManuscript?: (name: string) => void | Promise<void>;
   /** Called with the trimmed name when the user renames the project. */
   onRenameProject?: (name: string) => void | Promise<void>;
-  /** Current editing mode. */
-  mode: EditorMode;
-  /** Called when the user picks an editing mode. */
-  onSelectMode: (mode: EditorMode) => void;
+  /** @deprecated The editor-mode system was removed; ignored. */
+  mode?: 'wysiwyg' | 'source';
+  /** @deprecated The editor-mode system was removed; ignored. */
+  onSelectMode?: (mode: 'wysiwyg' | 'source') => void;
   /** Current autosave state. */
   saveStatus: SaveStatus;
   /** Whether the formatting toolbar is currently shown. */
@@ -142,8 +124,6 @@ export interface AppHeaderProps {
   onToggleFormattingToolbar: () => void;
   /** Called when the Commit action is activated. */
   onCommit: () => void;
-  /** Disables the mode switch when visual mode is unavailable for the file type. */
-  modeSwitchDisabled?: boolean;
   /** Called when the book button toggles the project drawer. */
   onToggleSidebar?: () => void;
   /** Whether the project drawer is currently open. */
@@ -209,13 +189,10 @@ export function AppHeader({
   manuscriptName,
   manuscriptDir,
   onRename, onRenameManuscript, onRenameProject,
-  mode,
-  onSelectMode,
   saveStatus,
   formattingToolbar,
   onToggleFormattingToolbar,
   onCommit,
-  modeSwitchDisabled,
   onToggleSidebar,
   sidebarOpen = false,
   toggleButtonRef,
@@ -244,12 +221,9 @@ export function AppHeader({
       />
       <SaveIndicator status={saveStatus} />
       <HeaderActions
-        mode={mode}
-        onSelectMode={onSelectMode}
         formattingToolbar={formattingToolbar}
         onToggleFormattingToolbar={onToggleFormattingToolbar}
         onCommit={onCommit}
-        modeSwitchDisabled={modeSwitchDisabled}
       />
     </header>
   );
