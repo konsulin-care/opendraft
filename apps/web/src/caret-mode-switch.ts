@@ -1,19 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { editorViewCtx } from '@milkdown/kit/core';
 import type { Editor } from '@milkdown/kit/core';
-import { editorViewCtx, parserCtx, serializerCtx } from '@milkdown/kit/core';
 import { getMarkdown, replaceAll } from '@milkdown/kit/utils';
 import { Selection, TextSelection } from '@milkdown/kit/prose/state';
 import type { EditorView } from '@milkdown/kit/prose/view';
-import { visualSelectionToSourceOffset, sourceOffsetToVisualPosition } from './caret-sync';
-import type { SourceEditorHandle } from './components/SourceEditor';
-
-/** Editing mode shared by the visual and source surfaces. */
-export type EditorMode = 'wysiwyg' | 'source';
-
-/** Mutable ref shape used by the mode switcher. */
-interface Ref<T> {
-  current: T;
-}
 
 /** Registered block editors, most recently registered last. */
 const blockEditors: Editor[] = [];
@@ -22,8 +11,7 @@ const blockEditors: Editor[] = [];
 let focusedBlockEditor: Editor | null = null;
 
 /**
- * Register a mounted block editor so toolbar commands and caret/content
- * sync can target it.
+ * Register a mounted block editor so toolbar commands can target it.
  *
  * @param editor - The Milkdown editor of a mounted block.
  * @returns Callback removing the editor from the registry (idempotent).
@@ -40,7 +28,7 @@ export function registerBlockEditor(editor: Editor): () => void {
  *
  * @param editor - The editor to remove.
  */
-export function unregisterBlockEditor(editor: Editor): void {
+function unregisterBlockEditor(editor: Editor): void {
   const index = blockEditors.indexOf(editor);
   if (index >= 0) blockEditors.splice(index, 1);
   if (blockEditors.length === 0) focusedBlockEditor = null;
@@ -56,9 +44,10 @@ export function focusBlockEditor(editor: Editor): void {
 }
 
 /**
- * The block editor toolbar commands and caret/content sync target: the
- * most recently focused registered editor, falling back to the most
- * recently registered one.
+ * The block editor toolbar commands target: the most recently focused
+ * registered editor, falling back to the most recently registered one.
+ * Exported for {@link useEditorCommands}, which binds the Milkdown command
+ * set to it.
  *
  * @returns The active block editor, or undefined when none is registered.
  */
@@ -77,8 +66,6 @@ export interface EditorTestApi {
   getMarkdown(): string;
   /** Replace the entire editor content with new markdown. */
   setMarkdown(markdown: string): void;
-  /** Switch between wysiwyg and source mode. */
-  setMode(mode: EditorMode): void;
   /** Current visual (ProseMirror) selection position. */
   getCaret(): number;
   /** Place the visual caret; values past the end clamp to the document end. */
@@ -88,11 +75,17 @@ export interface EditorTestApi {
 /**
  * Build the imperative test/external API around a milkdown editor.
  *
+ * The second parameter is accepted for callers that still pass a surface
+ * switch callback; with the editor-mode system removed it is ignored.
+ *
  * @param editor - The Milkdown editor instance to wrap.
- * @param syncContent - Callback switching the surface between modes.
+ * @param _syncContent - Unused legacy mode-switch callback.
  * @returns The imperative API bound to the editor.
  */
-export function createTestApi(editor: Editor, syncContent: (mode: EditorMode) => void): EditorTestApi {
+export function createTestApi(
+  editor: Editor,
+  _syncContent?: (mode: 'wysiwyg' | 'source') => void,
+): EditorTestApi {
   return {
     insertText: (text) => {
       editor.action((ctx) => {
@@ -103,7 +96,6 @@ export function createTestApi(editor: Editor, syncContent: (mode: EditorMode) =>
     },
     getMarkdown: () => editor.action(getMarkdown()),
     setMarkdown: (markdown) => editor.action(replaceAll(markdown)),
-    setMode: syncContent,
     getCaret: () => editor.action((ctx) => ctx.get(editorViewCtx).state.selection.from),
     setCaret: (pos) => editor.action((ctx) => placeVisualCaret(ctx.get(editorViewCtx), pos)),
   };
@@ -115,104 +107,10 @@ export function createTestApi(editor: Editor, syncContent: (mode: EditorMode) =>
  * @param view - ProseMirror view of the visual editor.
  * @param pos - Target position, clamped to the document; null places the caret at document start.
  */
-export function placeVisualCaret(view: EditorView, pos: number | null): void {
+function placeVisualCaret(view: EditorView, pos: number | null): void {
   const { doc } = view.state;
   const selection = pos === null
     ? Selection.atStart(doc)
     : TextSelection.near(doc.resolve(Math.max(0, Math.min(pos, doc.content.size))));
   view.dispatch(view.state.tr.setSelection(selection).scrollIntoView());
-}
-
-/**
- * Place the visual caret at document start once the editor is ready. Later
- * re-renders and re-wiring do not move it again.
- *
- * @param loading - Whether the editor is still loading.
- * @param getEditor - Returns the Milkdown editor, or nullish before it exists.
- */
-export function useInitialCaret(loading: boolean, getEditor: () => Editor | null | undefined): void {
-  const placedRef = useRef(false);
-  useEffect(() => {
-    if (placedRef.current) return;
-    const editor = getEditor();
-    if (!editor) return;
-    placedRef.current = true;
-    editor.action((ctx) => placeVisualCaret(ctx.get(editorViewCtx), null));
-  }, [loading, getEditor]);
-}
-
-/**
- * Visual to source: serialize the document and move the source caret to the
- * markdown offset of the visual caret.
- *
- * @returns The serialized markdown that was loaded into the source editor.
- */
-function enterSourceMode(editor: Editor, source: SourceEditorHandle | null): string {
-  const { markdown, offset } = editor.action((ctx) => {
-    const view = ctx.get(editorViewCtx);
-    const serialize = ctx.get(serializerCtx);
-    return {
-      markdown: serialize(view.state.doc),
-      offset: visualSelectionToSourceOffset({
-        doc: view.state.doc,
-        pos: view.state.selection.from,
-        serialize,
-      }),
-    };
-  });
-  source?.setContent(markdown, offset);
-  return markdown;
-}
-
-/**
- * Source to visual: replace the document with the source markdown and move
- * the visual caret to the position mapped from the source caret.
- */
-function enterVisualMode(editor: Editor, source: SourceEditorHandle | null): void {
-  const view = source?.getView();
-  if (!view) return;
-  const markdown = view.state.doc.toString();
-  const offset = view.state.selection.main.head;
-  const mapped = editor.action((ctx) =>
-    sourceOffsetToVisualPosition({
-      markdown,
-      offset,
-      parse: (text) => ctx.get(parserCtx)(text),
-    }),
-  );
-  editor.action(replaceAll(markdown));
-  editor.action((ctx) =>
-    placeVisualCaret(ctx.get(editorViewCtx), mapped.found ? mapped.pos : null),
-  );
-}
-
-/**
- * Build the callback that synchronizes content and caret when the mode changes.
- * Reads refs at call time, so the callback can be created once and reused.
- *
- * Reads the active (focused) block editor at call time, falling back to
- * this instance's editor ref when no block editor is registered.
- *
- * @param editorRef - Visual (Milkdown) editor ref, used as the fallback.
- * @param sourceRef - Source (CodeMirror) editor handle ref.
- * @param prevModeRef - Last applied mode; updated on every call.
- * @param setSourceMarkdown - State setter for the source markdown.
- * @returns Callback invoked with the new mode.
- */
-export function createModeSwitcher(
-  editorRef: Ref<Editor | null>,
-  sourceRef: Ref<SourceEditorHandle | null>,
-  prevModeRef: Ref<EditorMode>,
-  setSourceMarkdown: (md: string) => void,
-): (mode: EditorMode) => void {
-  return (newMode) => {
-    const editor = getActiveBlockEditor() ?? editorRef.current;
-    if (!editor) return;
-    if (newMode === 'source' && prevModeRef.current === 'wysiwyg') {
-      setSourceMarkdown(enterSourceMode(editor, sourceRef.current));
-    } else if (newMode === 'wysiwyg' && prevModeRef.current === 'source') {
-      enterVisualMode(editor, sourceRef.current);
-    }
-    prevModeRef.current = newMode;
-  };
 }
