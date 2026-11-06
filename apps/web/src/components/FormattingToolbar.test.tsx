@@ -39,19 +39,13 @@ function fakeCommands(active: ActiveState = INACTIVE_STATE, canFormat = true): E
 
 /** Accessible aria-label of every inline row button, More trigger included. */
 function inlineNames(container: HTMLElement): Array<string | null> {
-  const toolbar = container.querySelector('[role="toolbar"]')!;
-  return within(toolbar as HTMLElement).getAllByRole('button').map((button) => button.getAttribute('aria-label'));
+  return within(container.querySelector('[role="toolbar"]') as HTMLElement).getAllByRole('button').map((button) => button.getAttribute('aria-label'));
 }
 
 /** The inner row div holding the inline items and the More trigger. */
-function rowOf(container: HTMLElement): HTMLElement {
-  return container.querySelector('[role="toolbar"] > div') as HTMLElement;
-}
+function rowOf(container: HTMLElement): HTMLElement { return container.querySelector('[role="toolbar"] > div') as HTMLElement; }
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  overflow.visibleCount = 6;
-});
+beforeEach(() => { vi.clearAllMocks(); overflow.visibleCount = 6; });
 
 describe('FormattingToolbar inline row (visible count 6)', () => {
   it('renders the first six items inline in priority order, then More, no Insert', () => {
@@ -209,6 +203,11 @@ describe('FormattingToolbar visibility and responsiveness', () => {
     expect(off.container.querySelector('[role="toolbar"]')).toBeNull();
     const on = render(<EditorToolbars commands={fakeCommands()} formattingToolbar={true} />);
     expect(on.container.querySelector('[role="toolbar"]')).not.toBeNull();
+  });
+
+  it('renders no toolbar row through EditorToolbars in the source view', () => {
+    const { container } = render(<EditorToolbars commands={fakeCommands()} formattingToolbar mode="source" />);
+    expect(container.querySelector('[role="toolbar"]')).toBeNull();
   });
 
   it('hides below md; row uses the shared reading column and the outer wrapper keeps w-full', () => {

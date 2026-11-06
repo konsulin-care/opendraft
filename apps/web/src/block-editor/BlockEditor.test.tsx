@@ -18,6 +18,9 @@ const DIR = 'manuscripts/demo';
 /** Path of the assembly under test. */
 const ARTICLE = `${DIR}/article.qmd`;
 
+/** Assembly with no includes — the empty manuscript fixture. */
+const EMPTY_ARTICLE = '---\nmetadata-files:\n- _author.yml\n---\n\n::: {#refs}\n:::\n';
+
 /** Path of the block directory under test. */
 const BLOCKS = `${DIR}/blocks`;
 
@@ -60,6 +63,20 @@ async function setup(files: Record<string, string>): Promise<WorkspaceAdapter> {
   return ws;
 }
 
+/**
+ * Write an empty assembly into a fresh workspace and render the shell.
+ * Waits for the empty-state picker instead of block headings.
+ *
+ * @returns The workspace the rendered editor reads and writes.
+ */
+async function setupEmpty(): Promise<WorkspaceAdapter> {
+  const ws = new MemoryWorkspace();
+  await ws.writeFile(ARTICLE, EMPTY_ARTICLE);
+  render(<BlockEditor ws={ws} dir={DIR} projectKey="block-editor-test" />);
+  await screen.findByRole('button', { name: 'Introduction' });
+  return ws;
+}
+
 describe('BlockEditor container list', () => {
   it('renders one collapsible container per included block in include order', async () => {
     await setup({
@@ -91,9 +108,10 @@ describe('BlockEditor insert points', () => {
       [`${BLOCKS}/beta.qmd`]: blockFile('beta', 'Beta'),
     });
 
-    // One '+' between the two blocks and one after the last.
+    // One hover '+' before each block; the trailing hover point is
+    // replaced by the always-visible '+ Add section' button.
     const points = screen.getAllByRole('button', { name: 'Insert block here' });
-    expect(points).toHaveLength(3);
+    expect(points).toHaveLength(2);
 
     // The middle insert point opens the form between Alpha and Beta.
     fireEvent.click(points[1]);
@@ -107,11 +125,10 @@ describe('BlockEditor insert points', () => {
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
 
-    // Escape closes it; the end insert point opens the form after Beta.
+    // Escape closes it; '+ Add section' opens the form after Beta.
     fireEvent.keyDown(screen.getByLabelText('Title'), { key: 'Escape' });
     expect(screen.queryByLabelText('Add block')).toBeNull();
-    const endPoints = screen.getAllByRole('button', { name: 'Insert block here' });
-    fireEvent.click(endPoints[2]);
+    fireEvent.click(screen.getByRole('button', { name: '+ Add section' }));
     form = screen.getByLabelText('Add block');
     expect(beta.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
@@ -187,5 +204,34 @@ describe('BlockEditor delete flow', () => {
     expect(await ws.readFile(`${BLOCKS}/alpha.qmd`)).toBeNull();
     expect(await ws.readFile(ARTICLE)).not.toContain('blocks/alpha.qmd');
     expect(await ws.readFile(ARTICLE)).toContain('blocks/beta.qmd');
+  });
+});
+
+describe('BlockEditor empty state', () => {
+  it('renders the preset picker instead of the block list when no blocks exist', async () => {
+    await setupEmpty();
+    for (const name of ['Introduction', 'Methods', 'Results', 'Discussion', 'Conclusion']) {
+      expect(screen.getByRole('button', { name })).toBeInTheDocument();
+    }
+    expect(screen.queryByRole('button', { name: '+ Add section' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Insert block here' })).toBeNull();
+  });
+});
+
+describe('BlockEditor add section button', () => {
+  it("renders an always-visible '+ Add section' with no hover-only classes", async () => {
+    await setup({
+      [ARTICLE]: articleWith('alpha'),
+      [`${BLOCKS}/alpha.qmd`]: blockFile('alpha', 'Alpha'),
+    });
+    const add = screen.getByRole('button', { name: '+ Add section' });
+    expect(add.className).not.toContain('opacity-0');
+    expect(add.className).not.toContain('hidden');
+    // The between-block insert point stays hover-only.
+    const points = screen.getAllByRole('button', { name: 'Insert block here' });
+    expect(points).toHaveLength(1);
+    expect(points[0].className).toContain('opacity-0');
+    fireEvent.click(add);
+    expect(screen.getByLabelText('Add block')).toBeInTheDocument();
   });
 });

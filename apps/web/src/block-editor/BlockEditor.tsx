@@ -10,6 +10,7 @@ import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { AddBlockForm } from './AddBlockForm';
 import type { BlockDraft } from './AddBlockForm';
 import { BlockContainer } from './BlockContainer';
+import { EmptyState } from './EmptyState';
 import { useBlocks } from './use-blocks';
 import type { BlockEntry } from './use-blocks';
 import { useCollapseState } from './use-collapse-state';
@@ -223,29 +224,26 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
   const [deleting, setDeleting] = useState<DeleteTarget | null>(null);
   const closeForm = (): void => setAddingAt(null);
   const createAt = (position: number) => (draft: BlockDraft): void => {
-    closeForm();
-    void createBlock(position, draft.title);
+    closeForm(); void createBlock(position, draft.title);
   };
   const openDelete = (block: BlockEntry): void => {
-    void findBreakingRefs(ws, dir, block.short).then((refs) =>
-      setDeleting({ short: block.short, title: block.title, refs }));
+    void findBreakingRefs(ws, dir, block.short).then((refs) => setDeleting({ short: block.short, title: block.title, refs }));
   };
   const confirmDelete = async (): Promise<void> => {
     if (deleting === null) return;
-    await deleteBlock(deleting.short);
-    setDeleting(null);
+    await deleteBlock(deleting.short); setDeleting(null);
   };
   const closeDelete = (): void => setDeleting(null);
   if (loading) return null;
+  // Loaded with zero blocks: the preset picker replaces the whole list.
+  if (blocks.length === 0) return <EmptyState onCreate={createAt(0)} />;
   return (
     <div className="space-y-2">
       {blocks.map((block, index) => (
         <BlockRow
           key={block.short}
-          block={block}
-          formOpen={addingAt === index}
-          taken={shorts}
-          collapsed={isCollapsed(block.short)}
+          block={block} formOpen={addingAt === index}
+          taken={shorts} collapsed={isCollapsed(block.short)}
           onToggle={() => toggle(block.short)}
           onOverflow={() => openDelete(block)}
           onAdd={() => setAddingAt(index)}
@@ -253,11 +251,14 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
           onClose={closeForm}
         />
       ))}
-      <div className="group">
-        <InsertPoint onAdd={() => setAddingAt(blocks.length)} />
-        {addingAt === blocks.length && (
-          <AddBlockForm taken={shorts} onCreate={createAt(blocks.length)} onClose={closeForm} />
-        )}
+      <div>
+        <button
+          type="button" onClick={() => setAddingAt(blocks.length)}
+          className="flex h-9 w-full items-center justify-center rounded-md border border-dashed border-gray-300 text-sm text-gray-500 hover:bg-gray-50"
+        >
+          + Add section
+        </button>
+        {addingAt === blocks.length && <AddBlockForm taken={shorts} onCreate={createAt(blocks.length)} onClose={closeForm} />}
       </div>
       <DeleteConfirm target={deleting} onConfirm={confirmDelete} onCancel={closeDelete} />
     </div>
