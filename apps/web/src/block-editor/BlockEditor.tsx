@@ -7,8 +7,10 @@
  */
 import { useState } from 'react';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
+import type { SaveStatus } from '../components/AppHeader';
 import { AddBlockForm } from './AddBlockForm';
 import type { BlockDraft } from './AddBlockForm';
+import { BlockBody } from './BlockBody';
 import { BlockContainer } from './BlockContainer';
 import { EmptyState } from './EmptyState';
 import { useBlocks } from './use-blocks';
@@ -95,6 +97,10 @@ interface BlockRowProps {
   taken: readonly string[];
   /** Whether the block body is collapsed. */
   collapsed: boolean;
+  /** Workspace holding the manuscript files, forwarded to the body. */
+  ws: WorkspaceAdapter;
+  /** Manuscript directory, forwarded to the body. */
+  dir: string;
   /** Flip the collapsed state. */
   onToggle: () => void;
   /** Open the delete confirmation for this block. */
@@ -119,12 +125,16 @@ function BlockRow({
   formOpen,
   taken,
   collapsed,
+  ws,
+  dir,
   onToggle,
   onOverflow,
   onAdd,
   onCreate,
   onClose,
 }: BlockRowProps) {
+  const [wordCount, setWordCount] = useState(0);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   return (
     <div className="group">
       <InsertPoint onAdd={onAdd} />
@@ -136,7 +146,19 @@ function BlockRow({
         collapsed={collapsed}
         onToggle={onToggle}
         onOverflow={onOverflow}
-      />
+        wordCount={wordCount}
+        saveStatus={saveStatus}
+      >
+        <BlockBody
+          ws={ws}
+          dir={dir}
+          short={block.short}
+          title={block.title}
+          collapsed={collapsed}
+          onWordCount={setWordCount}
+          onSaveStatus={setSaveStatus}
+        />
+      </BlockContainer>
     </div>
   );
 }
@@ -244,6 +266,7 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
           key={block.short}
           block={block} formOpen={addingAt === index}
           taken={shorts} collapsed={isCollapsed(block.short)}
+          ws={ws} dir={dir}
           onToggle={() => toggle(block.short)}
           onOverflow={() => openDelete(block)}
           onAdd={() => setAddingAt(index)}
