@@ -27,6 +27,7 @@ export default tseslint.config(
       '**/build/**',
       '**/coverage/**',
       '**/*.min.js',
+      '.pi/**',
       'pnpm-lock.yaml',
     ],
   },

@@ -12,7 +12,7 @@ set -euo pipefail
 
 MAX_LINES=300
 PATTERN='\.(go|ts|tsx)$'
-EXCLUDED='pnpm-lock\.yaml|package-lock\.json|.*\.min\.js'
+EXCLUDED='pnpm-lock\.yaml|package-lock\.json|.*\.min\.js|\.pi/'
 
 failed=0
 
