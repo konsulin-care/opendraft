@@ -167,7 +167,7 @@ importers:
         version: link:../workspace
       isomorphic-git:
         specifier: ^1.44.3
-        version: 1.44.3
+        version: 1.44.11
     devDependencies:
       fake-indexeddb:
         specifier: ^6.2.6
@@ -2154,8 +2154,8 @@ packages:
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
 
-  isomorphic-git@1.44.3:
-    resolution: {integrity: sha512-xlEIMsVUrMfOR25F4jWB9He9s/rUHWsgfJJJ3zpdwFssv9X2QfoIUyYH9CEFok9yk2tx2UDipj2gJ+KVvV/qGA==}
+  isomorphic-git@1.44.11:
+    resolution: {integrity: sha512-Y1BohMJU12rnkEMwpiBklgQ+ZQo9PtQencCKQz/zsziilL9+Tn1Bip45cJ51czB8abrf/9oHLDGQE+4IlOVxbA==}
     engines: {node: '>=14.17'}
     hasBin: true
 
@@ -5489,7 +5489,7 @@ snapshots:
 
   isexe@2.0.0: {}
 
-  isomorphic-git@1.44.3:
+  isomorphic-git@1.44.11:
     dependencies:
       async-lock: 1.4.1
       clean-git-ref: 2.0.1
@@ -5499,7 +5499,6 @@ snapshots:
       minimisted: 2.0.1
       pako: 1.0.11
       pify: 4.0.1
-      readable-stream: 4.8.0
       sha.js: 2.4.12
       simple-get: 4.0.1
 
