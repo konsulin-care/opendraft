@@ -2,18 +2,22 @@
 /**
  * BlockEditor tests: include-ordered collapsible containers, hover '+'
  * insert points opening the add form at the clicked position, the delete
- * confirmation naming the section and listing breaking `@sec-`
- * references, and confirm deleting versus cancel leaving the block.
- * Creating a block emits the window `opendraft:files-changed` event and
- * starts the new block expanded rather than collapsed.
+ * confirmation naming the section and listing breaking `@sec-`, and
+ * creation emitting `opendraft:files-changed` and focusing the new block.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { MemoryWorkspace } from '@opendraft/workspace';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { BlockEditor } from './BlockEditor';
 import { blockCollapseStorageKey } from './use-collapse-state';
+import { focusBlockEditor } from '../caret-mode-switch';
+
+vi.mock('../caret-mode-switch', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../caret-mode-switch')>()),
+  focusBlockEditor: vi.fn(),
+}));
 
 /** Manuscript directory used by every fixture. */
 const DIR = 'manuscripts/demo';
@@ -242,9 +246,7 @@ describe('BlockEditor add section button', () => {
 describe('BlockEditor files-changed event', () => {
   it('dispatches files-changed on the window when a block is created', async () => {
     const seen: Event[] = [];
-    const listener = (event: Event): void => {
-      seen.push(event);
-    };
+    const listener = (event: Event): void => { seen.push(event); };
     await setup({
       [ARTICLE]: articleWith('alpha'),
       [`${BLOCKS}/alpha.qmd`]: blockFile('alpha', 'Alpha'),
@@ -258,6 +260,7 @@ describe('BlockEditor files-changed event', () => {
       });
       expect(seen).toHaveLength(1);
       expect(seen[0]).toBeInstanceOf(CustomEvent);
+      expect(focusBlockEditor).toHaveBeenCalledWith('discussion');
       expect(screen.getByRole('heading', { level: 1, name: 'Discussion' })).toBeInTheDocument();
     } finally {
       window.removeEventListener('opendraft:files-changed', listener);
