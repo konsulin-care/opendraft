@@ -246,7 +246,8 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
   const [deleting, setDeleting] = useState<DeleteTarget | null>(null);
   const closeForm = (): void => setAddingAt(null);
   const createAt = (position: number) => (draft: BlockDraft): void => {
-    closeForm(); void createBlock(position, draft.title);
+    closeForm();
+    void createBlock(position, draft.title).then(() => window.dispatchEvent(new CustomEvent('opendraft:files-changed')));
   };
   const openDelete = (block: BlockEntry): void => {
     void findBreakingRefs(ws, dir, block.short).then((refs) => setDeleting({ short: block.short, title: block.title, refs }));

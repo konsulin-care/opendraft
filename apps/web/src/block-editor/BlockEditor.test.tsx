@@ -4,6 +4,8 @@
  * insert points opening the add form at the clicked position, the delete
  * confirmation naming the section and listing breaking `@sec-`
  * references, and confirm deleting versus cancel leaving the block.
+ * Creating a block emits the window `opendraft:files-changed` event and
+ * starts the new block expanded rather than collapsed.
  */
 import { describe, expect, it } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
@@ -11,6 +13,7 @@ import '@testing-library/jest-dom/vitest';
 import { MemoryWorkspace } from '@opendraft/workspace';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { BlockEditor } from './BlockEditor';
+import { blockCollapseStorageKey } from './use-collapse-state';
 
 /** Manuscript directory used by every fixture. */
 const DIR = 'manuscripts/demo';
@@ -233,5 +236,62 @@ describe('BlockEditor add section button', () => {
     expect(points[0].className).toContain('opacity-0');
     fireEvent.click(add);
     expect(screen.getByLabelText('Add block')).toBeInTheDocument();
+  });
+});
+
+describe('BlockEditor files-changed event', () => {
+  it('dispatches files-changed on the window when a block is created', async () => {
+    const seen: Event[] = [];
+    const listener = (event: Event): void => {
+      seen.push(event);
+    };
+    await setup({
+      [ARTICLE]: articleWith('alpha'),
+      [`${BLOCKS}/alpha.qmd`]: blockFile('alpha', 'Alpha'),
+    });
+    window.addEventListener('opendraft:files-changed', listener);
+    try {
+      fireEvent.click(screen.getByRole('button', { name: '+ Add section' }));
+      fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Discussion' } });
+      await act(async () => {
+        fireEvent.keyDown(screen.getByLabelText('Title'), { key: 'Enter' });
+      });
+      expect(seen).toHaveLength(1);
+      expect(seen[0]).toBeInstanceOf(CustomEvent);
+      expect(screen.getByRole('heading', { level: 1, name: 'Discussion' })).toBeInTheDocument();
+    } finally {
+      window.removeEventListener('opendraft:files-changed', listener);
+    }
+  });
+});
+
+describe('BlockEditor new block expansion', () => {
+  it('starts the newly created block expanded rather than collapsed', async () => {
+    // Persisted collapse state marks only the pre-existing block collapsed,
+    // proving the collapse machinery is active for this render.
+    localStorage.clear();
+    localStorage.setItem(
+      blockCollapseStorageKey('block-editor-test'),
+      JSON.stringify({ intro: true }),
+    );
+    await setup({
+      [ARTICLE]: articleWith('intro'),
+      [`${BLOCKS}/intro.qmd`]: blockFile('intro', 'Introduction'),
+    });
+    expect(screen.getByRole('button', { name: 'Introduction section' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add section' }));
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Discussion' } });
+    await act(async () => {
+      fireEvent.keyDown(screen.getByLabelText('Title'), { key: 'Enter' });
+    });
+    expect(screen.getByRole('button', { name: 'Discussion section' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    localStorage.clear();
   });
 });
