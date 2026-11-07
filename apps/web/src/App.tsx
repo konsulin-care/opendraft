@@ -15,6 +15,9 @@ import { useToolbarPreference } from './hooks/useToolbarPreference';
 import { loadFile } from './persistence';
 import { createOpenManuscriptRenamer } from './project/rename-manuscript';
 
+/** Window event announcing a block mutation so the shell re-lists workspace files. */
+const FILES_CHANGED_EVENT = 'opendraft:files-changed';
+
 /** Extract the manuscript directory segment from a repo-relative path, or null. */
 function manuscriptDirName(path: string): string | null {
   const [root, dir] = path.split('/');
@@ -54,15 +57,20 @@ function useActiveFileContent(
   return file;
 }
 
-/** List every file path in the active project's workspace; empty while loading. */
+/** List every file path in the active project's workspace; empty while loading.
+ * Re-lists when `opendraft:files-changed` fires after a block mutation. */
 function useWorkspacePaths(workspace: WorkspaceAdapter | null, active: ProjectRecord | null): string[] {
   const [paths, setPaths] = useState<string[]>([]);
+  const [version, setVersion] = useState(0);
 
   useEffect(() => {
-    if (!workspace) {
-      setPaths([]);
-      return undefined;
-    }
+    const refresh = () => setVersion((v) => v + 1);
+    window.addEventListener(FILES_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(FILES_CHANGED_EVENT, refresh);
+  }, []);
+
+  useEffect(() => {
+    if (!workspace) { setPaths([]); return undefined; }
     let cancelled = false;
     workspace.listAll().then(
       (list) => {
@@ -70,10 +78,8 @@ function useWorkspacePaths(workspace: WorkspaceAdapter | null, active: ProjectRe
       },
       (err: unknown) => console.error('workspace file listing failed:', err),
     );
-    return () => {
-      cancelled = true;
-    };
-  }, [workspace, active]);
+    return () => { cancelled = true; };
+  }, [workspace, active, version]);
 
   return paths;
 }
@@ -235,13 +241,6 @@ function CommitSection({
   );
 }
 
-/** Boot placeholder while the registry loads or failed; null once booted. */
-function bootScreen(loading: boolean, error: Error | null) {
-  if (loading) return <div>Loading workspace...</div>;
-  if (error) return <div>Error: {error.message}</div>;
-  return null;
-}
-
 /**
  * App shell: icon header with commit action plus the single continuous
  * editor region for the active project path. Boots into the auto-created
@@ -264,8 +263,8 @@ export function App() {
   const file = useActiveFileContent(workspace, contentPath);
   const drawer = useDrawerState();
 
-  const boot = bootScreen(loading, error);
-  if (boot) return boot;
+  if (loading) return <div>Loading workspace...</div>;
+  if (error) return <div>Error: {error.message}</div>;
   if (!workspace || !activePath) return <div>Empty workspace</div>;
   const dirName = manuscriptDirName(activePath);
 

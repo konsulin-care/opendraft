@@ -243,3 +243,36 @@ describe('App save status', () => {
     await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Saved'), { timeout: 5000 });
   });
 });
+
+/** After a block mutation, `opendraft:files-changed` re-lists the files into the tree. */
+async function expectFilesChangedReListsTree(): Promise<void> {
+  render(<App />);
+  await waitFor(() => expect(screen.getByTestId('manuscript-view')).toBeDefined(), { timeout: 10000 });
+  fireEvent.click(screen.getByRole('button', { name: 'OpenDraft' }));
+  const drawer = screen.getByTestId('project-drawer');
+  expect(within(drawer).queryByRole('treeitem', { name: 'methods.qmd' })).toBeNull();
+
+  // A block mutation landed a new block file on disk.
+  const [record] = await projectRegistry.list();
+  const ws = await workspaceManager.get(record.id);
+  try {
+    await ws.writeFile('manuscripts/untitled-project/blocks/methods.qmd', '## Methods');
+  } finally {
+    workspaceManager.release(record.id);
+  }
+  // T17 announces the mutation; the shell must re-list for the tree.
+  act(() => {
+    window.dispatchEvent(new CustomEvent('opendraft:files-changed'));
+  });
+
+  await waitFor(
+    () => expect(within(drawer).getByRole('treeitem', { name: 'methods.qmd' })).toBeDefined(),
+    { timeout: 5000 },
+  );
+}
+
+describe('App file tree re-list', () => {
+  it('shows blocks/<short>.qmd immediately after creation', async () => {
+    await expectFilesChangedReListsTree();
+  });
+});
