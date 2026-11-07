@@ -164,6 +164,10 @@ describe('block toolbar heading menu', () => {
     expect(seen).not.toContain(1);
     // The source table itself carries no level-1 row.
     expect(toolbarSource).not.toMatch(/\[1,\s*'Heading/);
+    // No level-1 label literal or Heading1 icon identifier appears
+    // anywhere in the toolbar module, table or imports alike.
+    expect(toolbarSource).not.toContain("'Heading 1'");
+    expect(toolbarSource).not.toMatch(/\bHeading1\b/);
   });
 });
 

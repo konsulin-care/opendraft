@@ -57,8 +57,8 @@ export function createCrepeConfig(options: CrepeConfigOptions): Crepe {
       },
       [Crepe.Feature.BlockEdit]: {
         blockHandle: { shouldShow: () => false },
-        // Slash menu: Crepe's BlockEdit feature reads textGroup in
-        // menu/config.ts and skips the h1 entry when it is null —
+        // Slash menu (verified against Crepe 7.23.0 types and
+        // menu/config.ts, which skips the h1 entry when it is null):
         // block bodies never offer an H1 action. The heading guard
         // registered in BlockBody is the backstop for every other
         // heading-1 path (input rule, command, paste).

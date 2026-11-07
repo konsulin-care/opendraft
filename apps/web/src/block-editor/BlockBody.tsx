@@ -5,7 +5,8 @@
  * `splitHeading` and persists edits through `joinHeading` + the shared
  * debounced saver. The load never schedules a save; every save
  * reattaches the canonical heading so the block file's first line
- * survives editing.
+ * survives editing, and a heading guard registered on the instance
+ * demotes every heading-1 in the body to an H2.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';

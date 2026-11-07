@@ -85,6 +85,8 @@ const HEADINGS: Array<[level: BlockLevel, label: string, icon: LucideIcon]> = [
 
 /**
  * Build the Paragraph style menu items from the current heading level.
+ * Shared by the desktop Paragraph style menu and the mobile KeyboardBar,
+ * so both block-toolbar surfaces offer the same level-1-free list.
  *
  * @param heading - Active heading level, 0 for a plain paragraph.
  * @param onSelect - Runs `setHeading` with the chosen level.
