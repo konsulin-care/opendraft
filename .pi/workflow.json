@@ -1,0 +1,17 @@
+{
+  "implement": {
+    "tests": {
+      "scoped": [
+        { "argv": ["pnpm","exec","vitest","run","{tests}"], "scope": "files" },
+        { "argv": ["pnpm","run","test","--","{tests}"], "cwd": "apps/web", "scope": "files" },
+        { "argv": ["pnpm","run","test"], "cwd": "packages/git" },
+        { "argv": ["pnpm","run","test"], "cwd": "packages/metadata" },
+        { "argv": ["pnpm","run","test"], "cwd": "packages/rdf" },
+        { "argv": ["pnpm","run","test"], "cwd": "packages/references" },
+        { "argv": ["pnpm","run","test"], "cwd": "packages/schema" },
+        { "argv": ["pnpm","run","test"], "cwd": "packages/workspace" },
+        { "argv": ["go","test","{pkgs}"], "scope": "packages", "cwd": "apps/bff" }
+      ]
+    }
+  }
+}
