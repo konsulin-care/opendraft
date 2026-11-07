@@ -8,8 +8,10 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { Schema } from '@milkdown/kit/prose/model';
+import { Schema, Slice } from '@milkdown/kit/prose/model';
+import type { Fragment } from '@milkdown/kit/prose/model';
 import { EditorState, TextSelection } from '@milkdown/kit/prose/state';
+import type { Plugin } from '@milkdown/kit/prose/state';
 import { createHeadingGuard } from './heading-guard';
 
 /**
@@ -61,6 +63,64 @@ describe("typing '# ' in a block", () => {
     const block = next.doc.firstChild;
     expect(block?.type.name).toBe('heading');
     expect(block?.attrs.level).toBe(2);
+  });
+});
+
+/**
+ * Run the heading guard's `transformPasted` prop over a slice, the way
+ * the editor applies it before inserting pasted content. The prop is
+ * already bound to the plugin by ProseMirror, so it needs no view.
+ *
+ * @param plugin - Heading guard plugin from {@link createHeadingGuard}.
+ * @param slice - Slice about to be pasted.
+ * @returns The transformed slice.
+ */
+function transformPasted(plugin: Plugin, slice: Slice): Slice {
+  const transform = plugin.props.transformPasted as (slice: Slice) => Slice;
+  return transform(slice);
+}
+
+/**
+ * Collect the heading levels of the top-level nodes in a fragment.
+ *
+ * @param fragment - Fragment of the transformed slice to inspect.
+ * @returns Heading levels in document order.
+ */
+function headingLevels(fragment: Fragment): number[] {
+  const levels: number[] = [];
+  fragment.forEach((node) => {
+    if (node.type.name === 'heading') levels.push(node.attrs.level);
+  });
+  return levels;
+}
+
+describe('transformPasted', () => {
+  it("shifts pasted '# A' and '## B' to an H2 and an H3", () => {
+    const schema = createSchema();
+    const doc = schema.nodes.doc.create(null, [
+      schema.nodes.heading.create({ level: 1 }, schema.text('A')),
+      schema.nodes.heading.create({ level: 2 }, schema.text('B')),
+    ]);
+    const transformed = transformPasted(
+      createHeadingGuard(),
+      new Slice(doc.content, 0, 0),
+    );
+    expect(headingLevels(transformed.content)).toEqual([2, 3]);
+  });
+
+  it('shifts every level by one and keeps H6 at H6', () => {
+    const schema = createSchema();
+    const doc = schema.nodes.doc.create(
+      null,
+      [1, 2, 3, 4, 5, 6].map((level) =>
+        schema.nodes.heading.create({ level }, schema.text(`H${level}`)),
+      ),
+    );
+    const transformed = transformPasted(
+      createHeadingGuard(),
+      new Slice(doc.content, 0, 0),
+    );
+    expect(headingLevels(transformed.content)).toEqual([2, 3, 4, 5, 6, 6]);
   });
 });
 
