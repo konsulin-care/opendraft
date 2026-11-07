@@ -1,9 +1,10 @@
 /**
  * Canonical heading line utilities for block files.
  *
- * A block file opens with the canonical heading
- * `# Title {#sec-<short> .deo-<type>}` followed by the section body.
- * `splitHeading` parses that first line into title, anchor and type and
+ * A block file opens with a heading
+ * `# Title {#sec-<short> .deo-<role>}` (role class optional: custom
+ * sections carry no class) followed by the section body.
+ * `splitHeading` parses that first line into title, anchor and role and
  * returns the remaining body verbatim; a file without such a leading
  * heading comes back body-only with null heading parts. `joinHeading`
  * reassembles heading and body into canonical file text, exactly
@@ -16,8 +17,8 @@ export interface BlockHeading {
   title: string;
   /** Anchor id including the `sec-` prefix, e.g. `sec-methods`. */
   anchor: string;
-  /** Block type without the `deo-` prefix, e.g. `methods`. */
-  type: string;
+  /** Role without the `deo-` prefix, e.g. `methods`; omit for no class. */
+  type?: string | null;
 }
 
 /** A block file split into heading parts and the remaining body. */
@@ -26,14 +27,15 @@ export interface SplitHeading {
   title: string | null;
   /** Anchor id including the `sec-` prefix, or `null` without a heading. */
   anchor: string | null;
-  /** Block type without the `deo-` prefix, or `null` without a heading. */
+  /** Role without the `deo-` prefix; `null` for a heading with no class
+   *  or a file with no heading. */
   type: string | null;
   /** Text after the heading line; the whole file when there is no heading. */
   body: string;
 }
 
-/** Matches `# <title> {#sec-<short> .deo-<type>}` on a single line. */
-const HEADING_PATTERN = /^# (.+) \{#(sec-[a-z0-9-]+) \.(deo-[a-z0-9-]+)\}$/;
+/** Matches `# <title> {#sec-<short> [ .deo-<role>]}` on a single line. */
+const HEADING_PATTERN = /^# (.+) \{#(sec-[a-z0-9-]+)(?: \.(deo-[a-z0-9-]+))?\}$/;
 
 /** Prefix of the `.deo-<type>` class token. */
 const TYPE_PREFIX = 'deo-';
@@ -59,21 +61,24 @@ export function splitHeading(text: string): SplitHeading {
   }
   const [, title, anchor, deoType] = match;
   const body = lineEnd === -1 ? '' : text.slice(lineEnd + 1);
-  return { title, anchor, type: deoType.slice(TYPE_PREFIX.length), body };
+  const type = deoType === undefined ? null : deoType.slice(TYPE_PREFIX.length);
+  return { title, anchor, type, body };
 }
 
 /**
  * Join heading parts and a body into canonical block file text.
  *
  * The heading becomes the file's first line,
- * `# <title> {#<anchor> .deo-<type>}`, followed by the body verbatim —
- * the exact inverse of `splitHeading`.
+ * `# <title> {#<anchor> .deo-<role>}` (class omitted when the role is
+ * absent or null), followed by the body verbatim — the exact inverse of
+ * `splitHeading`.
  *
- * @param heading - Non-null heading parts (use literals when the file had
- *                  no leading heading of its own).
+ * @param heading - Heading parts (use literals when the file had no
+ *                  leading heading of its own).
  * @param body - Section body, typically the `body` from `splitHeading`.
  * @returns Canonical block file text.
  */
 export function joinHeading(heading: BlockHeading, body: string): string {
-  return `# ${heading.title} {#${heading.anchor} .deo-${heading.type}}\n${body}`;
+  const role = heading.type ? ` .deo-${heading.type}` : '';
+  return `# ${heading.title} {#${heading.anchor}${role}}\n${body}`;
 }

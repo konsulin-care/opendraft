@@ -22,14 +22,29 @@ export interface UseBlocksResult {
   loading: boolean;
   /** Blocks in `article.qmd` include order. */
   blocks: BlockEntry[];
-  /** Write `blocks/<short>.qmd` and insert its include at `position`. */
-  createBlock: (position: number, title: string) => Promise<void>;
+  /**
+   * Write `blocks/<short>.qmd` and insert its include at `position`.
+   *
+   * Pass a title string for the legacy derived-identity form, or a
+   * {@link CreateBlockDraft} to choose the short name and role.
+   */
+  createBlock: (position: number, draft: string | CreateBlockDraft) => Promise<void>;
   /** Remove the include line and delete the block file. */
   deleteBlock: (short: string) => Promise<void>;
   /** Rename file + include and rewrite `@sec-` refs in other blocks. */
   renameBlock: (oldShort: string, newShort: string) => Promise<void>;
   /** Rewrite the heading title; file name and anchor stay unchanged. */
   setTitle: (short: string, title: string) => Promise<void>;
+}
+
+/** Draft selecting a new block's own identity instead of deriving it. */
+export interface CreateBlockDraft {
+  /** Heading title. */
+  title: string;
+  /** Chosen short name — file stem and `sec-` anchor suffix. */
+  short: string;
+  /** Role without the `deo-` prefix; omit for a heading with no class. */
+  role?: string | null;
 }
 
 /** Matches one include shortcode on its own line. */
@@ -87,17 +102,18 @@ async function writeNewBlock(
   ws: WorkspaceAdapter,
   dir: string,
   position: number,
-  title: string,
+  draft: string | CreateBlockDraft,
 ): Promise<void> {
   const articlePath = `${dir}/article.qmd`;
   const article = (await ws.readFile(articlePath)) ?? '';
   const taken = new Set(extractIncludes(article));
   const files = await ws.listFiles(`${dir}/blocks`);
-  const short = uniqueShortName(
-    title,
-    (candidate) => taken.has(candidate) || files.includes(`${candidate}.qmd`),
-  );
-  const heading: BlockHeading = { title, anchor: `sec-${short}`, type: GENERIC_BLOCK_TYPE };
+  const isTaken = (candidate: string): boolean =>
+    taken.has(candidate) || files.includes(`${candidate}.qmd`);
+  const title = typeof draft === 'string' ? draft : draft.title;
+  const short = typeof draft === 'string' ? uniqueShortName(title, isTaken) : draft.short;
+  const role = typeof draft === 'string' ? GENERIC_BLOCK_TYPE : (draft.role ?? null);
+  const heading: BlockHeading = { title, anchor: `sec-${short}`, type: role };
   await ws.writeFile(`${dir}/blocks/${short}.qmd`, joinHeading(heading, ''));
   await ws.writeFile(articlePath, insertInclude(article, short, position));
 }
@@ -194,8 +210,8 @@ function useBlockMutations(
   refresh: () => Promise<void>,
 ): BlockMutations {
   const createBlock = useCallback(
-    async (position: number, title: string) => {
-      await writeNewBlock(ws, dir, position, title);
+    async (position: number, draft: string | CreateBlockDraft) => {
+      await writeNewBlock(ws, dir, position, draft);
       await refresh();
     },
     [ws, dir, refresh],

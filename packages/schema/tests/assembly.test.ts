@@ -114,6 +114,26 @@ describe('validateAssembly: heading anchors', () => {
   });
 });
 
+describe('validateAssembly: optional role class', () => {
+  it('accepts anchor headings with an optional role class and with no class', () => {
+    const withClass = validateAssembly({
+      assembly: '{{< include blocks/intro.qmd >}}',
+      blockFiles: { 'blocks/intro.qmd': '# Intro {#sec-intro .deo-intro}\n\nbody' },
+      files: ['intro.qmd'],
+    });
+    const withoutClass = validateAssembly({
+      assembly: '{{< include blocks/intro.qmd >}}',
+      blockFiles: { 'blocks/intro.qmd': '# Intro {#sec-intro}\n\nbody' },
+      files: ['intro.qmd'],
+    });
+
+    expect(withClass.valid).toBe(true);
+    expect(withClass.errors).toEqual([]);
+    expect(withoutClass.valid).toBe(true);
+    expect(withoutClass.errors).toEqual([]);
+  });
+});
+
 describe('validateAssembly: outcomes unchanged by anchor check', () => {
   it('keeps existing include/orphan/duplicate validation outcomes unchanged', () => {
     const missing = validateAssembly({

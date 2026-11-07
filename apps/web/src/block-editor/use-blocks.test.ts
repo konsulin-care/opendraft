@@ -101,6 +101,41 @@ describe('createBlock', () => {
   });
 });
 
+describe('createBlock drafts', () => {
+  it('writes a .deo-methods heading with the chosen short name for a role draft', async () => {
+    const { result, ws } = await setup({
+      [ARTICLE]: articleWith('intro'),
+      [`${BLOCKS}/intro.qmd`]: blockFile('Introduction', 'sec-intro', 'intro'),
+    });
+
+    await act(async () => {
+      await result.current.createBlock(1, { title: 'Methods', short: 'methods', role: 'methods' });
+    });
+
+    const created = (await ws.readFile(`${BLOCKS}/methods.qmd`)) ?? '';
+    expect(created).toContain('# Methods {#sec-methods .deo-methods}');
+    expect(await includeOrder(ws)).toEqual(['intro', 'methods']);
+    expect(result.current.blocks.map((block) => block.short)).toEqual(['intro', 'methods']);
+  });
+
+  it('writes a heading with no class for a custom draft that carries no role', async () => {
+    const { result, ws } = await setup({
+      [ARTICLE]: articleWith('intro'),
+      [`${BLOCKS}/intro.qmd`]: blockFile('Introduction', 'sec-intro', 'intro'),
+    });
+
+    await act(async () => {
+      await result.current.createBlock(1, { title: 'Custom', short: 'custom' });
+    });
+
+    const created = (await ws.readFile(`${BLOCKS}/custom.qmd`)) ?? '';
+    expect(created.split('\n')[0]).toBe('# Custom {#sec-custom}');
+    expect(created).not.toContain('.deo-');
+    expect(await includeOrder(ws)).toEqual(['intro', 'custom']);
+    expect(result.current.blocks.map((block) => block.short)).toEqual(['intro', 'custom']);
+  });
+});
+
 describe('deleteBlock', () => {
   it('deletes a block by removing its include line and deleting its file', async () => {
     const { result, ws } = await setup({

@@ -11,6 +11,15 @@ describe('splitHeading', () => {
     expect(body).toBe('\nIntro paragraph.');
   });
 
+  it("splits a class-less heading '# Custom {#sec-custom}' into a null type", () => {
+    const text = '# Custom {#sec-custom}\n\nIntro paragraph.';
+    const { title, anchor, type, body } = splitHeading(text);
+    expect(title).toBe('Custom');
+    expect(anchor).toBe('sec-custom');
+    expect(type).toBeNull();
+    expect(body).toBe('\nIntro paragraph.');
+  });
+
   it('treats a file with no leading heading as body-only with no title', () => {
     const text = 'Just prose.\n\nMore prose.';
     const { title, anchor, type, body } = splitHeading(text);
@@ -34,6 +43,30 @@ describe('splitHeading', () => {
   });
 });
 
+describe('splitHeading/joinHeading round-trip', () => {
+  it("round-trips a classed heading '# Methods {#sec-methods .deo-methods}'", () => {
+    const text = '# Methods {#sec-methods .deo-methods}\n\nBody text.';
+    const parts = splitHeading(text);
+    expect(parts.type).toBe('methods');
+    const rejoined = joinHeading(
+      { title: 'Methods', anchor: 'sec-methods', type: parts.type },
+      parts.body,
+    );
+    expect(rejoined).toBe(text);
+  });
+
+  it("round-trips a class-less heading '# Custom {#sec-custom}'", () => {
+    const text = '# Custom {#sec-custom}\n\nBody text.';
+    const parts = splitHeading(text);
+    expect(parts.type).toBeNull();
+    const rejoined = joinHeading(
+      { title: 'Custom', anchor: 'sec-custom', type: parts.type },
+      parts.body,
+    );
+    expect(rejoined).toBe(text);
+  });
+});
+
 describe('joinHeading', () => {
   it("joins a body with its heading so the file's first line is the canonical heading", () => {
     const joined = joinHeading(
@@ -41,5 +74,10 @@ describe('joinHeading', () => {
       'Intro paragraph.',
     );
     expect(joined.split('\n')[0]).toBe('# Methods {#sec-methods .deo-methods}');
+  });
+
+  it('emits no class when the heading carries no role', () => {
+    const joined = joinHeading({ title: 'Custom', anchor: 'sec-custom' }, 'Intro paragraph.');
+    expect(joined.split('\n')[0]).toBe('# Custom {#sec-custom}');
   });
 });
