@@ -17,8 +17,8 @@
 
 /** Detected test suites (label + argv + routing scope/cwd), frozen at generation time. */
 const SUITES = [
-  { "label": "config (pnpm exec vitest run {tests})", "argv": ["pnpm","exec","vitest","run","{tests}"], "scope": "files" },
-  { "label": "config (pnpm run test -- {tests})", "argv": ["pnpm","run","test","--","{tests}"], "scope": "files", "cwd": "apps/web" },
+  { "label": "config (pnpm exec vitest run --passWithNoTests {tests})", "argv": ["pnpm","exec","vitest","run","--passWithNoTests","{tests}"], "scope": "files" },
+  { "label": "config (pnpm exec vitest run {tests})", "argv": ["pnpm","exec","vitest","run","{tests}"], "scope": "files", "cwd": "apps/web" },
   { "label": "config (pnpm run test)", "argv": ["pnpm","run","test"], "cwd": "packages/git" },
   { "label": "config (pnpm run test)", "argv": ["pnpm","run","test"], "cwd": "packages/metadata" },
   { "label": "config (pnpm run test)", "argv": ["pnpm","run","test"], "cwd": "packages/rdf" },
