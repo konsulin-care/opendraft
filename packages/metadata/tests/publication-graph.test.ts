@@ -1,6 +1,7 @@
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { loadTurtle, validateShacl } from '@opendraft/rdf';
 import type { ShaclValidationReport, TurtleDataset } from '@opendraft/rdf';
@@ -8,7 +9,8 @@ import { compilePublicationGraph } from '../src/rdf/publication-graph.js';
 import type { PublicationGraphInput } from '../src/rdf/publication-graph.js';
 import type { AuthorObject, RegistryAffiliation } from '../src/types/author.js';
 
-const ARTICLE_SHAPES = 'protocol/article.shacl.ttl';
+// Repo-root protocol/, resolved from this file: suites run with cwd = packages/metadata.
+const ARTICLE_SHAPES = fileURLToPath(new URL('../../../protocol/article.shacl.ttl', import.meta.url));
 const SH_VIOLATION = 'http://www.w3.org/ns/shacl#Violation';
 const SH_WARNING = 'http://www.w3.org/ns/shacl#Warning';
 

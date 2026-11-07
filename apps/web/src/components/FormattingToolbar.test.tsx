@@ -177,15 +177,13 @@ describe('FormattingToolbar button behavior', () => {
 });
 
 describe('FormattingToolbar menus', () => {
-  it('Paragraph style menu offers Paragraph and H1-H3 and runs setHeading', () => {
+  it('Paragraph style menu offers exactly Paragraph, Heading 2 and Heading 3', () => {
     const commands = fakeCommands();
     render(<FormattingToolbar commands={commands} />);
     fireEvent.click(screen.getByRole('button', { name: 'Paragraph style' }));
     const items = screen.getAllByRole('menuitemradio');
-    expect(items.map((item) => item.getAttribute('aria-label'))).toEqual(['Paragraph', 'Heading 1', 'Heading 2', 'Heading 3']);
+    expect(items.map((item) => item.getAttribute('aria-label'))).toEqual(['Paragraph', 'Heading 2', 'Heading 3']);
     expect(items[0]).toHaveAttribute('aria-checked', 'true');
-    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Heading 1' }));
-    expect(commands.setHeading).toHaveBeenCalledWith(1);
   });
 });
 
