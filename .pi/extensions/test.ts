@@ -17,15 +17,15 @@
 
 /** Detected test suites (label + argv + routing scope/cwd), frozen at generation time. */
 const SUITES = [
-  { "label": "javascript (pnpm exec vitest run {tests})", "argv": ["pnpm","exec","vitest","run","{tests}"], "scope": "files" },
-  { "label": "javascript (pnpm run test) @ apps/web", "argv": ["pnpm","run","test"], "cwd": "apps/web" },
-  { "label": "javascript (pnpm run test) @ packages/git", "argv": ["pnpm","run","test"], "cwd": "packages/git" },
-  { "label": "javascript (pnpm run test) @ packages/metadata", "argv": ["pnpm","run","test"], "cwd": "packages/metadata" },
-  { "label": "javascript (pnpm run test) @ packages/rdf", "argv": ["pnpm","run","test"], "cwd": "packages/rdf" },
-  { "label": "javascript (pnpm run test) @ packages/references", "argv": ["pnpm","run","test"], "cwd": "packages/references" },
-  { "label": "javascript (pnpm run test) @ packages/schema", "argv": ["pnpm","run","test"], "cwd": "packages/schema" },
-  { "label": "javascript (pnpm run test) @ packages/workspace", "argv": ["pnpm","run","test"], "cwd": "packages/workspace" },
-  { "label": "go (go test {pkgs}) @ apps/bff", "argv": ["go","test","{pkgs}"], "scope": "packages", "cwd": "apps/bff" }
+  { "label": "config (pnpm exec vitest run {tests})", "argv": ["pnpm","exec","vitest","run","{tests}"], "scope": "files" },
+  { "label": "config (pnpm run test -- {tests})", "argv": ["pnpm","run","test","--","{tests}"], "scope": "files", "cwd": "apps/web" },
+  { "label": "config (pnpm run test)", "argv": ["pnpm","run","test"], "cwd": "packages/git" },
+  { "label": "config (pnpm run test)", "argv": ["pnpm","run","test"], "cwd": "packages/metadata" },
+  { "label": "config (pnpm run test)", "argv": ["pnpm","run","test"], "cwd": "packages/rdf" },
+  { "label": "config (pnpm run test)", "argv": ["pnpm","run","test"], "cwd": "packages/references" },
+  { "label": "config (pnpm run test)", "argv": ["pnpm","run","test"], "cwd": "packages/schema" },
+  { "label": "config (pnpm run test)", "argv": ["pnpm","run","test"], "cwd": "packages/workspace" },
+  { "label": "config (go test {pkgs})", "argv": ["go","test","{pkgs}"], "scope": "packages", "cwd": "apps/bff" }
 ];
 
 /** Per-suite wall clock budget: PI_TEST_TIMEOUT_MS, 300000ms default. */
