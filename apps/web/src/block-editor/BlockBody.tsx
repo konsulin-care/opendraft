@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import type { Editor } from '@milkdown/kit/core';
+import { $prose } from '@milkdown/kit/utils';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import type { SaveStatus } from '../components/AppHeader';
 import type { EditorTestApi } from '../caret-mode-switch';
@@ -17,6 +18,7 @@ import type { CitationState } from '../citation/types';
 import { createCrepeConfig, useEditorWiring } from '../components/crepe-config';
 import { useDebouncedSaver } from '../components/editor/autosave';
 import type { DebouncedSaver } from '../components/editor/autosave';
+import { createHeadingGuard } from './heading-guard';
 import { joinHeading, splitHeading } from './heading';
 import type { BlockHeading } from './heading';
 import { useLazyMount } from './use-lazy-mount';
@@ -146,6 +148,11 @@ function useCrepeEditor(options: CrepeEditorOptions): boolean {
       defaultValue: parts.body,
       workspace: ws,
       onStateChangeRef: citationStateRef,
+    });
+    // Every block editor demotes H1s: register the heading guard on
+    // the block-body Crepe instance before it mounts.
+    crepe.addFeature((editor) => {
+      editor.use($prose(() => createHeadingGuard()));
     });
     let cancelled = false;
     void crepe.create().then(() => {
