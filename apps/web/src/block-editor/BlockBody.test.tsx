@@ -1,16 +1,19 @@
 // @vitest-environment jsdom
 /**
  * BlockBody tests: typing persists the block file with its canonical
- * heading preserved, mounting without edits performs no write, and
- * Quarto constructs (::: divs, {#fig-x} attributes, shortcodes and
- * @sec- references) survive load and save unchanged.
+ * heading preserved, mounting without edits performs no write, a
+ * loaded body carrying a level-1 heading neither writes nor hides the
+ * header's warning badge, and Quarto constructs (::: divs, {#fig-x}
+ * attributes, shortcodes and @sec- references) survive load and save
+ * unchanged.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { MemoryWorkspace } from '@opendraft/workspace';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { BlockBody } from './BlockBody';
+import { BlockHeader, reportLoadedBody } from './BlockHeader';
 import type { EditorTestApi } from '../caret-mode-switch';
 
 /** Manuscript directory used by every fixture. */
@@ -141,6 +144,71 @@ describe('BlockBody autosave', () => {
 
     expect(writes).toBe(0);
     expect(await ws.readFile(path)).toBe(before);
+  }, 20000);
+});
+
+describe('BlockBody level-1 load path', () => {
+  it('performs no file write when the loaded file already contains a level-1 heading', async () => {
+    const { ws, path } = await mountBody(
+      '# Methods {#sec-methods .deo-section}\n# Legacy H1\nBody text.',
+    );
+    // mountBody returns its write count by value (a snapshot taken
+    // before the load), so count writes on the live spy directly.
+    let writes = 0;
+    const spied = ws.writeFile.bind(ws);
+    ws.writeFile = async (target, text) => {
+      writes += 1;
+      return spied(target, text);
+    };
+    await waitForApi();
+    const before = await ws.readFile(path);
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, SAVE_WINDOW_MS));
+    });
+
+    expect(writes).toBe(0);
+    expect(await ws.readFile(path)).toBe(before);
+  }, 20000);
+});
+
+describe('BlockBody level-1 warning badge', () => {
+  it('shows the level-1 warning badge in the header after that load', async () => {
+    // Reset the shared per-short registry so the badge must come from
+    // this load, not from an earlier test's report.
+    reportLoadedBody('methods', '## Level two');
+    const ws = new MemoryWorkspace();
+    const path = `${DIR}/blocks/methods.qmd`;
+    await ws.writeFile(
+      path,
+      '# Methods {#sec-methods .deo-section}\n# Legacy H1\nBody text.',
+    );
+    render(
+      <>
+        <BlockHeader
+          short="methods"
+          title="Methods"
+          collapsed={false}
+          onToggle={() => undefined}
+          wordCount={0}
+          saveStatus="saved"
+        />
+        <BlockBody
+          ws={ws}
+          dir={DIR}
+          short="methods"
+          title="Methods"
+          collapsed={false}
+        />
+      </>,
+    );
+
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('level-1-warning-badge')).toBeInTheDocument();
+      },
+      { timeout: 10000 },
+    );
   }, 20000);
 });
 
