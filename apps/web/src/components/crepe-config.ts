@@ -55,7 +55,12 @@ export function createCrepeConfig(options: CrepeConfigOptions): Crepe {
         theme: lightCodeBlockTheme,
         extensions: [quartoChunkOptionPlugin],
       },
-      [Crepe.Feature.BlockEdit]: { blockHandle: { shouldShow: () => false } },
+      [Crepe.Feature.BlockEdit]: {
+        blockHandle: { shouldShow: () => false },
+        // Slash menu: Crepe exposes the textGroup hook — drop the
+        // level-1 entry so block bodies never offer an H1 action.
+        textGroup: { h1: null },
+      },
     },
   });
   crepe.addFeature((editor) => {

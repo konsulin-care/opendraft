@@ -19,6 +19,7 @@ import { createCrepeConfig, useEditorWiring } from '../components/crepe-config';
 import { useDebouncedSaver } from '../components/editor/autosave';
 import type { DebouncedSaver } from '../components/editor/autosave';
 import { createHeadingGuard } from './heading-guard';
+import { reportLoadedBody } from './BlockHeader';
 import { joinHeading, splitHeading } from './heading';
 import type { BlockHeading } from './heading';
 import { useLazyMount } from './use-lazy-mount';
@@ -143,6 +144,9 @@ function useCrepeEditor(options: CrepeEditorOptions): boolean {
       type: parts.type ?? GENERIC_TYPE,
     };
     onWordCountRef.current?.(countWords(parts.body));
+    // Surface an H1 already present in the loaded body as a header
+    // warning badge; reporting never writes the file back.
+    reportLoadedBody(short, parts.body);
     const crepe = createCrepeConfig({
       root: rootRef.current,
       defaultValue: parts.body,

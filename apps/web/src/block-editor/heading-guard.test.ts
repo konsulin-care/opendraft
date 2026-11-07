@@ -13,6 +13,7 @@ import type { Fragment } from '@milkdown/kit/prose/model';
 import { EditorState, TextSelection } from '@milkdown/kit/prose/state';
 import type { Plugin } from '@milkdown/kit/prose/state';
 import { createHeadingGuard } from './heading-guard';
+import { headingItems } from '../components/toolbar-items';
 
 /**
  * Minimal schema mirroring the block body: doc > paragraph | heading.
@@ -124,6 +125,45 @@ describe('transformPasted', () => {
   });
 });
 
+describe('heading-1 command inside a block body', () => {
+  it('leaves the body with an H2', () => {
+    const schema = createSchema();
+    const doc = schema.nodes.doc.create(null, [
+      schema.nodes.paragraph.create(null, schema.text('Title')),
+    ]);
+    const state = EditorState.create({
+      doc,
+      plugins: [createHeadingGuard()],
+      selection: TextSelection.create(doc, 1),
+    });
+    // The setHeading(1) command path: setBlockType to a level-1 heading.
+    const next = state.apply(
+      state.tr.setBlockType(1, 1, schema.nodes.heading, { level: 1 }),
+    );
+    const block = next.doc.firstChild;
+    expect(block?.type.name).toBe('heading');
+    expect(block?.attrs.level).toBe(2);
+  });
+});
+
+describe('block toolbar heading menu', () => {
+  const toolbarSource = readFileSync(
+    fileURLToPath(new URL('../components/toolbar-items.ts', import.meta.url)),
+    'utf8',
+  );
+
+  it('lists no level-1 option', () => {
+    const seen: number[] = [];
+    const items = headingItems(0, (level) => seen.push(level));
+    expect(items.map((item) => item.label)).not.toContain('Heading 1');
+    // Selecting every entry never requests level 1.
+    items.forEach((item) => item.onSelect());
+    expect(seen).not.toContain(1);
+    // The source table itself carries no level-1 row.
+    expect(toolbarSource).not.toMatch(/\[1,\s*'Heading/);
+  });
+});
+
 describe('block-body Crepe configuration', () => {
   const blockBodySource = readFileSync(
     fileURLToPath(new URL('./BlockBody.tsx', import.meta.url)),
@@ -133,5 +173,13 @@ describe('block-body Crepe configuration', () => {
   it('registers the heading guard so every block editor carries the plugin', () => {
     expect(blockBodySource).toContain('createHeadingGuard');
     expect(blockBodySource).toMatch(/createCrepeConfig\([\s\S]*?createHeadingGuard/);
+  });
+
+  it('drops the slash menu level-1 entry via the Crepe textGroup hook', () => {
+    const crepeSource = readFileSync(
+      fileURLToPath(new URL('../components/crepe-config.ts', import.meta.url)),
+      'utf8',
+    );
+    expect(crepeSource).toMatch(/textGroup:\s*\{\s*h1:\s*null/);
   });
 });

@@ -3,8 +3,68 @@
  * the copyable `@sec-` reference chip, the word count, the save status
  * and the overflow menu. The disclosure toggle carries `aria-expanded`.
  */
+import { useSyncExternalStore } from 'react';
 import { ChevronDown, Ellipsis } from 'lucide-react';
 import type { SaveStatus } from '../components/AppHeader';
+
+/** Per-block level-1 warnings reported by mounted bodies, keyed by short name. */
+const level1Warnings = new Map<string, boolean>();
+/** Listeners notified when any block's level-1 warning changes. */
+const level1Listeners = new Set<() => void>();
+
+/**
+ * Whether a loaded block body carries a level-1 heading (an ATX `# `
+ * line outside a fenced code block). The canonical heading line has
+ * already been stripped by the caller.
+ *
+ * @param body - Loaded block body text.
+ * @returns True when the body contains a level-1 heading.
+ */
+function bodyHasLevel1(body: string): boolean {
+  let fence: string | null = null;
+  for (const line of body.split('\n')) {
+    const trimmed = line.trimStart();
+    if (fence !== null) {
+      if (trimmed.startsWith(fence)) fence = null;
+      continue;
+    }
+    const open = trimmed.match(/^(```|~~~)/);
+    if (open) {
+      fence = open[1];
+      continue;
+    }
+    if (/^ {0,3}# /.test(line)) return true;
+  }
+  return false;
+}
+
+/**
+ * Report a block's loaded body so its header can show a warning badge
+ * when the body already contains a level-1 heading. Read-only with
+ * respect to the workspace: the file itself is never rewritten here.
+ *
+ * @param short - Block short name the body belongs to.
+ * @param body - Loaded body text with the canonical heading stripped.
+ */
+export function reportLoadedBody(short: string, body: string): void {
+  const hasLevel1 = bodyHasLevel1(body);
+  if ((level1Warnings.get(short) ?? false) === hasLevel1) return;
+  level1Warnings.set(short, hasLevel1);
+  level1Listeners.forEach((listener) => listener());
+}
+
+/**
+ * Subscribe to level-1 warning changes.
+ *
+ * @param listener - Called after any block's warning changes.
+ * @returns An unsubscribe function.
+ */
+function subscribeLevel1Warning(listener: () => void): () => void {
+  level1Listeners.add(listener);
+  return () => {
+    level1Listeners.delete(listener);
+  };
+}
 
 /** Save-status labels, mirroring the app header indicator. */
 const SAVE_LABEL: Record<SaveStatus, string> = {
@@ -56,6 +116,24 @@ function CopyChip({ short }: { short: string }) {
 }
 
 /**
+ * Amber badge shown when the loaded body already contains a level-1
+ * heading; read-only signal rendered only while the warning is on.
+ *
+ * @returns The warning badge markup.
+ */
+function Level1Badge() {
+  return (
+    <span
+      data-testid="level-1-warning-badge"
+      title="Body contains a level-1 heading"
+      className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
+    >
+      H1 in body
+    </span>
+  );
+}
+
+/**
  * Header row of one block: disclosure toggle, H1 title, reference chip,
  * word count, save status and overflow menu.
  *
@@ -71,6 +149,11 @@ export function BlockHeader({
   saveStatus,
   onOverflow,
 }: BlockHeaderProps) {
+  const hasLevel1Warning = useSyncExternalStore(
+    subscribeLevel1Warning,
+    () => level1Warnings.get(short) ?? false,
+    () => false,
+  );
   return (
     <header className="flex items-center gap-2 border-b border-gray-200 px-3 py-2">
       <button
@@ -86,6 +169,7 @@ export function BlockHeader({
         />
       </button>
       <h1 className="flex-1 truncate text-base font-semibold text-gray-900">{title}</h1>
+      {hasLevel1Warning && <Level1Badge />}
       <CopyChip short={short} />
       <span className="text-xs text-gray-500">
         {wordCount} {wordCount === 1 ? 'word' : 'words'}

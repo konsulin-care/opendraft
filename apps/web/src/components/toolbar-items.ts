@@ -2,7 +2,6 @@ import {
   AtSign,
   Bold,
   Code,
-  Heading1,
   Heading2,
   Heading3,
   ImagePlus,
@@ -76,10 +75,10 @@ export const TOOLBAR_ITEMS: readonly ToolbarItemDef[] = [
   { key: 'rule', label: 'Rule', icon: Minus, group: 'insert', command: (c) => c.hr() },
 ];
 
-/** Paragraph style menu entries: paragraph plus headings 1-3. */
+/** Paragraph style menu entries: paragraph plus headings 2-3 (no level-1 —
+ * block bodies never offer an H1 surface). */
 const HEADINGS: Array<[level: BlockLevel, label: string, icon: LucideIcon]> = [
   [0, 'Paragraph', Pilcrow],
-  [1, 'Heading 1', Heading1],
   [2, 'Heading 2', Heading2],
   [3, 'Heading 3', Heading3],
 ];
