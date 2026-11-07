@@ -88,7 +88,8 @@ const HEADINGS: Array<[level: BlockLevel, label: string, icon: LucideIcon]> = [
  *
  * @param heading - Active heading level, 0 for a plain paragraph.
  * @param onSelect - Runs `setHeading` with the chosen level.
- * @returns Menu items with the current one marked checked.
+ * @returns Menu items with the current one marked checked; the list
+ * never includes a level-1 entry, so no selection can request an H1.
  */
 export function headingItems(heading: BlockLevel, onSelect: (level: BlockLevel) => void): ToolbarMenuItem[] {
   return HEADINGS.map(([level, label, icon]) => ({

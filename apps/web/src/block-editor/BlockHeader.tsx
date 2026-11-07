@@ -1,7 +1,8 @@
 /**
  * Block header: the collapsible block's title row, owning the H1 title,
- * the copyable `@sec-` reference chip, the word count, the save status
- * and the overflow menu. The disclosure toggle carries `aria-expanded`.
+ * the copyable `@sec-` reference chip, the level-1 warning badge, the
+ * word count, the save status and the overflow menu. The disclosure
+ * toggle carries `aria-expanded`.
  */
 import { useSyncExternalStore } from 'react';
 import { ChevronDown, Ellipsis } from 'lucide-react';

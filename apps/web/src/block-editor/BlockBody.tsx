@@ -154,7 +154,9 @@ function useCrepeEditor(options: CrepeEditorOptions): boolean {
       onStateChangeRef: citationStateRef,
     });
     // Every block editor demotes H1s: register the heading guard on
-    // the block-body Crepe instance before it mounts.
+    // the block-body Crepe instance before it mounts. The slash menu
+    // drops its H1 entry in crepe-config's textGroup hook; this guard
+    // is the backstop for input-rule, command and paste paths.
     crepe.addFeature((editor) => {
       editor.use($prose(() => createHeadingGuard()));
     });

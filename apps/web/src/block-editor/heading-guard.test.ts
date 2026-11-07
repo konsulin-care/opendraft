@@ -1,9 +1,12 @@
 // @vitest-environment node
 /**
- * Heading guard: typing "# " in a block lands on an H2 (the heading
- * input rule's H1 is demoted by the guard's appendTransaction), and
- * the block-body Crepe configuration registers the guard so every
- * block editor carries the plugin.
+ * Heading guard and H1 suppression in block editors: typing "# " or
+ * invoking a heading-1 action inside a block body lands on an H2 (the
+ * guard's appendTransaction demotes the level), pasted headings shift
+ * by one, the block-body Crepe configuration registers the guard so
+ * every block editor carries the plugin, the block toolbar's heading
+ * menu lists no level-1 option, and the Crepe slash menu drops its H1
+ * entry via the feature's textGroup hook.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
