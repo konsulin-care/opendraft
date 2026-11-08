@@ -246,6 +246,7 @@ export function BlockBody({ ws, dir, short, title, collapsed, onWordCount, onSav
   // reach this body's editor.
   useEditorWiring({
     loading: !ready,
+    short,
     get: () => editorRef.current,
     workspace: ws,
     editorRef,

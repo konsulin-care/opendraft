@@ -16,7 +16,7 @@ import { EmptyState } from './EmptyState';
 import { useBlocks } from './use-blocks';
 import type { BlockEntry } from './use-blocks';
 import { useCollapseState } from './use-collapse-state';
-import { focusBlockEditor } from '../caret-mode-switch';
+import { requestFocusForShort } from '../caret-mode-switch';
 
 /** Props for {@link BlockEditor}. */
 export interface BlockEditorProps {
@@ -248,7 +248,7 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
   const closeForm = (): void => setAddingAt(null);
   const createAt = (position: number) => (draft: BlockDraft): void => {
     closeForm();
-    void createBlock(position, draft.title).then(() => { window.dispatchEvent(new CustomEvent('opendraft:files-changed')); focusBlockEditor(draft.short); });
+    void createBlock(position, draft.title).then(() => { window.dispatchEvent(new CustomEvent('opendraft:files-changed')); requestFocusForShort(draft.short); });
   };
   const openDelete = (block: BlockEntry): void => {
     void findBreakingRefs(ws, dir, block.short).then((refs) => setDeleting({ short: block.short, title: block.title, refs }));

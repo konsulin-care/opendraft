@@ -14,6 +14,7 @@ import { MemoryWorkspace } from '@opendraft/workspace';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { BlockBody } from './BlockBody';
 import { BlockHeader, reportLoadedBody } from './BlockHeader';
+import { requestFocusForShort } from '../caret-mode-switch';
 import type { EditorTestApi } from '../caret-mode-switch';
 
 /** Manuscript directory used by every fixture. */
@@ -144,6 +145,20 @@ describe('BlockBody autosave', () => {
 
     expect(writes).toBe(0);
     expect(await ws.readFile(path)).toBe(before);
+  }, 20000);
+});
+
+describe('BlockBody focus-on-creation', () => {
+  it('fulfils a pending focus request with DOM focus inside the mounted body', async () => {
+    requestFocusForShort('methods');
+    await mountBody('# Methods {#sec-methods .deo-section}\nBody text.\n');
+    await waitForApi();
+    await waitFor(() => {
+      const surface = document.querySelector<HTMLElement>(
+        '[data-testid="block-body-editor"] .ProseMirror',
+      );
+      expect(surface?.contains(document.activeElement)).toBe(true);
+    }, { timeout: 10000 });
   }, 20000);
 });
 

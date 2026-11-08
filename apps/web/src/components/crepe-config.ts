@@ -3,14 +3,14 @@ import { EditorView } from '@codemirror/view';
 import { Crepe } from '@milkdown/crepe';
 import { editorViewCtx, remarkPluginsCtx, remarkStringifyOptionsCtx, type Editor } from '@milkdown/kit/core';
 import { listenerCtx } from '@milkdown/kit/plugin/listener';
-import { $prose } from '@milkdown/kit/utils';
+import { $prose, getMarkdown } from '@milkdown/kit/utils';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { PLACEHOLDER_HINT } from '../placeholder';
 import { createCitationPlugin } from '../citation/plugin';
 import type { CitationState } from '../citation/types';
 import { quartoRemarkPlugin, quartoInlineCodePlugin, quartoChunkOptionPlugin } from '../quarto-syntax';
 import { citationRemarkPlugin } from '../citation/citation-remark-plugin';
-import { createTestApi, focusBlockEditor, registerBlockEditor, type EditorTestApi } from '../caret-mode-switch';
+import { createTestApi, focusBlockEditor, fulfillPendingFocus, registerBlockEditor, type EditorTestApi } from '../caret-mode-switch';
 import type { DebouncedSaver } from './editor/autosave';
 
 /** Code blocks: light yellow active line/selection via @theme tokens in index.css. */
@@ -91,9 +91,16 @@ export function wireEditor(
   syncContent: (mode: 'wysiwyg' | 'source') => void,
   onEditorReady?: (api: EditorTestApi) => void,
 ): void {
+  // Markdown as it stands once the load has settled (load-time
+  // normalization, e.g. the heading guard demoting a legacy H1,
+  // completes before wiring). An emission equal to this baseline
+  // carries no user change, so it must not schedule a save — writing
+  // it back would rewrite the just-loaded file.
+  const loadedMarkdown = editor.action(getMarkdown());
   editor.action((ctx) => {
     const listener = ctx.get(listenerCtx);
     listener.markdownUpdated((_ctx, markdown) => {
+      if (markdown === loadedMarkdown) return;
       saver.schedule(markdown);
     });
   });
@@ -111,6 +118,8 @@ export function wireEditor(
 /** Options for {@link useEditorWiring}. */
 interface EditorWiringOptions {
   loading: boolean;
+  /** Short of the block body this wiring belongs to; matches the pending focus request. */
+  short: string;
   get: () => Editor | null | undefined;
   workspace: WorkspaceAdapter;
   editorRef: React.MutableRefObject<Editor | null>;
@@ -136,7 +145,7 @@ interface EditorWiringOptions {
  * @param options - See {@link EditorWiringOptions}.
  */
 export function useEditorWiring(options: EditorWiringOptions): void {
-  const { loading, get, workspace, editorRef, saver, syncContent, onEditorReady } = options;
+  const { loading, short, get, workspace, editorRef, saver, syncContent, onEditorReady } = options;
   const wiredEditorRef = useRef<Editor | null>(null);
   useEffect(() => {
     const editor = get();
@@ -147,6 +156,11 @@ export function useEditorWiring(options: EditorWiringOptions): void {
       wireEditor(editor, saver, syncContent, onEditorReady);
     }
     const unregister = registerBlockEditor(editor);
+    // A focus request made at block creation is fulfilled here, once
+    // the new block's editor finally exists (lazy mount + async create).
+    // wireEditor, registerBlockEditor and this call run synchronously in
+    // one effect, so waitForApi() implies fulfilment has run.
+    fulfillPendingFocus(editor, short);
     const surface = editor.action((ctx) => ctx.get(editorViewCtx));
     const onFocus = () => focusBlockEditor(editor);
     surface.dom.addEventListener('focusin', onFocus);

@@ -43,6 +43,35 @@ export function focusBlockEditor(editor: Editor): void {
   focusedBlockEditor = editor;
 }
 
+/** Short name of the block whose editor should receive DOM focus next. */
+let pendingFocusShort: string | null = null;
+
+/**
+ * Request DOM focus for a freshly created block. The request names the
+ * block's short and is fulfilled with a real DOM focus when a block
+ * body registers its editor via {@link fulfillPendingFocus}.
+ *
+ * @param short - Short name of the block that was just created.
+ */
+export function requestFocusForShort(short: string): void {
+  pendingFocusShort = short;
+}
+
+/**
+ * Fulfil an outstanding focus request by focusing a newly registered
+ * block editor's surface; no-op while no request is pending or while
+ * the registering body's short differs from the requested one (a
+ * concurrent lazy-mount of another block must not steal the request).
+ *
+ * @param editor - The block editor that just registered.
+ * @param short - Short name of the block body that just registered.
+ */
+export function fulfillPendingFocus(editor: Editor, short: string): void {
+  if (pendingFocusShort === null || pendingFocusShort !== short) return;
+  pendingFocusShort = null;
+  editor.action((ctx) => ctx.get(editorViewCtx).focus());
+}
+
 /**
  * The block editor toolbar commands target: the most recently focused
  * registered editor, falling back to the most recently registered one.

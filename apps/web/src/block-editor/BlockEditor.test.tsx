@@ -12,11 +12,11 @@ import { MemoryWorkspace } from '@opendraft/workspace';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { BlockEditor } from './BlockEditor';
 import { blockCollapseStorageKey } from './use-collapse-state';
-import { focusBlockEditor } from '../caret-mode-switch';
+import { requestFocusForShort } from '../caret-mode-switch';
 
 vi.mock('../caret-mode-switch', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../caret-mode-switch')>()),
-  focusBlockEditor: vi.fn(),
+  requestFocusForShort: vi.fn(),
 }));
 
 /** Manuscript directory used by every fixture. */
@@ -260,7 +260,7 @@ describe('BlockEditor files-changed event', () => {
       });
       expect(seen).toHaveLength(1);
       expect(seen[0]).toBeInstanceOf(CustomEvent);
-      expect(focusBlockEditor).toHaveBeenCalledWith('discussion');
+      expect(requestFocusForShort).toHaveBeenCalledWith('discussion');
       expect(screen.getByRole('heading', { level: 1, name: 'Discussion' })).toBeInTheDocument();
     } finally {
       window.removeEventListener('opendraft:files-changed', listener);
