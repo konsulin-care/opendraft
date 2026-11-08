@@ -1,4 +1,5 @@
 {
+  "finalize": { "maxPathsPerTask": 8 },
   "implement": {
     "tests": {
       "scoped": [
