@@ -8,6 +8,9 @@ pre-commit:
     typescript:
       glob: "*.{ts,tsx}"
       run: mise run typecheck
+    typescript-web:
+      glob: "*.{ts,tsx}"
+      run: mise run typecheck-web
     eslint:
       glob: "*.{ts,tsx,js,jsx}"
       run: mise run lint
