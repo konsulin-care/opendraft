@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 /**
- * EmptyState tests: the five DEO preset chips on an empty manuscript,
- * one click creating the clicked preset's block file and include, and
- * '+ Custom section' opening the add form.
+ * EmptyState tests: the embedded SectionPicker's five DEO preset chips
+ * on an empty manuscript, one click creating the clicked preset's block
+ * file and include with title, short and role, the picker's disclosure
+ * and accent styling on the empty-state surface, and its 'Custom
+ * section' entry opening the add form.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
@@ -10,6 +12,7 @@ import '@testing-library/jest-dom/vitest';
 import { MemoryWorkspace } from '@opendraft/workspace';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { EmptyState } from './EmptyState';
+import type { EmptyStateProps } from './EmptyState';
 import { useBlocks } from './use-blocks';
 
 /** Manuscript directory used by every fixture. */
@@ -41,9 +44,20 @@ function Harness({ ws }: { ws: WorkspaceAdapter }) {
   return <EmptyState onCreate={(draft) => createBlock(0, draft.title)} />;
 }
 
+/**
+ * Render the empty card with a create handler.
+ *
+ * @param onCreate - Create handler called by chips and the add form.
+ * @returns The rendered container for DOM-class assertions.
+ */
+function renderEmpty(onCreate: EmptyStateProps['onCreate']) {
+  const { container } = render(<EmptyState onCreate={onCreate} />);
+  return container;
+}
+
 describe('EmptyState preset chips', () => {
   it('renders the DEO preset chips for an empty manuscript', () => {
-    render(<EmptyState onCreate={vi.fn()} />);
+    renderEmpty(vi.fn());
 
     for (const name of PRESETS) {
       expect(screen.getByRole('button', { name })).toBeInTheDocument();
@@ -64,13 +78,55 @@ describe('EmptyState preset chips', () => {
     expect(await ws.readFile(`${BLOCKS}/methods.qmd`)).toContain('# Methods {#sec-methods');
     expect(await ws.readFile(ARTICLE)).toContain('{{< include blocks/methods.qmd >}}');
   });
+
+  it('calls onCreate with title, short and role when a core chip is clicked', () => {
+    const onCreate = vi.fn();
+    renderEmpty(onCreate);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Methods' }));
+
+    expect(onCreate).toHaveBeenCalledTimes(1);
+    expect(onCreate).toHaveBeenCalledWith({
+      title: 'Methods',
+      short: 'methods',
+      role: 'methods',
+    });
+  });
+});
+
+describe('EmptyState embedded section picker', () => {
+  it('embeds the same section picker', () => {
+    const container = renderEmpty(vi.fn());
+    const toggle = screen.getByRole('button', { name: 'More options' });
+    const classes = Array.from(container.querySelectorAll('[class]'))
+      .map((el) => el.getAttribute('class') ?? '')
+      .join(' ');
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(container.querySelector('select')).toBeNull();
+    expect(classes).toMatch(/\bbg-secondary\b/);
+    expect(classes).toMatch(/\bborder-black\b/);
+    expect(classes).toMatch(/\bfocus-visible:outline-black\b/);
+    expect(classes).not.toMatch(/\b(?:sky|blue)-/);
+    expect(
+      screen.getByRole('button', { name: 'Custom section' }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(
+      screen.getByRole('button', { name: 'Acknowledgements' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Methods' })).toBeInTheDocument();
+  });
 });
 
 describe('EmptyState custom section form', () => {
-  it("opens the add form when '+ Custom section' is activated", () => {
-    render(<EmptyState onCreate={vi.fn()} />);
+  it("opens the add form when the picker's 'Custom section' is activated", () => {
+    renderEmpty(vi.fn());
 
-    fireEvent.click(screen.getByRole('button', { name: '+ Custom section' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Custom section' }));
 
     expect(screen.getByLabelText('Add block')).toBeInTheDocument();
     expect(screen.getByLabelText('Title')).toHaveFocus();

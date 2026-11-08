@@ -1,11 +1,12 @@
 /**
- * Empty-manuscript card: DEO preset chips that create their section in
- * one click, plus a '+ Custom section' button opening the add form.
+ * Empty-manuscript card embedding the shared SectionPicker: core role
+ * chips create their section in one click, 'More options' reveals the
+ * extended DEO roles, and 'Custom section' opens the add form.
  */
 import { useState } from 'react';
 import { AddBlockForm } from './AddBlockForm';
 import type { BlockDraft } from './AddBlockForm';
-import { sectionTypePresets } from './deo-types';
+import { SectionPicker } from './SectionPicker';
 
 /** Props for {@link EmptyState}. */
 export interface EmptyStateProps {
@@ -24,32 +25,11 @@ export function EmptyState({ onCreate }: EmptyStateProps) {
           Pick a section type below, or add a custom section.
         </p>
       </div>
-      <ul className="flex flex-wrap gap-2">
-        {sectionTypePresets().map((preset) => (
-          <li key={preset.shortName}>
-            <button
-              type="button"
-              onClick={() =>
-                onCreate({
-                  title: preset.title,
-                  short: preset.shortName,
-                  type: preset.shortName,
-                })
-              }
-              className={`rounded-full border px-3 py-1 text-sm hover:bg-gray-50 ${preset.class}`}
-            >
-              {preset.title}
-            </button>
-          </li>
-        ))}
-      </ul>
-      <button
-        type="button"
-        onClick={() => setAdding(true)}
-        className="rounded-md border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50"
-      >
-        + Custom section
-      </button>
+      {/* Chips hand {title, short, role}; createAt reads title/short only. */}
+      <SectionPicker
+        onCreate={(draft) => onCreate(draft as BlockDraft)}
+        onCustom={() => setAdding(true)}
+      />
       {adding && (
         <AddBlockForm
           taken={[]}
