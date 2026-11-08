@@ -54,10 +54,21 @@ deeper headings remain free in the body.
 
 ### Section Type
 
-The DEO rhetorical type (Introduction, Methods, Results, Discussion,
-Conclusion) is selected in the add-block form and stored as the heading class
-`.deo-<type>`; generic sections use `.doco-section`. The type is changeable
-later from the block menu.
+DEO here is the **Discourse Elements Ontology**. Every block implies
+`doco:Section`; on top of that it may carry **at most one rhetorical role**
+class `.deo-<type>`, chosen from the section-level DEO vocabulary in
+`apps/web/src/block-editor/deo-types.ts`: the five core roles
+(Introduction, Methods, Results, Discussion, Conclusion) in document order
+plus every remaining section-level DEO role (Acknowledgements, Author
+Contribution, Background, Biography, Contribution, Data, Dataset
+Description, Dedication, Epilogue, Evaluation, External Resource
+Description, Future Work, Materials, Model, Motivation, Postscript,
+Problem Statement, Prologue, Related Work, Scenario, Supplementary
+Information Description). Non-section-level classes (DiscourseElement,
+Caption, Legend, Reference, BibliographicReference) are not section roles
+and never appear. Generic and custom sections carry no role class — they
+keep the fallback `.doco-section`. The type is changeable later from the
+block menu.
 
 ### Assembly Validation
 
@@ -81,4 +92,4 @@ accepted without an anchor error.
 - ADR-019: Block-Based Manuscript Editing (block-per-section model)
 - ADR-020: Milkdown Editor Adoption (superseded in part by this ADR)
 - Quarto cross-references: `sec-` prefix requirement
-- DEO (Document EntityType Ontology) rhetorical types; DoCO `doco:Section`
+- DEO (Discourse Elements Ontology) rhetorical roles; DoCO `doco:Section` (implied for every block; a block carries at most one rhetorical role, custom sections carry no class)
