@@ -2,7 +2,9 @@
 /**
  * SectionPicker tests: core role chips create immediately with title,
  * short and role, the 'More options' disclosure reveals the extended DEO
- * roles, and 'Custom section' hands off to the custom path.
+ * roles, 'Custom section' hands off to the custom path, used roles show
+ * a check mark yet stay clickable, and the accent styling is black with
+ * no native select element anywhere.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -19,10 +21,10 @@ import type { SectionPickerProps } from './SectionPicker';
 function renderPicker(overrides: Partial<SectionPickerProps> = {}) {
   const onCreate = vi.fn();
   const onCustom = vi.fn();
-  render(
+  const { container } = render(
     <SectionPicker onCreate={onCreate} onCustom={onCustom} {...overrides} />,
   );
-  return { onCreate, onCustom };
+  return { onCreate, onCustom, container };
 }
 
 describe('SectionPicker core chips', () => {
@@ -84,5 +86,38 @@ describe('SectionPicker custom section entry', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Custom section' }));
 
     expect(onCustom).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('SectionPicker used roles', () => {
+  it('shows a check mark on used roles but keeps them clickable', () => {
+    const { onCreate } = renderPicker({ usedRoles: new Set(['methods']) });
+    const chip = screen.getByRole('button', { name: 'Methods' });
+
+    expect(chip).toHaveTextContent('✓');
+    expect(chip).not.toBeDisabled();
+    expect(screen.getAllByText('✓')).toHaveLength(1);
+
+    fireEvent.click(chip);
+    expect(onCreate).toHaveBeenCalledTimes(1);
+    expect(onCreate).toHaveBeenCalledWith({
+      title: 'Methods', short: 'methods', role: 'methods',
+    });
+  });
+});
+
+describe('SectionPicker accent styling', () => {
+  it('uses black accent styling and renders no native select element', () => {
+    const { container } = renderPicker({ usedRoles: new Set(['methods']) });
+    const classes = Array.from(container.querySelectorAll('[class]'))
+      .map((el) => el.getAttribute('class') ?? '')
+      .join(' ');
+
+    expect(container.querySelector('select')).toBeNull();
+    expect(classes).toMatch(/\bbg-secondary\b/);
+    expect(classes).toMatch(/\bborder-black\b/);
+    expect(classes).toMatch(/\bhover:bg-secondary\b/);
+    expect(classes).toMatch(/\bfocus-visible:outline-black\b/);
+    expect(classes).not.toMatch(/\b(?:sky|blue)-/);
   });
 });

@@ -2,8 +2,8 @@
  * Section picker: the five core DEO role chips create a section in one
  * click, the 'More options' disclosure reveals the extended
  * section-level DEO roles, and 'Custom section' opens the custom path.
- * Used-role marks and accent styling are applied elsewhere; this
- * component only reports the pick.
+ * Roles already used show a check mark but stay clickable, and chips
+ * use the black/secondary accent tokens with no native select element.
  */
 import { useState } from 'react';
 import { extendedSectionTypePresets, sectionTypePresets } from './deo-types';
@@ -25,30 +25,42 @@ export interface SectionPickerProps {
   onCreate: (draft: SectionDraft) => void;
   /** Open the custom-section view; the picker still works without it. */
   onCustom?: () => void;
+  /** Role short names already used; their chips show a check mark. */
+  usedRoles?: ReadonlySet<string>;
 }
 
-/** Shared styling for the pill-shaped role chips. */
-const CHIP_CLASS = 'rounded-full border px-3 py-1 text-sm hover:bg-gray-50';
+/** Shared chip geometry plus the black-accent hover/focus styling. */
+const CHIP_BASE =
+  'rounded-full px-3 py-1 text-sm hover:bg-secondary focus-visible:outline-2 focus-visible:outline-black';
+
+/** Base chip with its neutral border and black hover accent. */
+const CHIP_CLASS = `${CHIP_BASE} border border-gray-300 hover:border-black`;
+
+/** Used chip: black border and secondary fill marking a taken role. */
+const CHIP_USED_CLASS = `${CHIP_BASE} border border-black bg-secondary`;
 
 /** Shared styling for the disclosure and entry buttons. */
 const BUTTON_CLASS =
-  'rounded-md border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50';
+  'rounded-md border border-gray-300 px-3 py-1 text-sm hover:bg-secondary focus-visible:outline-2 focus-visible:outline-black';
 
 /**
  * One role chip; clicking it creates the section immediately.
  *
- * @param props - The preset supplying label and draft fields, plus the
- *                create handler.
+ * @param props - The preset supplying label and draft fields, the create
+ *                handler, and the used flag.
  * @returns The chip button element.
  */
 function RoleChip({
   preset,
   onCreate,
+  used = false,
 }: {
   /** Preset supplying the title, short name and role. */
   preset: SectionTypePreset;
   /** Receives the draft when the chip is clicked. */
   onCreate: (draft: SectionDraft) => void;
+  /** Whether the role is already used; the chip stays clickable. */
+  used?: boolean;
 }) {
   return (
     <button
@@ -60,10 +72,48 @@ function RoleChip({
           role: preset.shortName,
         })
       }
-      className={CHIP_CLASS}
+      className={used ? CHIP_USED_CLASS : CHIP_CLASS}
     >
+      {used && <span aria-hidden="true">✓ </span>}
       {preset.title}
     </button>
+  );
+}
+
+/**
+ * Wrapping list of role chips; each chip carries the used check mark.
+ *
+ * @param props - Presets to render, the create handler, the used set,
+ *                and an optional list label.
+ * @returns The chip list element.
+ */
+function ChipList({
+  presets,
+  onCreate,
+  usedRoles,
+  label,
+}: {
+  /** Presets rendered as chips. */
+  presets: SectionTypePreset[];
+  /** Receives the draft when a chip is clicked. */
+  onCreate: (draft: SectionDraft) => void;
+  /** Role short names already used; their chips show a check mark. */
+  usedRoles?: ReadonlySet<string>;
+  /** Accessible name for the list, when one is needed. */
+  label?: string;
+}) {
+  return (
+    <ul className="flex flex-wrap gap-2" aria-label={label}>
+      {presets.map((preset) => (
+        <li key={preset.shortName}>
+          <RoleChip
+            preset={preset}
+            onCreate={onCreate}
+            used={usedRoles?.has(preset.shortName) ?? false}
+          />
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -74,7 +124,11 @@ function RoleChip({
  *
  * @param props - See {@link SectionPickerProps}.
  */
-export function SectionPicker({ onCreate, onCustom }: SectionPickerProps) {
+export function SectionPicker({
+  onCreate,
+  onCustom,
+  usedRoles,
+}: SectionPickerProps) {
   const [expanded, setExpanded] = useState(false);
   const core = sectionTypePresets();
   const coreNames = new Set(core.map((preset) => preset.shortName));
@@ -84,13 +138,7 @@ export function SectionPicker({ onCreate, onCustom }: SectionPickerProps) {
 
   return (
     <div className="space-y-2">
-      <ul className="flex flex-wrap gap-2">
-        {core.map((preset) => (
-          <li key={preset.shortName}>
-            <RoleChip preset={preset} onCreate={onCreate} />
-          </li>
-        ))}
-      </ul>
+      <ChipList presets={core} onCreate={onCreate} usedRoles={usedRoles} />
       <button
         type="button"
         aria-expanded={expanded}
@@ -100,13 +148,12 @@ export function SectionPicker({ onCreate, onCustom }: SectionPickerProps) {
         More options
       </button>
       {expanded && (
-        <ul aria-label="Extended DEO roles" className="flex flex-wrap gap-2">
-          {extended.map((preset) => (
-            <li key={preset.shortName}>
-              <RoleChip preset={preset} onCreate={onCreate} />
-            </li>
-          ))}
-        </ul>
+        <ChipList
+          presets={extended}
+          onCreate={onCreate}
+          usedRoles={usedRoles}
+          label="Extended DEO roles"
+        />
       )}
       <button
         type="button"

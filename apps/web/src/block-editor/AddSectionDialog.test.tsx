@@ -3,7 +3,8 @@
  * AddSectionDialog tests: the custom section view refuses an empty title,
  * submits the title plus short name with no role, collapses the derived
  * short name behind 'Change', and Back/Cancel/Add plus Enter/Escape drive
- * the dialog over the picker view.
+ * the dialog over the picker view. The picker view keeps black accent
+ * styling and renders no native select element.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -20,10 +21,10 @@ import type { AddSectionDialogProps } from './AddSectionDialog';
 function renderDialog(overrides: Partial<AddSectionDialogProps> = {}) {
   const onCreate = vi.fn();
   const onClose = vi.fn();
-  render(
+  const { container } = render(
     <AddSectionDialog onCreate={onCreate} onClose={onClose} {...overrides} />,
   );
-  return { onCreate, onClose };
+  return { onCreate, onClose, container };
 }
 
 /** Open the custom section view from the picker view. */
@@ -129,5 +130,19 @@ describe('AddSectionDialog Enter and Escape', () => {
       short: 'limitations',
     });
     expect(onClose).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('AddSectionDialog picker accent styling', () => {
+  it('uses black accent styling and renders no native select element', () => {
+    const { container } = renderDialog();
+    const classes = Array.from(container.querySelectorAll('[class]'))
+      .map((el) => el.getAttribute('class') ?? '')
+      .join(' ');
+
+    expect(container.querySelector('select')).toBeNull();
+    expect(classes).toMatch(/\bhover:bg-secondary\b/);
+    expect(classes).toMatch(/\bfocus-visible:outline-black\b/);
+    expect(classes).not.toMatch(/\b(?:sky|blue)-/);
   });
 });
