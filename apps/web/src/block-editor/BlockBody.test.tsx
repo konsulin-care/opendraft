@@ -149,6 +149,19 @@ describe('BlockBody autosave', () => {
 });
 
 describe('BlockBody focus-on-creation', () => {
+  it('leaves a request for another short unfulfilled when this body registers', async () => {
+    requestFocusForShort('intro');
+    await mountBody('# Methods {#sec-methods .deo-section}\nBody text.\n');
+    await waitForApi();
+    await waitFor(() => {
+      const surface = document.querySelector<HTMLElement>(
+        '[data-testid="block-body-editor"] .ProseMirror',
+      );
+      expect(surface).not.toBeNull();
+      expect(surface?.contains(document.activeElement)).toBe(false);
+    }, { timeout: 10000 });
+  }, 20000);
+
   it('fulfils a pending focus request with DOM focus inside the mounted body', async () => {
     requestFocusForShort('methods');
     await mountBody('# Methods {#sec-methods .deo-section}\nBody text.\n');

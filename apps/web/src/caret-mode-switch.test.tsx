@@ -4,7 +4,12 @@ import { act, cleanup, renderHook } from '@testing-library/react';
 import { Editor, rootCtx, defaultValueCtx, editorViewCtx } from '@milkdown/kit/core';
 import { commonmark } from '@milkdown/kit/preset/commonmark';
 import { getMarkdown } from '@milkdown/kit/utils';
-import { registerBlockEditor, focusBlockEditor } from './caret-mode-switch';
+import {
+  registerBlockEditor,
+  focusBlockEditor,
+  fulfillPendingFocus,
+  requestFocusForShort,
+} from './caret-mode-switch';
 import { useEditorCommands } from './hooks/useEditorCommands';
 
 const DOC = '# Title\n\nFirst paragraph.\n\nLast paragraph here.\n';
@@ -71,5 +76,19 @@ describe('toolbar commands target the focused block editor', () => {
       result.current.setHeading(1);
     });
     expect(result.current.activeState()).toMatchObject({ bold: false, heading: 0 });
+  }, 20000);
+});
+
+describe('pending focus handshake', () => {
+  it('focuses only the body whose short matches the pending request', async () => {
+    const other = await mountBlockEditor('# Other\n\nBody.\n');
+    requestFocusForShort('methods');
+    // A concurrent lazy-mount with another short must not steal the request.
+    fulfillPendingFocus(other, 'intro');
+    const surface = other.action((ctx) => ctx.get(editorViewCtx)).dom as HTMLElement;
+    expect(surface.contains(document.activeElement)).toBe(false);
+    // The request survives the mismatch and focuses the matching body.
+    fulfillPendingFocus(other, 'methods');
+    expect(surface.contains(document.activeElement)).toBe(true);
   }, 20000);
 });
