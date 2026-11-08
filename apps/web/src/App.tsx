@@ -154,7 +154,7 @@ function HeaderSection({
       projectName={active?.name} manuscriptDir={dirName ?? undefined}
       manuscriptName={dirName !== null ? active?.manuscriptNames?.[dirName] : undefined}
       onRenameProject={active ? (name) => rename(active.id, name) : undefined}
-      onRenameManuscript={createOpenManuscriptRenamer(active, dirName, { workspace, registry: projectRegistry, openFile, activePath, refresh: () => switchTo(active.id) })}
+      onRenameManuscript={createOpenManuscriptRenamer(active, dirName, { workspace, registry: projectRegistry, openFile, activePath, refresh: () => { if (active) switchTo(active.id); } })}
       saveStatus={saveStatus}
       formattingToolbar={formattingToolbar}
       onToggleFormattingToolbar={toggleFormattingToolbar}
@@ -279,7 +279,7 @@ export function App() {
       <EditorArea
         workspace={workspace} activePath={activePath} isDir={isDir}
         file={file !== null && file.path === contentPath ? file : null}
-        projectId={active.id} onSaveStatusChange={setSaveStatus}
+        projectId={active?.id ?? ''} onSaveStatusChange={setSaveStatus}
         formattingToolbar={formattingToolbar}
       />
       <DrawerSection

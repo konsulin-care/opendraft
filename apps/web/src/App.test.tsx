@@ -233,7 +233,7 @@ describe('App save status', () => {
     fireEvent.click(within(screen.getByTestId('project-drawer')).getByRole('treeitem', { name: 'references.bib' }));
     await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
     const cm = await waitFor(() => {
-      const el = document.querySelector('.cm-editor');
+      const el = document.querySelector<HTMLElement>('.cm-editor');
       if (!el) throw new Error('editor not ready');
       return el;
     }, { timeout: 5000 });

@@ -164,7 +164,7 @@ function PickerActions(props: PickerActionsProps): ReactNode {
       {props.manual && <ManualForm onCreate={(f) => { props.ops.addManual(f); props.onManual(false); }}
         onClose={() => props.onManual(false)} />}
       {props.editing && <EditSheet entry={props.editing} usage={refUsage(props.authors, String(props.editing.id))}
-        onSave={(patch) => { props.ops.saveEntry(String(props.editing.id), patch); props.onSaved(); }}
+        onSave={(patch) => { if (props.editing) props.ops.saveEntry(String(props.editing.id), patch); props.onSaved(); }}
         onClose={props.onSaved} />}
       {hasInline(props.authors) && (
         <button type="button" data-testid="affiliation-normalize" onClick={props.ops.normalize} className={ROW}>

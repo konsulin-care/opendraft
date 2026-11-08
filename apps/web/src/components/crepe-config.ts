@@ -70,7 +70,7 @@ export function createCrepeConfig(options: CrepeConfigOptions): Crepe {
     editor.use($prose(() => createCitationPlugin(workspace, onStateChangeRef.current)));
   });
   crepe.editor.config((ctx) => {
-    ctx.update(remarkStringifyOptionsCtx, (options) => ({ ...options, bullet: '-' }));
+    ctx.update(remarkStringifyOptionsCtx, (options) => ({ ...options, bullet: '-' as const }));
   });
   return crepe;
 }
@@ -110,7 +110,7 @@ export function wireEditor(
       quartoInlineCodePlugin,
       citationRemarkPlugin,
       ...ps,
-    ]);
+    ] as unknown as typeof ps);
   });
   onEditorReady?.(createTestApi(editor, syncContent));
 }

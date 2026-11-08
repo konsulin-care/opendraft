@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { CitationDropdown } from "./dropdown";
 import type { CitationState } from "./types";
@@ -47,9 +47,9 @@ function createOpenState(overrides?: Partial<CitationState>): CitationState {
   };
 }
 
-function renderDoiMode(opts: { doi?: string; dispatch?: ReturnType<typeof vi.fn>; onDoiResolved?: ReturnType<typeof vi.fn> } = {}) {
-  const dispatch = opts.dispatch ?? vi.fn();
-  const onDoiResolved = opts.onDoiResolved ?? vi.fn().mockResolvedValue(undefined);
+function renderDoiMode(opts: { doi?: string; dispatch?: Mock; onDoiResolved?: Mock } = {}) {
+  const dispatch: Mock = opts.dispatch ?? vi.fn();
+  const onDoiResolved: Mock = opts.onDoiResolved ?? vi.fn().mockResolvedValue(undefined);
   const state = createOpenState({ doiMode: true, doiInput: opts.doi ?? "10.9999/new" });
   render(
     <CitationDropdown state={state} dispatch={dispatch} onDoiResolved={onDoiResolved} />

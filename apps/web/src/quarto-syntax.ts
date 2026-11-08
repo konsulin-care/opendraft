@@ -27,7 +27,7 @@ const QUARTO_DOUBLE_BRACE_PATTERN = /^\{\{(\w+)\}\}$/;
  */
 export const quartoRemarkPlugin = {
   plugin: (() => {
-    const plugin: Plugin<[], object> = () => {
+    const plugin: Plugin<[Record<string, unknown>]> = () => {
       return (tree: object) => {
         visitCodeBlocks(tree, (node: Record<string, unknown>) => {
           const lang = node.lang as string | undefined;
@@ -85,7 +85,7 @@ export const quartoRemarkPlugin = {
  */
 export const quartoInlineCodePlugin = {
   plugin: (() => {
-    const plugin: Plugin<[], object> = () => {
+    const plugin: Plugin<[Record<string, unknown>]> = () => {
       return (tree: object) => {
         visitInlineCode(tree, (node: Record<string, unknown>, _parent: Record<string, unknown>) => {
           const value = node.value as string | undefined;

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, cleanup } from '@testing-library/react';
+import type { EditorView } from '@codemirror/view';
 import { SourceEditor, type SourceEditorHandle } from './SourceEditor';
 
 // @vitest-environment jsdom

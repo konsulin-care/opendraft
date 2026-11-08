@@ -182,7 +182,7 @@ export function createOps(
     const updated = authors.map((a, i) => (i === authorIndex ? withRef(a, id) : a));
     onApply(next ? { registry: next, authors: updated } : { authors: updated });
   };
-  const addEntry = (entry: AffiliationEntry): void => addRefTo(entry.id, [...registry, entry]);
+  const addEntry = (entry: AffiliationEntry): void => addRefTo(entry.id!, [...registry, entry]);
   const addOrgOp = (org: RorOrg): void => {
     const reused = registry.find((e) => e.ror && e.ror === org.ror);
     if (reused) { addRefTo(String(reused.id)); return; }

@@ -4,7 +4,7 @@
  * icon fields, degrees, email validation, status, CRediT pills, section
  * spacing of the person form.
  */
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { AuthorCard, type GroupOption } from './AuthorCard';
@@ -34,7 +34,7 @@ function renderCard(author: MetadataAuthor = PERSON, groups: GroupOption[] = [],
 }
 
 /** Rerender the controlled card with the author of the latest change. */
-function follow(rerender: (node: ReactElement) => void, onChange: ReturnType<typeof vi.fn>, groups: GroupOption[] = []): void {
+function follow(rerender: (node: ReactElement) => void, onChange: Mock, groups: GroupOption[] = []): void {
   rerender(<AuthorCard author={lastChange(onChange)} groups={groups} onChange={onChange} />);
 }
 
