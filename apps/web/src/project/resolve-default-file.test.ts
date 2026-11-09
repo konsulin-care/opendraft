@@ -20,8 +20,8 @@ describe('resolveDefaultFile with lastPath', () => {
   it('returns lastPath when that file exists', async () => {
     const ws = await scaffoldedWorkspace('p');
 
-    const result = await resolveDefaultFile(ws, 'manuscripts/p/references.bib');
-    expect(result).toBe('manuscripts/p/references.bib');
+    const result = await resolveDefaultFile(ws, 'manuscripts/p/_frontmatter.yml');
+    expect(result).toBe('manuscripts/p/_frontmatter.yml');
   });
 
   it('returns lastPath when it is an existing manuscript directory', async () => {
@@ -33,7 +33,6 @@ describe('resolveDefaultFile with lastPath', () => {
 
   it('ignores lastPath when neither the file nor anything under it exists', async () => {
     const ws = await scaffoldedWorkspace('p');
-    await ws.deleteFile('manuscripts/p/references.bib');
 
     const result = await resolveDefaultFile(ws, 'manuscripts/p/does-not-exist.bib');
     expect(result).toBe('manuscripts/p');

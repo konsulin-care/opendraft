@@ -232,8 +232,8 @@ describe('scaffoldProject — manuscript layout', () => {
       '_author.yml',
       '_frontmatter.yml',
       'article.qmd',
-      'references.bib',
     ]);
+    expect(files).not.toContain('references.bib');
     expect(validateManuscript('my-paper', files).valid).toBe(true);
   });
 

@@ -41,7 +41,7 @@ async function expectScaffolded(projectId: string, manuscriptId: string): Promis
   try {
     expect(await ws.readFile('opendraft.yml')).not.toBeNull();
     expect(await ws.readFile(`manuscripts/${manuscriptId}/article.qmd`)).not.toBeNull();
-    expect(await ws.readFile(`manuscripts/${manuscriptId}/references.bib`)).not.toBeNull();
+    expect(await ws.readFile('manuscripts/references.bib')).not.toBeNull();
   } finally {
     workspaceManager.release(projectId);
   }

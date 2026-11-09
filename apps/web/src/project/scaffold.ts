@@ -90,8 +90,8 @@ const REFERENCES_BIB = `@article{doe2024,
  * Writes a spec-conformant `opendraft.yml` whose protocol block is copied
  * from protocol/protocol.manifest.json, plus the manuscript layout under
  * `manuscripts/<manuscriptId>/`: a container `article.qmd` with no include
- * shortcodes and no starter block file under `blocks/`, the metadata files,
- * and the references file.
+ * shortcodes and no starter block file under `blocks/`, the metadata files.
+ * The shared `manuscripts/references.bib` is written only when missing.
  *
  * @param ws - Workspace adapter to write into (in-place).
  * @param options - Scaffold options; see {@link ScaffoldOptions}.
@@ -110,7 +110,6 @@ export async function scaffoldProject(ws: WorkspaceAdapter, options: ScaffoldOpt
   await ws.writeFile(`${manuscriptPath}/_author.yml`, AUTHOR_YML);
   await ws.writeFile(`${manuscriptPath}/_abstract.yml`, ABSTRACT_YML);
   await ws.writeFile(`${manuscriptPath}/_frontmatter.yml`, frontmatterYml(todayIsoDate()));
-  await ws.writeFile(`${manuscriptPath}/references.bib`, REFERENCES_BIB);
   if ((await ws.readFile(SHARED_BIB_PATH)) === null) {
     await ws.writeFile(SHARED_BIB_PATH, REFERENCES_BIB);
   }
