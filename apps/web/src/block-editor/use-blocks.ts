@@ -1,11 +1,12 @@
 /**
  * Block persistence hook: loads blocks in `article.qmd` include order and
- * exposes create, delete, rename and title-change assembly mutations.
+ * exposes create, delete, rename, retitle and title-change mutations.
  */
 import { useCallback, useEffect, useState } from 'react';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { joinHeading, splitHeading } from './heading';
 import type { BlockHeading } from './heading';
+import { retitleBlock } from './retitle';
 import { uniqueShortName } from './slug';
 import { countWords } from './word-count';
 
@@ -27,7 +28,6 @@ export interface UseBlocksResult {
   blocks: BlockEntry[];
   /**
    * Write `blocks/<short>.qmd` and insert its include at `position`.
-   *
    * Pass a title string for the legacy derived-identity form, or a
    * {@link CreateBlockDraft} to choose the short name and role.
    */
@@ -38,6 +38,8 @@ export interface UseBlocksResult {
   renameBlock: (oldShort: string, newShort: string) => Promise<void>;
   /** Rewrite the heading title; file name and anchor stay unchanged. */
   setTitle: (short: string, title: string) => Promise<void>;
+  /** Change the title, renaming the block when the new slug differs. */
+  retitle: (short: string, title: string) => Promise<string>;
 }
 
 /** Draft selecting a new block's own identity instead of deriving it. */
@@ -57,7 +59,7 @@ const INCLUDE_PATTERN = /\{\{< include\s+blocks\/([a-z0-9-]+)\.qmd\s*>\}\}/;
 const GENERIC_BLOCK_TYPE = 'section';
 
 /** Extract block short names from an assembly in include order. */
-function extractIncludes(article: string): string[] {
+export function extractIncludes(article: string): string[] {
   const shorts: string[] = [];
   for (const line of article.split('\n')) {
     const match = INCLUDE_PATTERN.exec(line.trim());
@@ -99,7 +101,6 @@ async function readBlocks(ws: WorkspaceAdapter, dir: string): Promise<BlockEntry
       continue;
     }
     const parts = splitHeading(text);
-    // The heading line is not body: only its remaining text counts.
     entries.push({ short, title: parts.title ?? short, wordCount: countWords(parts.body) });
   }
   return entries;
@@ -144,8 +145,7 @@ async function deleteBlockFile(ws: WorkspaceAdapter, dir: string, short: string)
 function renameIdentity(text: string, oldShort: string, newShort: string): string {
   const parts = splitHeading(text);
   const body = parts.body.replaceAll(`@sec-${oldShort}`, `@sec-${newShort}`);
-  // Re-emit the heading exactly as parsed: the class survives only when
-  // the parsed heading had one; a class-less heading stays class-less.
+  // Re-emit the heading exactly as parsed: a class-less heading stays class-less.
   if (parts.title === null || parts.anchor === null) return body;
   const anchor = parts.anchor === `sec-${oldShort}` ? `sec-${newShort}` : parts.anchor;
   return joinHeading({ title: parts.title, anchor, type: parts.type }, body);
@@ -169,7 +169,7 @@ async function rewriteOtherRefs(
 }
 
 /** Rename a block: file, include line and cross-block references. */
-async function renameBlockFile(
+export async function renameBlockFile(
   ws: WorkspaceAdapter,
   dir: string,
   oldShort: string,
@@ -193,7 +193,7 @@ async function renameBlockFile(
 }
 
 /** Rewrite a block's heading title, keeping file name and anchor. */
-async function updateBlockTitle(
+export async function updateBlockTitle(
   ws: WorkspaceAdapter,
   dir: string,
   short: string,
@@ -204,17 +204,16 @@ async function updateBlockTitle(
   if (text === null) return;
   const parts = splitHeading(text);
   const anchor = parts.anchor ?? `sec-${short}`;
-  // `parts.type` is null for a class-less heading: never write a class
-  // back onto a block whose parsed heading carried none.
+  // `parts.type` is null for a class-less heading: never re-add a class it never had.
   await ws.writeFile(path, joinHeading({ title, anchor, type: parts.type }, parts.body));
 }
 
 /** Mutation callbacks of {@link useBlocks}, bound to one workspace. */
 type BlockMutations = Pick<
-  UseBlocksResult, 'createBlock' | 'deleteBlock' | 'renameBlock' | 'setTitle'
+  UseBlocksResult, 'createBlock' | 'deleteBlock' | 'renameBlock' | 'retitle' | 'setTitle'
 >;
 
-/** Bind the four assembly mutations, each refreshing the block list after. */
+/** Bind the five assembly mutations, each refreshing the block list after. */
 function useBlockMutations(
   ws: WorkspaceAdapter,
   dir: string,
@@ -248,16 +247,22 @@ function useBlockMutations(
     },
     [ws, dir, refresh],
   );
-  return { createBlock, deleteBlock, renameBlock, setTitle };
+  const retitle = useCallback(
+    async (short: string, title: string) => {
+      const next = await retitleBlock(ws, dir, short, title);
+      await refresh();
+      return next;
+    },
+    [ws, dir, refresh],
+  );
+  return { createBlock, deleteBlock, renameBlock, retitle, setTitle };
 }
 
 /**
- * Track and mutate the blocks of a manuscript assembly.
- *
- * The block list loads in `article.qmd` include order whenever the
- * workspace or manuscript directory changes. Each mutation persists
- * through the workspace adapter and then refreshes the list.
- *
+ * Track and mutate the blocks of a manuscript assembly. The block list loads
+ * in `article.qmd` include order whenever the workspace or manuscript
+ * directory changes. Each mutation persists through the workspace adapter
+ * and then refreshes the list.
  * @param ws - Workspace holding the manuscript.
  * @param dir - Manuscript directory, e.g. `manuscripts/demo`.
  * @returns See {@link UseBlocksResult}.
