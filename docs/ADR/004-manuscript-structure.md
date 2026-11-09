@@ -1,6 +1,6 @@
 # ADR 004: Manuscript Structure & Metadata
 
-**Status:** Accepted  
+**Status:** Accepted, partially superseded by [ADR-024](./024-shared-references-bib.md)  
 **Date:** 2024-01-01  
 **PROPOSAL.md:** §4.2, §5, §6, §7
 
@@ -18,9 +18,10 @@ manuscripts/<id>/
 ├── article.qmd
 ├── _author.yml
 ├── _abstract.yml
-├── _frontmatter.yml
-└── references.bib
+└── _frontmatter.yml
 ```
+
+> **Note (ADR-024):** `references.bib` moved to the shared `manuscripts/references.bib`; see [ADR-024](./024-shared-references-bib.md).
 
 ### Metadata Separation
 Metadata is split into focused YAML files:

@@ -94,6 +94,19 @@ keywords:
 
 ## BibTeX (references.bib)
 
+One shared bibliography lives at `manuscripts/references.bib` (ADR-024),
+not inside each manuscript directory:
+
+```text
+manuscripts/
+├── references.bib
+└── <id>/
+    ├── article.qmd
+    └── ...
+```
+
+Each `article.qmd` front matter sets `bibliography: ../references.bib`.
+
 ```bibtex
 @article{doe2024,
   title = {Example Article},
@@ -119,3 +132,4 @@ Recent work [@doe2024; @smith2023] confirms...
 - Users should not construct complex YAML manually.
 - See ADR-004 for legacy layout rationale.
 - See ADR-019 for block-based layout rationale.
+- See ADR-024 for the shared references.bib.
