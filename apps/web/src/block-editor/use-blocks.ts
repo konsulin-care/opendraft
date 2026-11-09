@@ -7,6 +7,7 @@ import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { joinHeading, splitHeading } from './heading';
 import type { BlockHeading } from './heading';
 import { uniqueShortName } from './slug';
+import { countWords } from './word-count';
 
 /** One entry of the block list. */
 export interface BlockEntry {
@@ -14,6 +15,8 @@ export interface BlockEntry {
   short: string;
   /** Heading title; falls back to the short name when no heading exists. */
   title: string;
+  /** Word count of the body, excluding the heading line; 0 without a file. */
+  wordCount: number;
 }
 
 /** Value returned by {@link useBlocks}. */
@@ -91,8 +94,13 @@ async function readBlocks(ws: WorkspaceAdapter, dir: string): Promise<BlockEntry
   const entries: BlockEntry[] = [];
   for (const short of extractIncludes(article)) {
     const text = await ws.readFile(`${dir}/blocks/${short}.qmd`);
-    const title = text === null ? short : (splitHeading(text).title ?? short);
-    entries.push({ short, title });
+    if (text === null) {
+      entries.push({ short, title: short, wordCount: 0 });
+      continue;
+    }
+    const parts = splitHeading(text);
+    // The heading line is not body: only its remaining text counts.
+    entries.push({ short, title: parts.title ?? short, wordCount: countWords(parts.body) });
   }
   return entries;
 }

@@ -134,7 +134,9 @@ function BlockRow({
   onClose,
   onTitleSave,
 }: BlockRowProps) {
-  const [wordCount, setWordCount] = useState(0);
+  // Seed from the list-loaded body count; the mounted editor's live
+  // count overrides it through onWordCount once it reports.
+  const [wordCount, setWordCount] = useState(block.wordCount);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   return (
     <div className="group">

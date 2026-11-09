@@ -80,6 +80,23 @@ describe('loadBlocks', () => {
     expect(result.current.blocks.map((block) => block.short)).toEqual(['methods', 'intro']);
     expect(result.current.blocks.map((block) => block.title)).toEqual(['Methods', 'Introduction']);
   });
+
+  it('lists each block with the word count of its body, excluding the heading line', async () => {
+    const { result } = await setup({
+      [ARTICLE]: articleWith('intro', 'empty'),
+      [`${BLOCKS}/intro.qmd`]: blockFile(
+        'Introduction',
+        'sec-intro',
+        'intro',
+        'One two three four five.\n',
+      ),
+      [`${BLOCKS}/empty.qmd`]: blockFile('Empty', 'sec-empty', 'empty'),
+    });
+
+    // The heading line carries three whitespace tokens of its own; only
+    // body words may count, and a body-less block counts zero.
+    expect(result.current.blocks.map((block) => block.wordCount)).toEqual([5, 0]);
+  });
 });
 
 describe('createBlock', () => {
