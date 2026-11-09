@@ -1,14 +1,13 @@
 /**
  * Block editor shell: one collapsible container per included block in
  * `article.qmd` include order, hover-revealed '+' insert points between
- * blocks and at the end that open the add form at the clicked position,
- * and a single delete confirmation naming the section and listing every
- * `@sec-` reference that would break.
+ * blocks and at the end that open the add-section dialog at the clicked
+ * position, and a single delete confirmation naming the section and
+ * listing every `@sec-` reference that would break.
  */
 import { useState } from 'react';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import type { SaveStatus } from '../components/AppHeader';
-import { AddBlockForm } from './AddBlockForm';
 import type { BlockDraft } from './AddBlockForm';
 import { AddSectionDialog } from './AddSectionDialog';
 import { BlockBody } from './BlockBody';
@@ -73,7 +72,7 @@ async function findBreakingRefs(
 /**
  * Hover-revealed '+' insert point between blocks and at the end.
  *
- * @param props - Handler opening the add form at this point.
+ * @param props - Handler opening the add-section dialog at this point.
  * @returns The insert button.
  */
 function InsertPoint({ onAdd }: { onAdd: () => void }) {
@@ -93,10 +92,8 @@ function InsertPoint({ onAdd }: { onAdd: () => void }) {
 interface BlockRowProps {
   /** The block rendered in this row. */
   block: BlockEntry;
-  /** Whether the add form is open at this row's insert point. */
+  /** Whether the add-section dialog is open at this row's insert point. */
   formOpen: boolean;
-  /** Short names already taken; forwarded to the add form. */
-  taken: readonly string[];
   /** Whether the block body is collapsed. */
   collapsed: boolean;
   /** Workspace holding the manuscript files, forwarded to the body. */
@@ -107,16 +104,16 @@ interface BlockRowProps {
   onToggle: () => void;
   /** Open the delete confirmation for this block. */
   onOverflow: () => void;
-  /** Open the add form at this row's insert point. */
+  /** Open the add-section dialog at this row's insert point. */
   onAdd: () => void;
-  /** Create the block from the form draft. */
+  /** Create the block from the dialog draft. */
   onCreate: (draft: BlockDraft) => void;
-  /** Close the add form. */
+  /** Close the add-section dialog. */
   onClose: () => void;
 }
 
 /**
- * One list row: the insert point, an optional add form and the
+ * One list row: the insert point, an optional add-section dialog and the
  * collapsible block container.
  *
  * @param props - See {@link BlockRowProps}.
@@ -125,7 +122,6 @@ interface BlockRowProps {
 function BlockRow({
   block,
   formOpen,
-  taken,
   collapsed,
   ws,
   dir,
@@ -140,7 +136,7 @@ function BlockRow({
   return (
     <div className="group">
       <InsertPoint onAdd={onAdd} />
-      {formOpen && <AddBlockForm taken={taken} onCreate={onCreate} onClose={onClose} />}
+      {formOpen && <AddSectionDialog onCreate={(draft) => onCreate(draft as BlockDraft)} onClose={onClose} />}
       <BlockContainer
         short={block.short}
         title={block.title}
@@ -233,7 +229,7 @@ function DeleteConfirm({ target, onConfirm, onCancel }: DeleteConfirmProps) {
 /**
  * Block editor shell: renders the include-ordered block list as
  * collapsible containers with hover '+' insert points between them and
- * at the end, wires the add form to `createBlock` at the clicked
+ * at the end, wires the add-section dialog to `createBlock` at the clicked
  * position, and opens one delete confirmation per block that names the
  * section and lists every breaking `@sec-` reference before deleting.
  *
@@ -268,7 +264,7 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
         <BlockRow
           key={block.short}
           block={block} formOpen={addingAt === index}
-          taken={shorts} collapsed={isCollapsed(block.short)}
+          collapsed={isCollapsed(block.short)}
           ws={ws} dir={dir}
           onToggle={() => toggle(block.short)}
           onOverflow={() => openDelete(block)}

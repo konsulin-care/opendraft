@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
  * BlockEditor tests: include-ordered collapsible containers, hover '+'
- * insert points opening the add form at the clicked position, and creation
+ * insert points opening the add section dialog at the clicked position, and creation
  * emitting `opendraft:files-changed` and focusing the new block. The delete
  * confirmation and delete flow live in BlockEditor.deletion.test.tsx.
  */
@@ -108,7 +108,7 @@ describe('BlockEditor container list', () => {
 });
 
 describe('BlockEditor insert points', () => {
-  it('opens the add form at the insert point that was clicked', async () => {
+  it('opens the add section dialog at the insert point that was clicked', async () => {
     const ws = await setup({
       [ARTICLE]: articleWith('alpha', 'beta'),
       [`${BLOCKS}/alpha.qmd`]: blockFile('alpha', 'Alpha'),
@@ -120,28 +120,22 @@ describe('BlockEditor insert points', () => {
     const points = screen.getAllByRole('button', { name: 'Insert block here' });
     expect(points).toHaveLength(2);
 
-    // The middle insert point opens the form between Alpha and Beta.
+    // The middle insert point opens the dialog between Alpha and Beta.
     fireEvent.click(points[1]);
-    let form = screen.getByLabelText('Add block');
+    const dialog = screen.getByRole('dialog', { name: 'Add section' });
     const alpha = screen.getByRole('heading', { level: 1, name: 'Alpha' });
     const beta = screen.getByRole('heading', { level: 1, name: 'Beta' });
-    expect(alpha.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+    expect(alpha.compareDocumentPosition(dialog) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
-    expect(form.compareDocumentPosition(beta) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    );
-
-    // Escape closes it; '+ Add section' opens the dialog after Beta.
-    fireEvent.keyDown(screen.getByLabelText('Title'), { key: 'Escape' });
-    expect(screen.queryByLabelText('Add block')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '+ Add section' }));
-    form = screen.getByRole('dialog', { name: 'Add section' });
-    expect(beta.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+    expect(dialog.compareDocumentPosition(beta) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
 
-    // The dialog's custom form creates the block after Beta.
+    // Escape closes it; the custom view creates at the clicked position.
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Add section' })).toBeNull();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Insert block here' })[1]);
     fireEvent.click(screen.getByRole('button', { name: 'Custom section' }));
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Discussion' } });
     await act(async () => {
@@ -149,9 +143,9 @@ describe('BlockEditor insert points', () => {
     });
     expect(screen.queryByRole('dialog', { name: 'Add section' })).toBeNull();
     const after = screen.getAllByRole('heading', { level: 1 });
-    expect(after.map((heading) => heading.textContent)).toEqual(['Alpha', 'Beta', 'Discussion']);
+    expect(after.map((heading) => heading.textContent)).toEqual(['Alpha', 'Discussion', 'Beta']);
     expect(await ws.readFile(ARTICLE)).toContain(
-      '{{< include blocks/beta.qmd >}}\n\n{{< include blocks/discussion.qmd >}}',
+      '{{< include blocks/alpha.qmd >}}\n\n{{< include blocks/discussion.qmd >}}',
     );
   });
 });
@@ -196,6 +190,7 @@ describe('BlockEditor files-changed event', () => {
     window.addEventListener('opendraft:files-changed', listener);
     try {
       fireEvent.click(screen.getByRole('button', { name: 'Insert block here' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Custom section' }));
       fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Discussion' } });
       await act(async () => {
         fireEvent.keyDown(screen.getByLabelText('Title'), { key: 'Enter' });
@@ -229,6 +224,7 @@ describe('BlockEditor new block expansion', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Insert block here' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Custom section' }));
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Discussion' } });
     await act(async () => {
       fireEvent.keyDown(screen.getByLabelText('Title'), { key: 'Enter' });
