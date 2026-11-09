@@ -110,6 +110,8 @@ interface BlockRowProps {
   onCreate: (draft: BlockDraft) => void;
   /** Close the add-section dialog. */
   onClose: () => void;
+  /** Save an edited section title; forwarded to the header field. */
+  onTitleSave?: (title: string) => void | Promise<void>;
 }
 
 /**
@@ -130,6 +132,7 @@ function BlockRow({
   onAdd,
   onCreate,
   onClose,
+  onTitleSave,
 }: BlockRowProps) {
   const [wordCount, setWordCount] = useState(0);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
@@ -146,6 +149,7 @@ function BlockRow({
         onOverflow={onOverflow}
         wordCount={wordCount}
         saveStatus={saveStatus}
+        onTitleSave={onTitleSave}
       >
         <BlockBody
           ws={ws}
@@ -237,7 +241,7 @@ function DeleteConfirm({ target, onConfirm, onCancel }: DeleteConfirmProps) {
  * @returns The shell markup, or nothing while the list loads.
  */
 export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
-  const { loading, blocks, createBlock, deleteBlock } = useBlocks(ws, dir);
+  const { loading, blocks, createBlock, deleteBlock, setTitle } = useBlocks(ws, dir);
   const shorts = blocks.map((block) => block.short);
   const { isCollapsed, toggle } = useCollapseState(projectKey, shorts);
   const [addingAt, setAddingAt] = useState<number | null>(null);
@@ -270,7 +274,7 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
           onOverflow={() => openDelete(block)}
           onAdd={() => setAddingAt(index)}
           onCreate={createAt(index)}
-          onClose={closeForm}
+          onClose={closeForm} onTitleSave={(t) => setTitle(block.short, t)}
         />
       ))}
       <div>

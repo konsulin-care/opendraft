@@ -6,7 +6,7 @@
  * confirmation and delete flow live in BlockEditor.deletion.test.tsx.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { MemoryWorkspace } from '@opendraft/workspace';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
@@ -55,6 +55,15 @@ function blockFile(short: string, title: string, body = ''): string {
 }
 
 /**
+ * Displayed values of every inline title field, in document order.
+ *
+ * @returns The current value of each `block-title` input.
+ */
+function titleValues(): string[] {
+  return screen.getAllByTestId('block-title').map((el) => (el as HTMLInputElement).value);
+}
+
+/**
  * Write a fixture assembly into a fresh workspace and render the shell.
  *
  * @param files - Repo-relative paths mapped to file contents.
@@ -66,7 +75,7 @@ async function setup(files: Record<string, string>): Promise<WorkspaceAdapter> {
     await ws.writeFile(path, content);
   }
   render(<BlockEditor ws={ws} dir={DIR} projectKey="block-editor-test" />);
-  await screen.findAllByRole('heading', { level: 1 });
+  await screen.findAllByTestId('block-title');
   return ws;
 }
 
@@ -93,17 +102,41 @@ describe('BlockEditor container list', () => {
       [`${BLOCKS}/results.qmd`]: blockFile('results', 'Results'),
     });
 
-    const headings = screen.getAllByRole('heading', { level: 1 });
-    expect(headings.map((heading) => heading.textContent)).toEqual([
-      'Introduction',
-      'Methods',
-      'Results',
-    ]);
+    expect(titleValues()).toEqual(['Introduction', 'Methods', 'Results']);
     for (const title of ['Introduction', 'Methods', 'Results']) {
       const toggle = screen.getByRole('button', { name: `${title} section` });
       expect(toggle).toHaveAttribute('aria-expanded', 'true');
       expect(toggle.closest('section')).not.toBeNull();
     }
+  });
+});
+
+describe('BlockEditor inline title rename', () => {
+  it('opens the inline title field instead of a static heading when clicked', async () => {
+    await setup({
+      [ARTICLE]: articleWith('alpha'),
+      [`${BLOCKS}/alpha.qmd`]: blockFile('alpha', 'Alpha'),
+    });
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
+    const title = screen.getByTestId('block-title');
+    expect(title).toHaveValue('Alpha');
+    fireEvent.click(title);
+    expect((title as HTMLInputElement).selectionStart).toBe('Alpha'.length);
+  });
+
+  it('persists an edited title as a heading-title-only rewrite of the block file', async () => {
+    const ws = await setup({
+      [ARTICLE]: articleWith('alpha'),
+      [`${BLOCKS}/alpha.qmd`]: blockFile('alpha', 'Alpha', 'Body.\n'),
+    });
+    const title = screen.getByTestId('block-title');
+    fireEvent.change(title, { target: { value: 'Background' } });
+    fireEvent.keyDown(title, { key: 'Enter' });
+    await waitFor(async () => {
+      expect(await ws.readFile(`${BLOCKS}/alpha.qmd`)).toBe(
+        '# Background {#sec-alpha .deo-section}\nBody.\n',
+      );
+    });
   });
 });
 
@@ -123,8 +156,8 @@ describe('BlockEditor insert points', () => {
     // The middle insert point opens the dialog between Alpha and Beta.
     fireEvent.click(points[1]);
     const dialog = screen.getByRole('dialog', { name: 'Add section' });
-    const alpha = screen.getByRole('heading', { level: 1, name: 'Alpha' });
-    const beta = screen.getByRole('heading', { level: 1, name: 'Beta' });
+    const alpha = screen.getByDisplayValue('Alpha');
+    const beta = screen.getByDisplayValue('Beta');
     expect(alpha.compareDocumentPosition(dialog) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
@@ -142,8 +175,7 @@ describe('BlockEditor insert points', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     });
     expect(screen.queryByRole('dialog', { name: 'Add section' })).toBeNull();
-    const after = screen.getAllByRole('heading', { level: 1 });
-    expect(after.map((heading) => heading.textContent)).toEqual(['Alpha', 'Discussion', 'Beta']);
+    expect(titleValues()).toEqual(['Alpha', 'Discussion', 'Beta']);
     expect(await ws.readFile(ARTICLE)).toContain(
       '{{< include blocks/alpha.qmd >}}\n\n{{< include blocks/discussion.qmd >}}',
     );
@@ -198,7 +230,7 @@ describe('BlockEditor files-changed event', () => {
       expect(seen).toHaveLength(1);
       expect(seen[0]).toBeInstanceOf(CustomEvent);
       expect(requestFocusForShort).toHaveBeenCalledWith('discussion');
-      expect(screen.getByRole('heading', { level: 1, name: 'Discussion' })).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Discussion')).toBeInTheDocument();
     } finally {
       window.removeEventListener('opendraft:files-changed', listener);
     }
@@ -257,7 +289,7 @@ describe('BlockEditor add section dialog', () => {
       expect(seen[0]).toBeInstanceOf(CustomEvent);
       expect(requestFocusForShort).toHaveBeenCalledWith('methods');
       expect(await ws.readFile(ARTICLE)).toContain('blocks/methods.qmd');
-      expect(screen.getByRole('heading', { level: 1, name: 'Methods' })).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Methods')).toBeInTheDocument();
     } finally {
       window.removeEventListener('opendraft:files-changed', listener);
     }

@@ -35,6 +35,8 @@ export interface BlockContainerProps {
   saveStatus?: SaveStatus;
   /** Open the block's overflow menu. */
   onOverflow?: () => void;
+  /** Save an edited section title; forwarded to the header inline field. */
+  onTitleSave?: (title: string) => void | Promise<void>;
   /** The block's body: the visual editor or the code surface. */
   children?: ReactNode;
 }
@@ -56,6 +58,7 @@ export function BlockContainer({
   wordCount = 0,
   saveStatus = 'saved',
   onOverflow,
+  onTitleSave,
   children,
 }: BlockContainerProps) {
   // joinHeading appends the body newline; the gutter shows the line only.
@@ -70,6 +73,7 @@ export function BlockContainer({
         wordCount={wordCount}
         saveStatus={saveStatus}
         onOverflow={onOverflow}
+        onTitleSave={onTitleSave}
       />
       <div className="doco-block-body" data-testid="block-body" inert={collapsed}>
         {mode === 'code' && (

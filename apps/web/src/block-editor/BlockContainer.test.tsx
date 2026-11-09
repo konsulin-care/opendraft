@@ -93,3 +93,18 @@ describe('BlockContainer reference chip', () => {
     expect(writeText).toHaveBeenCalledWith('@sec-methods');
   });
 });
+
+describe('BlockContainer title passthrough', () => {
+  it('routes header title saves to onTitleSave when the prop is given', () => {
+    const onTitleSave = vi.fn();
+    renderContainer({ onTitleSave });
+
+    const input = screen.getByTestId('block-title');
+    expect(input).toHaveValue('Methods');
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
+    fireEvent.change(input, { target: { value: 'Background' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onTitleSave).toHaveBeenCalledTimes(1);
+    expect(onTitleSave).toHaveBeenCalledWith('Background');
+  });
+});
