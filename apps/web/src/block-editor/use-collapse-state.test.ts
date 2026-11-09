@@ -79,3 +79,29 @@ describe('collapse-all and expand-all', () => {
     expect(storedFor(PROJECT)).toEqual({ intro: false, methods: false, refs: false });
   });
 });
+
+describe('rename', () => {
+  it("moves a block's collapsed flag to the new short name and persists it", () => {
+    const { result } = renderHook(() => useCollapseState(PROJECT, BLOCKS));
+
+    act(() => result.current.toggle('intro'));
+    expect(result.current.isCollapsed('intro')).toBe(true);
+
+    act(() => result.current.rename('intro', 'opening'));
+
+    expect(result.current.isCollapsed('intro')).toBe(false);
+    expect(result.current.isCollapsed('opening')).toBe(true);
+    expect(storedFor(PROJECT)).toEqual({ opening: true });
+  });
+
+  it('keeps an expanded block expanded when it is renamed', () => {
+    localStorage.setItem(blockCollapseStorageKey(PROJECT), JSON.stringify({ intro: false }));
+
+    const { result } = renderHook(() => useCollapseState(PROJECT, BLOCKS));
+
+    act(() => result.current.rename('intro', 'opening'));
+
+    expect(result.current.isCollapsed('opening')).toBe(false);
+    expect(storedFor(PROJECT)).toEqual({ opening: false });
+  });
+});

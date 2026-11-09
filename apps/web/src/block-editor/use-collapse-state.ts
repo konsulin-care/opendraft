@@ -87,6 +87,14 @@ export interface UseCollapseStateResult {
   collapseAll: () => void;
   /** Mark every known block expanded and persist the change. */
   expandAll: () => void;
+  /**
+   * Move a block's collapsed flag from `oldShort` to `newShort` and
+   * persist the change; blocks with no stored flag stay expanded.
+   *
+   * @param oldShort - Current short name of the block.
+   * @param newShort - New short name of the block.
+   */
+  rename: (oldShort: string, newShort: string) => void;
 }
 
 /**
@@ -135,5 +143,17 @@ export function useCollapseState(
     persist(mapAll(blocks, false));
   }, [blocks, persist]);
 
-  return { isCollapsed, toggle, collapseAll, expandAll };
+  const rename = useCallback(
+    (oldShort: string, newShort: string): void => {
+      if (oldShort === newShort) return;
+      const next: CollapsedMap = { ...collapsed };
+      const flag = next[oldShort];
+      delete next[oldShort];
+      if (flag !== undefined) next[newShort] = flag;
+      persist(next);
+    },
+    [collapsed, persist],
+  );
+
+  return { isCollapsed, toggle, collapseAll, expandAll, rename };
 }
