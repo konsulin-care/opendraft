@@ -1,6 +1,7 @@
 /**
  * Collapsible block container: a header owning the H1 title and block
- * controls above a body that goes `inert` while collapsed. In code mode
+ * controls above a body that goes `hidden` and `inert` while collapsed. In
+ * code mode
  * the body opens with a read-only gutter line showing the exact
  * canonical heading written to the block file.
  */
@@ -23,7 +24,7 @@ export interface BlockContainerProps {
   title: string;
   /** Which surface the body renders; only code mode shows the heading line. */
   mode: BlockBodyMode;
-  /** Whether the body is collapsed; collapsed bodies go `inert`. */
+  /** Whether the body is collapsed; collapsed bodies go `hidden` and `inert`. */
   collapsed: boolean;
   /** Flip the collapsed state; wired to the header toggle. */
   onToggle: () => void;
@@ -45,7 +46,7 @@ export interface BlockContainerProps {
  * Collapsible container for one block.
  *
  * @param props - See {@link BlockContainerProps}.
- * @returns The header, the inertable body and, in code mode, the
+ * @returns The header, the hidden-and-inertable body and, in code mode, the
  *          read-only heading line above the code surface.
  */
 export function BlockContainer({
@@ -75,7 +76,12 @@ export function BlockContainer({
         onOverflow={onOverflow}
         onTitleSave={onTitleSave}
       />
-      <div className="doco-block-body" data-testid="block-body" inert={collapsed}>
+      <div
+        className="doco-block-body"
+        data-testid="block-body"
+        hidden={collapsed}
+        inert={collapsed}
+      >
         {mode === 'code' && (
           <div role="note" aria-label="Read-only heading line" className="doco-block-heading-line">
             {headingLine}

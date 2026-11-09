@@ -63,6 +63,28 @@ describe('BlockContainer collapse semantics', () => {
   });
 });
 
+describe('BlockContainer collapsed body visibility', () => {
+  it('hides the body after expanding then collapsing while children stay mounted', () => {
+    const { rerender, props } = renderContainer({
+      collapsed: true,
+      children: <div data-testid="mounted-child">section body</div>,
+    });
+    const body = screen.getByTestId('block-body');
+    expect(body).not.toBeVisible();
+
+    rerender(<BlockContainer {...props} collapsed={false} />);
+    expect(body).toBeVisible();
+    const child = screen.getByTestId('mounted-child');
+
+    rerender(<BlockContainer {...props} collapsed />);
+    expect(body).not.toBeVisible();
+
+    rerender(<BlockContainer {...props} collapsed={false} />);
+    expect(body).toBeVisible();
+    expect(screen.getByTestId('mounted-child')).toBe(child);
+  });
+});
+
 describe('BlockContainer code mode heading line', () => {
   it('shows a read-only heading line above the code surface naming the exact heading written to the file', () => {
     renderContainer({
