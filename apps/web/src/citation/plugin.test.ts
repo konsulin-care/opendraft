@@ -235,19 +235,21 @@ describe("citation plugin — SlashProvider behavior (source)", () => {
   });
 });
 
-describe("citation plugin — onSelectCitekey removed from signatures", () => {
-  it("createCitationPlugin does not accept onSelectCitekey parameter", () => {
-    // onSelectCitekey removed; insertion handled directly in plugin
-    expect(pluginSource).not.toMatch(/function createCitationPlugin[\s\S]*?onSelectCitekey/);
+describe("citation plugin — click-to-select via onSelectCitekey", () => {
+  const clickHandler = pluginSource.match(/onSelectCitekey = \(citekey[\s\S]*?\n\s*\}/)?.[0] ?? "";
+  const enterHandler = pluginSource.match(/case "Enter"[\s\S]*?applyCitekeySelection\(view, citekey, state\.trigger\)/)?.[0] ?? "";
+  it("createUpdateDropdown passes onSelectCitekey to CitationDropdown", () => {
+    expect(pluginSource).toMatch(/createUpdateDropdown\(root, dispatch, view, onDoiResolved\)/);
+    expect(pluginSource).toMatch(/React\.createElement\(CitationDropdown, \{[^}]*onSelectCitekey/);
   });
-  it("createGlobalKeyHandler does not accept onSelectCitekey parameter", () => {
-    expect(pluginSource).not.toMatch(/function createGlobalKeyHandler[\s\S]*?onSelectCitekey/);
+  it("clicking a citekey inserts via applyCitekeySelection like Enter", () => {
+    expect(clickHandler).toContain("applyCitekeySelection(view, citekey, state.trigger)");
+    expect(enterHandler).toContain("applyCitekeySelection(view, citekey, state.trigger)");
   });
-  it("createView does not accept onSelectCitekey parameter", () => {
-    expect(pluginSource).not.toMatch(/function createView[\s\S]*?onSelectCitekey/);
+  it("clicking a citekey closes the citation dropdown", () => {
+    expect(clickHandler).toContain('dispatch({ type: "CLOSE_CITATION" })');
   });
-  it("CitationSelectHandler type is not exported", () => {
-    // No longer needed since insertion is in the plugin
+  it("does not export CitationSelectHandler", () => {
     expect(pluginSource).not.toContain("export type CitationSelectHandler");
   });
 });

@@ -149,7 +149,7 @@ function createView(workspace: WorkspaceAdapter, bibPath: string) {
     window.addEventListener("keydown", globalKeyHandler, { capture: true });
     const domHandlers = setupDOMHandlers(view);
     const onDoiResolved = createDoiResolvedHandler(workspace, bibPath, view);
-    const updateDropdown = createUpdateDropdown(root, dispatch, onDoiResolved);
+    const updateDropdown = createUpdateDropdown(root, dispatch, view, onDoiResolved);
 
     setTimeout(() => {
       const ps = citationPluginKey.getState(view.state) as CitationPluginState | null;
@@ -204,9 +204,13 @@ function createSlashProviderConfig(dispatch: (action: CitationAction) => void, v
 }
 
 /** Create dropdown update function. */
-function createUpdateDropdown(root: ReturnType<typeof createRoot>, dispatch: (action: CitationAction) => void, onDoiResolved?: (bibtex: string) => void) {
+function createUpdateDropdown(root: ReturnType<typeof createRoot>, dispatch: (action: CitationAction) => void, view: EditorView, onDoiResolved?: (bibtex: string) => void) {
   return (state: CitationState) => {
-    root.render(React.createElement(CitationDropdown, { state, dispatch, onDoiResolved }));
+    const onSelectCitekey = (citekey: string) => {
+      if (state.trigger) applyCitekeySelection(view, citekey, state.trigger);
+      dispatch({ type: "CLOSE_CITATION" });
+    };
+    root.render(React.createElement(CitationDropdown, { state, dispatch, onDoiResolved, onSelectCitekey }));
   };
 }
 
