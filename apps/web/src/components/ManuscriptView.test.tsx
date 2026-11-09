@@ -67,7 +67,7 @@ describe('ManuscriptView metadata panel placement', () => {
       [`${DIR}/blocks/methods.qmd`]: blockFile('methods', 'Methods'),
     });
     const panel = await screen.findByTestId('metadata-panel');
-    const headings = await screen.findAllByRole('heading', { level: 1 });
+    const headings = await screen.findAllByTestId('block-title');
     // The panel section precedes every block heading in document order.
     const follows = panel.compareDocumentPosition(headings[0]) & Node.DOCUMENT_POSITION_FOLLOWING;
     expect(follows).toBe(Node.DOCUMENT_POSITION_FOLLOWING);

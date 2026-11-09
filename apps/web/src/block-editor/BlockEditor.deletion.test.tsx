@@ -61,7 +61,7 @@ async function setup(files: Record<string, string>): Promise<WorkspaceAdapter> {
     await ws.writeFile(path, content);
   }
   render(<BlockEditor ws={ws} dir={DIR} projectKey="block-editor-test" />);
-  await screen.findAllByRole('heading', { level: 1 });
+  await screen.findAllByTestId('block-title');
   return ws;
 }
 
@@ -107,7 +107,7 @@ describe('BlockEditor delete flow', () => {
     const cancelDialog = await screen.findByRole('dialog', { name: 'Delete Alpha' });
     fireEvent.click(within(cancelDialog).getByRole('button', { name: 'Cancel' }));
     expect(screen.queryByRole('dialog', { name: 'Delete Alpha' })).toBeNull();
-    expect(screen.getByRole('heading', { level: 1, name: 'Alpha' })).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Alpha')).toBeInTheDocument();
     expect(await ws.readFile(ARTICLE)).toBe(original);
 
     // Confirm deletes the block file and its include line.
@@ -116,8 +116,8 @@ describe('BlockEditor delete flow', () => {
     await act(async () => {
       fireEvent.click(within(confirmDialog).getByRole('button', { name: 'Delete block' }));
     });
-    expect(screen.queryByRole('heading', { level: 1, name: 'Alpha' })).toBeNull();
-    expect(screen.getByRole('heading', { level: 1, name: 'Beta' })).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('Alpha')).toBeNull();
+    expect(screen.getByDisplayValue('Beta')).toBeInTheDocument();
     expect(await ws.readFile(`${BLOCKS}/alpha.qmd`)).toBeNull();
     expect(await ws.readFile(ARTICLE)).not.toContain('blocks/alpha.qmd');
     expect(await ws.readFile(ARTICLE)).toContain('blocks/beta.qmd');
