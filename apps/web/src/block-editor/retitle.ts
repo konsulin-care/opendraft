@@ -13,6 +13,33 @@ import { normalizeShortName, uniqueShortName } from './slug';
 const ABBREVIATED_SLUGS: Record<string, string> = { introduction: 'intro' };
 
 /**
+ * Build the taken-name predicate feeding `uniqueShortName`.
+ *
+ * Gathers short names from the assembly's include lines and the block
+ * files on disk, then drops the retitled block's own short and own file
+ * first, so its current name never counts as taken.
+ *
+ * @param ws - Workspace holding the manuscript.
+ * @param dir - Manuscript directory, e.g. `manuscripts/demo`.
+ * @param short - Short name of the block being retitled.
+ * @returns Predicate reporting whether a candidate short name is owned
+ *          by another block's include line or file.
+ */
+async function buildIsTaken(
+  ws: WorkspaceAdapter,
+  dir: string,
+  short: string,
+): Promise<(candidate: string) => boolean> {
+  const article = (await ws.readFile(`${dir}/article.qmd`)) ?? '';
+  const taken = new Set(extractIncludes(article));
+  taken.delete(short);
+  const files = new Set(await ws.listFiles(`${dir}/blocks`));
+  files.delete(`${short}.qmd`);
+  return (candidate: string): boolean =>
+    taken.has(candidate) || files.has(`${candidate}.qmd`);
+}
+
+/**
  * Retitle a block, renaming it when the new title's slug differs.
  *
  * The new short name comes from `uniqueShortName` over the title after
@@ -35,13 +62,7 @@ export async function retitleBlock(
   short: string,
   title: string,
 ): Promise<string> {
-  const article = (await ws.readFile(`${dir}/article.qmd`)) ?? '';
-  const taken = new Set(extractIncludes(article));
-  taken.delete(short);
-  const ownFile = `${short}.qmd`;
-  const files = (await ws.listFiles(`${dir}/blocks`)).filter((file) => file !== ownFile);
-  const isTaken = (candidate: string): boolean =>
-    taken.has(candidate) || files.includes(`${candidate}.qmd`);
+  const isTaken = await buildIsTaken(ws, dir, short);
   const derived = ABBREVIATED_SLUGS[normalizeShortName(title)] ?? title;
   const next = uniqueShortName(derived, isTaken);
   if (next !== short) await renameBlockFile(ws, dir, short, next);
