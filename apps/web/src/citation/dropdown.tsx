@@ -129,6 +129,7 @@ function renderCitekeyList(
     <CitekeyList
       items={state.items}
       query={state.query}
+      loadError={state.loadError ?? null}
       activeIndex={state.activeIndex}
       onSelect={(citekey) => onSelectCitekey?.(citekey)}
       onAddCitation={() => dispatch({ type: "ENTER_DOI_MODE" })}
@@ -173,6 +174,7 @@ export function CitationDropdown({
 interface CitekeyListProps {
   items: CitationState["items"];
   query: string;
+  loadError?: CitationState["loadError"];
   activeIndex: number;
   onSelect: (citekey: string) => void;
   onAddCitation: () => void;
@@ -220,6 +222,7 @@ export function CitekeyItem({ item, isActive, onSelect }: CitekeyItemProps) {
 function CitekeyList({
   items,
   query,
+  loadError,
   activeIndex,
   onSelect,
   onAddCitation,
@@ -232,7 +235,9 @@ function CitekeyList({
         <ul>
           {filtered.length === 0 ? (
             <li className="citation-empty">
-              {items.length > 0
+              {loadError
+                ? `references.bib could not be parsed (line ${loadError.line})`
+                : items.length > 0
                 ? "No matching citations"
                 : "No references yet. Add one by DOI or create references.bib."}
             </li>

@@ -71,6 +71,14 @@ describe("CitationDropdown — empty state", () => {
     expect(screen.getByText(/Add one by DOI/)).toBeDefined();
   });
 
+  it("shows the bib load error instead of the empty-state text", () => {
+    const dispatch = vi.fn();
+    const state = createOpenState({ items: [], loadError: { message: "x", line: 12 } });
+    render(<CitationDropdown state={state} dispatch={dispatch} />);
+    expect(screen.getByText("references.bib could not be parsed (line 12)")).toBeDefined();
+    expect(screen.queryByText(/No references yet/)).toBeNull();
+  });
+
   it("still shows Add Citation button when no items", () => {
     const dispatch = vi.fn();
     const state = createOpenState({ items: [], query: "" });

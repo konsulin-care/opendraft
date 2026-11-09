@@ -13,6 +13,7 @@ export function createInitialState(): CitationState {
     doiLoading: false,
     comparison: null,
     error: null,
+    loadError: null,
   };
 }
 
@@ -57,7 +58,7 @@ function handleQueryItems(state: CitationState, action: CitationAction): Citatio
     return { ...state, query: action.query, activeIndex: 0 };
   }
   if (action.type === 'SET_ITEMS') {
-    return { ...state, items: action.items };
+    return { ...state, items: action.items, loadError: action.error ?? null };
   }
   return null;
 }
