@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 /**
  * BlockEditor tests: include-ordered collapsible containers, hover '+'
- * insert points opening the add form at the clicked position, the delete
- * confirmation naming the section and listing breaking `@sec-`, and
- * creation emitting `opendraft:files-changed` and focusing the new block.
+ * insert points opening the add form at the clicked position, and creation
+ * emitting `opendraft:files-changed` and focusing the new block. The delete
+ * confirmation and delete flow live in BlockEditor.deletion.test.tsx.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { MemoryWorkspace } from '@opendraft/workspace';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
@@ -152,65 +152,6 @@ describe('BlockEditor insert points', () => {
     expect(await ws.readFile(ARTICLE)).toContain(
       '{{< include blocks/beta.qmd >}}\n\n{{< include blocks/discussion.qmd >}}',
     );
-  });
-});
-
-describe('BlockEditor delete confirmation', () => {
-  it("names the section and lists every '@sec-' reference that would break", async () => {
-    await setup({
-      [ARTICLE]: articleWith('intro', 'methods', 'results'),
-      [`${BLOCKS}/intro.qmd`]: blockFile('intro', 'Introduction', 'See @sec-methods first.'),
-      [`${BLOCKS}/methods.qmd`]: blockFile('methods', 'Methods', 'Body.'),
-      [`${BLOCKS}/results.qmd`]: blockFile(
-        'results',
-        'Results',
-        'Shown in @sec-methods and again @sec-methods.',
-      ),
-    });
-
-    // Methods is the second block, so the second options button is its own.
-    const options = screen.getAllByRole('button', { name: 'Block options' });
-    fireEvent.click(options[1]);
-    const dialog = await screen.findByRole('dialog', { name: 'Delete Methods' });
-
-    expect(within(dialog).getByRole('heading', { name: 'Delete Methods' })).toBeInTheDocument();
-    const items = within(dialog).getAllByRole('listitem');
-    expect(items.map((item) => item.textContent)).toEqual([
-      '@sec-methods in intro',
-      '@sec-methods in results',
-      '@sec-methods in results',
-    ]);
-  });
-});
-
-describe('BlockEditor delete flow', () => {
-  it('deletes the block on confirm and leaves it untouched on cancel', async () => {
-    const ws = await setup({
-      [ARTICLE]: articleWith('alpha', 'beta'),
-      [`${BLOCKS}/alpha.qmd`]: blockFile('alpha', 'Alpha'),
-      [`${BLOCKS}/beta.qmd`]: blockFile('beta', 'Beta'),
-    });
-    const original = await ws.readFile(ARTICLE);
-
-    // Cancel closes the dialog and leaves the block and assembly untouched.
-    fireEvent.click(screen.getAllByRole('button', { name: 'Block options' })[0]);
-    const cancelDialog = await screen.findByRole('dialog', { name: 'Delete Alpha' });
-    fireEvent.click(within(cancelDialog).getByRole('button', { name: 'Cancel' }));
-    expect(screen.queryByRole('dialog', { name: 'Delete Alpha' })).toBeNull();
-    expect(screen.getByRole('heading', { level: 1, name: 'Alpha' })).toBeInTheDocument();
-    expect(await ws.readFile(ARTICLE)).toBe(original);
-
-    // Confirm deletes the block file and its include line.
-    fireEvent.click(screen.getAllByRole('button', { name: 'Block options' })[0]);
-    const confirmDialog = await screen.findByRole('dialog', { name: 'Delete Alpha' });
-    await act(async () => {
-      fireEvent.click(within(confirmDialog).getByRole('button', { name: 'Delete block' }));
-    });
-    expect(screen.queryByRole('heading', { level: 1, name: 'Alpha' })).toBeNull();
-    expect(screen.getByRole('heading', { level: 1, name: 'Beta' })).toBeInTheDocument();
-    expect(await ws.readFile(`${BLOCKS}/alpha.qmd`)).toBeNull();
-    expect(await ws.readFile(ARTICLE)).not.toContain('blocks/alpha.qmd');
-    expect(await ws.readFile(ARTICLE)).toContain('blocks/beta.qmd');
   });
 });
 
