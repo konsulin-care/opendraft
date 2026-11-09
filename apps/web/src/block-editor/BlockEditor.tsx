@@ -10,6 +10,7 @@ import type { WorkspaceAdapter } from '@opendraft/workspace';
 import type { SaveStatus } from '../components/AppHeader';
 import { AddBlockForm } from './AddBlockForm';
 import type { BlockDraft } from './AddBlockForm';
+import { AddSectionDialog } from './AddSectionDialog';
 import { BlockBody } from './BlockBody';
 import { BlockContainer } from './BlockContainer';
 import { EmptyState } from './EmptyState';
@@ -283,7 +284,7 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
         >
           + Add section
         </button>
-        {addingAt === blocks.length && <AddBlockForm taken={shorts} onCreate={createAt(blocks.length)} onClose={closeForm} />}
+        {addingAt === blocks.length && <AddSectionDialog onCreate={(draft) => createAt(blocks.length)(draft as BlockDraft)} onClose={closeForm} />}
       </div>
       <DeleteConfirm target={deleting} onConfirm={confirmDelete} onCancel={closeDelete} />
     </div>

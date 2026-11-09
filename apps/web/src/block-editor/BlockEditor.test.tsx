@@ -132,21 +132,22 @@ describe('BlockEditor insert points', () => {
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
 
-    // Escape closes it; '+ Add section' opens the form after Beta.
+    // Escape closes it; '+ Add section' opens the dialog after Beta.
     fireEvent.keyDown(screen.getByLabelText('Title'), { key: 'Escape' });
     expect(screen.queryByLabelText('Add block')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '+ Add section' }));
-    form = screen.getByLabelText('Add block');
+    form = screen.getByRole('dialog', { name: 'Add section' });
     expect(beta.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
 
-    // Enter creates the block at that insert position.
+    // The dialog's custom form creates the block after Beta.
+    fireEvent.click(screen.getByRole('button', { name: 'Custom section' }));
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Discussion' } });
     await act(async () => {
-      fireEvent.keyDown(screen.getByLabelText('Title'), { key: 'Enter' });
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     });
-    expect(screen.queryByLabelText('Add block')).toBeNull();
+    expect(screen.queryByRole('dialog', { name: 'Add section' })).toBeNull();
     const after = screen.getAllByRole('heading', { level: 1 });
     expect(after.map((heading) => heading.textContent)).toEqual(['Alpha', 'Beta', 'Discussion']);
     expect(await ws.readFile(ARTICLE)).toContain(
@@ -180,7 +181,7 @@ describe('BlockEditor add section button', () => {
     expect(points).toHaveLength(1);
     expect(points[0].className).toContain('opacity-0');
     fireEvent.click(add);
-    expect(screen.getByLabelText('Add block')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Add section' })).toBeInTheDocument();
   });
 });
 
@@ -194,7 +195,7 @@ describe('BlockEditor files-changed event', () => {
     });
     window.addEventListener('opendraft:files-changed', listener);
     try {
-      fireEvent.click(screen.getByRole('button', { name: '+ Add section' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Insert block here' }));
       fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Discussion' } });
       await act(async () => {
         fireEvent.keyDown(screen.getByLabelText('Title'), { key: 'Enter' });
@@ -227,7 +228,7 @@ describe('BlockEditor new block expansion', () => {
       'false',
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '+ Add section' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Insert block here' }));
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Discussion' } });
     await act(async () => {
       fireEvent.keyDown(screen.getByLabelText('Title'), { key: 'Enter' });
@@ -237,5 +238,32 @@ describe('BlockEditor new block expansion', () => {
       'true',
     );
     localStorage.clear();
+  });
+});
+
+describe('BlockEditor add section dialog', () => {
+  it('opens the dialog from + Add section and creates through createAt', async () => {
+    const seen: Event[] = [];
+    const listener = (event: Event): void => { seen.push(event); };
+    const ws = await setup({
+      [ARTICLE]: articleWith('alpha'),
+      [`${BLOCKS}/alpha.qmd`]: blockFile('alpha', 'Alpha'),
+    });
+    window.addEventListener('opendraft:files-changed', listener);
+    try {
+      fireEvent.click(screen.getByRole('button', { name: '+ Add section' }));
+      expect(screen.getByRole('dialog', { name: 'Add section' })).toBeInTheDocument();
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Methods' }));
+      });
+      expect(screen.queryByRole('dialog', { name: 'Add section' })).toBeNull();
+      expect(seen).toHaveLength(1);
+      expect(seen[0]).toBeInstanceOf(CustomEvent);
+      expect(requestFocusForShort).toHaveBeenCalledWith('methods');
+      expect(await ws.readFile(ARTICLE)).toContain('blocks/methods.qmd');
+      expect(screen.getByRole('heading', { level: 1, name: 'Methods' })).toBeInTheDocument();
+    } finally {
+      window.removeEventListener('opendraft:files-changed', listener);
+    }
   });
 });
