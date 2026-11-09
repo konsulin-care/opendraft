@@ -3,7 +3,7 @@ import type { EditorView } from "@milkdown/kit/prose/view";
 import { DecorationSet } from "@milkdown/kit/prose/view";
 import { SlashProvider } from "@milkdown/plugin-slash";
 import type { WorkspaceAdapter } from "@opendraft/workspace";
-import { parseBibTeX } from "@opendraft/references";
+import { readReferences } from "./references-source";
 import type { Reference } from "@opendraft/references";
 import { citationReducer, createInitialState } from "./state";
 import { matchCitationTrigger } from "./input-rule";
@@ -41,11 +41,13 @@ export function getCitationState(
  *
  * @param workspace - Workspace adapter for reading references.bib.
  * @param onStateChange - Optional callback fired on every state transition.
+ * @param bibPath - Path of the bib file to read and append to.
  * @returns ProseMirror Plugin instance.
  */
 export function createCitationPlugin(
   workspace: WorkspaceAdapter,
-  onStateChange?: (state: CitationState) => void
+  onStateChange?: (state: CitationState) => void,
+  bibPath = "references.bib",
 ): Plugin {
   return new Plugin({
     key: citationPluginKey,
@@ -56,7 +58,7 @@ export function createCitationPlugin(
         return ps?.decorations ?? DecorationSet.empty;
       },
     },
-    view: createView(workspace),
+    view: createView(workspace, bibPath),
   });
 }
 
@@ -136,15 +138,15 @@ function setupDOMHandlers(view: EditorView) {
 }
 
 /** Create the plugin view spec. */
-function createView(workspace: WorkspaceAdapter) {
+function createView(workspace: WorkspaceAdapter, bibPath: string) {
   return (view: EditorView) => {
-    loadReferences(workspace, view);
+    loadReferences(workspace, bibPath, view);
     const dispatch = createDispatch(view);
     const { provider, root } = createSlashProviderConfig(dispatch, view);
     const globalKeyHandler = createGlobalKeyHandler(view, dispatch);
     window.addEventListener("keydown", globalKeyHandler, { capture: true });
     const domHandlers = setupDOMHandlers(view);
-    const onDoiResolved = createDoiResolvedHandler(workspace, view);
+    const onDoiResolved = createDoiResolvedHandler(workspace, bibPath, view);
     const updateDropdown = createUpdateDropdown(root, dispatch, onDoiResolved);
 
     setTimeout(() => {
@@ -263,10 +265,10 @@ function extractQueryFromEditor(view: EditorView, triggerFrom: number): string {
 }
 
 /** Create the onDoiResolved handler for DOI resolution flow. */
-function createDoiResolvedHandler(workspace: WorkspaceAdapter, view: EditorView) {
+function createDoiResolvedHandler(workspace: WorkspaceAdapter, bibPath: string, view: EditorView) {
   return async (bibtex: string) => {
-    await appendReference(workspace, bibtex);
-    await loadReferences(workspace, view);
+    await appendReference(workspace, bibPath, bibtex);
+    await loadReferences(workspace, bibPath, view);
   };
 }
 
@@ -280,19 +282,12 @@ function syncQueryFromEditor(editorView: EditorView, dispatch: (action: Citation
 }
 
 /** Load references from workspace and dispatch to state. */
-async function loadReferences(workspace: WorkspaceAdapter, view: EditorView): Promise<void> {
+async function loadReferences(workspace: WorkspaceAdapter, bibPath: string, view: EditorView): Promise<void> {
   try {
-    const content = await workspace.readFile("references.bib");
-    if (!content || view.isDestroyed) return;
-
-    try {
-      const refs = parseBibTeX(content);
-      const tr = view.state.tr.setMeta(citationPluginKey, { type: "SET_ITEMS", items: refs });
-      view.dispatch(tr);
-      setTimeout(() => rebuildDecorations(view, refs), 0);
-    } catch {
-      // Ignore parse errors
-    }
+    const { items, error } = await readReferences(workspace, bibPath);
+    if (error || items.length === 0 || view.isDestroyed) return;
+    view.dispatch(view.state.tr.setMeta(citationPluginKey, { type: "SET_ITEMS", items }));
+    setTimeout(() => rebuildDecorations(view, items), 0);
   } catch (err) {
     if (err instanceof DOMException && err.name === "InvalidStateError") return;
     throw err;

@@ -1,57 +1,49 @@
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 
-const BIB_PATH = 'references.bib';
-
 /**
- * Append a BibTeX entry to references.bib.
+ * Append a BibTeX entry to the given bib file.
  *
  * @param workspace - Workspace adapter for file I/O.
+ * @param bibPath - Path of the bib file.
  * @param bibtexEntry - The BibTeX entry string to append.
  */
 export async function appendReference(
   workspace: WorkspaceAdapter,
+  bibPath: string,
   bibtexEntry: string,
 ): Promise<void> {
-  const existing = (await workspace.readFile(BIB_PATH)) ?? '';
+  const existing = (await workspace.readFile(bibPath)) ?? '';
   const separator = existing.trimEnd() ? '\n\n' : '';
-  await workspace.writeFile(BIB_PATH, `${existing.trimEnd()}${separator}${bibtexEntry}\n`);
+  await workspace.writeFile(bibPath, `${existing.trimEnd()}${separator}${bibtexEntry}\n`);
 }
 
 /**
- * Replace an existing BibTeX entry by citekey.
- *
- * If the citekey is not found, the new entry is appended.
+ * Replace an existing BibTeX entry by citekey; appends when not found.
  *
  * @param workspace - Workspace adapter for file I/O.
+ * @param bibPath - Path of the bib file.
  * @param citekey - The citekey to replace.
  * @param newEntry - The new BibTeX entry string.
  */
 export async function replaceReference(
   workspace: WorkspaceAdapter,
+  bibPath: string,
   citekey: string,
   newEntry: string,
 ): Promise<void> {
-  const existing = (await workspace.readFile(BIB_PATH)) ?? '';
-
+  const existing = (await workspace.readFile(bibPath)) ?? '';
   if (!existing) {
-    await workspace.writeFile(BIB_PATH, `${newEntry}\n`);
+    await workspace.writeFile(bibPath, `${newEntry}\n`);
     return;
   }
-
-  // Match entry starting with @type{citekey, until the closing }
-  // Handles both single-line and multi-line entries
   const entryRegex = new RegExp(
     `@[a-zA-Z]+\\s*\\{\\s*${escapeRegex(citekey)}\\s*,[\\s\\S]*?\\}`,
     'g',
   );
-
   if (entryRegex.test(existing)) {
-    // Replace the existing entry
-    const replaced = existing.replace(entryRegex, newEntry);
-    await workspace.writeFile(BIB_PATH, replaced);
+    await workspace.writeFile(bibPath, existing.replace(entryRegex, newEntry));
   } else {
-    // Citekey not found, append
-    await appendReference(workspace, newEntry);
+    await appendReference(workspace, bibPath, newEntry);
   }
 }
 
