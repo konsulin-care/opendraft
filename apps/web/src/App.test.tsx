@@ -26,6 +26,11 @@ afterEach(async () => {
   }
 });
 
+/** True when the element is the selected treeitem. */
+function isSelected(el: HTMLElement): boolean {
+  return el.getAttribute('aria-selected') === 'true';
+}
+
 describe('App', () => {
   it('boots into the manuscript view, not an article assembly', async () => {
     render(<App />);
@@ -60,7 +65,7 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'OpenDraft' }));
 
     // Opening another file is remembered; a remount reopens it.
-    await projectRegistry.setLastPath(records[0].id, 'manuscripts/untitled-project/references.bib');
+    await projectRegistry.setLastPath(records[0].id, 'manuscripts/references.bib');
     unmount();
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
@@ -69,8 +74,9 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'OpenDraft' }));
     const drawer = screen.getByTestId('project-drawer');
     await waitFor(() => expect(
-      within(drawer).getByRole('treeitem', { name: 'references.bib' }).getAttribute('aria-selected'),
-    ).toBe('true'));
+      within(drawer).getAllByRole('treeitem', { name: 'references.bib' })
+        .some(isSelected),
+    ).toBe(true));
   });
 });
 
@@ -99,7 +105,7 @@ async function expectDrawerTreeOpensFiles(): Promise<void> {
   await waitFor(() => expect(within(drawer).getAllByRole('treeitem').length).toBeGreaterThan(1));
   for (const path of paths) {
     const name = path.split('/').pop() as string;
-    expect(within(drawer).getByRole('treeitem', { name })).toBeDefined();
+    expect(within(drawer).getAllByRole('treeitem', { name }).length).toBeGreaterThan(0);
   }
 
   // Clicking a file opens its path and selects its treeitem.
@@ -230,7 +236,7 @@ describe('App save status', () => {
     await waitFor(() => expect(screen.getByTestId('manuscript-view')).toBeDefined(), { timeout: 10000 });
     // The manuscript view has no CodeMirror surface: open a source file first.
     fireEvent.click(screen.getByRole('button', { name: 'OpenDraft' }));
-    fireEvent.click(within(screen.getByTestId('project-drawer')).getByRole('treeitem', { name: 'references.bib' }));
+    fireEvent.click(within(screen.getByTestId('project-drawer')).getAllByRole('treeitem', { name: 'references.bib' })[0]);
     await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
     const cm = await waitFor(() => {
       const el = document.querySelector<HTMLElement>('.cm-editor');

@@ -5,6 +5,9 @@ import protocolManifest from '../../../../protocol/protocol.manifest.json' with 
 /** Path of the project configuration file at the workspace root. */
 export const OPENDRAFT_CONFIG_PATH = 'opendraft.yml';
 
+/** Path of the shared bibliography for all manuscripts. */
+export const SHARED_BIB_PATH = 'manuscripts/references.bib';
+
 /** Options for scaffolding a new project workspace. */
 export interface ScaffoldOptions {
   /** Identifier for the initial manuscript (lowercase alphanumeric + hyphens). */
@@ -26,6 +29,7 @@ metadata-files:
 - _author.yml
 - _abstract.yml
 - _frontmatter.yml
+bibliography: ../references.bib
 ---
 
 ::: {#refs}
@@ -69,7 +73,7 @@ function todayIsoDate(): string {
   return `${now.getFullYear()}-${mm}-${dd}`;
 }
 
-/** Starter references, mirroring templates/manuscript/references.bib. */
+/** Starter references, mirroring templates/project/manuscripts/references.bib. */
 const REFERENCES_BIB = `@article{doe2024,
   title = {Example Article},
   author = {Doe, Jane},
@@ -107,4 +111,7 @@ export async function scaffoldProject(ws: WorkspaceAdapter, options: ScaffoldOpt
   await ws.writeFile(`${manuscriptPath}/_abstract.yml`, ABSTRACT_YML);
   await ws.writeFile(`${manuscriptPath}/_frontmatter.yml`, frontmatterYml(todayIsoDate()));
   await ws.writeFile(`${manuscriptPath}/references.bib`, REFERENCES_BIB);
+  if ((await ws.readFile(SHARED_BIB_PATH)) === null) {
+    await ws.writeFile(SHARED_BIB_PATH, REFERENCES_BIB);
+  }
 }

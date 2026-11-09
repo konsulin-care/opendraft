@@ -8,7 +8,7 @@ import { scaffoldProject } from '../project/scaffold';
 
 // @vitest-environment jsdom
 
-const BIB_PATH = 'manuscripts/p/references.bib';
+const BIB_PATH = 'manuscripts/references.bib';
 const DIR_PATH = 'manuscripts/p';
 
 let projectId: string;

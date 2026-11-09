@@ -66,6 +66,7 @@ metadata-files:
 - _author.yml
 - _abstract.yml
 - _frontmatter.yml
+bibliography: ../references.bib
 ---
 
 ::: {#refs}
@@ -112,6 +113,22 @@ describe('templates/manuscript/article.qmd', () => {
     const article = (await ws.readFile(`${MANUSCRIPT_DIR}/article.qmd`)) as string;
 
     expect(templateWithoutInclude).toBe(article);
+  });
+});
+
+describe('scaffoldProject — manuscripts/references.bib', () => {
+  it('writes the shared bib with the starter doe2024 entry', async () => {
+    const ws = new MemoryWorkspace();
+    await scaffoldProject(ws, { manuscriptId: 'my-paper' });
+    expect(await ws.readFile('manuscripts/references.bib')).toContain('@article{doe2024,');
+  });
+
+  it('leaves an existing shared bib unchanged', async () => {
+    const ws = new MemoryWorkspace();
+    await scaffoldProject(ws, { manuscriptId: 'first' });
+    await ws.writeFile('manuscripts/references.bib', '@misc{keep,}\n');
+    await scaffoldProject(ws, { manuscriptId: 'second' });
+    expect(await ws.readFile('manuscripts/references.bib')).toBe('@misc{keep,}\n');
   });
 });
 
