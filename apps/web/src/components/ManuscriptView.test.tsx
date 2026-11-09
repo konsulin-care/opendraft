@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 /**
- * ManuscriptView tests: the metadata panel above the block list inside
- * the single scroll container, the empty-state preset picker for an
- * assembly with no blocks, and the always-visible '+ Add section'
- * button that needs no hover to show.
+ * ManuscriptView tests: the metadata panel and block list sharing one
+ * reading column inside the single scroll container, the empty-state
+ * preset picker for an assembly with no blocks, and the always-visible
+ * '+ Add section' button that needs no hover to show.
  */
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
@@ -60,7 +60,7 @@ async function renderView(files: Record<string, string>): Promise<WorkspaceAdapt
 }
 
 describe('ManuscriptView metadata panel placement', () => {
-  it('renders the MetadataPanel above the block list in one scroll container', async () => {
+  it('renders the metadata panel and the block editor list in the same reading column', async () => {
     await renderView({
       [`${DIR}/article.qmd`]: articleWith('intro', 'methods'),
       [`${DIR}/blocks/intro.qmd`]: blockFile('intro', 'Introduction'),
@@ -71,10 +71,14 @@ describe('ManuscriptView metadata panel placement', () => {
     // The panel section precedes every block heading in document order.
     const follows = panel.compareDocumentPosition(headings[0]) & Node.DOCUMENT_POSITION_FOLLOWING;
     expect(follows).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    // The panel lives in the surface's single scroll container.
+    // The metadata panel and the block editor list share one .reading-column.
+    const column = panel.closest('.reading-column');
+    expect(column).not.toBeNull();
+    expect(headings[0].closest('.reading-column')).toBe(column);
+    // The column lives in the surface's single scroll container.
     const surface = screen.getByTestId('manuscript-view');
     expect(surface.children).toHaveLength(1);
-    expect(panel.parentElement).toBe(surface.children[0]);
+    expect(surface.children[0].contains(column)).toBe(true);
   });
 });
 

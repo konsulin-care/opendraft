@@ -21,10 +21,12 @@ export interface ManuscriptViewProps {
 /**
  * Reading view for a manuscript directory: one scroll container (the
  * panel's scroll-collapse driver) holding the editor toolbars whose
- * formatting commands dispatch to the focused block editor, the metadata
- * panel on top of the block list, and the block editor underneath — all
- * guarded against focus-scroll jumps. The surface keeps exactly one child
- * so the scroll container remains the single scrollport.
+ * formatting commands dispatch to the focused block editor, and one
+ * shared ReadingColumn holding the metadata panel on top of the block
+ * list so the title block and the blocks share one display
+ * configuration — all guarded against focus-scroll jumps. The surface
+ * keeps exactly one child so the scroll container remains the single
+ * scrollport.
  *
  * @param props - See {@link ManuscriptViewProps}.
  * @returns The manuscript-view surface with one scroll container.
@@ -43,13 +45,13 @@ export function ManuscriptView({ workspace, dir, projectKey }: ManuscriptViewPro
         style={{ flex: 1, minHeight: 0, overflow: 'auto' }}
       >
         <EditorToolbars commands={commands} formattingToolbar={formattingToolbar} />
-        <MetadataPanel
-          workspace={workspace}
-          manuscriptRoot={dir}
-          projectKey={projectKey}
-          editorFocusRef={scrollContainerRef}
-        />
         <ReadingColumn>
+          <MetadataPanel
+            workspace={workspace}
+            manuscriptRoot={dir}
+            projectKey={projectKey}
+            editorFocusRef={scrollContainerRef}
+          />
           <BlockEditor ws={workspace} dir={dir} projectKey={projectKey} />
         </ReadingColumn>
       </div>
