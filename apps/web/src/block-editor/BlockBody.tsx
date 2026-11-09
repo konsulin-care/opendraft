@@ -24,6 +24,7 @@ import { reportLoadedBody } from './BlockHeader';
 import { joinHeading, splitHeading } from './heading';
 import type { BlockHeading } from './heading';
 import { useLazyMount } from './use-lazy-mount';
+import { sharedBibPath } from '../citation/references-source';
 
 /** Section type given to blocks that carry no type of their own. */
 const GENERIC_TYPE = 'section';
@@ -104,6 +105,8 @@ interface CrepeEditorOptions {
   fileText: string | null;
   /** Workspace holding the block file. */
   ws: WorkspaceAdapter;
+  /** Shared bib path handed to the citation plugin. */
+  bibPath: string;
   /** Short name used as the fallback anchor. */
   short: string;
   /** Title used as the fallback heading title. */
@@ -133,7 +136,7 @@ interface CrepeEditorOptions {
  * @returns Whether the editor finished creating.
  */
 function useCrepeEditor(options: CrepeEditorOptions): boolean {
-  const { mounted, fileText, ws, short, title } = options;
+  const { mounted, fileText, ws, short, title, bibPath } = options;
   const { rootRef, editorRef, headingRef, citationStateRef, onWordCountRef } = options;
   const [ready, setReady] = useState(false);
   useEffect(() => {
@@ -153,6 +156,7 @@ function useCrepeEditor(options: CrepeEditorOptions): boolean {
       defaultValue: parts.body,
       workspace: ws,
       onStateChangeRef: citationStateRef,
+      bibPath,
     });
     // Every block editor demotes H1s: register the heading guard on
     // the block-body Crepe instance before it mounts. The slash menu
@@ -176,7 +180,7 @@ function useCrepeEditor(options: CrepeEditorOptions): boolean {
       setReady(false);
       crepe.destroy();
     };
-  }, [mounted, fileText, ws, short, title]);
+  }, [mounted, fileText, ws, short, title, bibPath]);
   return ready;
 }
 
@@ -237,7 +241,7 @@ export function BlockBody({ ws, dir, short, title, collapsed, onWordCount, onSav
   const saver = useDebouncedSaver(ws, path, onSaveStatus);
   const fileText = useBlockFileText(ws, path, mounted);
   const ready = useCrepeEditor({
-    mounted, fileText, ws, short, title, rootRef,
+    mounted, fileText, ws, short, title, rootRef, bibPath: sharedBibPath(dir),
     editorRef, headingRef, citationStateRef, onWordCountRef,
   });
   const joinedSaver = useJoinedSaver(saver, headingRef, onWordCountRef);

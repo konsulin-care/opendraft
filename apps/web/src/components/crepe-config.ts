@@ -27,6 +27,8 @@ interface CrepeConfigOptions {
   defaultValue: string;
   workspace: WorkspaceAdapter;
   onStateChangeRef: React.MutableRefObject<(state: CitationState) => void>;
+  /** Bib file the citation plugin reads and appends to. */
+  bibPath?: string;
 }
 
 /**
@@ -40,7 +42,7 @@ interface CrepeConfigOptions {
  * @returns The configured Crepe instance, not yet mounted.
  */
 export function createCrepeConfig(options: CrepeConfigOptions): Crepe {
-  const { root, defaultValue, workspace, onStateChangeRef } = options;
+  const { root, defaultValue, workspace, onStateChangeRef, bibPath } = options;
   const crepe = new Crepe({
     root,
     defaultValue,
@@ -67,7 +69,7 @@ export function createCrepeConfig(options: CrepeConfigOptions): Crepe {
     },
   });
   crepe.addFeature((editor) => {
-    editor.use($prose(() => createCitationPlugin(workspace, onStateChangeRef.current)));
+    editor.use($prose(() => createCitationPlugin(workspace, onStateChangeRef.current, bibPath)));
   });
   crepe.editor.config((ctx) => {
     ctx.update(remarkStringifyOptionsCtx, (options) => ({ ...options, bullet: '-' as const }));

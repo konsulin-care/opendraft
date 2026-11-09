@@ -16,6 +16,12 @@ import { BlockBody } from './BlockBody';
 import { BlockHeader, reportLoadedBody } from './BlockHeader';
 import { requestFocusForShort } from '../caret-mode-switch';
 import type { EditorTestApi } from '../caret-mode-switch';
+import { createCitationPlugin } from '../citation/plugin';
+
+vi.mock('../citation/plugin', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../citation/plugin')>();
+  return { ...actual, createCitationPlugin: vi.fn(actual.createCitationPlugin) };
+});
 
 /** Manuscript directory used by every fixture. */
 const DIR = 'manuscripts/demo';
@@ -145,6 +151,17 @@ describe('BlockBody autosave', () => {
 
     expect(writes).toBe(0);
     expect(await ws.readFile(path)).toBe(before);
+  }, 20000);
+});
+
+describe('BlockBody citation bib path', () => {
+  it('creates its editor with the shared citation bib path', async () => {
+    vi.mocked(createCitationPlugin).mockClear();
+    await mountBody('# Methods {#sec-methods .deo-section}\nBody text.\n');
+    await waitForApi();
+    const calls = vi.mocked(createCitationPlugin).mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls[calls.length - 1][2]).toBe('manuscripts/references.bib');
   }, 20000);
 });
 
