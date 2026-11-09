@@ -61,7 +61,6 @@ describe("createCitationPlugin", () => {
   it("exports pluginKey", () => {
     expect(citationPluginKey).toBeDefined();
   });
-
   it("uses global capture-phase keyboard handler instead of props.handleKeyDown", () => {
     const plugin = createCitationPlugin(workspace);
     // handleKeyDown is no longer on props; keyboard is handled via window listener
@@ -111,7 +110,6 @@ describe("citation plugin — global keyboard handler (capture phase)", () => {
     expect(pluginSource).toContain("planCitationInsertion");
     expect(pluginSource).toContain("insertion.text");
   });
-
 });
 
 describe("citation plugin — insert range and cursor placement", () => {
@@ -206,41 +204,33 @@ describe("citation plugin — SlashProvider behavior (source)", () => {
     expect(pluginSource).toContain("@milkdown/plugin-slash");
     expect(pluginSource).toContain("SlashProvider");
   });
-
   it("creates SlashProvider with trigger '@'", () => {
     expect(pluginSource).toMatch(/trigger:\s*["']@["']/);
   });
-
   it("sets debounce to 0 for immediate trigger response", () => {
     expect(pluginSource).toContain("debounce: 0");
   });
-
   it("passes floatingUIOptions with bottom-start placement", () => {
     expect(pluginSource).toContain("floatingUIOptions");
     expect(pluginSource).toContain("bottom-start");
   });
-
   it("onShow does not dispatch top/left coordinates", () => {
     expect(pluginSource).not.toContain("top: 0");
     expect(pluginSource).not.toContain("left: 0");
   });
-
   it("uses custom shouldShow for word-boundary detection", () => {
     expect(pluginSource).toContain("shouldShow");
   });
-
   it("provides content element with React-rendered CitationDropdown", () => {
     expect(pluginSource).toContain("content");
     expect(pluginSource).toContain("CitationDropdown");
   });
-
   it("has onShow and onHide lifecycle callbacks", () => {
     expect(pluginSource).toContain("onShow");
     expect(pluginSource).toContain("OPEN_CITATION");
     expect(pluginSource).toContain("onHide");
     expect(pluginSource).toContain("CLOSE_CITATION");
   });
-
   it("calls provider.update and provider.destroy in plugin view", () => {
     expect(pluginSource).toContain("provider.update");
     expect(pluginSource).toContain("provider.destroy");
@@ -252,18 +242,26 @@ describe("citation plugin — onSelectCitekey removed from signatures", () => {
     // onSelectCitekey removed; insertion handled directly in plugin
     expect(pluginSource).not.toMatch(/function createCitationPlugin[\s\S]*?onSelectCitekey/);
   });
-
   it("createGlobalKeyHandler does not accept onSelectCitekey parameter", () => {
     expect(pluginSource).not.toMatch(/function createGlobalKeyHandler[\s\S]*?onSelectCitekey/);
   });
-
   it("createView does not accept onSelectCitekey parameter", () => {
     expect(pluginSource).not.toMatch(/function createView[\s\S]*?onSelectCitekey/);
   });
-
   it("CitationSelectHandler type is not exported", () => {
     // No longer needed since insertion is in the plugin
     expect(pluginSource).not.toContain("export type CitationSelectHandler");
+  });
+});
+
+describe("citation plugin — bib reload on open", () => {
+  it("opening the @ dropdown re-reads the bib file", () => {
+    expect(pluginSource).toMatch(/OPEN_CITATION[\s\S]*?onOpen\?\.\(\)/);
+    expect(pluginSource).toMatch(/createSlashProviderConfig\(dispatch, view, \(\) => \{\s*void loadReferences\(workspace, bibPath, view\)/);
+  });
+  it("a malformed bib dispatches the load error via SET_ITEMS", () => {
+    expect(pluginSource).toContain('{ type: "SET_ITEMS", items, error }');
+    expect(pluginSource).not.toContain("if (error || items.length === 0");
   });
 });
 

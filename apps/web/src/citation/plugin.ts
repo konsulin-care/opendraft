@@ -142,7 +142,9 @@ function createView(workspace: WorkspaceAdapter, bibPath: string) {
   return (view: EditorView) => {
     loadReferences(workspace, bibPath, view);
     const dispatch = createDispatch(view);
-    const { provider, root } = createSlashProviderConfig(dispatch, view);
+    const { provider, root } = createSlashProviderConfig(dispatch, view, () => {
+      void loadReferences(workspace, bibPath, view);
+    });
     const globalKeyHandler = createGlobalKeyHandler(view, dispatch);
     window.addEventListener("keydown", globalKeyHandler, { capture: true });
     const domHandlers = setupDOMHandlers(view);
@@ -178,7 +180,7 @@ function createView(workspace: WorkspaceAdapter, bibPath: string) {
 }
 
 /** Create SlashProvider configuration. */
-function createSlashProviderConfig(dispatch: (action: CitationAction) => void, view: EditorView) {
+function createSlashProviderConfig(dispatch: (action: CitationAction) => void, view: EditorView, onOpen?: () => void) {
   const container = document.createElement("div");
   const root = createRoot(container);
   const provider = new SlashProvider({
@@ -195,6 +197,7 @@ function createSlashProviderConfig(dispatch: (action: CitationAction) => void, v
     const trigger = matchCitationTrigger(paragraphText);
     if (!trigger) return;
     dispatch({ type: "OPEN_CITATION", trigger: { from: $from.start() + trigger.from, bracketed: trigger.bracketed } });
+    onOpen?.();
   };
   provider.onHide = () => dispatch({ type: "CLOSE_CITATION" });
   return { provider, container, root };
@@ -285,8 +288,9 @@ function syncQueryFromEditor(editorView: EditorView, dispatch: (action: Citation
 async function loadReferences(workspace: WorkspaceAdapter, bibPath: string, view: EditorView): Promise<void> {
   try {
     const { items, error } = await readReferences(workspace, bibPath);
-    if (error || items.length === 0 || view.isDestroyed) return;
-    view.dispatch(view.state.tr.setMeta(citationPluginKey, { type: "SET_ITEMS", items }));
+    if (view.isDestroyed) return;
+    view.dispatch(view.state.tr.setMeta(citationPluginKey, { type: "SET_ITEMS", items, error }));
+    if (error) return;
     setTimeout(() => rebuildDecorations(view, items), 0);
   } catch (err) {
     if (err instanceof DOMException && err.name === "InvalidStateError") return;
