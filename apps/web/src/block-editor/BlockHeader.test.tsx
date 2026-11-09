@@ -55,6 +55,26 @@ describe('BlockHeader level-1 warning badge', () => {
   });
 });
 
+describe('BlockHeader delete button', () => {
+  it("renders a trash-icon 'Delete section' button and no 'Block options' button", () => {
+    renderHeader('methods');
+
+    const button = screen.getByRole('button', { name: 'Delete section' });
+    expect(button).toBeInTheDocument();
+    expect(button.querySelector('svg.lucide-trash-2')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Block options' })).not.toBeInTheDocument();
+  });
+
+  it("activates 'Delete section' through the onOverflow handler", () => {
+    const onOverflow = vi.fn();
+    renderHeader('methods', { onOverflow });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete section' }));
+
+    expect(onOverflow).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('BlockHeader title rename', () => {
   it('saves the edited title through onTitleSave when the user commits with Enter', () => {
     const onTitleSave = vi.fn();

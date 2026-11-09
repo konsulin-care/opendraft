@@ -78,8 +78,8 @@ describe('BlockEditor delete confirmation', () => {
       ),
     });
 
-    // Methods is the second block, so the second options button is its own.
-    const options = screen.getAllByRole('button', { name: 'Block options' });
+    // Methods is the second block, so the second delete button is its own.
+    const options = screen.getAllByRole('button', { name: 'Delete section' });
     fireEvent.click(options[1]);
     const dialog = await screen.findByRole('dialog', { name: 'Delete Methods' });
 
@@ -103,7 +103,7 @@ describe('BlockEditor delete flow', () => {
     const original = await ws.readFile(ARTICLE);
 
     // Cancel closes the dialog and leaves the block and assembly untouched.
-    fireEvent.click(screen.getAllByRole('button', { name: 'Block options' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Delete section' })[0]);
     const cancelDialog = await screen.findByRole('dialog', { name: 'Delete Alpha' });
     fireEvent.click(within(cancelDialog).getByRole('button', { name: 'Cancel' }));
     expect(screen.queryByRole('dialog', { name: 'Delete Alpha' })).toBeNull();
@@ -111,7 +111,7 @@ describe('BlockEditor delete flow', () => {
     expect(await ws.readFile(ARTICLE)).toBe(original);
 
     // Confirm deletes the block file and its include line.
-    fireEvent.click(screen.getAllByRole('button', { name: 'Block options' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Delete section' })[0]);
     const confirmDialog = await screen.findByRole('dialog', { name: 'Delete Alpha' });
     await act(async () => {
       fireEvent.click(within(confirmDialog).getByRole('button', { name: 'Delete block' }));

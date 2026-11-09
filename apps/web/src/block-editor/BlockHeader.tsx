@@ -1,13 +1,13 @@
 /**
  * Block header: the collapsible block's title row, owning the H1 title,
  * the copyable `@sec-` reference chip, the level-1 warning badge, the
- * word count, the save status and the overflow menu. The disclosure
+ * word count, the save status and the delete button. The disclosure
  * toggle carries `aria-expanded`. The warning badge reflects the body
  * as loaded: new level-1 headings cannot appear because the body's
  * heading guard demotes them to H2.
  */
 import { useSyncExternalStore } from 'react';
-import { ChevronDown, Ellipsis } from 'lucide-react';
+import { ChevronDown, Trash2 } from 'lucide-react';
 import type { SaveStatus } from '../components/AppHeader';
 import { InlineEditField } from '../components/InlineEditField';
 
@@ -91,7 +91,7 @@ export interface BlockHeaderProps {
   wordCount: number;
   /** Autosave state shown next to the word count. */
   saveStatus: SaveStatus;
-  /** Open the block's overflow menu. */
+  /** Open the delete confirmation for this block's section. */
   onOverflow?: () => void;
   /**
    * Save an edited header title — wired to `useBlocks().setTitle`.
@@ -195,7 +195,7 @@ function HeaderStatus({ wordCount, saveStatus }: { wordCount: number; saveStatus
 
 /**
  * Header row of one block: disclosure toggle, H1 title, reference chip,
- * word count, save status and overflow menu.
+ * word count, save status and delete button.
  *
  * @param props - See {@link BlockHeaderProps}.
  * @returns The rendered header markup.
@@ -235,11 +235,11 @@ export function BlockHeader({
       <HeaderStatus wordCount={wordCount} saveStatus={saveStatus} />
       <button
         type="button"
-        aria-label="Block options"
+        aria-label="Delete section"
         onClick={onOverflow}
         className="inline-flex items-center justify-center rounded-md p-1 text-gray-500 hover:bg-gray-100"
       >
-        <Ellipsis aria-hidden="true" className="h-4 w-4" />
+        <Trash2 aria-hidden="true" className="h-4 w-4" />
       </button>
     </header>
   );
