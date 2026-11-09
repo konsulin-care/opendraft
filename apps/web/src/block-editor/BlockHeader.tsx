@@ -9,6 +9,7 @@
 import { useSyncExternalStore } from 'react';
 import { ChevronDown, Ellipsis } from 'lucide-react';
 import type { SaveStatus } from '../components/AppHeader';
+import { InlineEditField } from '../components/InlineEditField';
 
 /** Per-block level-1 warnings reported by mounted bodies, keyed by short name. */
 const level1Warnings = new Map<string, boolean>();
@@ -92,6 +93,12 @@ export interface BlockHeaderProps {
   saveStatus: SaveStatus;
   /** Open the block's overflow menu. */
   onOverflow?: () => void;
+  /**
+   * Save an edited header title — wired to `useBlocks().setTitle`.
+   * When omitted the header renders a static H1 instead of the
+   * inline-edit field.
+   */
+  onTitleSave?: (title: string) => void | Promise<void>;
 }
 
 /**
@@ -137,6 +144,56 @@ function Level1Badge() {
 }
 
 /**
+ * Header title: the inline-edit field when a save handler is wired,
+ * otherwise the static H1 so consumers without rename support keep
+ * their level-1 heading.
+ *
+ * @param props - Title value and the optional save handler.
+ * @returns The title markup.
+ */
+function HeaderTitle({
+  title,
+  onTitleSave,
+}: {
+  title: string;
+  onTitleSave?: (title: string) => void | Promise<void>;
+}) {
+  if (onTitleSave === undefined) {
+    return <h1 className="flex-1 truncate text-base font-semibold text-gray-900">{title}</h1>;
+  }
+  return (
+    <span className="min-w-0 flex-1">
+      <InlineEditField
+        value={title}
+        label="Section title"
+        testId="block-title"
+        onSave={onTitleSave}
+        inputClassName="text-base font-semibold"
+      />
+    </span>
+  );
+}
+
+/**
+ * Word count and save status shown right of the title.
+ *
+ * @param props - Word count and autosave state.
+ * @returns The word count and status markup.
+ */
+function HeaderStatus({ wordCount, saveStatus }: { wordCount: number; saveStatus: SaveStatus }) {
+  return (
+    <>
+      <span className="text-xs text-gray-500">
+        {wordCount} {wordCount === 1 ? 'word' : 'words'}
+      </span>
+      <span role="status" aria-live="polite" className="text-xs text-gray-600">
+        {SAVE_LABEL[saveStatus]}
+      </span>
+    </>
+  );
+}
+
+/**
  * Header row of one block: disclosure toggle, H1 title, reference chip,
  * word count, save status and overflow menu.
  *
@@ -151,6 +208,7 @@ export function BlockHeader({
   wordCount,
   saveStatus,
   onOverflow,
+  onTitleSave,
 }: BlockHeaderProps) {
   const hasLevel1Warning = useSyncExternalStore(
     subscribeLevel1Warning,
@@ -171,15 +229,10 @@ export function BlockHeader({
           className={`h-4 w-4 transition-transform ${collapsed ? '-rotate-90' : ''}`}
         />
       </button>
-      <h1 className="flex-1 truncate text-base font-semibold text-gray-900">{title}</h1>
+      <HeaderTitle title={title} onTitleSave={onTitleSave} />
       {hasLevel1Warning && <Level1Badge />}
       <CopyChip short={short} />
-      <span className="text-xs text-gray-500">
-        {wordCount} {wordCount === 1 ? 'word' : 'words'}
-      </span>
-      <span role="status" aria-live="polite" className="text-xs text-gray-600">
-        {SAVE_LABEL[saveStatus]}
-      </span>
+      <HeaderStatus wordCount={wordCount} saveStatus={saveStatus} />
       <button
         type="button"
         aria-label="Block options"

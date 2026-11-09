@@ -136,7 +136,9 @@ async function deleteBlockFile(ws: WorkspaceAdapter, dir: string, short: string)
 function renameIdentity(text: string, oldShort: string, newShort: string): string {
   const parts = splitHeading(text);
   const body = parts.body.replaceAll(`@sec-${oldShort}`, `@sec-${newShort}`);
-  if (parts.title === null || parts.anchor === null || parts.type === null) return body;
+  // Re-emit the heading exactly as parsed: the class survives only when
+  // the parsed heading had one; a class-less heading stays class-less.
+  if (parts.title === null || parts.anchor === null) return body;
   const anchor = parts.anchor === `sec-${oldShort}` ? `sec-${newShort}` : parts.anchor;
   return joinHeading({ title: parts.title, anchor, type: parts.type }, body);
 }
@@ -194,8 +196,9 @@ async function updateBlockTitle(
   if (text === null) return;
   const parts = splitHeading(text);
   const anchor = parts.anchor ?? `sec-${short}`;
-  const type = parts.type ?? GENERIC_BLOCK_TYPE;
-  await ws.writeFile(path, joinHeading({ title, anchor, type }, parts.body));
+  // `parts.type` is null for a class-less heading: never write a class
+  // back onto a block whose parsed heading carried none.
+  await ws.writeFile(path, joinHeading({ title, anchor, type: parts.type }, parts.body));
 }
 
 /** Mutation callbacks of {@link useBlocks}, bound to one workspace. */

@@ -174,6 +174,30 @@ describe('renameBlock', () => {
     expect(methods).toContain('@sec-overview');
     expect(methods).not.toContain('@sec-intro');
   });
+
+  it('re-emits a class-less heading without adding a class when renaming', async () => {
+    const { result, ws } = await setup({
+      [ARTICLE]: articleWith('intro', 'methods'),
+      [`${BLOCKS}/intro.qmd`]: '# Introduction {#sec-intro}\nBody.\n',
+      [`${BLOCKS}/methods.qmd`]: blockFile(
+        'Methods',
+        'sec-methods',
+        'methods',
+        '\nSee @sec-intro for background.\n',
+      ),
+    });
+
+    await act(async () => {
+      await result.current.renameBlock('intro', 'overview');
+    });
+
+    const renamed = (await ws.readFile(`${BLOCKS}/overview.qmd`)) ?? '';
+    expect(renamed).toBe('# Introduction {#sec-overview}\nBody.\n');
+    expect(renamed).not.toContain('.deo-');
+    expect(await ws.readFile(`${BLOCKS}/intro.qmd`)).toBeNull();
+    const methods = (await ws.readFile(`${BLOCKS}/methods.qmd`)) ?? '';
+    expect(methods).toContain('@sec-overview');
+  });
 });
 
 describe('setTitle', () => {
@@ -191,5 +215,38 @@ describe('setTitle', () => {
     expect(retitle).toContain('# Background {#sec-intro .deo-intro}');
     expect(await ws.listFiles(BLOCKS)).toEqual(['intro.qmd']);
     expect(await includeOrder(ws)).toEqual(['intro']);
+  });
+
+  it('rewrites only the heading title, leaving anchor, class and body untouched', async () => {
+    const { result, ws } = await setup({
+      [ARTICLE]: articleWith('intro'),
+      [`${BLOCKS}/intro.qmd`]: blockFile('Introduction', 'sec-intro', 'intro', '\nBody.\n'),
+    });
+
+    await act(async () => {
+      await result.current.setTitle('intro', 'Background');
+    });
+
+    expect(await ws.readFile(`${BLOCKS}/intro.qmd`)).toBe(
+      '# Background {#sec-intro .deo-intro}\n\nBody.\n',
+    );
+    expect(await ws.listFiles(BLOCKS)).toEqual(['intro.qmd']);
+    expect(await includeOrder(ws)).toEqual(['intro']);
+  });
+
+  it('re-emits a class-less heading without adding a class', async () => {
+    const { result, ws } = await setup({
+      [ARTICLE]: articleWith('intro'),
+      [`${BLOCKS}/intro.qmd`]: '# Introduction {#sec-intro}\nBody.\n',
+    });
+
+    await act(async () => {
+      await result.current.setTitle('intro', 'Background');
+    });
+
+    const retitle = (await ws.readFile(`${BLOCKS}/intro.qmd`)) ?? '';
+    expect(retitle).toBe('# Background {#sec-intro}\nBody.\n');
+    expect(retitle).not.toContain('.deo-');
+    expect(await ws.listFiles(BLOCKS)).toEqual(['intro.qmd']);
   });
 });
