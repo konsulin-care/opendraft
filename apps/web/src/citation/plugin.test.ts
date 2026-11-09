@@ -31,10 +31,10 @@ function textBeforeCursor(state: EditorState): string {
   return $from.parent.textBetween(0, $from.parentOffset);
 }
 
-const pluginSource = readFileSync(
-  fileURLToPath(new URL("./plugin.ts", import.meta.url)),
-  "utf8",
-);
+const readSource = (file: string): string =>
+  readFileSync(fileURLToPath(new URL(file, import.meta.url)), "utf8");
+const pluginSource = readSource("./plugin.ts");
+const insertSource = readSource("./insert.ts");
 
 function createMockWorkspace(): WorkspaceAdapter {
   return {
@@ -93,22 +93,20 @@ describe("citation plugin — global keyboard handler (capture phase)", () => {
     expect(pluginSource).toContain("filterCitekeys");
   });
 
-  it("inserts citekey via direct view.dispatch in global handler", () => {
-    // Insertion moved into plugin to avoid stale editor.action() dispatch
-    expect(pluginSource).toContain("tr.insertText");
-    expect(pluginSource).toContain("view.dispatch(tr)");
+  it("inserts citekey via applyCitekeySelection in Enter handler", () => {
+    expect(pluginSource).toContain("applyCitekeySelection(view, citekey, state.trigger)");
+    expect(insertSource).toContain("tr.insertText");
+    expect(insertSource).toContain("view.dispatch(tr)");
   });
 
   it("reads trigger from citation state for insert range", () => {
-    // Insertion range is planned from the citation-state trigger
     expect(pluginSource).toContain("state.trigger");
-    expect(pluginSource).toContain("planCitationInsertion");
+    expect(insertSource).toContain("planCitationInsertion");
   });
 
   it("delegates bracket handling to planCitationInsertion", () => {
-    // Bracket format ([@citekey] vs @citekey) and ] dedup live in insert.ts
-    expect(pluginSource).toContain("planCitationInsertion");
-    expect(pluginSource).toContain("insertion.text");
+    expect(insertSource).toContain("planCitationInsertion");
+    expect(insertSource).toContain("insertion.text");
   });
 });
 
@@ -117,14 +115,14 @@ describe("citation plugin — insert range and cursor placement", () => {
     // T3: the replacement starts at the @ (trigger.from), not at the [.
     // A ] is appended by planCitationInsertion only when the group lacks one.
     expect(pluginSource).not.toContain("trigger.from - 1");
-    expect(pluginSource).toContain("planCitationInsertion");
+    expect(insertSource).toContain("planCitationInsertion");
   });
 
   it("places the cursor just before the closing ] after insert", () => {
     // T4: after the first pick in [@key] the cursor must sit at the offset
     // just before the closing ] (insertion.from + "@citekey".length) so the
     // user can type "; @" to add another citation to the same group.
-    expect(pluginSource).toMatch(
+    expect(insertSource).toMatch(
       /insertText\([\s\S]*?setSelection\(\s*TextSelection\.create\(tr\.doc, insertion\.from \+ citekey\.length \+ 1\)\s*,?\s*\)[\s\S]*?view\.dispatch\(tr\)/,
     );
   });

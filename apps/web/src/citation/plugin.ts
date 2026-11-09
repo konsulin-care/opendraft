@@ -1,4 +1,4 @@
-import { Plugin, PluginKey, TextSelection } from "@milkdown/kit/prose/state";
+import { Plugin, PluginKey } from "@milkdown/kit/prose/state";
 import type { EditorView } from "@milkdown/kit/prose/view";
 import { DecorationSet } from "@milkdown/kit/prose/view";
 import { SlashProvider } from "@milkdown/plugin-slash";
@@ -8,7 +8,7 @@ import type { Reference } from "@opendraft/references";
 import { citationReducer, createInitialState } from "./state";
 import { matchCitationTrigger } from "./input-rule";
 import { filterCitekeys } from "./citekey-list";
-import { planCitationInsertion } from "./insert";
+import { applyCitekeySelection } from "./insert";
 import type { CitationState, CitationAction } from "./types";
 import { createRoot } from "react-dom/client";
 import React from "react";
@@ -228,18 +228,7 @@ function createGlobalKeyHandler(
         if (filtered.length > 0 && state.activeIndex < filtered.length) {
           const citekey = filtered[state.activeIndex].citeKey;
           if (state.trigger) {
-            const { $from } = view.state.selection;
-            const cursorPos = $from.pos;
-            const textAfter = view.state.doc.textBetween(cursorPos, $from.end(), undefined, "\uFFFD");
-            const insertion = planCitationInsertion(cursorPos, citekey, state.trigger, textAfter);
-            const tr = view.state.tr;
-            tr.insertText(insertion.text, insertion.from, insertion.to);
-            // Leave the cursor just before the closing ] so the user can
-            // type "; @" to add another citation to the same group.
-            tr.setSelection(
-              TextSelection.create(tr.doc, insertion.from + citekey.length + 1),
-            );
-            view.dispatch(tr);
+            applyCitekeySelection(view, citekey, state.trigger);
           }
         }
         dispatch({ type: "CLOSE_CITATION" });
