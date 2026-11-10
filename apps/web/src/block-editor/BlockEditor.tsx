@@ -62,34 +62,21 @@ async function findBreakingRefs(
 }
 
 /**
- * Build the title-commit handler: drain pending autosaves, retitle the
- * block (renaming file/include/refs when the slug changed), then move
- * the collapse flag to the resulting short name.
+ * Build the title-commit handler: drain pending autosaves, then rewrite
+ * only the heading title. Section identity (file, include, anchor) stays
+ * unchanged per ADR-023.
  *
  * @param short - Short name of the block being retitled.
- * @param retitle - Changes the title, renaming the block when the slug differs.
- * @param rename - Moves the collapse flag to the resulting short name.
- * @param reloadBodies - Bumps the row epoch so open bodies remount and
- *   re-read their files; called only when the retitle changed the short.
+ * @param setTitle - Rewrites the heading title of a block.
  * @returns The async handler wired to a block header's title field.
  */
 function titleSaver(
   short: string,
-  retitle: (short: string, title: string) => Promise<string>,
-  rename: (oldShort: string, newShort: string) => void,
-  reloadBodies: () => void,
+  setTitle: (short: string, title: string) => Promise<void>,
 ): (title: string) => Promise<void> {
   return async (title) => {
-    // Title-commit sequence: drain pending autosaves, retitle
-    // (renaming file/include/refs when the slug changed), then
-    // move the collapse flag to the resulting short name.
     flushBlockBody(short);
-    const next = await retitle(short, title);
-    rename(short, next);
-    // A renaming retitle rewrote `@sec-<old>` refs in the other files
-    // on disk; bump the row epoch so every open body remounts and
-    // re-reads, leaving no stale editor able to save the old text back.
-    if (next !== short) reloadBodies();
+    await setTitle(short, title);
   };
 }
 
@@ -221,12 +208,11 @@ function BlockRow({
  * @returns The shell markup, or nothing while the list loads.
  */
 export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
-  const { loading, blocks, createBlock, deleteBlock, retitle } = useBlocks(ws, dir);
+  const { loading, blocks, createBlock, deleteBlock, setTitle } = useBlocks(ws, dir);
   const shorts = blocks.map((block) => block.short);
-  const { isCollapsed, toggle, rename } = useCollapseState(projectKey, shorts);
+  const { isCollapsed, toggle } = useCollapseState(projectKey, shorts);
   const [addingAt, setAddingAt] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<DeleteTarget | null>(null);
-  const [bodyEpoch, setBodyEpoch] = useState(0); // remount epoch; see titleSaver
   const closeForm = (): void => setAddingAt(null);
   const createAt = (position: number) => (draft: BlockDraft): void => {
     closeForm();
@@ -245,7 +231,7 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
     <div className="space-y-2">
       {blocks.map((block, index) => (
         <BlockRow
-          key={`${block.short}:${bodyEpoch}`}
+          key={block.short}
           block={block} formOpen={addingAt === index}
           collapsed={isCollapsed(block.short)}
           ws={ws} dir={dir}
@@ -254,7 +240,7 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
           onAdd={() => setAddingAt(index)}
           onCreate={createAt(index)}
           onClose={closeForm}
-          onTitleSave={titleSaver(block.short, retitle, rename, () => setBodyEpoch((value) => value + 1))}
+          onTitleSave={titleSaver(block.short, setTitle)}
         />
       ))}
       <div>

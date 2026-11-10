@@ -1,12 +1,11 @@
 /**
  * Block persistence hook: loads blocks in `article.qmd` include order and
- * exposes create, delete, rename, retitle and title-change mutations.
+ * exposes create, delete, rename and title-change mutations.
  */
 import { useCallback, useEffect, useState } from 'react';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { joinHeading, splitHeading } from './heading';
 import type { BlockHeading } from './heading';
-import { retitleBlock } from './retitle';
 import { uniqueShortName } from './slug';
 import { countWords } from './word-count';
 
@@ -38,8 +37,6 @@ export interface UseBlocksResult {
   renameBlock: (oldShort: string, newShort: string) => Promise<void>;
   /** Rewrite the heading title; file name and anchor stay unchanged. */
   setTitle: (short: string, title: string) => Promise<void>;
-  /** Change the title, renaming the block when the new slug differs. */
-  retitle: (short: string, title: string) => Promise<string>;
 }
 
 /** Draft selecting a new block's own identity instead of deriving it. */
@@ -210,10 +207,10 @@ export async function updateBlockTitle(
 
 /** Mutation callbacks of {@link useBlocks}, bound to one workspace. */
 type BlockMutations = Pick<
-  UseBlocksResult, 'createBlock' | 'deleteBlock' | 'renameBlock' | 'retitle' | 'setTitle'
+  UseBlocksResult, 'createBlock' | 'deleteBlock' | 'renameBlock' | 'setTitle'
 >;
 
-/** Bind the five assembly mutations, each refreshing the block list after. */
+/** Bind the four assembly mutations, each refreshing the block list after. */
 function useBlockMutations(
   ws: WorkspaceAdapter,
   dir: string,
@@ -247,15 +244,7 @@ function useBlockMutations(
     },
     [ws, dir, refresh],
   );
-  const retitle = useCallback(
-    async (short: string, title: string) => {
-      const next = await retitleBlock(ws, dir, short, title);
-      await refresh();
-      return next;
-    },
-    [ws, dir, refresh],
-  );
-  return { createBlock, deleteBlock, renameBlock, retitle, setTitle };
+  return { createBlock, deleteBlock, renameBlock, setTitle };
 }
 
 /**
