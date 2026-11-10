@@ -69,12 +69,15 @@ async function findBreakingRefs(
  * @param short - Short name of the block being retitled.
  * @param retitle - Changes the title, renaming the block when the slug differs.
  * @param rename - Moves the collapse flag to the resulting short name.
+ * @param reloadBodies - Bumps the row epoch so open bodies remount and
+ *   re-read their files; called only when the retitle changed the short.
  * @returns The async handler wired to a block header's title field.
  */
 function titleSaver(
   short: string,
   retitle: (short: string, title: string) => Promise<string>,
   rename: (oldShort: string, newShort: string) => void,
+  reloadBodies: () => void,
 ): (title: string) => Promise<void> {
   return async (title) => {
     // Title-commit sequence: drain pending autosaves, retitle
@@ -83,6 +86,10 @@ function titleSaver(
     flushBlockBody(short);
     const next = await retitle(short, title);
     rename(short, next);
+    // A renaming retitle rewrote `@sec-<old>` refs in the other files
+    // on disk; bump the row epoch so every open body remounts and
+    // re-reads, leaving no stale editor able to save the old text back.
+    if (next !== short) reloadBodies();
   };
 }
 
@@ -219,6 +226,7 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
   const { isCollapsed, toggle, rename } = useCollapseState(projectKey, shorts);
   const [addingAt, setAddingAt] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<DeleteTarget | null>(null);
+  const [bodyEpoch, setBodyEpoch] = useState(0); // remount epoch; see titleSaver
   const closeForm = (): void => setAddingAt(null);
   const createAt = (position: number) => (draft: BlockDraft): void => {
     closeForm();
@@ -237,7 +245,7 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
     <div className="space-y-2">
       {blocks.map((block, index) => (
         <BlockRow
-          key={block.short}
+          key={`${block.short}:${bodyEpoch}`}
           block={block} formOpen={addingAt === index}
           collapsed={isCollapsed(block.short)}
           ws={ws} dir={dir}
@@ -246,7 +254,7 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
           onAdd={() => setAddingAt(index)}
           onCreate={createAt(index)}
           onClose={closeForm}
-          onTitleSave={titleSaver(block.short, retitle, rename)}
+          onTitleSave={titleSaver(block.short, retitle, rename, () => setBodyEpoch((value) => value + 1))}
         />
       ))}
       <div>
