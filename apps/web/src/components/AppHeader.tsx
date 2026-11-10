@@ -4,7 +4,6 @@ import {
   CircleAlert,
   GitBranch,
   LoaderCircle,
-  Type,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { RefObject } from 'react';
@@ -51,33 +50,19 @@ function SaveIndicator({ status }: SaveIndicatorProps) {
 
 /** Props for {@link HeaderActions}. */
 interface HeaderActionsProps {
-  /** Whether the formatting toolbar is currently shown. */
-  formattingToolbar: boolean;
-  /** Called when the formatting-toolbar toggle is activated. */
-  onToggleFormattingToolbar: () => void;
   /** Called when the Commit action is activated. */
   onCommit: () => void;
 }
 
 /**
- * Right-hand header controls: the toolbar toggle, Commit, and the
- * overflow menu that carries Commit on small screens.
+ * Right-hand header controls: Commit and the overflow menu that carries
+ * Commit on small screens.
  *
  * @param props - See {@link HeaderActionsProps}.
  */
-function HeaderActions({ formattingToolbar, onToggleFormattingToolbar, onCommit }: HeaderActionsProps) {
+function HeaderActions({ onCommit }: HeaderActionsProps) {
   return (
     <div className="flex items-center gap-1">
-      <button
-        type="button"
-        aria-label="Formatting toolbar"
-        title={`${formattingToolbar ? 'Hide' : 'Show'} formatting toolbar (Ctrl/Cmd+\\)`}
-        aria-pressed={formattingToolbar}
-        onClick={onToggleFormattingToolbar}
-        className={ICON_BUTTON}
-      >
-        <Type className="h-4 w-4" aria-hidden="true" />
-      </button>
       <button
         type="button"
         aria-label="Commit"
@@ -118,10 +103,6 @@ export interface AppHeaderProps {
   onSelectMode?: (mode: 'wysiwyg' | 'source') => void;
   /** Current autosave state. */
   saveStatus: SaveStatus;
-  /** Whether the formatting toolbar is currently shown. */
-  formattingToolbar: boolean;
-  /** Called when the formatting-toolbar toggle is activated. */
-  onToggleFormattingToolbar: () => void;
   /** Called when the Commit action is activated. */
   onCommit: () => void;
   /** Called when the book button toggles the project drawer. */
@@ -190,8 +171,6 @@ export function AppHeader({
   manuscriptDir,
   onRename, onRenameManuscript, onRenameProject,
   saveStatus,
-  formattingToolbar,
-  onToggleFormattingToolbar,
   onCommit,
   onToggleSidebar,
   sidebarOpen = false,
@@ -220,11 +199,7 @@ export function AppHeader({
         onRenameProject={onRenameProject ?? onRename}
       />
       <SaveIndicator status={saveStatus} />
-      <HeaderActions
-        formattingToolbar={formattingToolbar}
-        onToggleFormattingToolbar={onToggleFormattingToolbar}
-        onCommit={onCommit}
-      />
+      <HeaderActions onCommit={onCommit} />
     </header>
   );
 }

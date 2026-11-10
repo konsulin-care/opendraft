@@ -8,23 +8,16 @@ import { EditorView } from '@codemirror/view';
 
 // @vitest-environment jsdom
 
-// The default path of a freshly scaffolded project is the manuscript
-// directory `manuscripts/<id>`, so the app boots into the manuscript view.
-// Every file (article.qmd, block .qmd, .yml, ...) opens the source-only
-// editor; there is no editor-mode system anymore.
-beforeEach(async () => {
+/** Clear localStorage and remove every project record. */
+async function resetProjects(): Promise<void> {
   localStorage.clear();
   for (const record of await projectRegistry.list()) {
     await projectRegistry.remove(record.id);
   }
-});
+}
 
-afterEach(async () => {
-  localStorage.clear();
-  for (const record of await projectRegistry.list()) {
-    await projectRegistry.remove(record.id);
-  }
-});
+beforeEach(resetProjects);
+afterEach(resetProjects);
 
 /** True when the element is the selected treeitem. */
 function isSelected(el: HTMLElement): boolean {
@@ -80,7 +73,6 @@ async function expectDrawerTreeOpensFiles(): Promise<void> {
   render(<App />);
   await waitFor(() => expect(screen.getByTestId('manuscript-view')).toBeDefined(), { timeout: 10000 });
 
-  // Open the drawer via the book icon.
   fireEvent.click(screen.getByRole('button', { name: 'OpenDraft' }));
   const drawer = screen.getByTestId('project-drawer');
 
@@ -196,17 +188,29 @@ describe('App header', () => {
 });
 
 describe('App mode and commit', () => {
-  it('toggles the formatting toolbar preference from the header', async () => {
+  it('renders no Formatting toolbar button next to Commit in the header', async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('app-header')).toBeDefined());
-    const toggle = screen.getByRole('button', { name: 'Formatting toolbar' });
-    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    const header = screen.getByTestId('app-header');
+    expect(within(header).queryByRole('button', { name: 'Formatting toolbar' })).toBeNull();
+    expect(within(header).getByRole('button', { name: 'Commit' })).toBeDefined();
+  });
 
-    fireEvent.click(toggle);
-    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+  it('leaves the formatting toolbar rendered after Ctrl/Cmd+\\', async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByTestId('manuscript-view')).toBeDefined(), { timeout: 10000 });
+    // Open a source file: its formatting toolbar comes from the app shell.
+    fireEvent.click(screen.getByRole('button', { name: 'OpenDraft' }));
+    const drawer = screen.getByTestId('project-drawer');
+    fireEvent.click(within(drawer).getAllByRole('treeitem', { name: 'article.qmd' })[0]);
+    await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
 
-    fireEvent.click(toggle);
-    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.keyDown(window, { key: '\\', ctrlKey: true });
+    // Wait past the 150 ms toolbar collapse window: the toolbar must survive.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    });
+    expect(screen.getByRole('toolbar')).not.toBeNull();
   });
 
   it('opens the commit dialog from the header Commit button', async () => {
@@ -254,9 +258,7 @@ async function expectFilesChangedReListsTree(): Promise<void> {
     workspaceManager.release(record.id);
   }
   // T17 announces the mutation; the shell must re-list for the tree.
-  act(() => {
-    window.dispatchEvent(new CustomEvent('opendraft:files-changed'));
-  });
+  act(() => window.dispatchEvent(new CustomEvent('opendraft:files-changed')));
 
   await waitFor(() => expect(within(drawer).getByRole('treeitem', { name: 'methods.qmd' })).toBeDefined(), { timeout: 5000 });
 }

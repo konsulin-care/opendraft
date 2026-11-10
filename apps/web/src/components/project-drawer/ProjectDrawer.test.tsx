@@ -40,8 +40,6 @@ function Harness() {
     mode: 'wysiwyg',
     onSelectMode: vi.fn(),
     saveStatus: 'saved',
-    formattingToolbar: true,
-    onToggleFormattingToolbar: vi.fn(),
     onCommit: vi.fn(),
   };
   return (

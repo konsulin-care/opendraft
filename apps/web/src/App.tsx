@@ -10,7 +10,6 @@ import { DeleteProjectAction } from './components/project-drawer/DeleteProjectDi
 import { FileTree } from './components/project-drawer/FileTree';
 import { useProjects, projectRegistry } from './hooks/useProjects';
 import { useActiveFile } from './hooks/useActiveFile';
-import { useToolbarPreference } from './hooks/useToolbarPreference';
 import { loadFile } from './persistence';
 import { createOpenManuscriptRenamer } from './project/rename-manuscript';
 
@@ -93,16 +92,14 @@ interface HeaderSectionProps {
   switchTo: (id: string) => Promise<void>;
   rename: (id: string, name: string) => Promise<void>;
   saveStatus: SaveStatus;
-  formattingToolbar: boolean;
-  toggleFormattingToolbar: () => void;
   onCommit: () => void;
   drawer: ReturnType<typeof useDrawerState>;
 }
 
-/** Icon header with rename, save status, toolbar toggle, commit, and sidebar actions. */
+/** Icon header with rename, save status, commit, and sidebar actions. */
 function HeaderSection({
   active, dirName, workspace, openFile, activePath, switchTo,
-  rename, saveStatus, formattingToolbar, toggleFormattingToolbar, onCommit, drawer,
+  rename, saveStatus, onCommit, drawer,
 }: HeaderSectionProps) {
   return (
     <AppHeader
@@ -111,8 +108,6 @@ function HeaderSection({
       onRenameProject={active ? (name) => rename(active.id, name) : undefined}
       onRenameManuscript={createOpenManuscriptRenamer(active, dirName, { workspace, registry: projectRegistry, openFile, activePath, refresh: () => { if (active) switchTo(active.id); } })}
       saveStatus={saveStatus}
-      formattingToolbar={formattingToolbar}
-      onToggleFormattingToolbar={toggleFormattingToolbar}
       onCommit={onCommit}
       sidebarOpen={drawer.open} onToggleSidebar={drawer.toggle} toggleButtonRef={drawer.toggleRef}
     />
@@ -210,7 +205,9 @@ export function App() {
   const paths = useWorkspacePaths(workspace, active);
   const [showCommitDialog, setShowCommitDialog] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
-  const { formattingToolbar, toggleFormattingToolbar } = useToolbarPreference();
+  // T11 removed the header toggle and its Ctrl/Cmd+\ shortcut: the source
+  // editor's formatting toolbar stays on unconditionally.
+  const formattingToolbar = true;
   // The listing loads asynchronously: until it arrives the active path is
   // treated as unresolved so a directory is never rendered as a file.
   const isDir = activePath !== null && paths.some((p) => p.startsWith(`${activePath}/`));
@@ -228,7 +225,6 @@ export function App() {
       <HeaderSection
         active={active} dirName={dirName} workspace={workspace} openFile={openFile}
         activePath={activePath} switchTo={switchTo} rename={rename} saveStatus={saveStatus}
-        formattingToolbar={formattingToolbar} toggleFormattingToolbar={toggleFormattingToolbar}
         onCommit={() => setShowCommitDialog(true)} drawer={drawer}
       />
       <EditorArea

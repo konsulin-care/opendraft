@@ -207,8 +207,7 @@ describe('project switcher panel positioning', () => {
 function renderHeader(overrides: Partial<AppHeaderProps> = {}) {
   render(
     <AppHeader fileName="manuscript.md" projectName="Newer Paper" mode="wysiwyg"
-      onSelectMode={vi.fn()} saveStatus="saved" formattingToolbar
-      onToggleFormattingToolbar={vi.fn()} onCommit={vi.fn()} {...overrides} />,
+      onSelectMode={vi.fn()} saveStatus="saved" onCommit={vi.fn()} {...overrides} />,
   );
 }
 
@@ -220,13 +219,16 @@ describe('project switcher rename', () => {
   });
 
   // Rename moved out of the dropdown into the header inline input.
-  it('renames through the header input with the trimmed name on Enter and blur', () => {
+  it('renames through the header input with the trimmed name on Enter and blur', async () => {
     const onRename = vi.fn();
     renderHeader({ onRename });
     const input = screen.getByRole('textbox', { name: 'Project name' });
     fireEvent.change(input, { target: { value: '  Renamed Paper  ' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(onRename).toHaveBeenCalledWith('Renamed Paper');
+    // InlineEditField ignores saves while the Enter save is in flight;
+    // let it settle before the next edit+blur (same as InlineEditField.test).
+    await act(async () => {});
 
     fireEvent.change(input, { target: { value: 'Blurred Name' } });
     fireEvent.blur(input);

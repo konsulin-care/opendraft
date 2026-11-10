@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { AppHeader } from './AppHeader';
 import type { AppHeaderProps } from './AppHeader';
 import { APP_BAR_HEIGHT } from './app-bar-layout';
@@ -9,8 +9,6 @@ import { APP_BAR_HEIGHT } from './app-bar-layout';
 const BASE_PROPS: AppHeaderProps = {
   fileName: 'manuscript.md',
   saveStatus: 'saved',
-  formattingToolbar: true,
-  onToggleFormattingToolbar: vi.fn(),
   onCommit: vi.fn(),
   sidebarOpen: false,
   onToggleSidebar: vi.fn(),
@@ -192,25 +190,13 @@ describe('AppHeader mode removal', () => {
   });
 });
 
-describe('AppHeader toolbar preference', () => {
-  it('mirrors the formatting toolbar preference and toggles on click', () => {
-    const onToggleFormattingToolbar = vi.fn();
-    renderHeader({ formattingToolbar: true, onToggleFormattingToolbar });
-    const toggle = screen.getByRole('button', { name: 'Formatting toolbar' });
-    expect(toggle.getAttribute('aria-pressed')).toBe('true');
-    expect(toggle.getAttribute('title')).toBe('Hide formatting toolbar (Ctrl/Cmd+\\)');
-
-    fireEvent.click(toggle);
-    expect(onToggleFormattingToolbar).toHaveBeenCalledTimes(1);
+describe('AppHeader toolbar toggle removal', () => {
+  it('renders no Formatting toolbar button next to Commit', () => {
+    renderHeader();
+    const header = screen.getByTestId('app-header');
+    expect(within(header).queryByRole('button', { name: 'Formatting toolbar' })).toBeNull();
+    expect(within(header).getByRole('button', { name: 'Commit' })).toBeDefined();
   });
-
-  it('shows the toolbar toggle as unpressed when the preference is off', () => {
-    renderHeader({ formattingToolbar: false });
-    expect(
-      screen.getByRole('button', { name: 'Formatting toolbar' }).getAttribute('aria-pressed'),
-    ).toBe('false');
-  });
-
 });
 
 describe('AppHeader commit and overflow', () => {
