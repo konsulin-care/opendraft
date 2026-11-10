@@ -73,6 +73,16 @@ export function createCrepeConfig(options: CrepeConfigOptions): Crepe {
   });
   crepe.editor.config((ctx) => {
     ctx.update(remarkStringifyOptionsCtx, (options) => ({ ...options, bullet: '-' as const }));
+    // Register remark plugins here, at ConfigReady: the editor reduces
+    // remarkPluginsCtx into the processor exactly once at SchemaReady,
+    // so registering after create() (wireEditor) never reaches the
+    // serializer. Each entry must be {plugin, options}.
+    ctx.update(remarkPluginsCtx, (ps) => [
+      { plugin: citationRemarkPlugin, options: {} },
+      quartoRemarkPlugin,
+      quartoInlineCodePlugin,
+      ...ps,
+    ] as unknown as typeof ps);
   });
   return crepe;
 }
@@ -105,14 +115,6 @@ export function wireEditor(
       if (markdown === loadedMarkdown) return;
       saver.schedule(markdown);
     });
-  });
-  editor.action((ctx) => {
-    ctx.update(remarkPluginsCtx, (ps) => [
-      quartoRemarkPlugin,
-      quartoInlineCodePlugin,
-      citationRemarkPlugin,
-      ...ps,
-    ] as unknown as typeof ps);
   });
   onEditorReady?.(createTestApi(editor, syncContent));
 }
