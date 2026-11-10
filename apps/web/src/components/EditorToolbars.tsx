@@ -7,8 +7,6 @@ import type { EditorCommands } from '../editor-commands/types';
 export interface EditorToolbarsProps {
   /** Command set bound to the active editor surface. */
   commands: EditorCommands;
-  /** Formatting-toolbar visibility preference from the app shell. */
-  formattingToolbar: boolean;
   /** Current editing surface; the toolbar only shows in wysiwyg mode. */
   mode?: 'wysiwyg' | 'source';
   /** True while the on-screen keyboard is open. */
@@ -34,14 +32,12 @@ const COLLAPSE_MS = 150;
  */
 export function EditorToolbars({
   commands,
-  formattingToolbar,
   mode = 'wysiwyg',
   open = false,
   bottomOffset = 0,
 }: EditorToolbarsProps) {
-  // Effective visibility: the stored preference is gated on wysiwyg mode.
-  // Mode switches must not rewrite the stored preference itself.
-  const effectiveToolbar = formattingToolbar && mode === 'wysiwyg';
+  // Effective visibility: the formatting toolbar is gated on wysiwyg mode.
+  const effectiveToolbar = mode === 'wysiwyg';
   const [mountedToolbar, setMountedToolbar] = useState(effectiveToolbar);
 
   useEffect(() => {
@@ -59,7 +55,6 @@ export function EditorToolbars({
         commands={commands}
         open={open}
         bottomOffset={bottomOffset}
-        formattingToolbar={formattingToolbar}
       />
     );
   }

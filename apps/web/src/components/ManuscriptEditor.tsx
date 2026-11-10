@@ -21,7 +21,11 @@ interface ManuscriptEditorProps {
   path: string;
   /** Reports autosave progress: saving, saved, or error. */
   onSaveStatusChange?: (status: SaveStatus) => void;
-  /** Formatting-toolbar visibility preference, owned by the app shell. */
+  /**
+   * Formatting-toolbar visibility preference forwarded by the app shell.
+   * Accepted for compatibility with the shell's call site but ignored:
+   * toolbar visibility derives from the editing mode, not this flag.
+   */
   formattingToolbar?: boolean;
 }
 
@@ -51,7 +55,6 @@ export function ManuscriptEditor({
   defaultValue,
   path,
   onSaveStatusChange,
-  formattingToolbar = true,
 }: ManuscriptEditorProps) {
   const [sourceMarkdown, setSourceMarkdown] = useState(() => editorContent(path, defaultValue));
   const sourceEditorRef = useRef<SourceEditorHandle | null>(null);
@@ -74,7 +77,6 @@ export function ManuscriptEditor({
 
   return (
     <EditorFrame
-      formattingToolbar={formattingToolbar}
       path={path}
       sourceMarkdown={sourceMarkdown}
       sourceEditorRef={sourceEditorRef}

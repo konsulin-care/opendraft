@@ -42,7 +42,7 @@ export function ManuscriptView({ workspace, dir, projectKey }: ManuscriptViewPro
         tabIndex={-1}
         style={{ flex: 1, minHeight: 0, overflow: 'auto' }}
       >
-        <EditorToolbars commands={commands} formattingToolbar />
+        <EditorToolbars commands={commands} />
         <ReadingColumn>
           <MetadataPanel
             workspace={workspace}

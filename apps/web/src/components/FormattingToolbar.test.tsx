@@ -196,15 +196,13 @@ describe('FormattingToolbar in source mode (canFormat false)', () => {
 });
 
 describe('FormattingToolbar visibility and responsiveness', () => {
-  it('renders through EditorToolbars only when the preference is on', () => {
-    const off = render(<EditorToolbars commands={fakeCommands()} formattingToolbar={false} />);
-    expect(off.container.querySelector('[role="toolbar"]')).toBeNull();
-    const on = render(<EditorToolbars commands={fakeCommands()} formattingToolbar={true} />);
-    expect(on.container.querySelector('[role="toolbar"]')).not.toBeNull();
+  it('renders the formatting toolbar in wysiwyg mode without a formattingToolbar prop', () => {
+    const { container } = render(<EditorToolbars commands={fakeCommands()} />);
+    expect(container.querySelector('[role="toolbar"]')).not.toBeNull();
   });
 
   it('renders no toolbar row through EditorToolbars in the source view', () => {
-    const { container } = render(<EditorToolbars commands={fakeCommands()} formattingToolbar mode="source" />);
+    const { container } = render(<EditorToolbars commands={fakeCommands()} mode="source" />);
     expect(container.querySelector('[role="toolbar"]')).toBeNull();
   });
 
@@ -219,8 +217,8 @@ describe('FormattingToolbar visibility and responsiveness', () => {
 });
 
 describe('FormattingToolbar collapse transition', () => {
-  it('wraps the toolbar in the collapse container, open when the preference is on', () => {
-    const { container } = render(<EditorToolbars commands={fakeCommands()} formattingToolbar />);
+  it('wraps the toolbar in the collapse container, open in wysiwyg mode', () => {
+    const { container } = render(<EditorToolbars commands={fakeCommands()} />);
     const wrap = container.querySelector('.editor-toolbar-collapse')!;
     expect(wrap.className).toContain('is-open');
     expect(wrap.querySelector('[role="toolbar"]')).not.toBeNull();
@@ -229,8 +227,8 @@ describe('FormattingToolbar collapse transition', () => {
   it('collapses over 150 ms: mounted while closing, unmounted after the timer', () => {
     vi.useFakeTimers();
     try {
-      const { container, rerender } = render(<EditorToolbars commands={fakeCommands()} formattingToolbar />);
-      rerender(<EditorToolbars commands={fakeCommands()} formattingToolbar={false} />);
+      const { container, rerender } = render(<EditorToolbars commands={fakeCommands()} />);
+      rerender(<EditorToolbars commands={fakeCommands()} mode="source" />);
       const wrap = container.querySelector('.editor-toolbar-collapse')!;
       expect(wrap.className).toContain('is-closed');
       // Still mounted so the max-height/opacity transition can run.

@@ -40,7 +40,7 @@ const stubCommands: EditorCommands = {
 };
 /** Render {@link EditorToolbars} with stub commands and an open keyboard. */
 function renderToolbars(mode: "wysiwyg" | "source") {
-  return render(createElement(EditorToolbars, { commands: stubCommands, formattingToolbar: true, mode, open: true, bottomOffset: 0 }));
+  return render(createElement(EditorToolbars, { commands: stubCommands, mode, open: true, bottomOffset: 0 }));
 }
 /** Render {@link ManuscriptEditor} over a fresh MemoryWorkspace. */
 function renderEditor(options: {
@@ -135,17 +135,13 @@ describe("ManuscriptEditor — light code block theme", () => {
   it("wires the theme into the CodeMirror feature config", () => { expect(crepeConfigSource).toContain("Crepe.Feature.CodeMirror"); expect(crepeConfigSource).toContain("theme: lightCodeBlockTheme"); });
 });
 
-describe("ManuscriptEditor — formatting toolbar preference", () => {
-  it("shows the toolbar when the preference is on and hides it when off", async () => {
+describe("ManuscriptEditor — formatting toolbar", () => {
+  it("renders the formatting toolbar without a formattingToolbar prop", async () => {
     const props = { workspace: new MemoryWorkspace(), defaultValue: "# Title\n\nSome text.", path: DOC_PATH };
-    const on = render(createElement(ManuscriptEditor, { ...props, formattingToolbar: true }));
-    expect(screen.queryByRole("toolbar", { name: "Formatting" })).not.toBeNull();
-    on.unmount();
-    const off = render(createElement(ManuscriptEditor, { ...props, formattingToolbar: false }));
+    render(createElement(ManuscriptEditor, props));
     await waitFor(() => expect(document.querySelector(".editor-toolbar-collapse")).not.toBeNull());
-    expect(document.querySelector(".editor-toolbar-collapse")!.className).toContain("is-closed");
-    expect(screen.queryByRole("toolbar", { name: "Formatting" })).toBeNull();
-    off.unmount();
+    expect(document.querySelector(".editor-toolbar-collapse")!.className).toContain("is-open");
+    expect(screen.queryByRole("toolbar", { name: "Formatting" })).not.toBeNull();
   }, 20000);
 });
 
