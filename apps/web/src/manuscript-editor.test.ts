@@ -114,8 +114,23 @@ describe("ManuscriptEditor — block gutter removed", () => {
 describe("ManuscriptEditor — light code block theme", () => {
   it("imports EditorView from @codemirror/view", () => { expect(crepeConfigSource).toMatch(/EditorView.*from\s+['"]@codemirror\/view['"]|@codemirror\/view.*EditorView/); });
   it("defines a lightCodeBlockTheme via EditorView.theme()", () => { expect(crepeConfigSource).toMatch(/lightCodeBlockTheme\s*=\s*EditorView\.theme\(/); });
-  it("sets active line and gutter backgrounds via the yellow token", () => { expect(crepeConfigSource).toContain("'.cm-activeLine'"); expect(crepeConfigSource).toContain("'.cm-activeLineGutter'"); expect(crepeConfigSource).toContain("backgroundColor: 'var(--color-yellow-200)'"); });
-  it("sets selection backgrounds via the yellow token", () => { expect(crepeConfigSource).toMatch(/\.cm-selectionBackground'.*\.cm-focused \.cm-selectionBackground/s); expect(crepeConfigSource).toContain("var(--color-yellow-200)"); });
+  it("uses a translucent active-line token for active line and gutter", () => {
+    expect(crepeConfigSource).toContain("'.cm-activeLine': { backgroundColor: 'var(--color-active-line)' }");
+    expect(crepeConfigSource).toContain("'.cm-activeLineGutter': { backgroundColor: 'var(--color-active-line)' }");
+    const token = css.match(/--color-active-line:\s*([^;]+);/)?.[1]?.trim() ?? "";
+    expect(token, "--color-active-line must be translucent").toMatch(/^rgba\(/);
+    expect(Number.parseFloat(token.match(/,\s*([0-9.]+)\s*\)$/)?.[1] ?? "1")).toBeLessThan(1);
+  });
+  it("sets selection backgrounds via a token distinct from the active-line token", () => {
+    const block = crepeConfigSource.match(/lightCodeBlockTheme\s*=\s*EditorView\.theme\(\{([\s\S]*?)\}\)/)?.[1] ?? "";
+    expect(block).toContain("'.cm-selectionBackground'");
+    expect(block).toContain("'.cm-focused .cm-selectionBackground'");
+    const active = block.match(/\.cm-activeLine':\s*\{ backgroundColor: '([^']+)' \}/)?.[1];
+    const selection = block.match(/\.cm-selectionBackground':\s*\{ backgroundColor: '([^']+)' \}/)?.[1];
+    expect(active).toBe("var(--color-active-line)");
+    expect(selection).toBeDefined();
+    expect(selection).not.toBe(active);
+  });
   it("uses only var(--color-*) tokens in the code block theme, no hex literals", () => { const themeBlock = crepeConfigSource.match(/lightCodeBlockTheme\s*=\s*EditorView\.theme\(\{([\s\S]*?)\}\)/)?.[1]; expect(themeBlock).toBeDefined(); expect(themeBlock).not.toMatch(/#[0-9a-fA-F]{3,8}\b/); expect(themeBlock).toMatch(/var\(--color-[\w-]+\)/); });
   it("wires the theme into the CodeMirror feature config", () => { expect(crepeConfigSource).toContain("Crepe.Feature.CodeMirror"); expect(crepeConfigSource).toContain("theme: lightCodeBlockTheme"); });
 });

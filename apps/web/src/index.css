@@ -123,7 +123,7 @@
 
   /* Editor surfaces */
   --color-selection: #d0d7de;
-  --color-active-line: #f2f2f2;
+  --color-active-line: rgba(0, 0, 0, 0.05);
   --color-gutter-bg: #f7f7f7;
   --color-editor-dark: #282c34;
   --color-slate-800: #1e293b;

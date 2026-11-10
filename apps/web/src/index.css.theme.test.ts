@@ -20,7 +20,7 @@ const expectedTokens = [
   '--color-inverse: #343a40',
   '--color-error: #dc3545',
   '--color-selection: #d0d7de',
-  '--color-active-line: #f2f2f2',
+  '--color-active-line: rgba(0, 0, 0, 0.05)',
   '--color-gutter-bg: #f7f7f7',
   '--color-editor-dark: #282c34',
   '--color-amber-100: #fef3c7',
@@ -79,6 +79,16 @@ describe('index.css — color token theme', () => {
     for (const token of expectedTokens) {
       expect(themeBlock).toContain(token);
     }
+  });
+
+  it('declares --color-active-line as a translucent rgba value', () => {
+    // Translucent so the CodeMirror selection layer shows through the
+    // active line instead of being hidden behind an opaque background.
+    const value = themeBlock.match(/--color-active-line:\s*([^;]+);/)?.[1]?.trim();
+    expect(value, '--color-active-line must be declared').toBeDefined();
+    expect(value).toMatch(/^rgba\(/);
+    const alpha = Number.parseFloat(value!.match(/,\s*([0-9.]+)\s*\)$/)?.[1] ?? '1');
+    expect(alpha).toBeLessThan(1);
   });
 });
 

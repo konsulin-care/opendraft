@@ -13,12 +13,13 @@ import { citationRemarkPlugin } from '../citation/citation-remark-plugin';
 import { createTestApi, focusBlockEditor, fulfillPendingFocus, registerBlockEditor, type EditorTestApi } from '../caret-mode-switch';
 import type { DebouncedSaver } from './editor/autosave';
 
-/** Code blocks: light yellow active line/selection via @theme tokens in index.css. */
+/** Code blocks: translucent active line (selection shows through) and a
+ *  distinct selection background, via @theme tokens in index.css. */
 export const lightCodeBlockTheme = EditorView.theme({
-  '.cm-activeLine': { backgroundColor: 'var(--color-yellow-200)' },
-  '.cm-activeLineGutter': { backgroundColor: 'var(--color-yellow-200)' },
-  '.cm-selectionBackground': { backgroundColor: 'var(--color-yellow-200)' },
-  '.cm-focused .cm-selectionBackground': { backgroundColor: 'var(--color-yellow-200)' },
+  '.cm-activeLine': { backgroundColor: 'var(--color-active-line)' },
+  '.cm-activeLineGutter': { backgroundColor: 'var(--color-active-line)' },
+  '.cm-selectionBackground': { backgroundColor: 'var(--color-selection)' },
+  '.cm-focused .cm-selectionBackground': { backgroundColor: 'var(--color-selection)' },
 });
 
 /** Options for {@link createCrepeConfig}. */
