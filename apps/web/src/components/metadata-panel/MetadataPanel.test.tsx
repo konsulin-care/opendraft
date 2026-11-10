@@ -260,6 +260,14 @@ describe('MetadataPanel overlay', () => {
     expect(screen.queryByTestId('metadata-panel-overlay')).toBeNull();
     scroller.remove();
   });
+  it('wraps the pinned bar and expanded body in a .reading-column', async () => {
+    stubResizeObserver(); stubRaf(); const scroller = makeScroller(400);
+    await renderPanel({}, { current: scroller }); flushFrames(); stubBodyHeight(900); fireResize();
+    const column = screen.getByTestId('metadata-panel').querySelector('.reading-column');
+    expect(column?.querySelector('[data-testid="metadata-panel-bar"]')).not.toBeNull();
+    expect(column?.querySelector('[data-testid="metadata-panel-body"]')).not.toBeNull();
+    scroller.remove();
+  });
 });
 
 describe('MetadataPanel narrow sheet reading column', () => {

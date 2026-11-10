@@ -210,7 +210,8 @@ function PanelBody({ meta, expanded, bodyRef, dialogIndex, saveStatus, onClose }
  * and re-expands it at the top; scroll collapse is never persisted.
  * When the expanded body is taller than the editor viewport the panel
  * renders as an editor-area overlay with its own vertical scroll and
- * scroll collapse is disabled.
+ * scroll collapse is disabled. Overlay and sheet wrap the bar and body
+ * in the shared `.reading-column` so side padding matches the editor.
  *
  * @param props - See {@link MetadataPanelProps}.
  * @returns The panel section, or null when outside a loaded manuscript.
@@ -260,7 +261,7 @@ export function MetadataPanel({
           ? 'absolute inset-0 z-20 overflow-hidden bg-white'
           : 'contents'}
     >
-      {sheet ? <div className="reading-column">{content}</div> : content}
+      {sheet || layout.overlay ? <div className={layout.overlay ? 'reading-column h-full' : 'reading-column'}>{content}</div> : content}
     </section>
   );
 }
