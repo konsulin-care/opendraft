@@ -10,7 +10,7 @@ import type { WorkspaceAdapter } from '@opendraft/workspace';
 import type { SaveStatus } from '../components/AppHeader';
 import type { BlockDraft } from './AddBlockForm';
 import { AddSectionDialog } from './AddSectionDialog';
-import { BlockBody } from './BlockBody';
+import { BlockBody, flushBlockBody } from './BlockBody';
 import { BlockContainer } from './BlockContainer';
 import { DeleteConfirm } from './DeleteConfirm';
 import type { DeleteTarget } from './DeleteConfirm';
@@ -59,6 +59,50 @@ async function findBreakingRefs(
     }
   }
   return refs.sort();
+}
+
+/**
+ * Build the title-commit handler: drain pending autosaves, retitle the
+ * block (renaming file/include/refs when the slug changed), then move
+ * the collapse flag to the resulting short name.
+ *
+ * @param short - Short name of the block being retitled.
+ * @param retitle - Changes the title, renaming the block when the slug differs.
+ * @param rename - Moves the collapse flag to the resulting short name.
+ * @returns The async handler wired to a block header's title field.
+ */
+function titleSaver(
+  short: string,
+  retitle: (short: string, title: string) => Promise<string>,
+  rename: (oldShort: string, newShort: string) => void,
+): (title: string) => Promise<void> {
+  return async (title) => {
+    // Title-commit sequence: drain pending autosaves, retitle
+    // (renaming file/include/refs when the slug changed), then
+    // move the collapse flag to the resulting short name.
+    flushBlockBody(short);
+    const next = await retitle(short, title);
+    rename(short, next);
+  };
+}
+
+/**
+ * Build the overflow handler that collects breaking `@sec-` references
+ * and opens the delete confirmation for a block.
+ *
+ * @param ws - Workspace holding the manuscript.
+ * @param dir - Manuscript directory.
+ * @param setDeleting - Stores the delete target once refs are collected.
+ * @returns The handler opening the confirmation for the clicked block.
+ */
+function openDeleteFor(
+  ws: WorkspaceAdapter,
+  dir: string,
+  setDeleting: (target: DeleteTarget) => void,
+): (block: BlockEntry) => void {
+  return (block) => {
+    void findBreakingRefs(ws, dir, block.short).then((refs) => setDeleting({ short: block.short, title: block.title, refs }));
+  };
 }
 
 /**
@@ -170,9 +214,9 @@ function BlockRow({
  * @returns The shell markup, or nothing while the list loads.
  */
 export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
-  const { loading, blocks, createBlock, deleteBlock, setTitle } = useBlocks(ws, dir);
+  const { loading, blocks, createBlock, deleteBlock, retitle } = useBlocks(ws, dir);
   const shorts = blocks.map((block) => block.short);
-  const { isCollapsed, toggle } = useCollapseState(projectKey, shorts);
+  const { isCollapsed, toggle, rename } = useCollapseState(projectKey, shorts);
   const [addingAt, setAddingAt] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<DeleteTarget | null>(null);
   const closeForm = (): void => setAddingAt(null);
@@ -180,9 +224,7 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
     closeForm();
     void createBlock(position, draft.title).then(() => { window.dispatchEvent(new CustomEvent('opendraft:files-changed')); requestFocusForShort(draft.short); });
   };
-  const openDelete = (block: BlockEntry): void => {
-    void findBreakingRefs(ws, dir, block.short).then((refs) => setDeleting({ short: block.short, title: block.title, refs }));
-  };
+  const openDelete = openDeleteFor(ws, dir, setDeleting);
   const confirmDelete = async (): Promise<void> => {
     if (deleting === null) return;
     await deleteBlock(deleting.short); setDeleting(null);
@@ -203,7 +245,8 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
           onOverflow={() => openDelete(block)}
           onAdd={() => setAddingAt(index)}
           onCreate={createAt(index)}
-          onClose={closeForm} onTitleSave={(t) => setTitle(block.short, t)}
+          onClose={closeForm}
+          onTitleSave={titleSaver(block.short, retitle, rename)}
         />
       ))}
       <div>

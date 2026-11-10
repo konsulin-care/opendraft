@@ -2,11 +2,12 @@
 /**
  * BlockEditor tests: include-ordered collapsible containers, hover '+'
  * insert points opening the add section dialog at the clicked position, and creation
- * emitting `opendraft:files-changed` and focusing the new block. The delete
- * confirmation and delete flow live in BlockEditor.deletion.test.tsx.
+ * emitting `opendraft:files-changed` and focusing the new block. Deletion
+ * lives in BlockEditor.deletion.test.tsx, title-commit renames in
+ * BlockEditor.retitle.test.tsx.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { MemoryWorkspace } from '@opendraft/workspace';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
@@ -122,21 +123,6 @@ describe('BlockEditor inline title rename', () => {
     expect(title).toHaveValue('Alpha');
     fireEvent.click(title);
     expect((title as HTMLInputElement).selectionStart).toBe('Alpha'.length);
-  });
-
-  it('persists an edited title as a heading-title-only rewrite of the block file', async () => {
-    const ws = await setup({
-      [ARTICLE]: articleWith('alpha'),
-      [`${BLOCKS}/alpha.qmd`]: blockFile('alpha', 'Alpha', 'Body.\n'),
-    });
-    const title = screen.getByTestId('block-title');
-    fireEvent.change(title, { target: { value: 'Background' } });
-    fireEvent.keyDown(title, { key: 'Enter' });
-    await waitFor(async () => {
-      expect(await ws.readFile(`${BLOCKS}/alpha.qmd`)).toBe(
-        '# Background {#sec-alpha .deo-section}\nBody.\n',
-      );
-    });
   });
 });
 

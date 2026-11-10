@@ -32,6 +32,22 @@ const GENERIC_TYPE = 'section';
 /** Stable no-op surface-sync callback (mode switching was removed). */
 const NOOP_SYNC = () => undefined;
 
+/** Registered autosave flush hooks of mounted bodies, keyed by block short. */
+const bodyFlushers = new Map<string, () => void>();
+
+/**
+ * Flush a mounted block body's pending autosave immediately.
+ *
+ * Called before a committed retitle so a pending body edit lands on the
+ * current file before the rename path moves it; no-ops while the body
+ * is not mounted (no editor, no pending save).
+ *
+ * @param short - Short name of the block whose autosave should flush.
+ */
+export function flushBlockBody(short: string): void {
+  bodyFlushers.get(short)?.();
+}
+
 /** Word-count sink carried in the props; absent means no reporter. */
 type WordCountSink = ((count: number) => void) | undefined;
 
@@ -213,6 +229,19 @@ function useJoinedSaver(
 }
 
 /**
+ * Expose the flush hook so a title commit can drain pending saves
+ * before the retitle renames the file out from under them.
+ */
+function useBodyFlush(short: string, joinedSaver: DebouncedSaver): void {
+  useEffect(() => {
+    bodyFlushers.set(short, joinedSaver.flush);
+    return () => {
+      bodyFlushers.delete(short);
+    };
+  }, [short, joinedSaver]);
+}
+
+/**
  * One lazily mounted visual editor for a block body: loads the block
  * file (split at its canonical heading), mounts Crepe once the block
  * has earned mounting, autosaves user edits joined back onto the
@@ -245,6 +274,7 @@ export function BlockBody({ ws, dir, short, title, collapsed, onWordCount, onSav
     editorRef, headingRef, citationStateRef, onWordCountRef,
   });
   const joinedSaver = useJoinedSaver(saver, headingRef, onWordCountRef);
+  useBodyFlush(short, joinedSaver);
 
   // Register autosave + the block-editor registry so toolbar commands
   // reach this body's editor.
