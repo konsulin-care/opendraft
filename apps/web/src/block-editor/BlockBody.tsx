@@ -158,10 +158,11 @@ function useCrepeEditor(options: CrepeEditorOptions): boolean {
   useEffect(() => {
     if (!mounted || fileText === null || rootRef.current === null) return undefined;
     const parts = splitHeading(fileText);
+    // A class-less heading stays class-less: only a file with no leading heading defaults to the generic type.
     headingRef.current = {
       title: parts.title ?? title,
       anchor: parts.anchor ?? `sec-${short}`,
-      type: parts.type ?? GENERIC_TYPE,
+      type: parts.title === null ? GENERIC_TYPE : parts.type,
     };
     onWordCountRef.current?.(countWords(parts.body));
     // Surface an H1 already present in the loaded body as a header
