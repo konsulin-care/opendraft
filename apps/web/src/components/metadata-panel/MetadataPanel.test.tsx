@@ -17,19 +17,11 @@ const originalMatchMedia = Object.getOwnPropertyDescriptor(window, 'matchMedia')
 /** Pending animation frames recorded by the stubbed rAF. */
 let pendingFrames: ((time: number) => void)[] = [];
 /** Replace requestAnimationFrame with a queue tests flush manually. */
-function stubRaf(): void {
-  pendingFrames = []; vi.stubGlobal('requestAnimationFrame', (cb: (time: number) => void) => { pendingFrames.push(cb); return pendingFrames.length; });
-  vi.stubGlobal('cancelAnimationFrame', (id: number) => { pendingFrames[id - 1] = () => {}; });
-}
+function stubRaf(): void { pendingFrames = []; vi.stubGlobal('requestAnimationFrame', (cb: (time: number) => void) => { pendingFrames.push(cb); return pendingFrames.length; }); vi.stubGlobal('cancelAnimationFrame', (id: number) => { pendingFrames[id - 1] = () => {}; }); }
 /** Run every queued animation frame inside act(). */
 function flushFrames(): void { const frames = pendingFrames; pendingFrames = []; act(() => { for (const frame of frames) frame(0); }); }
 /** Detached editor scroll container (clientHeight 0 unless overridden). */
-function makeScroller(clientHeight = 0): HTMLDivElement {
-  const scroller = document.createElement('div');
-  scroller.tabIndex = -1; document.body.appendChild(scroller);
-  if (clientHeight > 0) Object.defineProperty(scroller, 'clientHeight', { configurable: true, value: clientHeight });
-  return scroller;
-}
+function makeScroller(clientHeight = 0): HTMLDivElement { const scroller = document.createElement('div'); scroller.tabIndex = -1; document.body.appendChild(scroller); if (clientHeight > 0) Object.defineProperty(scroller, 'clientHeight', { configurable: true, value: clientHeight }); return scroller; }
 /** ResizeObserver stub recorded per test; `fireResize` triggers the latest. */
 class MockResizeObserver {
   static instances: MockResizeObserver[] = [];
@@ -45,25 +37,14 @@ function fireResize(): void { const instance = MockResizeObserver.instances.at(-
 function stubBodyHeight(height: number): void { Object.defineProperty(screen.getByTestId('metadata-panel-body'), 'offsetHeight', { configurable: true, value: height }); }
 /** Stub `window.matchMedia` so the narrow-viewport query matches or not. */
 function stubNarrowViewport(narrow: boolean): void {
-  Object.defineProperty(window, 'matchMedia', {
-    configurable: true, writable: true,
+  Object.defineProperty(window, 'matchMedia', { configurable: true, writable: true,
     value: (query: string) => ({ matches: narrow && query.includes('639'), media: query,
-      addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {},
-      onchange: null, dispatchEvent: () => false }),
-  });
+      addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {}, onchange: null, dispatchEvent: () => false }) });
 }
 /** Seed a memory workspace with manuscript metadata files. */
-async function seededWorkspace(seed: Record<string, string>): Promise<WorkspaceAdapter> {
-  const ws = new MemoryWorkspace();
-  for (const [path, content] of Object.entries(seed)) await ws.writeFile(path, content);
-  return ws;
-}
+async function seededWorkspace(seed: Record<string, string>): Promise<WorkspaceAdapter> { const ws = new MemoryWorkspace(); for (const [path, content] of Object.entries(seed)) await ws.writeFile(path, content); return ws; }
 /** Render the panel with a seeded workspace; defaults to the standard seed. */
-async function renderPanel(seed: Record<string, string> = SEEDED, focusRef?: RefObject<HTMLElement | null>) {
-  const ws = await seededWorkspace(seed);
-  const rendered = render(<MetadataPanel workspace={ws} manuscriptRoot={ROOT} projectKey={PROJECT} editorFocusRef={focusRef} />);
-  await waitFor(() => expect(screen.getByTestId('metadata-panel')).toBeDefined()); return rendered;
-}
+async function renderPanel(seed: Record<string, string> = SEEDED, focusRef?: RefObject<HTMLElement | null>) { const ws = await seededWorkspace(seed); const rendered = render(<MetadataPanel workspace={ws} manuscriptRoot={ROOT} projectKey={PROJECT} editorFocusRef={focusRef} />); await waitFor(() => expect(screen.getByTestId('metadata-panel')).toBeDefined()); return rendered; }
 beforeEach(() => { localStorage.clear(); stubNarrowViewport(false); });
 afterEach(() => { localStorage.clear(); vi.unstubAllGlobals(); if (originalMatchMedia) Object.defineProperty(window, 'matchMedia', originalMatchMedia); });
 
@@ -78,12 +59,14 @@ describe('manuscriptRootFromPath', () => {
 
 describe('MetadataPanel collapsed bar', () => {
   it('shows the title and given-then-family byline names', async () => {
+    localStorage.setItem(metadataPanelStorageKey(PROJECT), 'collapsed');
     await renderPanel();
     expect(screen.getByTestId('metadata-panel-bar-title').textContent).toBe('Deep Dive');
     expect(screen.getByTestId('metadata-panel-byline').textContent).toContain('Alice Marie Smith, Budi Lee');
   });
   it('shows "N authors" below the 640px breakpoint', async () => {
     stubNarrowViewport(true);
+    localStorage.setItem(metadataPanelStorageKey(PROJECT), 'collapsed');
     await renderPanel();
     expect(screen.getByTestId('metadata-panel-byline').textContent).toBe('2 authors');
   });
@@ -92,6 +75,7 @@ describe('MetadataPanel collapsed bar', () => {
     expect(screen.getByTestId('metadata-panel-separator').className).toContain('h-px');
   });
   it('chevron toggle expands and collapses the panel', async () => {
+    localStorage.setItem(metadataPanelStorageKey(PROJECT), 'collapsed');
     await renderPanel({ [`${ROOT}/_frontmatter.yml`]: FRONTMATTER });
     expect(screen.queryByTestId('metadata-panel-expanded')).toBeNull();
     fireEvent.click(screen.getByTestId('metadata-panel-toggle'));
@@ -103,6 +87,7 @@ describe('MetadataPanel collapsed bar', () => {
 
 describe('MetadataPanel collapse/expand body', () => {
   it('collapsed: bar title and byline render, body is grid-rows 0fr and aria-hidden', async () => {
+    localStorage.setItem(metadataPanelStorageKey(PROJECT), 'collapsed');
     await renderPanel();
     expect(screen.getByTestId('metadata-panel-bar-title').textContent).toBe('Deep Dive');
     expect(screen.getByTestId('metadata-panel-byline').textContent).toContain('Alice Marie Smith, Budi Lee');
@@ -112,6 +97,7 @@ describe('MetadataPanel collapse/expand body', () => {
     expect(body.hasAttribute('inert')).toBe(true);
   });
   it('expanded: title and byline render once in the animated body, not in the bar', async () => {
+    localStorage.setItem(metadataPanelStorageKey(PROJECT), 'collapsed');
     await renderPanel();
     fireEvent.click(screen.getByTestId('metadata-panel-toggle'));
     expect(screen.queryByTestId('metadata-panel-bar-title')).toBeNull();
@@ -130,6 +116,16 @@ describe('MetadataPanel expanded state', () => {
   it('mounts expanded when the title is missing', async () => {
     await renderPanel({ [`${ROOT}/_author.yml`]: AUTHORS });
     expect(screen.queryByTestId('metadata-panel-expanded')).not.toBeNull();
+  });
+  it('mounts expanded for a titled manuscript with no stored panel state', async () => {
+    await renderPanel();
+    expect(screen.queryByTestId('metadata-panel-expanded')).not.toBeNull();
+  });
+  it('mounts collapsed when the stored panel state is collapsed', async () => {
+    localStorage.setItem(metadataPanelStorageKey(PROJECT), 'collapsed');
+    await renderPanel();
+    expect(screen.queryByTestId('metadata-panel-expanded')).toBeNull();
+    expect(screen.getByTestId('metadata-panel-bar-title').textContent).toBe('Deep Dive');
   });
   it('restores the collapsed state after a remount', async () => {
     // Empty title starts expanded; collapsing persists for the project.
@@ -160,8 +156,7 @@ describe('MetadataPanel scroll collapse', () => {
     const scroller = makeScroller();
     await renderPanel(SEEDED, { current: scroller });
     flushFrames();
-    // A titled manuscript starts collapsed; chevron-expand it first.
-    fireEvent.click(screen.getByTestId('metadata-panel-toggle'));
+    // A titled manuscript with no stored state mounts expanded.
     expect(screen.queryByTestId('metadata-panel-expanded')).not.toBeNull();
     stubBodyHeight(300);
     const stored = localStorage.getItem(metadataPanelStorageKey(PROJECT));

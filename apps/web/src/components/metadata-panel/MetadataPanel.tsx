@@ -65,16 +65,17 @@ export function authorBylineName(author: MetadataAuthor): string {
 
 /**
  * Resolve the initial expanded state of the panel. A stored preference
- * always wins; without one, an untitled manuscript starts expanded.
+ * always wins; without one the panel starts expanded regardless of the
+ * title.
  *
- * @param title - Current manuscript title ('' when missing).
+ * @param title - Current manuscript title; not consulted by the default.
  * @param stored - Persisted state ('expanded' | 'collapsed') or null.
  * @returns Whether the panel starts expanded.
  */
 export function initialExpanded(title: string, stored: string | null): boolean {
   if (stored === 'expanded') return true;
   if (stored === 'collapsed') return false;
-  return title.trim() === '';
+  return true;
 }
 
 /** Read the persisted state for a project; null when absent or unreadable. */

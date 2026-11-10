@@ -47,6 +47,24 @@ describe('collapse persistence', () => {
   });
 });
 
+describe('default expansion', () => {
+  it('renders section blocks without a stored collapse flag expanded', () => {
+    const { result } = renderHook(() => useCollapseState(PROJECT, BLOCKS));
+
+    expect(result.current.isCollapsed('intro')).toBe(false);
+    expect(result.current.isCollapsed('methods')).toBe(false);
+
+    localStorage.setItem(
+      blockCollapseStorageKey(PROJECT),
+      JSON.stringify({ intro: true }),
+    );
+    const partial = renderHook(() => useCollapseState(PROJECT, BLOCKS));
+
+    expect(partial.result.current.isCollapsed('intro')).toBe(true);
+    expect(partial.result.current.isCollapsed('methods')).toBe(false);
+  });
+});
+
 describe('collapse restoration', () => {
   it('restores the persisted collapse state when the editor loads', () => {
     localStorage.setItem(
