@@ -8,13 +8,13 @@
 import { useState } from 'react';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import type { SaveStatus } from '../components/AppHeader';
-import type { BlockDraft } from './AddBlockForm';
 import { AddSectionDialog } from './AddSectionDialog';
 import { BlockBody, flushBlockBody } from './BlockBody';
 import { BlockContainer } from './BlockContainer';
 import { DeleteConfirm } from './DeleteConfirm';
 import type { DeleteTarget } from './DeleteConfirm';
 import { EmptyState } from './EmptyState';
+import type { SectionDraft } from './SectionPicker';
 import { useBlocks } from './use-blocks';
 import type { BlockEntry } from './use-blocks';
 import { useCollapseState } from './use-collapse-state';
@@ -147,7 +147,7 @@ interface BlockRowProps {
   /** Open the add-section dialog at this row's insert point. */
   onAdd: () => void;
   /** Create the block from the dialog draft. */
-  onCreate: (draft: BlockDraft) => void;
+  onCreate: (draft: SectionDraft) => void;
   /** Close the add-section dialog. */
   onClose: () => void;
   /** Save an edited section title; forwarded to the header field. */
@@ -181,7 +181,7 @@ function BlockRow({
   return (
     <div className="group">
       <InsertPoint onAdd={onAdd} />
-      {formOpen && <AddSectionDialog onCreate={(draft) => onCreate(draft as BlockDraft)} onClose={onClose} />}
+      {formOpen && <AddSectionDialog onCreate={onCreate} onClose={onClose} />}
       <BlockContainer
         short={block.short}
         title={block.title}
@@ -224,9 +224,9 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
   const [addingAt, setAddingAt] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<DeleteTarget | null>(null);
   const closeForm = (): void => setAddingAt(null);
-  const createAt = (position: number) => (draft: BlockDraft): void => {
+  const createAt = (position: number) => (draft: SectionDraft): void => {
     closeForm();
-    void createBlock(position, draft.title).then(() => { notifyFilesChanged(); requestFocusForShort(draft.short); });
+    void createBlock(position, { title: draft.title, short: draft.short, role: draft.role }).then(() => { notifyFilesChanged(); requestFocusForShort(draft.short); });
   };
   const openDelete = openDeleteFor(ws, dir, setDeleting);
   const confirmDelete = async (): Promise<void> => {
@@ -261,7 +261,7 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
         >
           + Add section
         </button>
-        {addingAt === blocks.length && <AddSectionDialog onCreate={(draft) => createAt(blocks.length)(draft as BlockDraft)} onClose={closeForm} />}
+        {addingAt === blocks.length && <AddSectionDialog onCreate={createAt(blocks.length)} onClose={closeForm} />}
       </div>
       <DeleteConfirm target={deleting} onConfirm={confirmDelete} onCancel={closeDelete} />
     </div>

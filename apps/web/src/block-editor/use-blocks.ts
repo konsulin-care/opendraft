@@ -45,7 +45,7 @@ export interface CreateBlockDraft {
   title: string;
   /** Chosen short name — file stem and `sec-` anchor suffix. */
   short: string;
-  /** Role without the `deo-` prefix; omit for a heading with no class. */
+  /** Role without the `deo-` prefix; omit for the generic `.doco-section` class. */
   role?: string | null;
 }
 
@@ -117,8 +117,11 @@ async function writeNewBlock(
   const isTaken = (candidate: string): boolean =>
     taken.has(candidate) || files.includes(`${candidate}.qmd`);
   const title = typeof draft === 'string' ? draft : draft.title;
-  const short = typeof draft === 'string' ? uniqueShortName(title, isTaken) : draft.short;
-  const role = typeof draft === 'string' ? GENERIC_BLOCK_TYPE : (draft.role ?? null);
+  // De-duplicate every chosen short name so a taken name never overwrites
+  // an existing block file.
+  const short = uniqueShortName(typeof draft === 'string' ? title : draft.short, isTaken);
+  // A role-less draft falls back to the generic section type.
+  const role = typeof draft === 'string' ? GENERIC_BLOCK_TYPE : (draft.role ?? GENERIC_BLOCK_TYPE);
   const heading: BlockHeading = { title, anchor: `sec-${short}`, type: role };
   await ws.writeFile(`${dir}/blocks/${short}.qmd`, joinHeading(heading, ''));
   await ws.writeFile(articlePath, insertInclude(article, short, position));

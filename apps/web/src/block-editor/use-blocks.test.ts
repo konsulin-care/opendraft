@@ -112,9 +112,39 @@ describe('createBlock', () => {
     });
 
     const created = (await ws.readFile(`${BLOCKS}/methods.qmd`)) ?? '';
-    expect(created).toContain('# Methods {#sec-methods .deo-section}');
+    expect(created).toContain('# Methods {#sec-methods .doco-section}');
     expect(await includeOrder(ws)).toEqual(['alpha', 'methods', 'beta']);
     expect(result.current.blocks.map((block) => block.short)).toEqual(['alpha', 'methods', 'beta']);
+  });
+
+  it('gives a draft short name already used by another block a unique suffix', async () => {
+    const { result, ws } = await setup({
+      [ARTICLE]: articleWith('intro'),
+      [`${BLOCKS}/intro.qmd`]: blockFile('Introduction', 'sec-intro', 'intro'),
+    });
+
+    await act(async () => {
+      await result.current.createBlock(1, {
+        title: 'Introduction',
+        short: 'intro',
+        role: 'introduction',
+      });
+    });
+
+    // The pre-existing block's file stays untouched; the new block gets a
+    // suffixed file name and its own include line.
+    expect(await ws.readFile(`${BLOCKS}/intro.qmd`)).toBe(
+      blockFile('Introduction', 'sec-intro', 'intro'),
+    );
+    const files = await ws.listFiles(BLOCKS);
+    expect(files).toContain('intro.qmd');
+    const createdName = files.find((file) => file !== 'intro.qmd');
+    expect(createdName).toMatch(/^intro-[a-z0-9]{6}\.qmd$/);
+    const createdShort = createdName?.replace(/\.qmd$/, '');
+    const created = (await ws.readFile(`${BLOCKS}/${createdShort}.qmd`)) ?? '';
+    expect(created).toContain('.deo-introduction');
+    expect(await includeOrder(ws)).toEqual(['intro', createdShort]);
+    expect(result.current.blocks.map((block) => block.short)).toEqual(['intro', createdShort]);
   });
 });
 
@@ -135,7 +165,7 @@ describe('createBlock drafts', () => {
     expect(result.current.blocks.map((block) => block.short)).toEqual(['intro', 'methods']);
   });
 
-  it('writes a heading with no class for a custom draft that carries no role', async () => {
+  it('writes the generic .doco-section heading for a custom draft that carries no role', async () => {
     const { result, ws } = await setup({
       [ARTICLE]: articleWith('intro'),
       [`${BLOCKS}/intro.qmd`]: blockFile('Introduction', 'sec-intro', 'intro'),
@@ -146,7 +176,7 @@ describe('createBlock drafts', () => {
     });
 
     const created = (await ws.readFile(`${BLOCKS}/custom.qmd`)) ?? '';
-    expect(created.split('\n')[0]).toBe('# Custom {#sec-custom}');
+    expect(created.split('\n')[0]).toBe('# Custom {#sec-custom .doco-section}');
     expect(created).not.toContain('.deo-');
     expect(await includeOrder(ws)).toEqual(['intro', 'custom']);
     expect(result.current.blocks.map((block) => block.short)).toEqual(['intro', 'custom']);
