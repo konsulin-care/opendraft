@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 /**
- * BlockEditor deletion tests: the confirm/cancel delete flow and the delete
+ * BlockEditor deletion tests: the confirm/cancel delete flow, the delete
  * confirmation dialog naming the section and listing every breaking `@sec-`
- * reference. Moved out of BlockEditor.test.tsx, which sits at the 300-line
- * max-lines ceiling.
+ * reference, and the files-changed dispatch after a confirmed delete. Moved
+ * out of BlockEditor.test.tsx, which sits at the 300-line max-lines ceiling.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
@@ -121,5 +121,36 @@ describe('BlockEditor delete flow', () => {
     expect(await ws.readFile(`${BLOCKS}/alpha.qmd`)).toBeNull();
     expect(await ws.readFile(ARTICLE)).not.toContain('blocks/alpha.qmd');
     expect(await ws.readFile(ARTICLE)).toContain('blocks/beta.qmd');
+  });
+});
+
+describe('BlockEditor delete files-changed event', () => {
+  it('dispatches opendraft:files-changed after the block file is removed', async () => {
+    const ws = await setup({
+      [ARTICLE]: articleWith('alpha', 'beta'),
+      [`${BLOCKS}/alpha.qmd`]: blockFile('alpha', 'Alpha'),
+      [`${BLOCKS}/beta.qmd`]: blockFile('beta', 'Beta'),
+    });
+    // The listener reads the block file at dispatch time: the event must
+    // fire only once the file is already gone from the workspace.
+    const order: string[] = [];
+    const listener = (): void => {
+      order.push('event');
+      void ws.readFile(`${BLOCKS}/alpha.qmd`).then((text) => {
+        order.push(text === null ? 'file-removed' : 'file-present');
+      });
+    };
+    window.addEventListener('opendraft:files-changed', listener);
+    try {
+      fireEvent.click(screen.getAllByRole('button', { name: 'Delete section' })[0]);
+      const dialog = await screen.findByRole('dialog', { name: 'Delete Alpha' });
+      await act(async () => {
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Delete block' }));
+      });
+      await act(async () => {});
+      expect(order).toEqual(['event', 'file-removed']);
+    } finally {
+      window.removeEventListener('opendraft:files-changed', listener);
+    }
   });
 });

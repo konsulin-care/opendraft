@@ -100,6 +100,16 @@ function openDeleteFor(
 }
 
 /**
+ * Notify listeners (notably the file tree in App) that workspace files
+ * changed so their listings refresh after a create or delete mutation.
+ *
+ * @returns Nothing; dispatches `opendraft:files-changed` on `window`.
+ */
+function notifyFilesChanged(): void {
+  window.dispatchEvent(new CustomEvent('opendraft:files-changed'));
+}
+
+/**
  * Hover-revealed '+' insert point between blocks and at the end.
  *
  * @param props - Handler opening the add-section dialog at this point.
@@ -216,12 +226,13 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
   const closeForm = (): void => setAddingAt(null);
   const createAt = (position: number) => (draft: BlockDraft): void => {
     closeForm();
-    void createBlock(position, draft.title).then(() => { window.dispatchEvent(new CustomEvent('opendraft:files-changed')); requestFocusForShort(draft.short); });
+    void createBlock(position, draft.title).then(() => { notifyFilesChanged(); requestFocusForShort(draft.short); });
   };
   const openDelete = openDeleteFor(ws, dir, setDeleting);
   const confirmDelete = async (): Promise<void> => {
     if (deleting === null) return;
     await deleteBlock(deleting.short); setDeleting(null);
+    notifyFilesChanged();
   };
   const closeDelete = (): void => setDeleting(null);
   if (loading) return null;
