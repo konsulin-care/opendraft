@@ -18,17 +18,16 @@ export interface ManuscriptViewProps {
 }
 
 /**
- * Reading view for a manuscript directory: one scroll container (the
- * panel's scroll-collapse driver) holding the editor toolbars whose
- * formatting commands dispatch to the focused block editor, and one
- * shared ReadingColumn holding the metadata panel on top of the block
- * list so the title block and the blocks share one display
- * configuration — all guarded against focus-scroll jumps. The surface
- * keeps exactly one child so the scroll container remains the single
- * scrollport.
+ * Reading view for a manuscript directory: the editor toolbars whose
+ * formatting commands dispatch to the focused block editor rendered as the
+ * surface's first child — outside the one scroll container (the panel's
+ * scroll-collapse driver) so scrolling never hides them — and one shared
+ * ReadingColumn holding the metadata panel on top of the block list inside
+ * that overflow-auto scrollport, so the title block and the blocks share
+ * one display configuration, all guarded against focus-scroll jumps.
  *
  * @param props - See {@link ManuscriptViewProps}.
- * @returns The manuscript-view surface with one scroll container.
+ * @returns The manuscript-view surface: toolbars first, then one scroll container.
  */
 export function ManuscriptView({ workspace, dir, projectKey }: ManuscriptViewProps) {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -37,12 +36,12 @@ export function ManuscriptView({ workspace, dir, projectKey }: ManuscriptViewPro
   const commands = useEditorCommands('wysiwyg', () => null);
   return (
     <div className="manuscript-editor" data-testid="manuscript-view">
+      <EditorToolbars commands={commands} />
       <div
         ref={scrollContainerRef}
         tabIndex={-1}
         style={{ flex: 1, minHeight: 0, overflow: 'auto' }}
       >
-        <EditorToolbars commands={commands} />
         <ReadingColumn>
           <MetadataPanel
             workspace={workspace}

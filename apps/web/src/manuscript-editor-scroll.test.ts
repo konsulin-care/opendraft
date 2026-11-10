@@ -49,15 +49,19 @@ describe("ManuscriptEditor — one scroll container for the source-only editor",
   }, 20000);
 });
 
-describe("ManuscriptView — one scroll container for the reading view", () => {
-  it("the surface has exactly one child element and it is the overflow-auto scroll container", async () => {
+describe("ManuscriptView — toolbar outside the reading view's scroll container", () => {
+  it("the toolbar is the surface's first child and the overflow-auto container holds the reading column", async () => {
     render(createElement(ManuscriptView, {
       workspace: new MemoryWorkspace(), dir: "manuscripts/p", projectKey: "scroll-test",
     }));
     await waitFor(() => expect(screen.getByTestId("manuscript-view")).toBeDefined(), { timeout: 10000 });
     const surface = screen.getByTestId("manuscript-view");
-    expect(surface.children).toHaveLength(1);
-    const container = surface.children[0] as HTMLDivElement;
+    expect(surface.children).toHaveLength(2);
+    const toolbarArea = surface.children[0] as HTMLDivElement;
+    const container = surface.children[1] as HTMLDivElement;
+    const toolbar = screen.getByRole("toolbar", { name: "Formatting" });
+    expect(toolbarArea.contains(toolbar)).toBe(true);
+    expect(container.contains(toolbar)).toBe(false);
     expect(container.style.overflow).toBe("auto");
     expect(container.querySelector(".reading-column")).not.toBeNull();
   }, 20000);

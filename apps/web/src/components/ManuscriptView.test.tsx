@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 /**
- * ManuscriptView tests: the metadata panel and block list sharing one
- * reading column inside the single scroll container, the empty-state
+ * ManuscriptView tests: the formatting toolbar sitting outside the scroll
+ * container as the surface's first child, the metadata panel and block list
+ * sharing one reading column inside the overflow-auto scroll container, the
+ * empty-state
  * preset picker for an assembly with no blocks, and the always-visible
  * '+ Add section' button that needs no hover to show.
  */
@@ -75,10 +77,32 @@ describe('ManuscriptView metadata panel placement', () => {
     const column = panel.closest('.reading-column');
     expect(column).not.toBeNull();
     expect(headings[0].closest('.reading-column')).toBe(column);
-    // The column lives in the surface's single scroll container.
+    // The column lives in the surface's overflow-auto scroll container.
     const surface = screen.getByTestId('manuscript-view');
-    expect(surface.children).toHaveLength(1);
-    expect(surface.children[0].contains(column)).toBe(true);
+    expect(surface.children).toHaveLength(2);
+    const scrollContainer = surface.children[1] as HTMLDivElement;
+    expect(scrollContainer.style.overflow).toBe('auto');
+    expect(scrollContainer.contains(column)).toBe(true);
+  });
+});
+
+describe('ManuscriptView toolbar placement', () => {
+  it('renders the formatting toolbar as the first child, outside the scroll container', async () => {
+    await renderView({
+      [`${DIR}/article.qmd`]: articleWith('intro'),
+      [`${DIR}/blocks/intro.qmd`]: blockFile('intro', 'Introduction'),
+    });
+    const surface = screen.getByTestId('manuscript-view');
+    const toolbar = await screen.findByRole('toolbar', { name: 'Formatting' });
+    // The toolbar is the surface's first child, never inside the scroller,
+    // so scrolling the reading column never hides it.
+    expect(surface.children[0].contains(toolbar)).toBe(true);
+    const scrollContainer = surface.children[1] as HTMLDivElement;
+    expect(scrollContainer.style.overflow).toBe('auto');
+    expect(scrollContainer.contains(toolbar)).toBe(false);
+    // The scroll container still holds the reading column content.
+    const panel = await screen.findByTestId('metadata-panel');
+    expect(scrollContainer.contains(panel)).toBe(true);
   });
 });
 
