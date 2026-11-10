@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ProjectRecord, WorkspaceAdapter } from '@opendraft/workspace';
 import { AppHeader } from './components/AppHeader';
 import type { SaveStatus } from './components/AppHeader';
-import { ManuscriptEditor } from './components/ManuscriptEditor';
-import { ManuscriptView } from './components/ManuscriptView';
+import { EditorArea } from './components/EditorArea';
 import { CommitDialog } from './components/CommitDialog';
 import { ProjectDrawer, useDrawerState } from './components/project-drawer/ProjectDrawer';
 import { ProjectSwitcher } from './components/project-drawer/ProjectSwitcher';
@@ -82,50 +81,6 @@ function useWorkspacePaths(workspace: WorkspaceAdapter | null, active: ProjectRe
   }, [workspace, active, version]);
 
   return paths;
-}
-
-/** Props for the always-present editor region. */
-interface EditorAreaProps {
-  workspace: WorkspaceAdapter;
-  activePath: string;
-  isDir: boolean;
-  file: { path: string; text: string } | null;
-  projectId: string;
-  onSaveStatusChange: (status: SaveStatus) => void;
-  formattingToolbar: boolean;
-}
-
-/**
- * Always-present editor region: directories route to the manuscript view
- * (block editor reading column), every file routes to the source-only
- * editor. `file` is null while loading or stale for the active path.
- *
- * @param props - See {@link EditorAreaProps}.
- */
-function EditorArea({
-  workspace,
-  activePath,
-  isDir,
-  file,
-  projectId,
-  onSaveStatusChange,
-  formattingToolbar,
-}: EditorAreaProps) {
-  return (
-    <main style={{ flex: 1, overflow: 'hidden' }}>
-      {isDir ? (
-        <ManuscriptView workspace={workspace} dir={activePath} projectKey={projectId} />
-      ) : file !== null ? (
-        <ManuscriptEditor
-          workspace={workspace}
-          defaultValue={file.text}
-          path={file.path}
-          onSaveStatusChange={onSaveStatusChange}
-          formattingToolbar={formattingToolbar}
-        />
-      ) : null}
-    </main>
-  );
 }
 
 /** Props for {@link HeaderSection}. */
@@ -280,7 +235,7 @@ export function App() {
         workspace={workspace} activePath={activePath} isDir={isDir}
         file={file !== null && file.path === contentPath ? file : null}
         projectId={active?.id ?? ''} onSaveStatusChange={setSaveStatus}
-        formattingToolbar={formattingToolbar}
+        formattingToolbar={formattingToolbar} openFile={openFile}
       />
       <DrawerSection
         projects={projects} active={active} switchTo={switchTo}
