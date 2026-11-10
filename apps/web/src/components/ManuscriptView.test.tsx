@@ -92,6 +92,26 @@ describe('ManuscriptView empty state', () => {
   });
 });
 
+describe('ManuscriptView formatting toolbar', () => {
+  it("renders the formatting toolbar even when localStorage 'opendraft:prefs' stores formattingToolbar false", async () => {
+    localStorage.setItem(
+      'opendraft:prefs',
+      JSON.stringify({ v: 2, formattingToolbar: false }),
+    );
+    try {
+      await renderView({
+        [`${DIR}/article.qmd`]: articleWith('intro'),
+        [`${DIR}/blocks/intro.qmd`]: blockFile('intro', 'Introduction'),
+      });
+      expect(
+        await screen.findByRole('toolbar', { name: 'Formatting' }),
+      ).toBeInTheDocument();
+    } finally {
+      localStorage.clear();
+    }
+  });
+});
+
 describe('ManuscriptView add section button', () => {
   it("shows an always-visible '+ Add section' without hover classes", async () => {
     await renderView({

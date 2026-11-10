@@ -3,7 +3,6 @@ import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { BlockEditor } from '../block-editor/BlockEditor';
 import { useEditorCommands } from '../hooks/useEditorCommands';
 import { useFocusScrollGuard } from '../hooks/useFocusScrollGuard';
-import { useToolbarPreference } from '../hooks/useToolbarPreference';
 import { EditorToolbars } from './EditorToolbars';
 import { MetadataPanel } from './metadata-panel/MetadataPanel';
 import { ReadingColumn } from './ReadingColumn';
@@ -36,7 +35,6 @@ export function ManuscriptView({ workspace, dir, projectKey }: ManuscriptViewPro
   useFocusScrollGuard(scrollContainerRef);
   // Formatting commands target the most recently focused block editor.
   const commands = useEditorCommands('wysiwyg', () => null);
-  const { formattingToolbar } = useToolbarPreference();
   return (
     <div className="manuscript-editor" data-testid="manuscript-view">
       <div
@@ -44,7 +42,7 @@ export function ManuscriptView({ workspace, dir, projectKey }: ManuscriptViewPro
         tabIndex={-1}
         style={{ flex: 1, minHeight: 0, overflow: 'auto' }}
       >
-        <EditorToolbars commands={commands} formattingToolbar={formattingToolbar} />
+        <EditorToolbars commands={commands} formattingToolbar />
         <ReadingColumn>
           <MetadataPanel
             workspace={workspace}
