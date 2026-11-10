@@ -34,11 +34,32 @@ export interface SplitHeading {
   body: string;
 }
 
-/** Matches `# <title> {#sec-<short> [ .deo-<role>]}` on a single line. */
-const HEADING_PATTERN = /^# (.+) \{#(sec-[a-z0-9-]+)(?: \.(deo-[a-z0-9-]+))?\}$/;
+/** Matches `# <title> {#sec-<short> [ .<class>]}` on a single line. */
+const HEADING_PATTERN = /^# (.+) \{#(sec-[a-z0-9-]+)(?: \.(doco-[a-z0-9-]+|deo-[a-z0-9-]+))?\}$/;
 
-/** Prefix of the `.deo-<type>` class token. */
+/** Prefix of a `.deo-<type>` role class token. */
 const TYPE_PREFIX = 'deo-';
+
+/** Generic section type and its canonical `.doco-section` class. */
+const GENERIC_TYPE = 'section';
+const GENERIC_CLASS = 'doco-section';
+
+/**
+ * Map a heading class token to its section type.
+ *
+ * @param className - Class without the leading dot, e.g. `deo-methods`;
+ *                    `undefined` when the heading carries no class.
+ * @returns The generic `'section'` for `.doco-section` and the legacy
+ *          `.deo-section`, the role for `.deo-<role>`, or `null` for a
+ *          class-less heading.
+ */
+function classToType(className: string | undefined): string | null {
+  if (className === undefined) return null;
+  if (className === GENERIC_CLASS || className === `${TYPE_PREFIX}${GENERIC_TYPE}`) {
+    return GENERIC_TYPE;
+  }
+  return className.slice(TYPE_PREFIX.length);
+}
 
 /**
  * Split a block file at its canonical leading heading.
@@ -59,19 +80,19 @@ export function splitHeading(text: string): SplitHeading {
   if (match === null) {
     return { title: null, anchor: null, type: null, body: text };
   }
-  const [, title, anchor, deoType] = match;
+  const [, title, anchor, className] = match;
   const body = lineEnd === -1 ? '' : text.slice(lineEnd + 1);
-  const type = deoType === undefined ? null : deoType.slice(TYPE_PREFIX.length);
-  return { title, anchor, type, body };
+  return { title, anchor, type: classToType(className), body };
 }
 
 /**
  * Join heading parts and a body into canonical block file text.
  *
- * The heading becomes the file's first line,
- * `# <title> {#<anchor> .deo-<role>}` (class omitted when the role is
- * absent or null), followed by the body verbatim — the exact inverse of
- * `splitHeading`.
+ * The heading becomes the file's first line —
+ * `# <title> {#<anchor> .doco-section}` for the generic `'section'`
+ * type, `# <title> {#<anchor> .deo-<role>}` for a role, and no class
+ * when the role is absent or null — followed by the body verbatim, the
+ * exact inverse of `splitHeading`.
  *
  * @param heading - Heading parts (use literals when the file had no
  *                  leading heading of its own).
@@ -79,6 +100,10 @@ export function splitHeading(text: string): SplitHeading {
  * @returns Canonical block file text.
  */
 export function joinHeading(heading: BlockHeading, body: string): string {
-  const role = heading.type ? ` .deo-${heading.type}` : '';
+  let role = '';
+  if (heading.type) {
+    const className = heading.type === GENERIC_TYPE ? GENERIC_CLASS : `${TYPE_PREFIX}${heading.type}`;
+    role = ` .${className}`;
+  }
   return `# ${heading.title} {#${heading.anchor}${role}}\n${body}`;
 }

@@ -43,6 +43,20 @@ describe('splitHeading', () => {
   });
 });
 
+describe('splitHeading generic section class', () => {
+  it("parses '.doco-section' as the generic type 'section'", () => {
+    const text = '# Intro {#sec-intro .doco-section}\n\nBody.';
+    const { type } = splitHeading(text);
+    expect(type).toBe('section');
+  });
+
+  it("parses the legacy '.deo-section' as the generic type 'section'", () => {
+    const text = '# Intro {#sec-intro .deo-section}\n\nBody.';
+    const { type } = splitHeading(text);
+    expect(type).toBe('section');
+  });
+});
+
 describe('splitHeading/joinHeading round-trip', () => {
   it("round-trips a classed heading '# Methods {#sec-methods .deo-methods}'", () => {
     const text = '# Methods {#sec-methods .deo-methods}\n\nBody text.';
@@ -69,6 +83,22 @@ describe('splitHeading/joinHeading round-trip', () => {
 
 describe('joinHeading', () => {
   it("joins a body with its heading so the file's first line is the canonical heading", () => {
+    const joined = joinHeading(
+      { title: 'Methods', anchor: 'sec-methods', type: 'methods' },
+      'Intro paragraph.',
+    );
+    expect(joined.split('\n')[0]).toBe('# Methods {#sec-methods .deo-methods}');
+  });
+
+  it("writes the generic type 'section' as '.doco-section'", () => {
+    const joined = joinHeading(
+      { title: 'Intro', anchor: 'sec-intro', type: 'section' },
+      'Intro paragraph.',
+    );
+    expect(joined.split('\n')[0]).toBe('# Intro {#sec-intro .doco-section}');
+  });
+
+  it("writes a role type as '.deo-<role>'", () => {
     const joined = joinHeading(
       { title: 'Methods', anchor: 'sec-methods', type: 'methods' },
       'Intro paragraph.',
