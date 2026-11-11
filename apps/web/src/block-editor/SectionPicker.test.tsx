@@ -79,6 +79,73 @@ describe('SectionPicker extended role chips', () => {
   });
 });
 
+describe('SectionPicker disclosure toggle collapsed', () => {
+  it("renders 'More options' as a borderless text button with a down chevron below the core chips", () => {
+    renderPicker();
+    const toggle = screen.getByRole('button', { name: 'More options' });
+
+    expect(toggle.className).not.toMatch(/border/);
+    expect(toggle).toHaveTextContent('▾');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    const methods = screen.getByRole('button', { name: 'Methods' });
+    expect(
+      toggle.compareDocumentPosition(methods) &
+        Node.DOCUMENT_POSITION_PRECEDING,
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole('button', { name: 'Acknowledgements' }),
+    ).toBeNull();
+  });
+});
+
+describe('SectionPicker disclosure toggle expanded', () => {
+  it("reads 'Show less' with an up chevron after the extended chips when expanded", () => {
+    renderPicker();
+    const toggle = screen.getByRole('button', { name: 'More options' });
+    fireEvent.click(toggle);
+
+    const showLess = screen.getByRole('button', { name: 'Show less' });
+    expect(showLess.className).not.toMatch(/border/);
+    expect(showLess).toHaveTextContent('▴');
+    expect(showLess).toHaveAttribute('aria-expanded', 'true');
+
+    const core = screen.getByRole('button', { name: 'Methods' });
+    const extended = screen.getByRole('button', { name: 'Related Work' });
+    // Core chips first, then the extended chips, then the toggle.
+    expect(
+      extended.compareDocumentPosition(core) & Node.DOCUMENT_POSITION_PRECEDING,
+    ).toBeTruthy();
+    expect(
+      showLess.compareDocumentPosition(extended) &
+        Node.DOCUMENT_POSITION_PRECEDING,
+    ).toBeTruthy();
+  });
+});
+
+describe('SectionPicker disclosure toggle identity', () => {
+  it('keeps aria-expanded in sync and reuses the same DOM node across toggles', () => {
+    renderPicker();
+    const toggle = screen.getByRole('button', { name: 'More options' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(toggle);
+    const expandedToggle = screen.getByRole('button', { name: 'Show less' });
+    expect(expandedToggle).toBe(toggle);
+    expect(expandedToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(expandedToggle).toHaveTextContent('▴');
+
+    fireEvent.click(expandedToggle);
+    const collapsedToggle = screen.getByRole('button', { name: 'More options' });
+    expect(collapsedToggle).toBe(toggle);
+    expect(collapsedToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(collapsedToggle).toHaveTextContent('▾');
+    expect(
+      screen.queryByRole('button', { name: 'Related Work' }),
+    ).toBeNull();
+  });
+});
+
 describe('SectionPicker custom section entry', () => {
   it("hands the 'Custom section' button to onCustom", () => {
     const { onCustom } = renderPicker();

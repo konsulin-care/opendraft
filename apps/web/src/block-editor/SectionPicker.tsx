@@ -39,9 +39,13 @@ const CHIP_CLASS = `${CHIP_BASE} border border-gray-300 hover:border-black`;
 /** Used chip: black border and secondary fill marking a taken role. */
 const CHIP_USED_CLASS = `${CHIP_BASE} border border-black bg-secondary`;
 
-/** Shared styling for the disclosure and entry buttons. */
+/** Shared styling for the bordered entry buttons. */
 const BUTTON_CLASS =
   'rounded-md border border-gray-300 px-3 py-1 text-sm hover:bg-secondary focus-visible:outline-2 focus-visible:outline-black';
+
+/** Borderless text-only disclosure toggle with the black focus outline. */
+const TOGGLE_CLASS =
+  'self-start text-sm hover:underline focus-visible:outline-2 focus-visible:outline-black';
 
 /**
  * One role chip; clicking it creates the section immediately.
@@ -139,14 +143,6 @@ export function SectionPicker({
   return (
     <div className="space-y-2">
       <ChipList presets={core} onCreate={onCreate} usedRoles={usedRoles} />
-      <button
-        type="button"
-        aria-expanded={expanded}
-        onClick={() => setExpanded((value) => !value)}
-        className={BUTTON_CLASS}
-      >
-        More options
-      </button>
       {expanded && (
         <ChipList
           presets={extended}
@@ -155,6 +151,17 @@ export function SectionPicker({
           label="Extended DEO roles"
         />
       )}
+      <button
+        type="button"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((value) => !value)}
+        className={TOGGLE_CLASS}
+      >
+        {expanded ? 'Show less' : 'More options'}
+        <span aria-hidden="true" className="ml-1">
+          {expanded ? '▴' : '▾'}
+        </span>
+      </button>
       <button
         type="button"
         onClick={() => onCustom?.()}
