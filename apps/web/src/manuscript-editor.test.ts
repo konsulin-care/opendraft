@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { MemoryWorkspace } from "@opendraft/workspace";
 import { EditorView } from "@codemirror/view";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { ManuscriptEditor } from "./components/ManuscriptEditor";
 import { EditorToolbars } from "./components/EditorToolbars";
@@ -98,7 +98,8 @@ describe("ManuscriptEditor crepe theme integration", () => {
   it("does not import Crepe theme CSS in the component", () => { expect(manuscriptSource).not.toMatch(/@milkdown\/crepe\/theme\/(common\/style\.css|classic\.css)/); });
   it("does not import the split prosemirror/reset sheets", () => { expect(manuscriptSource).not.toMatch(/@milkdown\/crepe\/theme\/common\/(prosemirror|reset)\.css/); });
   it("imports Crepe theme CSS in index.css without a cascade layer", () => { expect(css).not.toMatch(/@layer\s+crepe/); expect(css).toContain("@milkdown/crepe/theme/common/style.css"); expect(css).toContain("@milkdown/crepe/theme/classic.css"); });
-  it("configures a static placeholder feature", () => { expect(crepeConfigSource).toContain("Crepe.Feature.Placeholder"); expect(crepeConfigSource).toContain("PLACEHOLDER_HINT"); expect(crepeConfigSource).not.toContain("pickPlaceholderHint"); });
+  it("disables the Placeholder feature so empty block bodies show no hint text", () => { expect(crepeConfigSource).toContain("[Crepe.Feature.Placeholder]: false"); expect(crepeConfigSource).not.toContain("../placeholder"); expect(crepeConfigSource).not.toContain("PLACEHOLDER_HINT"); });
+  it("has deleted the PLACEHOLDER_HINT module", () => { expect(existsSync(resolve(__dirname, "./placeholder.ts"))).toBe(false); expect(existsSync(resolve(__dirname, "./placeholder.test.ts"))).toBe(false); });
   it("configures block handle at content edge", () => { expect(crepeConfigSource).toContain("Crepe.Feature.BlockEdit"); expect(crepeConfigSource).toContain("blockHandle"); expect(crepeConfigSource).toContain("shouldShow: () => false"); });
 });
 

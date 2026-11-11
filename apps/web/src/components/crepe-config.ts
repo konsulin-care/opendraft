@@ -5,7 +5,6 @@ import { editorViewCtx, remarkPluginsCtx, remarkStringifyOptionsCtx, type Editor
 import { listenerCtx } from '@milkdown/kit/plugin/listener';
 import { $prose, getMarkdown } from '@milkdown/kit/utils';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
-import { PLACEHOLDER_HINT } from '../placeholder';
 import { createCitationPlugin } from '../citation/plugin';
 import type { CitationState } from '../citation/types';
 import { quartoRemarkPlugin, quartoInlineCodePlugin, quartoChunkOptionPlugin } from '../quarto-syntax';
@@ -50,9 +49,10 @@ export function createCrepeConfig(options: CrepeConfigOptions): Crepe {
     features: {
       [Crepe.Feature.TopBar]: false,
       [Crepe.Feature.AI]: false,
+      // Placeholder hint disabled: empty block bodies show no text.
+      [Crepe.Feature.Placeholder]: false,
     },
     featureConfigs: {
-      [Crepe.Feature.Placeholder]: { text: PLACEHOLDER_HINT, mode: 'block' },
       [Crepe.Feature.Cursor]: { virtual: false },
       [Crepe.Feature.CodeMirror]: {
         theme: lightCodeBlockTheme,
