@@ -16,6 +16,8 @@ import { useOverlayCollapse } from './overlay-collapse';
 export interface PinnedBarProps {
   /** Manuscript title shown in the bar while collapsed. */
   title: string;
+  /** Manuscript folder id shown in muted text when the title is empty. */
+  folderId: string;
   /** Byline shown in the bar while collapsed. */
   byline: string;
   /** Effective expanded state (false also while scroll-collapsed). */
@@ -35,13 +37,14 @@ export interface PinnedBarProps {
  * hairline separator below it. The bar and the separator share one
  * sticky container so the hairline stays pinned under the bar for the
  * whole scroll range; the bar text fades in with the panel's
- * `--collapse-progress` CSS variable.
+ * `--collapse-progress` CSS variable. An empty title falls back to the
+ * manuscript folder id in muted text instead of a placeholder label.
  *
  * @param props - See {@link PinnedBarProps}.
  * @returns The sticky wrapper containing the bar and separator.
  */
 export function PinnedBar({
-  title, byline, expanded, collapseProgress, narrow, badge, onToggle,
+  title, folderId, byline, expanded, collapseProgress, narrow, badge, onToggle,
 }: PinnedBarProps): ReactNode {
   // While explicitly collapsed the text is fully opaque; while expanded
   // it fades in with the collapse progress written by the scroll hook.
@@ -57,7 +60,7 @@ export function PinnedBar({
           {showText && (
             <div style={textStyle}>
               <div data-testid="metadata-panel-bar-title" className={narrow ? 'line-clamp-2' : 'truncate'}>
-                {title || 'Untitled manuscript'}
+                {title || <span className="text-muted">{folderId}</span>}
               </div>
               {byline && (
                 <div className="truncate text-sm text-muted" data-testid="metadata-panel-byline">{byline}</div>

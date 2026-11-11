@@ -46,6 +46,17 @@ export function manuscriptRootFromPath(path: string): string | null {
 }
 
 /**
+ * Folder id of a manuscript root: `manuscripts/alpha` -> `alpha`.
+ *
+ * @param root - Repo-relative manuscript directory.
+ * @returns The trailing folder id used as the empty-title fallback.
+ */
+function manuscriptFolderId(root: string): string {
+  const segments = root.split('/');
+  return segments[segments.length - 1] ?? '';
+}
+
+/**
  * Derive an author's display name: literal for groups, otherwise
  * given then family (with optional particle and suffix).
  *
@@ -248,7 +259,7 @@ export function MetadataPanel({
   const sheet = expanded && narrow;
   const content = (
     <OverlayLayer overlay={layout.overlay} scrollerRef={overlayRef}>
-      <PinnedBar title={title} byline={narrow ? `${authors.length} authors` : byline}
+      <PinnedBar title={title} folderId={manuscriptFolderId(manuscriptRoot)} byline={narrow ? `${authors.length} authors` : byline}
         expanded={layout.panelExpanded} collapseProgress={layout.progress} narrow={narrow} onToggle={layout.toggle}
         badge={<ValidationBadge issues={issues} onSelect={issueFocus.select} onOpen={openIssues} />} />
       <PanelBody meta={meta} expanded={expanded} bodyRef={bodyRef}
