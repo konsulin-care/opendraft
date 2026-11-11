@@ -54,6 +54,26 @@ describe('InlineEditField pen icon', () => {
   });
 });
 
+describe('InlineEditField auto-sized input', () => {
+  it('drops w-full, sizes the input to its text and keeps SquarePen as the adjacent sibling', () => {
+    const { container } = renderField();
+    const input = screen.getByRole('textbox', { name: 'Test field' }) as HTMLInputElement;
+
+    const classes = input.className.split(/\s+/);
+    expect(classes).not.toContain('w-full');
+    expect(classes).toContain('field-sizing-content');
+    expect(input.size).toBe('Test Project'.length);
+
+    fireEvent.change(input, { target: { value: 'A much longer project title' } });
+    expect(input.size).toBe('A much longer project title'.length);
+
+    const pen = input.nextElementSibling as Element | null;
+    expect(pen).not.toBeNull();
+    expect(pen?.classList.contains('lucide-square-pen')).toBe(true);
+    expect(container.querySelector('.lucide-square-pen')).toBe(pen);
+  });
+});
+
 describe('InlineEditField save and revert', () => {
   it('saves the trimmed value on Enter', () => {
     const onSave = vi.fn();

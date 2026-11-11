@@ -55,6 +55,15 @@ describe('BlockHeader level-1 warning badge', () => {
   });
 });
 
+describe('BlockHeader reference chip removal', () => {
+  it("renders no '@sec-' reference copy button", () => {
+    renderHeader('methods');
+
+    expect(screen.queryByRole('button', { name: /Copy @sec-/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/@sec-/)).not.toBeInTheDocument();
+  });
+});
+
 describe('BlockHeader delete button', () => {
   it("renders a trash-icon 'Delete section' button and no 'Block options' button", () => {
     renderHeader('methods');

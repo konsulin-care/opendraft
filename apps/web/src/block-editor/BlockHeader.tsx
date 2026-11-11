@@ -1,7 +1,7 @@
 /**
  * Block header: the collapsible block's title row, owning the H1 title,
- * the copyable `@sec-` reference chip, the level-1 warning badge, the
- * word count, the save status and the delete button. The disclosure
+ * the level-1 warning badge, the word count, the save status and the
+ * delete button. The disclosure
  * toggle carries `aria-expanded`. The warning badge reflects the body
  * as loaded: new level-1 headings cannot appear because the body's
  * heading guard demotes them to H2.
@@ -102,30 +102,6 @@ export interface BlockHeaderProps {
 }
 
 /**
- * Copyable `@sec-<short>` chip.
- *
- * @param props - The block short name the reference is built from.
- * @returns The chip button; activation copies `@sec-<short>` to the clipboard.
- */
-function CopyChip({ short }: { short: string }) {
-  const copyReference = (): void => {
-    void navigator.clipboard?.writeText(`@sec-${short}`).catch(() => {
-      // Clipboard unavailable: the chip keeps showing the reference.
-    });
-  };
-  return (
-    <button
-      type="button"
-      aria-label={`Copy @sec-${short} reference`}
-      onClick={copyReference}
-      className="rounded border border-gray-300 px-1.5 py-0.5 text-xs text-gray-600 hover:bg-gray-50"
-    >
-      <code>@sec-{short}</code>
-    </button>
-  );
-}
-
-/**
  * Amber badge shown when the loaded body already contains a level-1
  * heading; read-only signal rendered only while the warning is on.
  *
@@ -194,7 +170,7 @@ function HeaderStatus({ wordCount, saveStatus }: { wordCount: number; saveStatus
 }
 
 /**
- * Header row of one block: disclosure toggle, H1 title, reference chip,
+ * Header row of one block: disclosure toggle, H1 title,
  * word count, save status and delete button.
  *
  * @param props - See {@link BlockHeaderProps}.
@@ -231,7 +207,6 @@ export function BlockHeader({
       </button>
       <HeaderTitle title={title} onTitleSave={onTitleSave} />
       {hasLevel1Warning && <Level1Badge />}
-      <CopyChip short={short} />
       <HeaderStatus wordCount={wordCount} saveStatus={saveStatus} />
       <button
         type="button"

@@ -2,9 +2,9 @@
 /**
  * BlockContainer tests: the header H1 in both modes, aria-expanded with an
  * inert collapsed body, the read-only code-mode heading gutter line, and
- * clipboard copy of the `@sec-` reference chip.
+ * the absence of the `@sec-` reference copy chip in the header.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { BlockContainer } from './BlockContainer';
@@ -27,10 +27,6 @@ function renderContainer(overrides: Partial<BlockContainerProps> = {}) {
   const view = render(<BlockContainer {...props} />);
   return { ...view, onToggle, props };
 }
-
-afterEach(() => {
-  Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
-});
 
 describe('BlockContainer heading', () => {
   it('renders the section title as the H1 in the header in both visual and code mode', () => {
@@ -102,17 +98,11 @@ describe('BlockContainer code mode heading line', () => {
 });
 
 describe('BlockContainer reference chip', () => {
-  it("copies the '@sec-<short>' reference to the clipboard when the chip is activated", () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, 'clipboard', {
-      value: { writeText },
-      configurable: true,
-    });
-
+  it("renders no '@sec-' reference copy button in the section header", () => {
     renderContainer();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy @sec-methods reference' }));
-    expect(writeText).toHaveBeenCalledWith('@sec-methods');
+    expect(screen.queryByRole('button', { name: /Copy @sec-/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/@sec-/)).not.toBeInTheDocument();
   });
 });
 

@@ -18,7 +18,7 @@ export interface InlineEditFieldProps {
 const SAVE_ERROR = 'Could not rename.';
 
 const INPUT_CLASS =
-  'w-full min-w-0 border-0 p-0 text-sm font-medium leading-tight text-gray-900 focus:outline-none';
+  'field-sizing-content min-w-0 border-0 p-0 text-sm font-medium leading-tight text-gray-900 focus:outline-none';
 
 /**
  * Draft state for the inline edit: tracks the edited value, the last
@@ -102,6 +102,7 @@ export function InlineEditField({ value, label, testId, onSave, inputClassName }
         aria-label={label}
         data-testid={testId}
         value={draft}
+        size={Math.max(draft.length, 1)}
         onChange={(event) => setDraft(event.target.value)}
         onFocus={moveCaretToEnd}
         onClick={moveCaretToEnd}
