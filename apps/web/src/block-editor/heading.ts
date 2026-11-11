@@ -37,6 +37,9 @@ export interface SplitHeading {
 /** Matches `# <title> {#sec-<short> [ .<class>]}` on a single line. */
 const HEADING_PATTERN = /^# (.+) \{#(sec-[a-z0-9-]+)(?: \.(doco-[a-z0-9-]+|deo-[a-z0-9-]+))?\}$/;
 
+/** Matches a canonical heading line, capturing `# ` and the attribute block. */
+const HEADING_TAIL_PATTERN = /^(# ).+(\{#sec-[a-z0-9-]+(?:\s+\.(?:doco-[a-z0-9-]+|deo-[a-z0-9-]+))?\})$/;
+
 /** Prefix of a `.deo-<type>` role class token. */
 const TYPE_PREFIX = 'deo-';
 
@@ -106,4 +109,27 @@ export function joinHeading(heading: BlockHeading, body: string): string {
     role = ` .${className}`;
   }
   return `# ${heading.title} {#${heading.anchor}${role}}\n${body}`;
+}
+
+/**
+ * Rewrite only the heading title of a block file.
+ *
+ * The attribute block (anchor and class token) is copied byte-for-byte,
+ * so a legacy `.deo-section` heading stays `.deo-section` and a class-less
+ * heading stays class-less; only the title text changes. Unlike
+ * `splitHeading` + `joinHeading`, this never normalizes the class.
+ *
+ * @param text - Full block file text.
+ * @param title - New heading title.
+ * @returns The file text with only the first line's title replaced, or
+ *          `text` unchanged when the first line is not a canonical
+ *          heading (the caller handles that case).
+ */
+export function retitleHeading(text: string, title: string): string {
+  const lineEnd = text.indexOf('\n');
+  const firstLine = (lineEnd === -1 ? text : text.slice(0, lineEnd)).replace(/\r$/, '');
+  const match = HEADING_TAIL_PATTERN.exec(firstLine);
+  if (match === null) return text;
+  const body = lineEnd === -1 ? '' : text.slice(lineEnd + 1);
+  return `${match[1]}${title} ${match[2]}\n${body}`;
 }

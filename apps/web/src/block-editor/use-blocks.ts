@@ -4,7 +4,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
-import { joinHeading, splitHeading } from './heading';
+import { joinHeading, retitleHeading, splitHeading } from './heading';
 import type { BlockHeading } from './heading';
 import { uniqueShortName } from './slug';
 import { countWords } from './word-count';
@@ -203,9 +203,14 @@ export async function updateBlockTitle(
   const text = await ws.readFile(path);
   if (text === null) return;
   const parts = splitHeading(text);
-  const anchor = parts.anchor ?? `sec-${short}`;
-  // `parts.type` is null for a class-less heading: never re-add a class it never had.
-  await ws.writeFile(path, joinHeading({ title, anchor, type: parts.type }, parts.body));
+  if (parts.title !== null) {
+    // Rewrite only the title: the anchor and class token stay byte-for-byte.
+    await ws.writeFile(path, retitleHeading(text, title));
+    return;
+  }
+  // No canonical heading: prepend one anchored at the file's short name,
+  // class-less — `parts.type` is null, so no class is ever re-added.
+  await ws.writeFile(path, joinHeading({ title, anchor: `sec-${short}`, type: null }, text));
 }
 
 /** Mutation callbacks of {@link useBlocks}, bound to one workspace. */
