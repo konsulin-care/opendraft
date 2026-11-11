@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import type { ScrollCollapseApi } from './scroll-collapse';
 import { useScrollCollapse } from './scroll-collapse';
+import { useOverlayCollapse } from './overlay-collapse';
 
 /** Props for {@link PinnedBar}. */
 export interface PinnedBarProps {
@@ -85,6 +86,8 @@ export function PinnedBar({
 export interface OverlayLayerProps {
   /** Whether the panel currently overlays the editor area. */
   overlay: boolean;
+  /** Ref to the layer element; the overlay scroll collapse reads it. */
+  scrollerRef?: RefObject<HTMLDivElement | null>;
   /** Pinned bar and panel body rendered inside the layer. */
   children: ReactNode;
 }
@@ -98,9 +101,10 @@ export interface OverlayLayerProps {
  * @param props - See {@link OverlayLayerProps}.
  * @returns The layer element wrapping the children.
  */
-export function OverlayLayer({ overlay, children }: OverlayLayerProps): ReactNode {
+export function OverlayLayer({ overlay, scrollerRef, children }: OverlayLayerProps): ReactNode {
   return (
     <div
+      ref={scrollerRef}
       data-testid={overlay ? 'metadata-panel-overlay' : undefined}
       className={overlay ? 'h-full overflow-y-auto' : 'contents'}
     >
@@ -199,8 +203,12 @@ export interface PanelLayoutOptions {
   bodyRef: RefObject<HTMLDivElement | null>;
   /** Editor scroll container driving the scroll collapse. */
   scrollRef: RefObject<HTMLElement | null>;
+  /** Overlay scroll layer driving the overlay collapse progress. */
+  overlayRef: RefObject<HTMLElement | null>;
   /** Editor container focused when Esc collapses the panel. */
   editorFocusRef?: RefObject<HTMLElement | null>;
+  /** Session-only collapse fired when the overlay scrolls the body out. */
+  onOverlayScrollOut: () => void;
 }
 
 /** Controls returned by {@link usePanelLayout}. */
@@ -218,10 +226,12 @@ export interface PanelLayoutApi {
 }
 
 /**
- * Wire the panel layout: overlay detection, the scroll-collapse hook
- * and the chevron/Escape controls. Scroll collapse is disabled on
- * narrow viewports (full-screen sheet) and while the overlay owns the
- * scrolling; scroll collapse is never persisted.
+ * Wire the panel layout: overlay detection, the editor scroll-collapse
+ * hook, the overlay scroll collapse and the chevron/Escape controls.
+ * Scroll collapse is disabled on narrow viewports (full-screen sheet);
+ * the editor variant is disabled while the overlay owns the scrolling,
+ * and the overlay variant collapses session-only through
+ * `onOverlayScrollOut`. Neither scroll collapse is ever persisted.
  *
  * @param options - See {@link PanelLayoutOptions}.
  * @returns The layout state plus the panel's interaction handlers.
@@ -229,7 +239,7 @@ export interface PanelLayoutApi {
 export function usePanelLayout(options: PanelLayoutOptions): PanelLayoutApi {
   const {
     expanded, setExpanded, narrow, loaded, manuscriptRoot,
-    panelRef, bodyRef, scrollRef, editorFocusRef,
+    panelRef, bodyRef, scrollRef, overlayRef, editorFocusRef, onOverlayScrollOut,
   } = options;
   // Height of the expandable region the scroll offset is measured against.
   const expandedHeight = useCallback((): number => {
@@ -242,6 +252,9 @@ export function usePanelLayout(options: PanelLayoutOptions): PanelLayoutApi {
   const overlay = tall && expanded;
   const collapse = useScrollCollapse({ scrollRef, panelRef, enabled: base && !overlay, expandedHeight });
   useOverlayPin(overlay, collapse, scrollRef);
+  const overlayCollapse = useOverlayCollapse({
+    overlayRef, panelRef, enabled: overlay, expandedHeight, onScrolledOut: onOverlayScrollOut,
+  });
   const collapsedByScroll = collapse.state.mode === 'scroll';
   const toggle = useCallback(() => {
     if (collapsedByScroll) {
@@ -261,7 +274,7 @@ export function usePanelLayout(options: PanelLayoutOptions): PanelLayoutApi {
   return {
     overlay,
     panelExpanded: expanded && !collapsedByScroll,
-    progress: collapse.state.progress,
+    progress: overlay ? overlayCollapse.progress : collapse.state.progress,
     toggle,
     onKeyDown,
   };
