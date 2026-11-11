@@ -29,7 +29,7 @@ export function ManuscriptCard({ id, title, byline, keywords, onOpen }: Manuscri
       data-testid="manuscript-card"
       data-id={id}
       onClick={onOpen}
-      className="flex h-full flex-col gap-2 rounded-lg border border-gray-200 bg-white p-4 text-left shadow-sm hover:border-blue-300 hover:shadow"
+      className="flex h-full flex-col gap-2 rounded-lg border border-gray-200 bg-white p-4 text-left shadow-sm hover:border-blue-600-18 hover:shadow"
     >
       {title ? (
         <span data-testid="manuscript-card-title" className="text-base font-semibold text-gray-900">
