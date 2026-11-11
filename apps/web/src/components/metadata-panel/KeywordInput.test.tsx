@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 /**
- * KeywordInput tests: chip creation with Enter and comma, paste
- * splitting, duplicate skipping, Backspace removal and the count.
+ * KeywordInput tests: the 'Add keyword' reveal button, chip creation
+ * with Enter and comma, paste splitting, duplicate skipping,
+ * Backspace removal and the count.
  */
 import { useState, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -35,10 +36,33 @@ function Harness({ initial = [], onChange }: HarnessProps): ReactNode {
   );
 }
 
+/** Click the 'Add keyword' button that reveals the input when empty. */
+function revealKeywordInput(): void {
+  fireEvent.click(screen.getByRole('button', { name: 'Add keyword' }));
+}
+
+describe('KeywordInput reveal', () => {
+  it('with no keywords shows only an Add keyword button and no input', () => {
+    render(<Harness />);
+    expect(screen.queryByTestId('keyword-field')).toBeNull();
+    expect(screen.getByTestId('keyword-input').querySelectorAll('input')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'Add keyword' }).tagName).toBe('BUTTON');
+  });
+
+  it("clicking 'Add keyword' reveals a focused input with no placeholder", () => {
+    render(<Harness />);
+    revealKeywordInput();
+    const input = screen.getByTestId('keyword-field') as HTMLInputElement;
+    expect(document.activeElement).toBe(input);
+    expect(input.hasAttribute('placeholder')).toBe(false);
+  });
+});
+
 describe('KeywordInput chips', () => {
   it("adds a chip when 'fasting' is entered with Enter", () => {
     const onChange = vi.fn();
     render(<Harness onChange={onChange} />);
+    revealKeywordInput();
     const input = screen.getByTestId('keyword-field');
     fireEvent.change(input, { target: { value: 'fasting' } });
     fireEvent.keyDown(input, { key: 'Enter' });
@@ -49,6 +73,7 @@ describe('KeywordInput chips', () => {
 
   it('adds a chip when a comma is typed', () => {
     render(<Harness />);
+    revealKeywordInput();
     const input = screen.getByTestId('keyword-field');
     fireEvent.change(input, { target: { value: 'keto' } });
     fireEvent.keyDown(input, { key: ',' });
@@ -58,6 +83,7 @@ describe('KeywordInput chips', () => {
   it("splits a paste of 'a, b; c' into three chips", () => {
     const onChange = vi.fn();
     render(<Harness onChange={onChange} />);
+    revealKeywordInput();
     fireEvent.paste(screen.getByTestId('keyword-field'), {
       clipboardData: { getData: () => 'a, b; c' },
     });
