@@ -120,6 +120,23 @@ describe('EmptyState embedded section picker', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Methods' })).toBeInTheDocument();
   });
+
+  it("'Custom section' sits below a divider after the chips and the toggle", () => {
+    renderEmpty(vi.fn());
+    const custom = screen.getByRole('button', { name: 'Custom section' });
+    const toggle = screen.getByRole('button', { name: 'More options' });
+    const methods = screen.getByRole('button', { name: 'Methods' });
+
+    expect(custom.closest('footer')).toHaveClass('border-t');
+    expect(
+      toggle.compareDocumentPosition(custom) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      methods.compareDocumentPosition(custom) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
 });
 
 describe('EmptyState custom section form', () => {

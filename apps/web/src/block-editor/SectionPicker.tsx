@@ -6,6 +6,8 @@
  * use the black/secondary accent tokens with no native select element.
  */
 import { useState } from 'react';
+import type { ReactNode } from 'react';
+import { PRIMARY_BUTTON } from '../components/button-styles';
 import { extendedSectionTypePresets, sectionTypePresets } from './deo-types';
 import type { SectionTypePreset } from './deo-types';
 
@@ -27,6 +29,8 @@ export interface SectionPickerProps {
   onCustom?: () => void;
   /** Role short names already used; their chips show a check mark. */
   usedRoles?: ReadonlySet<string>;
+  /** Footer content rendered opposite the Custom section entry, e.g. Cancel. */
+  footer?: ReactNode;
 }
 
 /** Shared chip geometry plus the black-accent hover/focus styling. */
@@ -38,10 +42,6 @@ const CHIP_CLASS = `${CHIP_BASE} border border-gray-300 hover:border-black`;
 
 /** Used chip: black border and secondary fill marking a taken role. */
 const CHIP_USED_CLASS = `${CHIP_BASE} border border-black bg-secondary`;
-
-/** Shared styling for the bordered entry buttons. */
-const BUTTON_CLASS =
-  'rounded-md border border-gray-300 px-3 py-1 text-sm hover:bg-secondary focus-visible:outline-2 focus-visible:outline-black';
 
 /** Borderless text-only disclosure toggle with the black focus outline. */
 const TOGGLE_CLASS =
@@ -132,6 +132,7 @@ export function SectionPicker({
   onCreate,
   onCustom,
   usedRoles,
+  footer,
 }: SectionPickerProps) {
   const [expanded, setExpanded] = useState(false);
   const core = sectionTypePresets();
@@ -162,13 +163,12 @@ export function SectionPicker({
           {expanded ? '▴' : '▾'}
         </span>
       </button>
-      <button
-        type="button"
-        onClick={() => onCustom?.()}
-        className={BUTTON_CLASS}
-      >
-        Custom section
-      </button>
+      <footer className="flex items-center justify-between border-t pt-2">
+        <button type="button" onClick={() => onCustom?.()} className={PRIMARY_BUTTON}>
+          Custom section
+        </button>
+        {footer}
+      </footer>
     </div>
   );
 }

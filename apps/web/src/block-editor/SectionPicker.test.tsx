@@ -11,6 +11,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { SectionPicker } from './SectionPicker';
 import type { SectionPickerProps } from './SectionPicker';
+import { PRIMARY_BUTTON } from '../components/button-styles';
 
 /**
  * Render the picker with spy handlers.
@@ -153,6 +154,15 @@ describe('SectionPicker custom section entry', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Custom section' }));
 
     expect(onCustom).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders 'Custom section' with the shared primary class", () => {
+    renderPicker();
+    const custom = screen.getByRole('button', { name: 'Custom section' });
+
+    expect(custom.className).toContain(PRIMARY_BUTTON);
+    expect(custom.className).toMatch(/\bbg-black\b/);
+    expect(custom.className).toMatch(/\btext-white\b/);
   });
 });
 

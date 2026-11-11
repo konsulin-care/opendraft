@@ -101,6 +101,25 @@ describe('AddSectionDialog pick view wiring', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("'Custom section' sits in a footer opposite Cancel below a divider", () => {
+    renderDialog();
+    const custom = screen.getByRole('button', { name: 'Custom section' });
+    const cancel = screen.getByRole('button', { name: 'Cancel' });
+    const footer = custom.closest('footer');
+
+    expect(footer).toHaveClass('border-t', 'justify-between');
+    expect(footer).toContainElement(cancel);
+    expect(
+      cancel.compareDocumentPosition(custom) &
+        Node.DOCUMENT_POSITION_PRECEDING,
+    ).toBeTruthy();
+    const toggle = screen.getByRole('button', { name: 'More options' });
+    expect(
+      toggle.compareDocumentPosition(custom) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it('returns to the picker view with Back and closes with Cancel', () => {
     const { onClose } = renderDialog();
     openCustom();

@@ -105,12 +105,8 @@ function PickView({ onCreate, onClose, onCustom }: PickViewProps) {
       <SectionPicker
         onCreate={(draft) => { onCreate(draft); onClose(); }}
         onCustom={onCustom}
+        footer={<button type="button" onClick={onClose} className={SECONDARY_CLASS}>Cancel</button>}
       />
-      <div className="mt-3 flex justify-end gap-2">
-        <button type="button" onClick={onClose} className={SECONDARY_CLASS}>
-          Cancel
-        </button>
-      </div>
     </div>
   );
 }
