@@ -269,7 +269,7 @@ export function MetadataPanel({
           ? 'absolute inset-0 z-20 overflow-hidden bg-white'
           : 'contents'}
     >
-      {sheet || layout.overlay ? <div className={layout.overlay ? 'reading-column h-full' : 'reading-column'}>{content}</div> : content}
+      <div className={sheet ? 'reading-column' : layout.overlay ? 'reading-column h-full' : 'contents'}>{content}</div>
     </section>
   );
 }
