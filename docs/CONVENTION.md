@@ -13,27 +13,31 @@ Each manuscript is a directory under `manuscripts/<id>/`. Two layouts are suppor
 ### Legacy Layout
 
 ```text
-manuscripts/<id>/
-├── article.qmd
-├── _author.yml
-├── _abstract.yml
-├── _frontmatter.yml
-└── references.bib
+manuscripts/
+├── references.bib            # shared by all manuscripts (ADR-024)
+└── <id>/
+    ├── article.qmd
+    ├── _author.yml
+    ├── _abstract.yml
+    └── _frontmatter.yml
 ```
 
 ### Block-Based Layout
 
 ```text
-manuscripts/<id>/
-├── article.qmd              # derived — do not edit directly
-├── _author.yml
-├── _abstract.yml
-├── _frontmatter.yml
-├── references.bib
-└── blocks/
-    ├── manifest.json         # ordered block list
-    └── <slug>.qmd            # one file per block
+manuscripts/
+├── references.bib            # shared by all manuscripts (ADR-024)
+└── <id>/
+    ├── article.qmd
+    ├── _author.yml
+    ├── _abstract.yml
+    ├── _frontmatter.yml
+    └── blocks/
+        ├── manifest.json     # ordered block list
+        └── <slug>.qmd        # one file per block
 ```
+
+**Bibliography:** `manuscripts/references.bib` is shared. Each `article.qmd` sets `bibliography: ../references.bib`.
 
 **Detection:** Presence of `blocks/manifest.json` signals block-based layout.
 
@@ -47,7 +51,6 @@ manuscripts/<id>/
 | `_author.yml` | Required | Required | Author information |
 | `_abstract.yml` | Required | Required | Abstract text |
 | `_frontmatter.yml` | Required | Required | Title, date, keywords |
-| `references.bib` | Required | Required | BibTeX references |
 | `blocks/manifest.json` | — | Required | Ordered block list |
 | `blocks/<slug>.qmd` | — | Required | Section-per-block files |
 

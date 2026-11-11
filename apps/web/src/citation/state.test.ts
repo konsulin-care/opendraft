@@ -122,6 +122,16 @@ describe('citationReducer - query/items', () => {
   });
 });
 
+describe('citationReducer - load error', () => {
+  it('stores load error from SET_ITEMS and clears it on a later SET_ITEMS', () => {
+    const err = { message: 'bad', line: 7 };
+    const s1 = citationReducer(createInitialState(), { type: 'SET_ITEMS', items: [], error: err });
+    expect(s1.loadError).toEqual(err);
+    const s2 = citationReducer(s1, { type: 'SET_ITEMS', items: [mockReference] });
+    expect(s2.loadError).toBeNull();
+  });
+});
+
 describe('citationReducer - active index', () => {
   it('SET_ACTIVE_INDEX sets exact index', () => {
     const state = createInitialState();

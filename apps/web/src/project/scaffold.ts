@@ -1,10 +1,12 @@
 import type { WorkspaceAdapter } from '@opendraft/workspace';
-import { ulid } from 'ulid';
 import { stringify } from 'yaml';
 import protocolManifest from '../../../../protocol/protocol.manifest.json' with { type: 'json' };
 
 /** Path of the project configuration file at the workspace root. */
 export const OPENDRAFT_CONFIG_PATH = 'opendraft.yml';
+
+/** Path of the shared bibliography for all manuscripts. */
+export const SHARED_BIB_PATH = 'manuscripts/references.bib';
 
 /** Options for scaffolding a new project workspace. */
 export interface ScaffoldOptions {
@@ -13,20 +15,22 @@ export interface ScaffoldOptions {
 }
 
 /**
- * Build the container article text for a starter block.
+ * Build the container article text.
  *
- * @param blockPath - Repo-relative block path (`blocks/<slug>.qmd`).
- * @returns Container article text with a single include and a refs fence.
+ * The scaffolded article ships with no include shortcodes: blocks are
+ * created later by the user, so the container only carries the metadata
+ * frontmatter and the refs fence.
+ *
+ * @returns Container article text with no include shortcodes.
  */
-function containerArticle(blockPath: string): string {
+function containerArticle(): string {
   return `---
 metadata-files:
 - _author.yml
 - _abstract.yml
 - _frontmatter.yml
+bibliography: ../references.bib
 ---
-
-{{< include ${blockPath} >}}
 
 ::: {#refs}
 :::
@@ -69,7 +73,7 @@ function todayIsoDate(): string {
   return `${now.getFullYear()}-${mm}-${dd}`;
 }
 
-/** Starter references, mirroring templates/manuscript/references.bib. */
+/** Starter references, mirroring templates/project/manuscripts/references.bib. */
 const REFERENCES_BIB = `@article{doe2024,
   title = {Example Article},
   author = {Doe, Jane},
@@ -85,8 +89,9 @@ const REFERENCES_BIB = `@article{doe2024,
  *
  * Writes a spec-conformant `opendraft.yml` whose protocol block is copied
  * from protocol/protocol.manifest.json, plus the manuscript layout under
- * `manuscripts/<manuscriptId>/`: a container `article.qmd` that includes
- * an empty starter block, the metadata files, and the references file.
+ * `manuscripts/<manuscriptId>/`: a container `article.qmd` with no include
+ * shortcodes and no starter block file under `blocks/`, the metadata files.
+ * The shared `manuscripts/references.bib` is written only when missing.
  *
  * @param ws - Workspace adapter to write into (in-place).
  * @param options - Scaffold options; see {@link ScaffoldOptions}.
@@ -101,15 +106,11 @@ export async function scaffoldProject(ws: WorkspaceAdapter, options: ScaffoldOpt
   };
   await ws.writeFile(OPENDRAFT_CONFIG_PATH, stringify(config));
 
-  // Lowercase ULID: the validator (INCLUDE_RE, SLUG_RE) and the pre-commit
-  // assembly flow only accept blocks/[a-z0-9-]+.qmd.
-  const blockPath = `blocks/${ulid().toLowerCase()}.qmd`;
-  // Empty on purpose: Milkdown would render any comment or text in the
-  // visual editor.
-  await ws.writeFile(`${manuscriptPath}/${blockPath}`, '');
-  await ws.writeFile(`${manuscriptPath}/article.qmd`, containerArticle(blockPath));
+  await ws.writeFile(`${manuscriptPath}/article.qmd`, containerArticle());
   await ws.writeFile(`${manuscriptPath}/_author.yml`, AUTHOR_YML);
   await ws.writeFile(`${manuscriptPath}/_abstract.yml`, ABSTRACT_YML);
   await ws.writeFile(`${manuscriptPath}/_frontmatter.yml`, frontmatterYml(todayIsoDate()));
-  await ws.writeFile(`${manuscriptPath}/references.bib`, REFERENCES_BIB);
+  if ((await ws.readFile(SHARED_BIB_PATH)) === null) {
+    await ws.writeFile(SHARED_BIB_PATH, REFERENCES_BIB);
+  }
 }

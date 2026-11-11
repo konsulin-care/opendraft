@@ -70,7 +70,6 @@ function TitleField(
       aria-label="Manuscript title"
       value={title}
       rows={1}
-      placeholder="Untitled manuscript"
       onChange={(event) => {
         setTitle(event.target.value.replace(/\r?\n/g, ' '));
         autoGrow(event.currentTarget);
@@ -110,7 +109,7 @@ function AbstractLabelRow({ abstract }: { abstract: string }): ReactNode {
   );
 }
 
-/** Borderless auto-grown abstract textarea with a guidance placeholder. */
+/** Borderless auto-grown abstract textarea without a placeholder. */
 function AbstractField(
   { abstract, setAbstract, textareaRef }: {
     abstract: string;
@@ -132,7 +131,6 @@ function AbstractField(
         aria-label="Abstract"
         value={abstract}
         rows={2}
-        placeholder="Summarize background, objectives, methods, results, and conclusions."
         onChange={(event) => {
           setAbstract(event.target.value);
           autoGrow(event.currentTarget);

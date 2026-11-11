@@ -4,7 +4,7 @@
  * icon fields, degrees, email validation, status, CRediT pills, section
  * spacing of the person form.
  */
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { AuthorCard, type GroupOption } from './AuthorCard';
@@ -34,7 +34,7 @@ function renderCard(author: MetadataAuthor = PERSON, groups: GroupOption[] = [],
 }
 
 /** Rerender the controlled card with the author of the latest change. */
-function follow(rerender: (node: ReactElement) => void, onChange: ReturnType<typeof vi.fn>, groups: GroupOption[] = []): void {
+function follow(rerender: (node: ReactElement) => void, onChange: Mock, groups: GroupOption[] = []): void {
   rerender(<AuthorCard author={lastChange(onChange)} groups={groups} onChange={onChange} />);
 }
 
@@ -42,22 +42,22 @@ function follow(rerender: (node: ReactElement) => void, onChange: ReturnType<typ
 const after = (a: Element, b: Element): boolean =>
   Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
 
-/** Assert one field renders an icon, placeholder, aria-label and border-b. */
-function expectIconField(testid: string, badge?: string): void {
+/** Assert an icon/badge, aria-label and border-b; a label also means visible text and no placeholder. */
+function expectIconField(testid: string, opts: { badge?: string; label?: string } = {}): void {
   const input = screen.getByTestId(testid) as HTMLInputElement;
   const classes = input.className.split(/\s+/);
-  expect(input.placeholder).not.toBe('');
   expect(input.getAttribute('aria-label')).toBeTruthy();
-  expect(classes).toContain('border-b');
-  expect(classes).toContain('border-secondary');
+  expect(classes).toContain('border-b'); expect(classes).toContain('border-secondary');
   const leading = input.parentElement?.firstElementChild ?? null;
-  if (badge) expect(leading?.textContent).toContain(badge);
+  if (opts.badge) expect(leading?.textContent).toContain(opts.badge);
   else expect(leading?.querySelector('svg')).not.toBeNull();
+  if (opts.label) { expect(screen.getByText(opts.label)).toBeDefined(); expect(input.hasAttribute('placeholder')).toBe(false); expect(input.getAttribute('aria-label')).toBe(opts.label); }
+  else expect(input.placeholder).not.toBe('');
 }
 
 describe('AuthorCard icon fields', () => {
-  it('ORCID, email and degree show an icon, placeholder, aria-label and border', () => {
-    renderCard(); expectIconField('author-orcid', 'iD'); expectIconField('author-email'); expectIconField('author-degree-field');
+  it('ORCID keeps its placeholder; email and degree show a visible label with none', () => {
+    renderCard(); expectIconField('author-orcid', { badge: 'iD' }); expectIconField('author-email', { label: 'Email' }); expectIconField('author-degree-field', { label: 'Degree' });
   });
 
   it('name inputs carry the light grey bottom border', () => {
@@ -65,10 +65,10 @@ describe('AuthorCard icon fields', () => {
     ['author-given', 'author-family'].forEach((id) => expect(screen.getByTestId(id).className.split(/\s+/)).toContain('border-b'));
   });
 
-  it('url, phone, fax, note and acknowledgements render icons and placeholders', () => {
-    renderCard();
-    fireEvent.click(screen.getByRole('button', { name: 'Show author details' }));
-    ['url', 'phone', 'fax', 'note', 'acknowledgements'].forEach((key) => expectIconField(`author-${key}`));
+  it('url, phone, fax, note and acknowledgements show visible labels and no placeholders', () => {
+    renderCard(); fireEvent.click(screen.getByRole('button', { name: 'Show author details' }));
+    ([['url', 'Website URL'], ['phone', 'Phone'], ['fax', 'Fax'], ['note', 'Note'], ['acknowledgements', 'Acknowledgements']] as const)
+      .forEach(([key, label]) => expectIconField(`author-${key}`, { label }));
   });
 });
 
@@ -81,7 +81,7 @@ describe('AuthorCard name editing', () => {
   it("'only one name' hides Given and stores {literal} with author-type person", () => {
     const { onChange, rerender } = renderCard({ id: 'dewi', name: { given: '', family: '' } });
     fireEvent.click(screen.getByTestId('author-single-name')); follow(rerender, onChange);
-    expect(screen.queryByTestId('author-given')).toBeNull(); fireEvent.change(screen.getByPlaceholderText('Name'), { target: { value: 'Dewi' } });
+    expect(screen.queryByTestId('author-given')).toBeNull(); fireEvent.change(screen.getByTestId('author-literal'), { target: { value: 'Dewi' } });
     expect(lastChange(onChange).name).toEqual({ literal: 'Dewi' });
     expect(lastChange(onChange).metadata).toMatchObject({ 'author-type': 'person' });
   });
@@ -158,15 +158,15 @@ describe('AuthorCard black accent', () => {
   });
 });
 
-describe('AuthorCard placeholder-only name fields', () => {
-  it('renders no visible given/family labels, only placeholders and aria-labels', () => {
+describe('AuthorCard visible name field labels', () => {
+  it('renders visible given/family labels with no placeholder and the aria-labels', () => {
     renderCard();
-    expect(screen.queryByText('Given name(s)')).toBeNull();
-    expect(screen.queryByText('Family name')).toBeNull();
+    expect(screen.getByText('Given name(s)')).toBeDefined();
+    expect(screen.getByText('Family name')).toBeDefined();
     const given = screen.getByTestId('author-given') as HTMLInputElement;
-    expect(given.placeholder).toBe('Given name(s)'); expect(given.getAttribute('aria-label')).toBe('Given name(s)');
+    expect(given.hasAttribute('placeholder')).toBe(false); expect(given.getAttribute('aria-label')).toBe('Given name(s)');
     const family = screen.getByTestId('author-family') as HTMLInputElement;
-    expect(family.placeholder).toBe('Family name'); expect(family.getAttribute('aria-label')).toBe('Family name');
+    expect(family.hasAttribute('placeholder')).toBe(false); expect(family.getAttribute('aria-label')).toBe('Family name');
   });
 
   it('keeps no author-preview testid (byline preview removed)', () => {
@@ -206,13 +206,13 @@ describe('AuthorCard author details toggle label', () => {
 });
 
 describe('AuthorCard single-name literal storage', () => {
-  it('ticking shows one input with placeholder Name storing a literal person', () => {
+  it('ticking shows one labelled Name input with no placeholder storing a literal person', () => {
     const { onChange, rerender } = renderCard({ id: 'dewi', name: { given: '', family: '' } });
     fireEvent.click(screen.getByTestId('author-single-name'));
     follow(rerender, onChange);
     expect(screen.queryByTestId('author-given')).toBeNull();
-    const single = screen.getByPlaceholderText('Name') as HTMLInputElement;
-    expect(single.getAttribute('aria-label')).toBe('Name'); fireEvent.change(single, { target: { value: 'Dewi' } });
+    const single = screen.getByTestId('author-literal') as HTMLInputElement;
+    expect(screen.getByText('Name')).toBeDefined(); expect(single.hasAttribute('placeholder')).toBe(false); expect(single.getAttribute('aria-label')).toBe('Name'); fireEvent.change(single, { target: { value: 'Dewi' } });
     expect(lastChange(onChange).name).toEqual({ literal: 'Dewi' }); expect(lastChange(onChange).metadata).toMatchObject({ 'author-type': 'person' });
   });
 
@@ -229,7 +229,7 @@ describe('AuthorCard single-name literal storage', () => {
   it('renders a literal name with author-type person as a person card', () => {
     renderCard({ id: 'plato', name: { literal: 'Plato' }, metadata: { 'author-type': 'person' } });
     expect(screen.getByTestId('author-type-person').getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByPlaceholderText('Name')).toBeDefined(); expect(screen.queryByTestId('author-group-name')).toBeNull();
+    expect(screen.getByText('Name')).toBeDefined(); expect((screen.getByTestId('author-literal') as HTMLInputElement).hasAttribute('placeholder')).toBe(false); expect(screen.queryByTestId('author-group-name')).toBeNull();
   });
 });
 

@@ -49,6 +49,15 @@ describe('index.css — block gutter removed', () => {
   });
 });
 
+describe('index.css — focus-visible outline', () => {
+  it('buttons and textareas use a black focus-visible outline instead of sky blue', () => {
+    const rule = css.match(/button,\s*textarea\s*\{[^}]*\}/s);
+    expect(rule, 'button, textarea rule must exist').not.toBeNull();
+    expect(rule![0]).toContain('focus-visible:outline-black');
+    expect(rule![0]).not.toContain('sky-600');
+  });
+});
+
 describe('index.css — shared reading column', () => {
   /** Returns the declaration block text for a top-level selector. */
   const block = (selector: string): string => {
@@ -120,19 +129,24 @@ describe('reading column wiring (source scan)', () => {
   /** Reads a source file relative to apps/web/src. */
   const read = (path: string): string => readFileSync(resolve(__dirname, path), 'utf-8');
 
-  it('EditorSurface declares exactly one .reading-column holding the panel and both surfaces', () => {
-    const surface = read('components/EditorSurface.tsx');
-    // Exactly one reading-column declaration: one shared column, not one per mode.
-    const columns = surface.split('className="reading-column"');
-    expect(columns).toHaveLength(2);
-    const column = columns[1];
-    // The single column owns the panel and both mode surfaces.
-    expect(column).toContain('{panel}');
-    expect(column).toContain('<Milkdown />');
-    expect(column).toContain('<SourceEditor');
-    // No per-mode conditional panel: the panel renders exactly once.
-    expect(surface).not.toMatch(/mode\s*===\s*"[^"]*"\s*&&\s*panel/);
-    expect(surface.match(/\{\s*panel\s*\}/g)).toHaveLength(1);
+  it('ReadingColumn declares the shared .reading-column class exactly once', () => {
+    const column = read('components/ReadingColumn.tsx');
+    expect(column.split('className="reading-column"')).toHaveLength(2);
+  });
+
+  it('ManuscriptView and ManuscriptEditor each render their content inside ReadingColumn', () => {
+    const view = read('components/ManuscriptView.tsx');
+    expect(view).not.toContain('className="reading-column"');
+    const viewColumns = view.split('<ReadingColumn');
+    expect(viewColumns).toHaveLength(2);
+    expect(viewColumns[1]).toContain('<BlockEditor');
+
+    const editor = read('components/ManuscriptEditor.tsx');
+    expect(editor).not.toContain('className="reading-column"');
+    const editorColumns = editor.split('<ReadingColumn');
+    expect(editorColumns).toHaveLength(2);
+    expect(editorColumns[1]).toContain('<SourceEditor');
+    expect(editor).not.toContain('mode ===');
   });
 
   it('FormattingToolbar row carries the shared column class, not a bespoke width', () => {

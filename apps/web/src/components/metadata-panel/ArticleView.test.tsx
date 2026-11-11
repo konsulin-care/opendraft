@@ -196,15 +196,14 @@ describe('ArticleView section labels', () => {
     }
   });
 
-  it('places the word count in the abstract label row with a guidance placeholder', () => {
+  it('places the word count in the abstract label row and renders no placeholder', () => {
     renderView({ abstract: 'one two three' });
     const row = screen.getByTestId('abstract-label-row');
     expect(row.querySelector('[data-testid="section-label"]')?.textContent).toBe('Abstract');
     expect(row.textContent).toContain('3 words');
     const textarea = screen.getByTestId('metadata-abstract') as HTMLTextAreaElement;
-    expect(textarea.getAttribute('placeholder')).toBe(
-      'Summarize background, objectives, methods, results, and conclusions.',
-    );
+    expect(textarea.hasAttribute('placeholder')).toBe(false);
+    expect(screen.getByTestId('metadata-panel-title-input').hasAttribute('placeholder')).toBe(false);
     const parent = row.parentElement;
     expect(parent).not.toBeNull();
     const children = Array.from(parent?.children ?? []);

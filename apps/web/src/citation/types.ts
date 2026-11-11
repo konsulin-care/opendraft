@@ -26,6 +26,14 @@ export interface CitationError {
   message: string;
 }
 
+/** Load error for references.bib parsing. */
+export interface CitationLoadError {
+  /** Parser error message. */
+  message: string;
+  /** 1-based line where parsing failed. */
+  line: number;
+}
+
 /** Citation plugin state. */
 export interface CitationState {
   /** Whether the dropdown is open. */
@@ -48,6 +56,8 @@ export interface CitationState {
   comparison: ComparisonState | null;
   /** Error state. */
   error: CitationError | null;
+  /** references.bib load error, if parsing failed. */
+  loadError?: CitationLoadError | null;
 }
 
 /** Actions for citation state reducer. */
@@ -55,7 +65,7 @@ export type CitationAction =
   | { type: 'OPEN_CITATION'; trigger: CitationTrigger }
   | { type: 'CLOSE_CITATION' }
   | { type: 'SET_QUERY'; query: string }
-  | { type: 'SET_ITEMS'; items: Reference[] }
+  | { type: 'SET_ITEMS'; items: Reference[]; error?: CitationLoadError | null }
   | { type: 'SET_ACTIVE_INDEX'; index: number }
   | { type: 'INCREMENT_ACTIVE_INDEX' }
   | { type: 'DECREMENT_ACTIVE_INDEX' }

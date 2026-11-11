@@ -1,3 +1,5 @@
+import { TextSelection } from '@milkdown/kit/prose/state';
+import type { EditorView } from '@milkdown/kit/prose/view';
 import type { CitationTrigger } from './types';
 
 /** Planned text replacement for a selected citation. */
@@ -51,6 +53,41 @@ export function planCitationInsertion(
     text += ']';
   }
   return { from: trigger.from, to: cursor, text };
+}
+
+/**
+ * Apply the picked citekey to the editor view.
+ *
+ * Plans the insertion from the current selection, replaces only the
+ * "@query" range in a single transaction, and leaves the cursor just
+ * before the closing bracket so the user can keep typing.
+ *
+ * @param view - Editor view whose selection marks the end of the query.
+ * @param citekey - The picked citation key.
+ * @param trigger - Trigger context with the @ position and bracketed flag.
+ */
+export function applyCitekeySelection(
+  view: EditorView,
+  citekey: string,
+  trigger: CitationTrigger,
+): void {
+  const { $from } = view.state.selection;
+  const cursorPos = $from.pos;
+  const textAfter = view.state.doc.textBetween(
+    cursorPos,
+    $from.end(),
+    undefined,
+    '\uFFFD',
+  );
+  const insertion = planCitationInsertion(cursorPos, citekey, trigger, textAfter);
+  const tr = view.state.tr;
+  tr.insertText(insertion.text, insertion.from, insertion.to);
+  // Leave the cursor just before the closing ] so the user can
+  // type "; @" to add another citation to the same group.
+  tr.setSelection(
+    TextSelection.create(tr.doc, insertion.from + citekey.length + 1),
+  );
+  view.dispatch(tr);
 }
 
 /**

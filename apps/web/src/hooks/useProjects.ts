@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ProjectRegistry,
   workspaceManager,
-  type IndexedDBWorkspace,
+  withLogging,
+  type WorkspaceAdapter,
   type ProjectRecord,
 } from '@opendraft/workspace';
+import { isDebugEnabled } from '../debug-flags';
 import { cleanupLegacyDatabases } from '../project/legacy-cleanup';
 import { scaffoldProject } from '../project/scaffold';
 
@@ -92,7 +94,7 @@ export interface UseProjectsResult {
   /** The active project record, or null before boot completes. */
   active: ProjectRecord | null;
   /** IndexedDB workspace of the active project, or null before boot completes. */
-  workspace: IndexedDBWorkspace | null;
+  workspace: WorkspaceAdapter | null;
   /** True while the registry boot is in flight. */
   loading: boolean;
   /** Boot or mutation error, if any. */
@@ -161,8 +163,8 @@ function useBootEffect(
 function useActiveWorkspace(
   activeId: string | null,
   onError: (err: Error) => void,
-): IndexedDBWorkspace | null {
-  const [workspace, setWorkspace] = useState<IndexedDBWorkspace | null>(null);
+): WorkspaceAdapter | null {
+  const [workspace, setWorkspace] = useState<WorkspaceAdapter | null>(null);
   useEffect(() => {
     if (!activeId) return undefined;
     let cancelled = false;
@@ -173,7 +175,7 @@ function useActiveWorkspace(
           workspaceManager.release(activeId);
           return;
         }
-        setWorkspace(ws);
+        setWorkspace(isDebugEnabled('workspace') ? withLogging(ws) : ws);
       } catch (err) {
         if (!cancelled) onError(err as Error);
       }

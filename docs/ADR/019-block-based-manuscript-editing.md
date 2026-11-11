@@ -15,16 +15,19 @@ ADR-004 defined a flat manuscript layout where `article.qmd` is the sole prose s
 Each manuscript is a directory under `manuscripts/<id>/`:
 
 ```text
-manuscripts/<id>/
-├── article.qmd              # derived — do not edit directly
-├── _author.yml
-├── _abstract.yml
-├── _frontmatter.yml
-├── references.bib
-└── blocks/
-    ├── manifest.json         # ordered block list
-    └── <slug>.qmd            # one file per block
+manuscripts/
+├── references.bib            # shared (ADR-024)
+└── <id>/
+    ├── article.qmd           # derived — do not edit directly
+    ├── _author.yml
+    ├── _abstract.yml
+    ├── _frontmatter.yml
+    └── blocks/
+        ├── manifest.json     # ordered block list
+        └── <slug>.qmd        # one file per block
 ```
+
+> **Note (ADR-024):** `references.bib` is no longer per-manuscript; it is shared at `manuscripts/references.bib`.
 
 The legacy flat layout (ADR-004) remains valid. Migrate via `migrateToBlockLayout`.
 

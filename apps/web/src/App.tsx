@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react';
-import { MilkdownProvider } from '@milkdown/react';
 import type { ProjectRecord, WorkspaceAdapter } from '@opendraft/workspace';
 import { AppHeader } from './components/AppHeader';
 import type { SaveStatus } from './components/AppHeader';
-import { ManuscriptEditor } from './components/ManuscriptEditor';
-import type { EditorMode } from './components/ModeSwitch';
+import { EditorArea } from './components/EditorArea';
 import { CommitDialog } from './components/CommitDialog';
 import { ProjectDrawer, useDrawerState } from './components/project-drawer/ProjectDrawer';
 import { ProjectSwitcher } from './components/project-drawer/ProjectSwitcher';
@@ -12,27 +10,20 @@ import { DeleteProjectAction } from './components/project-drawer/DeleteProjectDi
 import { FileTree } from './components/project-drawer/FileTree';
 import { useProjects, projectRegistry } from './hooks/useProjects';
 import { useActiveFile } from './hooks/useActiveFile';
-import { useToolbarPreference } from './hooks/useToolbarPreference';
-import { useEditorMode } from './hooks/useEditorMode';
 import { loadFile } from './persistence';
 import { createOpenManuscriptRenamer } from './project/rename-manuscript';
 
-/**
- * Extract the manuscript directory name from a repo-relative path.
- *
- * @param path - Repo-relative path such as `manuscripts/p/article.qmd`.
- * @returns The directory segment under `manuscripts/`, or null.
- */
+/** Window event announcing a block mutation so the shell re-lists workspace files. */
+const FILES_CHANGED_EVENT = 'opendraft:files-changed';
+
+/** Extract the manuscript directory segment from a repo-relative path, or null. */
 function manuscriptDirName(path: string): string | null {
   const [root, dir] = path.split('/');
   return root === 'manuscripts' && dir ? dir : null;
 }
 
 /**
- * Load the content of the active file. The previous content is dropped
- * synchronously whenever the active path changes so a stale file is never
- * rendered (or saved) under a new path.
- *
+ * Load the active file's content, dropping the previous content when the path changes.
  * @param workspace - Workspace of the active project, or null before boot.
  * @param activePath - Repo-relative path of the active file, or null.
  * @returns The loaded `{ path, text }`, or null while loading.
@@ -64,21 +55,20 @@ function useActiveFileContent(
   return file;
 }
 
-/**
- * List every file path in the active project's workspace.
- *
- * @param workspace - Workspace of the active project, or null before boot.
- * @param active - Active project record; changes (e.g. a manuscript rename) re-list the workspace.
- * @returns Repo-relative paths of all workspace files, empty while loading.
- */
+/** List every file path in the active project's workspace; empty while loading.
+ * Re-lists when `opendraft:files-changed` fires after a block mutation. */
 function useWorkspacePaths(workspace: WorkspaceAdapter | null, active: ProjectRecord | null): string[] {
   const [paths, setPaths] = useState<string[]>([]);
+  const [version, setVersion] = useState(0);
 
   useEffect(() => {
-    if (!workspace) {
-      setPaths([]);
-      return undefined;
-    }
+    const refresh = () => setVersion((v) => v + 1);
+    window.addEventListener(FILES_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(FILES_CHANGED_EVENT, refresh);
+  }, []);
+
+  useEffect(() => {
+    if (!workspace) { setPaths([]); return undefined; }
     let cancelled = false;
     workspace.listAll().then(
       (list) => {
@@ -86,90 +76,59 @@ function useWorkspacePaths(workspace: WorkspaceAdapter | null, active: ProjectRe
       },
       (err: unknown) => console.error('workspace file listing failed:', err),
     );
-    return () => {
-      cancelled = true;
-    };
-  }, [workspace, active]);
+    return () => { cancelled = true; };
+  }, [workspace, active, version]);
 
   return paths;
 }
 
-/**
- * Always-present editor region. Renders the Milkdown editor once the active
- * file's content has loaded; `file` is null while loading or stale.
- *
- * @param props - Workspace, loaded file and editor wiring.
- */
-function EditorArea({
-  workspace,
-  file,
-  mode,
-  projectId,
-  onSaveStatusChange,
-  formattingToolbar,
-}: {
-  /** Workspace of the active project. */
+/** Props for {@link HeaderSection}. */
+interface HeaderSectionProps {
+  active: ProjectRecord | null;
+  dirName: string | null;
   workspace: WorkspaceAdapter;
-  /** Loaded file, or null while loading or when stale for the active path. */
-  file: { path: string; text: string } | null;
-  /** Active editor mode. */
-  mode: EditorMode;
-  /** Project identifier for per-project metadata-panel state. */
-  projectId: string;
-  /** Reports autosave status changes to the header. */
-  onSaveStatusChange: (status: SaveStatus) => void;
-  /** Whether the formatting toolbar is shown. */
-  formattingToolbar: boolean;
-}) {
+  openFile: (path: string) => Promise<void>;
+  activePath: string;
+  switchTo: (id: string) => Promise<void>;
+  rename: (id: string, name: string) => Promise<void>;
+  saveStatus: SaveStatus;
+  onCommit: () => void;
+  drawer: ReturnType<typeof useDrawerState>;
+}
+
+/** Icon header with rename, save status, commit, and sidebar actions. */
+function HeaderSection({
+  active, dirName, workspace, openFile, activePath, switchTo,
+  rename, saveStatus, onCommit, drawer,
+}: HeaderSectionProps) {
   return (
-    <main style={{ flex: 1, overflow: 'hidden' }}>
-      {file && (
-        <MilkdownProvider>
-          <ManuscriptEditor
-            workspace={workspace}
-            defaultValue={file.text}
-            path={file.path}
-            mode={mode}
-            projectId={projectId}
-            onSaveStatusChange={onSaveStatusChange}
-            formattingToolbar={formattingToolbar}
-          />
-        </MilkdownProvider>
-      )}
-    </main>
+    <AppHeader
+      projectName={active?.name} manuscriptDir={dirName ?? undefined}
+      manuscriptName={dirName !== null ? active?.manuscriptNames?.[dirName] : undefined}
+      onRenameProject={active ? (name) => rename(active.id, name) : undefined}
+      onRenameManuscript={createOpenManuscriptRenamer(active, dirName, { workspace, registry: projectRegistry, openFile, activePath, refresh: () => { if (active) switchTo(active.id); } })}
+      saveStatus={saveStatus}
+      onCommit={onCommit}
+      sidebarOpen={drawer.open} onToggleSidebar={drawer.toggle} toggleButtonRef={drawer.toggleRef}
+    />
   );
 }
 
 /** Props for the overlay project drawer section. */
 interface DrawerSectionProps {
-  /** All registered projects. */
   projects: ReturnType<typeof useProjects>['projects'];
-  /** The active project, or null when none. */
   active: ReturnType<typeof useProjects>['active'];
-  /** Make the given project active. */
   switchTo: (id: string) => void;
-  /** Register and scaffold a new project. */
   create: (name: string, manuscriptId: string) => void;
-  /** Remove a project. */
   remove: (id: string) => void;
-  /** Drawer open state and toggle wiring. */
   drawer: ReturnType<typeof useDrawerState>;
-  /** Workspace of the active project. */
   workspace: WorkspaceAdapter;
-  /** Repo-relative path of the active file, or null. */
+  paths: string[];
   activePath: string | null;
-  /** Open a file in the editor. */
   onOpen: (path: string) => void;
 }
 
-/**
- * Overlay project drawer with the project switcher pinned in its header,
- * the active project's file tree as its body, and the delete action in
- * its footer.
- *
- * @param props - Projects, active project, registry actions, drawer state,
- *   workspace, active file path and the open-file handler.
- */
+/** Overlay project drawer: switcher header, file tree body, delete action footer. */
 function DrawerSection({
   projects,
   active,
@@ -178,10 +137,10 @@ function DrawerSection({
   remove,
   drawer,
   workspace,
+  paths,
   activePath,
   onOpen,
 }: DrawerSectionProps) {
-  const paths = useWorkspacePaths(workspace, active);
   return (
     <ProjectDrawer
       open={drawer.open}
@@ -212,21 +171,14 @@ function DrawerSection({
   );
 }
 
-/**
- * Commit dialog, shown after the header's Commit action.
- *
- * @param props - Dialog visibility, close handler, and the workspace to commit.
- */
+/** Commit dialog shown after the header's Commit action. */
 function CommitSection({
   open,
   onClose,
   workspace,
 }: {
-  /** Whether the dialog is visible. */
   open: boolean;
-  /** Close the dialog. */
   onClose: () => void;
-  /** Workspace committed to. */
   workspace: WorkspaceAdapter;
 }) {
   return (
@@ -241,19 +193,26 @@ function CommitSection({
 
 /**
  * App shell: icon header with commit action plus the single continuous
- * editor for the active project file. Boots into the auto-created
- * "Untitled project" and opens the project's default file.
+ * editor region for the active project path. Boots into the auto-created
+ * "Untitled project" and opens the project's default path (the manuscript
+ * directory for a fresh scaffold).
  */
 export function App() {
   const {
     workspace, projects, active, loading, error, switchTo, create, rename, remove,
   } = useProjects();
   const { activePath, openFile } = useActiveFile(workspace, active?.id ?? null);
-  const { mode, setMode } = useEditorMode();
+  const paths = useWorkspacePaths(workspace, active);
   const [showCommitDialog, setShowCommitDialog] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
-  const { formattingToolbar, toggleFormattingToolbar } = useToolbarPreference();
-  const file = useActiveFileContent(workspace, activePath);
+  // T11 removed the header toggle and its Ctrl/Cmd+\ shortcut: the source
+  // editor's formatting toolbar stays on unconditionally.
+  const formattingToolbar = true;
+  // The listing loads asynchronously: until it arrives the active path is
+  // treated as unresolved so a directory is never rendered as a file.
+  const isDir = activePath !== null && paths.some((p) => p.startsWith(`${activePath}/`));
+  const contentPath = activePath !== null && paths.length > 0 && !isDir ? activePath : null;
+  const file = useActiveFileContent(workspace, contentPath);
   const drawer = useDrawerState();
 
   if (loading) return <div>Loading workspace...</div>;
@@ -263,28 +222,21 @@ export function App() {
 
   return (
     <div className="flex h-dvh flex-col">
-      <AppHeader
-        projectName={active?.name} manuscriptDir={dirName ?? undefined}
-        manuscriptName={dirName !== null ? active?.manuscriptNames?.[dirName] : undefined}
-        onRenameProject={active ? (name) => rename(active.id, name) : undefined}
-        onRenameManuscript={createOpenManuscriptRenamer(active, dirName, { workspace, registry: projectRegistry, openFile, activePath, refresh: () => switchTo(active.id) })}
-        mode={mode} onSelectMode={setMode} saveStatus={saveStatus}
-        formattingToolbar={formattingToolbar}
-        onToggleFormattingToolbar={toggleFormattingToolbar}
-        onCommit={() => setShowCommitDialog(true)}
-        sidebarOpen={drawer.open} onToggleSidebar={drawer.toggle} toggleButtonRef={drawer.toggleRef}
+      <HeaderSection
+        active={active} dirName={dirName} workspace={workspace} openFile={openFile}
+        activePath={activePath} switchTo={switchTo} rename={rename} saveStatus={saveStatus}
+        onCommit={() => setShowCommitDialog(true)} drawer={drawer}
       />
       <EditorArea
-        workspace={workspace}
-        file={file !== null && file.path === activePath ? file : null}
-        mode={mode} projectId={active.id}
-        onSaveStatusChange={setSaveStatus}
-        formattingToolbar={formattingToolbar}
+        workspace={workspace} activePath={activePath} isDir={isDir}
+        file={file !== null && file.path === contentPath ? file : null}
+        projectId={active?.id ?? ''} onSaveStatusChange={setSaveStatus}
+        formattingToolbar={formattingToolbar} openFile={openFile}
       />
       <DrawerSection
         projects={projects} active={active} switchTo={switchTo}
         create={create} remove={remove} drawer={drawer}
-        workspace={workspace} activePath={activePath} onOpen={openFile}
+        workspace={workspace} paths={paths} activePath={activePath} onOpen={openFile}
       />
       <CommitSection
         open={showCommitDialog}

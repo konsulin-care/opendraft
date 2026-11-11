@@ -107,23 +107,23 @@ describe('validateManuscript — legacy layout required files', () => {
     expect(result.errors.some((e) => e.path.includes('_frontmatter.yml'))).toBe(true);
   });
 
-  it('rejects missing references.bib', () => {
+  it('accepts legacy layout without references.bib', () => {
     const files = LEGACY_REQUIRED_FILES.filter((f) => f !== 'references.bib');
     const result = validateManuscript('my-article', files);
-    expect(result.valid).toBe(false);
-    expect(result.errors.some((e) => e.path.includes('references.bib'))).toBe(true);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
   });
 
   it('reports all missing files at once', () => {
     const result = validateManuscript('my-article', []);
     expect(result.valid).toBe(false);
-    expect(result.errors.length).toBe(5);
+    expect(result.errors.length).toBe(4);
   });
 
   it('reports id and file errors together', () => {
     const result = validateManuscript('Bad_ID!', []);
     expect(result.valid).toBe(false);
-    expect(result.errors.length).toBe(6);
+    expect(result.errors.length).toBe(5);
   });
 });
 
@@ -161,11 +161,11 @@ describe('validateManuscript — block-based layout', () => {
     expect(result.errors.some((e) => e.path.includes('_frontmatter.yml'))).toBe(true);
   });
 
-  it('rejects block layout missing references.bib', () => {
+  it('accepts block layout without references.bib', () => {
     const files = BLOCK_REQUIRED_FILES.filter((f) => f !== 'references.bib');
     const result = validateManuscript('my-article', files);
-    expect(result.valid).toBe(false);
-    expect(result.errors.some((e) => e.path.includes('references.bib'))).toBe(true);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
   });
 
   it('does not require article.qmd in block layout', () => {

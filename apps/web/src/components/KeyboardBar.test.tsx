@@ -38,7 +38,7 @@ function fakeCommands(active: ActiveState = INACTIVE_STATE, canFormat = true): E
   };
 }
 
-/** Accessible names of the keyboard bar buttons with the toolbar preference on. */
+/** Accessible names of the keyboard bar buttons whenever the bar is open. */
 const BAR_NAMES = ['Undo', 'Redo', 'Paragraph style', 'Bullet list', 'Citation', 'Insert'];
 
 /** Formatting button names that must be disabled in source mode. */
@@ -49,8 +49,8 @@ beforeEach(() => {
 });
 
 describe('KeyboardBar buttons', () => {
-  it('renders Undo, Redo, Paragraph style, Bullet list, Citation, and Insert when open with the preference on', () => {
-    render(<KeyboardBar commands={fakeCommands()} open bottomOffset={0} formattingToolbar />);
+  it('renders the formatting controls alongside Undo and Redo whenever it is open', () => {
+    render(<KeyboardBar commands={fakeCommands()} open bottomOffset={0} />);
     const bar = screen.getByRole('toolbar', { name: 'Keyboard bar' });
     const names = within(bar)
       .getAllByRole('button')
@@ -58,32 +58,23 @@ describe('KeyboardBar buttons', () => {
     expect(names).toEqual(BAR_NAMES);
   });
 
-  it('renders only Undo and Redo when the formattingToolbar preference is off', () => {
-    render(<KeyboardBar commands={fakeCommands()} open bottomOffset={0} formattingToolbar={false} />);
-    const bar = screen.getByRole('toolbar', { name: 'Keyboard bar' });
-    const names = within(bar)
-      .getAllByRole('button')
-      .map((button) => button.getAttribute('aria-label'));
-    expect(names).toEqual(['Undo', 'Redo']);
-  });
-
   it('renders nothing when the keyboard is closed', () => {
     const { container } = render(
-      <KeyboardBar commands={fakeCommands()} open={false} bottomOffset={250} formattingToolbar />,
+      <KeyboardBar commands={fakeCommands()} open={false} bottomOffset={250} />,
     );
     expect(container.firstChild).toBeNull();
   });
 
   it('is fixed at the bottom with style bottom equal to bottomOffset', () => {
     const { container } = render(
-      <KeyboardBar commands={fakeCommands()} open bottomOffset={284} formattingToolbar />,
+      <KeyboardBar commands={fakeCommands()} open bottomOffset={284} />,
     );
     const bar = container.querySelector('[role="toolbar"]')!;
     expect(bar).toHaveStyle({ position: 'fixed', bottom: '284px' });
   });
 
   it('prevents the default on pointerdown for its buttons', () => {
-    render(<KeyboardBar commands={fakeCommands()} open bottomOffset={0} formattingToolbar />);
+    render(<KeyboardBar commands={fakeCommands()} open bottomOffset={0} />);
     for (const name of BAR_NAMES) {
       // fireEvent returns false when preventDefault() was called.
       expect(fireEvent.pointerDown(screen.getByRole('button', { name })), name).toBe(false);
@@ -94,7 +85,7 @@ describe('KeyboardBar buttons', () => {
 describe('KeyboardBar command wiring', () => {
   it('runs commands from its buttons and menus', () => {
     const commands = fakeCommands();
-    render(<KeyboardBar commands={commands} open bottomOffset={0} formattingToolbar />);
+    render(<KeyboardBar commands={commands} open bottomOffset={0} />);
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
     fireEvent.click(screen.getByRole('button', { name: 'Redo' }));
     fireEvent.click(screen.getByRole('button', { name: 'Bullet list' }));
@@ -115,7 +106,7 @@ describe('KeyboardBar command wiring', () => {
 describe('KeyboardBar in source mode (canFormat false)', () => {
   it('disables formatting buttons but keeps Undo and Redo enabled', () => {
     render(
-      <KeyboardBar commands={fakeCommands(INACTIVE_STATE, false)} open bottomOffset={0} formattingToolbar />,
+      <KeyboardBar commands={fakeCommands(INACTIVE_STATE, false)} open bottomOffset={0} />,
     );
     for (const name of FORMATTING_NAMES) {
       expect(screen.getByRole('button', { name }), name).toBeDisabled();
@@ -128,7 +119,7 @@ describe('KeyboardBar in source mode (canFormat false)', () => {
 describe('EditorToolbars while the keyboard is open', () => {
   it('does not render FormattingToolbar while open is true', () => {
     const { container } = render(
-      <EditorToolbars commands={fakeCommands()} formattingToolbar open bottomOffset={0} />,
+      <EditorToolbars commands={fakeCommands()} open bottomOffset={0} />,
     );
     expect(container.querySelector('[aria-label="Formatting"]')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Bold' })).toBeNull();
@@ -137,7 +128,7 @@ describe('EditorToolbars while the keyboard is open', () => {
 
   it('renders FormattingToolbar while open is false', () => {
     const { container } = render(
-      <EditorToolbars commands={fakeCommands()} formattingToolbar open={false} bottomOffset={0} />,
+      <EditorToolbars commands={fakeCommands()} open={false} bottomOffset={0} />,
     );
     expect(container.querySelector('[aria-label="Formatting"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Keyboard bar"]')).toBeNull();

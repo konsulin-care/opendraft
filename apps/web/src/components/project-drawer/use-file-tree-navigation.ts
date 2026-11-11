@@ -33,9 +33,17 @@ export function useBinaryPaths(paths: string[], workspace: WorkspaceAdapter): Se
     void (async () => {
       const binary = new Set<string>();
       for (const path of paths) {
-        const content = await workspace.readFile(path);
-        if (content !== null && getFileCapability(path, content) === 'binary') {
-          binary.add(path);
+        // Stop promptly once the hook unmounts or its inputs change.
+        if (cancelled) return;
+        try {
+          const content = await workspace.readFile(path);
+          if (content !== null && getFileCapability(path, content) === 'binary') {
+            binary.add(path);
+          }
+        } catch {
+          // A workspace closed after unmount (e.g. IndexedDB torn down by
+          // project removal) rejects readFile; swallow it so the rejection
+          // never escapes this fire-and-forget promise.
         }
       }
       if (!cancelled) setBinaryPaths(binary);

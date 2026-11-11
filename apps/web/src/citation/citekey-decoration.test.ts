@@ -22,7 +22,7 @@ function doc(schema: Schema, ...children: ReturnType<Schema['nodes']['paragraph'
   return schema.nodes.doc.create(null, children);
 }
 
-function paragraph(schema: Schema, ...children: ReturnType<Schema['text']['create']>[]) {
+function paragraph(schema: Schema, ...children: ReturnType<Schema['text']>[]) {
   return schema.nodes.paragraph.create(null, children);
 }
 

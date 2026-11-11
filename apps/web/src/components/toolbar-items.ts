@@ -2,7 +2,6 @@ import {
   AtSign,
   Bold,
   Code,
-  Heading1,
   Heading2,
   Heading3,
   ImagePlus,
@@ -76,20 +75,23 @@ export const TOOLBAR_ITEMS: readonly ToolbarItemDef[] = [
   { key: 'rule', label: 'Rule', icon: Minus, group: 'insert', command: (c) => c.hr() },
 ];
 
-/** Paragraph style menu entries: paragraph plus headings 1-3. */
+/** Paragraph style menu entries: paragraph plus headings 2-3 (no level-1 —
+ * block bodies never offer an H1 surface). */
 const HEADINGS: Array<[level: BlockLevel, label: string, icon: LucideIcon]> = [
   [0, 'Paragraph', Pilcrow],
-  [1, 'Heading 1', Heading1],
   [2, 'Heading 2', Heading2],
   [3, 'Heading 3', Heading3],
 ];
 
 /**
  * Build the Paragraph style menu items from the current heading level.
+ * Shared by the desktop Paragraph style menu and the mobile KeyboardBar,
+ * so both block-toolbar surfaces offer the same level-1-free list.
  *
  * @param heading - Active heading level, 0 for a plain paragraph.
  * @param onSelect - Runs `setHeading` with the chosen level.
- * @returns Menu items with the current one marked checked.
+ * @returns Menu items with the current one marked checked; the list
+ * never includes a level-1 entry, so no selection can request an H1.
  */
 export function headingItems(heading: BlockLevel, onSelect: (level: BlockLevel) => void): ToolbarMenuItem[] {
   return HEADINGS.map(([level, label, icon]) => ({

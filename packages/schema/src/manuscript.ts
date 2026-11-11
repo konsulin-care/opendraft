@@ -9,7 +9,6 @@ const LEGACY_REQUIRED_FILES = [
   '_author.yml',
   '_abstract.yml',
   '_frontmatter.yml',
-  'references.bib',
 ];
 
 /** Required files in a block-based manuscript directory (besides blocks/). */
@@ -17,7 +16,6 @@ const BLOCK_REQUIRED_FILES = [
   '_author.yml',
   '_abstract.yml',
   '_frontmatter.yml',
-  'references.bib',
 ];
 
 /** Signal file for block-based layout. */

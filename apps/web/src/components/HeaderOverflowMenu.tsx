@@ -1,13 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { EllipsisVertical } from 'lucide-react';
-import type { EditorMode } from './ModeSwitch';
 
 /** Props for {@link HeaderOverflowMenu}. */
 export interface HeaderOverflowMenuProps {
-  /** Current editing mode; the menu offers the opposite mode. */
-  mode: EditorMode;
-  /** Called when the user picks an editing mode. */
-  onSelectMode: (mode: EditorMode) => void;
   /** Called when the Commit action is activated. */
   onCommit: () => void;
 }
@@ -40,17 +35,15 @@ export function useOutsideClose(
 }
 
 /**
- * Overflow menu for small screens: switches editing mode and commits.
+ * Overflow menu for small screens: commits the pending changes.
  *
  * @param props - See {@link HeaderOverflowMenuProps}.
  */
-export function HeaderOverflowMenu({ mode, onSelectMode, onCommit }: HeaderOverflowMenuProps) {
+export function HeaderOverflowMenu({ onCommit }: HeaderOverflowMenuProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const closeMenu = useRef(() => setMenuOpen(false)).current;
   useOutsideClose(menuOpen, menuRef, closeMenu);
-
-  const switchTarget: EditorMode = mode === 'wysiwyg' ? 'source' : 'wysiwyg';
 
   return (
     <div className="relative md:hidden" ref={menuRef}>
@@ -66,16 +59,6 @@ export function HeaderOverflowMenu({ mode, onSelectMode, onCommit }: HeaderOverf
       </button>
       {menuOpen && (
         <div className="absolute right-0 z-20 mt-1 w-44 rounded-md border border-gray-200 bg-white py-1 shadow-lg">
-          <button
-            type="button"
-            className={MENU_ITEM}
-            onClick={() => {
-              setMenuOpen(false);
-              onSelectMode(switchTarget);
-            }}
-          >
-            Switch to {switchTarget === 'source' ? 'Source' : 'Visual'}
-          </button>
           <button
             type="button"
             className={MENU_ITEM}

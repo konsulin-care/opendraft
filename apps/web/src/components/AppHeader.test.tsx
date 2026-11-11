@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { AppHeader } from './AppHeader';
 import type { AppHeaderProps } from './AppHeader';
 import { APP_BAR_HEIGHT } from './app-bar-layout';
@@ -8,11 +8,7 @@ import { APP_BAR_HEIGHT } from './app-bar-layout';
 
 const BASE_PROPS: AppHeaderProps = {
   fileName: 'manuscript.md',
-  mode: 'wysiwyg',
-  onSelectMode: vi.fn(),
   saveStatus: 'saved',
-  formattingToolbar: true,
-  onToggleFormattingToolbar: vi.fn(),
   onCommit: vi.fn(),
   sidebarOpen: false,
   onToggleSidebar: vi.fn(),
@@ -186,59 +182,21 @@ describe('AppHeader inline rename cancellation', () => {
   });
 });
 
-describe('AppHeader mode toggle', () => {
-  it('shows a FileText toggle targeting source in visual mode and switches on click', () => {
-    const onSelectMode = vi.fn();
-    const { container } = renderHeader({ mode: 'wysiwyg', onSelectMode });
-    const toggle = screen.getByRole('button', { name: 'Switch to source' });
-    expect(toggle.getAttribute('title')).toBe('Switch to source');
-    expect(container.querySelector('.lucide-file-text')).not.toBeNull();
-    expect(container.querySelector('.lucide-file-code')).toBeNull();
-
-    fireEvent.click(toggle);
-    expect(onSelectMode).toHaveBeenCalledWith('source');
-  });
-
-  it('shows a FileCode toggle targeting visual in source mode and switches on click', () => {
-    const onSelectMode = vi.fn();
-    const { container } = renderHeader({ mode: 'source', onSelectMode });
-    const toggle = screen.getByRole('button', { name: 'Switch to visual' });
-    expect(toggle.getAttribute('title')).toBe('Switch to visual');
-    expect(container.querySelector('.lucide-file-code')).not.toBeNull();
-    expect(container.querySelector('.lucide-file-text')).toBeNull();
-
-    fireEvent.click(toggle);
-    expect(onSelectMode).toHaveBeenCalledWith('wysiwyg');
-  });
-
-  it('keeps the mode toggle hidden below md', () => {
+describe('AppHeader mode removal', () => {
+  it('renders no mode switch: no button names a target mode', () => {
     renderHeader();
-    const toggle = screen.getByRole('button', { name: 'Switch to source' });
-    const wrapper = toggle.parentElement;
-    expect(wrapper?.className).toMatch(/\bhidden\b/);
-    expect(wrapper?.className).toMatch(/md:flex/);
+    expect(screen.queryByRole('button', { name: /Switch to/ })).toBeNull();
+    expect(screen.queryByText(/Switch to/)).toBeNull();
   });
 });
 
-describe('AppHeader toolbar preference', () => {
-  it('mirrors the formatting toolbar preference and toggles on click', () => {
-    const onToggleFormattingToolbar = vi.fn();
-    renderHeader({ formattingToolbar: true, onToggleFormattingToolbar });
-    const toggle = screen.getByRole('button', { name: 'Formatting toolbar' });
-    expect(toggle.getAttribute('aria-pressed')).toBe('true');
-    expect(toggle.getAttribute('title')).toBe('Hide formatting toolbar (Ctrl/Cmd+\\)');
-
-    fireEvent.click(toggle);
-    expect(onToggleFormattingToolbar).toHaveBeenCalledTimes(1);
+describe('AppHeader toolbar toggle removal', () => {
+  it('renders no Formatting toolbar button next to Commit', () => {
+    renderHeader();
+    const header = screen.getByTestId('app-header');
+    expect(within(header).queryByRole('button', { name: 'Formatting toolbar' })).toBeNull();
+    expect(within(header).getByRole('button', { name: 'Commit' })).toBeDefined();
   });
-
-  it('shows the toolbar toggle as unpressed when the preference is off', () => {
-    renderHeader({ formattingToolbar: false });
-    expect(
-      screen.getByRole('button', { name: 'Formatting toolbar' }).getAttribute('aria-pressed'),
-    ).toBe('false');
-  });
-
 });
 
 describe('AppHeader commit and overflow', () => {
@@ -275,16 +233,14 @@ describe('AppHeader commit and overflow', () => {
     expect(onCommit).toHaveBeenCalledTimes(1);
   });
 
-  it('moves mode and commit actions into the overflow menu when open', () => {
-    const onSelectMode = vi.fn();
+  it('moves the Commit action into the overflow menu when open', () => {
     const onCommit = vi.fn();
-    renderHeader({ onSelectMode, onCommit });
+    renderHeader({ onCommit });
     fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Switch to Source' }));
-    expect(onSelectMode).toHaveBeenCalledWith('source');
+    const items = screen.getAllByRole('button');
+    expect(items.some((b) => /Switch to/.test(b.textContent ?? ''))).toBe(false);
 
-    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
     fireEvent.click(screen.getByRole('button', { name: 'Commit changes' }));
     expect(onCommit).toHaveBeenCalledTimes(1);
   });

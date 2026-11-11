@@ -1,146 +1,75 @@
 import { describe, it, expect } from "vitest";
 import { createElement } from "react";
-import { act, render, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { MemoryWorkspace } from "@opendraft/workspace";
-import { MilkdownProvider } from "@milkdown/react";
 import { ManuscriptEditor } from "./components/ManuscriptEditor";
-import type { EditorTestApi } from "./components/ManuscriptEditor";
+import { ManuscriptView } from "./components/ManuscriptView";
 
-/** Rich block path: the only file type mounting both surfaces. */
-const DOC_PATH = "manuscripts/p/blocks/01hxyz00000000000000000000.qmd";
+/** Manuscript block path: opens in the source-only editor. */
+const DOC_PATH = "manuscripts/p/blocks/01hxyz000000000000000000000000.qmd";
 
 /** Resolve on the next animation frame. */
 const nextFrame = (): Promise<void> =>
   new Promise((resolve) => requestAnimationFrame(() => resolve()));
 
-/** A mounted editor surface: its scroll container plus a rerender mode switch. */
-interface MountedSurface {
-  /** The single scroll-container child of the manuscript-editor surface. */
-  container: HTMLDivElement;
-  /** Rerender the editor into another mode (same component instances). */
-  setMode: (mode: "wysiwyg" | "source") => void;
-}
-
 /**
- * Mount ManuscriptEditor on the rich block path and wait for the editor.
+ * Mount the source-only ManuscriptEditor and wait for its CodeMirror surface.
  *
- * @param mode - Editing mode to mount in.
- * @returns The scroll container and a rerender-based mode switch.
+ * @returns The single scroll-container child of the manuscript-editor surface.
  */
-async function mountScrollSurface(mode: "wysiwyg" | "source" = "wysiwyg"): Promise<MountedSurface> {
+async function mountScrollSurface(): Promise<HTMLDivElement> {
   const workspace = new MemoryWorkspace();
-  let api: EditorTestApi | null = null;
-  const app = (next: "wysiwyg" | "source") =>
-    createElement(MilkdownProvider, null, createElement(ManuscriptEditor, {
-      workspace, defaultValue: "# Title\n\nSome text.", path: DOC_PATH,
-      onEditorReady: (r: EditorTestApi) => { api = r; }, mode: next,
-    }));
-  const view = render(app(mode));
-  await waitFor(() => expect(api).not.toBeNull(), { timeout: 10000 });
+  render(createElement(ManuscriptEditor, {
+    workspace, defaultValue: "# Title\n\nSome text.", path: DOC_PATH,
+  }));
+  await waitFor(() => expect(document.querySelector(".source-editor .cm-editor")).not.toBeNull(), { timeout: 10000 });
   const surface = document.querySelector('[data-testid="manuscript-editor"]');
   expect(surface).not.toBeNull();
   const container = surface!.children[0] as HTMLDivElement;
   expect(container).toBeDefined();
-  return { container, setMode: (next) => view.rerender(app(next)) };
+  return container;
 }
 
-/**
- * Wait until the metadata panel exists and return it.
- *
- * @returns The panel section element.
- */
-async function waitForPanel(): Promise<HTMLElement> {
-  return waitFor(() => {
-    const panel = document.querySelector('[data-testid="metadata-panel"]');
-    expect(panel).not.toBeNull();
-    return panel as HTMLElement;
-  }, { timeout: 10000 });
-}
-
-describe("EditorSurface — one scroll container shared by both modes", () => {
-  it("wysiwyg: the surface has exactly one child element and it is the overflow-auto scroll container", async () => {
-    const { container } = await mountScrollSurface("wysiwyg");
+describe("ManuscriptEditor — one scroll container for the source-only editor", () => {
+  it("the surface has exactly one child element and it is the overflow-auto scroll container", async () => {
+    const container = await mountScrollSurface();
     const surface = document.querySelector('[data-testid="manuscript-editor"]')!;
     expect(surface.children).toHaveLength(1);
     expect(surface.children[0]).toBe(container);
     expect(container.style.overflow).toBe("auto");
   }, 20000);
 
-  it("source: the surface has exactly one child element and it is the overflow-auto scroll container", async () => {
-    const { container } = await mountScrollSurface("source");
-    const surface = document.querySelector('[data-testid="manuscript-editor"]')!;
-    expect(surface.children).toHaveLength(1);
-    expect(surface.children[0]).toBe(container);
-    expect(container.style.overflow).toBe("auto");
-  }, 20000);
-
-  it("source mode: the source editor sits in the scroll container and the Milkdown wrapper is hidden", async () => {
-    const { container } = await mountScrollSurface("source");
-    const source = container.querySelector(".source-editor") as HTMLElement;
-    expect(source).not.toBeNull();
-    const milkdownRoot = container.querySelector("[data-milkdown-root]") as HTMLElement;
-    expect(milkdownRoot).not.toBeNull();
-    expect(milkdownRoot.parentElement?.style.display).toBe("none");
-    expect(source.parentElement?.style.display).toBe("block");
-  }, 20000);
-
-  it("wysiwyg mode: the Milkdown root sits in the scroll container and the source editor wrapper is hidden", async () => {
-    const { container } = await mountScrollSurface("wysiwyg");
-    expect(container.querySelector("[data-milkdown-root]")).not.toBeNull();
-    const source = container.querySelector(".source-editor") as HTMLElement;
-    expect(source).not.toBeNull();
-    expect(source.parentElement?.style.display).toBe("none");
+  it("the source editor sits in the scroll container's reading column", async () => {
+    const container = await mountScrollSurface();
+    const column = container.querySelector(".reading-column") as HTMLElement;
+    expect(column).not.toBeNull();
+    expect(column.querySelector(".source-editor")).not.toBeNull();
+    expect(container.querySelector("[data-milkdown-root]")).toBeNull();
+    expect(container.querySelector(".ProseMirror")).toBeNull();
   }, 20000);
 });
 
-describe("ManuscriptEditor — source mode scroll-driven panel behavior", () => {
-  it("scrolling the shared container past the panel height drives --collapse-progress from 0", async () => {
-    const { container } = await mountScrollSurface("source");
-    const panel = await waitForPanel();
-    // The collapse hook seeds the variable once scroll collapse is enabled.
-    await waitFor(() => expect(panel.style.getPropertyValue("--collapse-progress")).toBe("0"));
-    const body = document.querySelector('[data-testid="metadata-panel-body"]') as HTMLElement;
-    expect(body).not.toBeNull();
-    // jsdom reports no layout: stand in an expanded panel height (300px).
-    Object.defineProperty(body, "offsetHeight", { configurable: true, value: 300 });
-    container.scrollTop = 350; // past the expanded panel height
-    act(() => { container.dispatchEvent(new Event("scroll")); });
-    await waitFor(
-      () => expect(panel.style.getPropertyValue("--collapse-progress")).toBe("1"),
-      { timeout: 5000 },
-    );
-  }, 20000);
-
-  it("keeps the same metadata panel element across a wysiwyg → source rerender", async () => {
-    const { setMode } = await mountScrollSurface("wysiwyg");
-    const before = await waitForPanel();
-    setMode("source");
-    // The switch applied: the source wrapper is now the visible one.
-    await waitFor(() => {
-      const source = document.querySelector('[data-testid="manuscript-editor"] .source-editor') as HTMLElement;
-      expect(source.parentElement?.style.display).toBe("block");
-    });
-    expect(document.querySelector('[data-testid="metadata-panel"]')).toBe(before);
-  }, 20000);
-
-  it("restores scrollTop when focus moves outside after switching to source mode", async () => {
-    const { container, setMode } = await mountScrollSurface("wysiwyg");
-    setMode("source");
-    container.scrollTop = 240;
-    container.addEventListener("focusout", () => { container.scrollTop = 10; }, { once: true });
-    const outside = document.createElement("button");
-    document.body.appendChild(outside);
-    act(() => {
-      container.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: outside }));
-    });
-    await waitFor(() => expect(container.scrollTop).toBe(240));
-    outside.remove();
+describe("ManuscriptView — toolbar outside the reading view's scroll container", () => {
+  it("the toolbar is the surface's first child and the overflow-auto container holds the reading column", async () => {
+    render(createElement(ManuscriptView, {
+      workspace: new MemoryWorkspace(), dir: "manuscripts/p", projectKey: "scroll-test",
+    }));
+    await waitFor(() => expect(screen.getByTestId("manuscript-view")).toBeDefined(), { timeout: 10000 });
+    const surface = screen.getByTestId("manuscript-view");
+    expect(surface.children).toHaveLength(2);
+    const toolbarArea = surface.children[0] as HTMLDivElement;
+    const container = surface.children[1] as HTMLDivElement;
+    const toolbar = screen.getByRole("toolbar", { name: "Formatting" });
+    expect(toolbarArea.contains(toolbar)).toBe(true);
+    expect(container.contains(toolbar)).toBe(false);
+    expect(container.style.overflow).toBe("auto");
+    expect(container.querySelector(".reading-column")).not.toBeNull();
   }, 20000);
 });
 
 describe("ManuscriptEditor — viewport stability when focus leaves the surface", () => {
   it("keeps scrollTop when focus moves outside the surface (blur jump is undone)", async () => {
-    const { container } = await mountScrollSurface();
+    const container = await mountScrollSurface();
     container.scrollTop = 240;
 
     // Emulate the browser's scroll-on-blur jump: a listener that runs after
@@ -158,7 +87,7 @@ describe("ManuscriptEditor — viewport stability when focus leaves the surface"
   }, 20000);
 
   it("leaves focus moves within the surface untouched (no restore)", async () => {
-    const { container } = await mountScrollSurface();
+    const container = await mountScrollSurface();
     container.scrollTop = 240;
 
     // A same-surface focus move (e.g. table cell to table cell) may scroll

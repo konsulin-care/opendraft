@@ -31,10 +31,10 @@ function textBeforeCursor(state: EditorState): string {
   return $from.parent.textBetween(0, $from.parentOffset);
 }
 
-const pluginSource = readFileSync(
-  fileURLToPath(new URL("./plugin.ts", import.meta.url)),
-  "utf8",
-);
+const readSource = (file: string): string =>
+  readFileSync(fileURLToPath(new URL(file, import.meta.url)), "utf8");
+const pluginSource = readSource("./plugin.ts");
+const insertSource = readSource("./insert.ts");
 
 function createMockWorkspace(): WorkspaceAdapter {
   return {
@@ -61,7 +61,6 @@ describe("createCitationPlugin", () => {
   it("exports pluginKey", () => {
     expect(citationPluginKey).toBeDefined();
   });
-
   it("uses global capture-phase keyboard handler instead of props.handleKeyDown", () => {
     const plugin = createCitationPlugin(workspace);
     // handleKeyDown is no longer on props; keyboard is handled via window listener
@@ -94,24 +93,21 @@ describe("citation plugin — global keyboard handler (capture phase)", () => {
     expect(pluginSource).toContain("filterCitekeys");
   });
 
-  it("inserts citekey via direct view.dispatch in global handler", () => {
-    // Insertion moved into plugin to avoid stale editor.action() dispatch
-    expect(pluginSource).toContain("tr.insertText");
-    expect(pluginSource).toContain("view.dispatch(tr)");
+  it("inserts citekey via applyCitekeySelection in Enter handler", () => {
+    expect(pluginSource).toContain("applyCitekeySelection(view, citekey, state.trigger)");
+    expect(insertSource).toContain("tr.insertText");
+    expect(insertSource).toContain("view.dispatch(tr)");
   });
 
   it("reads trigger from citation state for insert range", () => {
-    // Insertion range is planned from the citation-state trigger
     expect(pluginSource).toContain("state.trigger");
-    expect(pluginSource).toContain("planCitationInsertion");
+    expect(insertSource).toContain("planCitationInsertion");
   });
 
   it("delegates bracket handling to planCitationInsertion", () => {
-    // Bracket format ([@citekey] vs @citekey) and ] dedup live in insert.ts
-    expect(pluginSource).toContain("planCitationInsertion");
-    expect(pluginSource).toContain("insertion.text");
+    expect(insertSource).toContain("planCitationInsertion");
+    expect(insertSource).toContain("insertion.text");
   });
-
 });
 
 describe("citation plugin — insert range and cursor placement", () => {
@@ -119,14 +115,14 @@ describe("citation plugin — insert range and cursor placement", () => {
     // T3: the replacement starts at the @ (trigger.from), not at the [.
     // A ] is appended by planCitationInsertion only when the group lacks one.
     expect(pluginSource).not.toContain("trigger.from - 1");
-    expect(pluginSource).toContain("planCitationInsertion");
+    expect(insertSource).toContain("planCitationInsertion");
   });
 
   it("places the cursor just before the closing ] after insert", () => {
     // T4: after the first pick in [@key] the cursor must sit at the offset
     // just before the closing ] (insertion.from + "@citekey".length) so the
     // user can type "; @" to add another citation to the same group.
-    expect(pluginSource).toMatch(
+    expect(insertSource).toMatch(
       /insertText\([\s\S]*?setSelection\(\s*TextSelection\.create\(tr\.doc, insertion\.from \+ citekey\.length \+ 1\)\s*,?\s*\)[\s\S]*?view\.dispatch\(tr\)/,
     );
   });
@@ -206,64 +202,66 @@ describe("citation plugin — SlashProvider behavior (source)", () => {
     expect(pluginSource).toContain("@milkdown/plugin-slash");
     expect(pluginSource).toContain("SlashProvider");
   });
-
   it("creates SlashProvider with trigger '@'", () => {
     expect(pluginSource).toMatch(/trigger:\s*["']@["']/);
   });
-
   it("sets debounce to 0 for immediate trigger response", () => {
     expect(pluginSource).toContain("debounce: 0");
   });
-
   it("passes floatingUIOptions with bottom-start placement", () => {
     expect(pluginSource).toContain("floatingUIOptions");
     expect(pluginSource).toContain("bottom-start");
   });
-
   it("onShow does not dispatch top/left coordinates", () => {
     expect(pluginSource).not.toContain("top: 0");
     expect(pluginSource).not.toContain("left: 0");
   });
-
   it("uses custom shouldShow for word-boundary detection", () => {
     expect(pluginSource).toContain("shouldShow");
   });
-
   it("provides content element with React-rendered CitationDropdown", () => {
     expect(pluginSource).toContain("content");
     expect(pluginSource).toContain("CitationDropdown");
   });
-
   it("has onShow and onHide lifecycle callbacks", () => {
     expect(pluginSource).toContain("onShow");
     expect(pluginSource).toContain("OPEN_CITATION");
     expect(pluginSource).toContain("onHide");
     expect(pluginSource).toContain("CLOSE_CITATION");
   });
-
   it("calls provider.update and provider.destroy in plugin view", () => {
     expect(pluginSource).toContain("provider.update");
     expect(pluginSource).toContain("provider.destroy");
   });
 });
 
-describe("citation plugin — onSelectCitekey removed from signatures", () => {
-  it("createCitationPlugin does not accept onSelectCitekey parameter", () => {
-    // onSelectCitekey removed; insertion handled directly in plugin
-    expect(pluginSource).not.toMatch(/function createCitationPlugin[\s\S]*?onSelectCitekey/);
+describe("citation plugin — click-to-select via onSelectCitekey", () => {
+  const clickHandler = pluginSource.match(/onSelectCitekey = \(citekey[\s\S]*?\n\s*\}/)?.[0] ?? "";
+  const enterHandler = pluginSource.match(/case "Enter"[\s\S]*?applyCitekeySelection\(view, citekey, state\.trigger\)/)?.[0] ?? "";
+  it("createUpdateDropdown passes onSelectCitekey to CitationDropdown", () => {
+    expect(pluginSource).toMatch(/createUpdateDropdown\(root, dispatch, view, onDoiResolved\)/);
+    expect(pluginSource).toMatch(/React\.createElement\(CitationDropdown, \{[^}]*onSelectCitekey/);
   });
-
-  it("createGlobalKeyHandler does not accept onSelectCitekey parameter", () => {
-    expect(pluginSource).not.toMatch(/function createGlobalKeyHandler[\s\S]*?onSelectCitekey/);
+  it("clicking a citekey inserts via applyCitekeySelection like Enter", () => {
+    expect(clickHandler).toContain("applyCitekeySelection(view, citekey, state.trigger)");
+    expect(enterHandler).toContain("applyCitekeySelection(view, citekey, state.trigger)");
   });
-
-  it("createView does not accept onSelectCitekey parameter", () => {
-    expect(pluginSource).not.toMatch(/function createView[\s\S]*?onSelectCitekey/);
+  it("clicking a citekey closes the citation dropdown", () => {
+    expect(clickHandler).toContain('dispatch({ type: "CLOSE_CITATION" })');
   });
-
-  it("CitationSelectHandler type is not exported", () => {
-    // No longer needed since insertion is in the plugin
+  it("does not export CitationSelectHandler", () => {
     expect(pluginSource).not.toContain("export type CitationSelectHandler");
+  });
+});
+
+describe("citation plugin — bib reload on open", () => {
+  it("opening the @ dropdown re-reads the bib file", () => {
+    expect(pluginSource).toMatch(/OPEN_CITATION[\s\S]*?onOpen\?\.\(\)/);
+    expect(pluginSource).toMatch(/createSlashProviderConfig\(dispatch, view, \(\) => \{\s*void loadReferences\(workspace, bibPath, view\)/);
+  });
+  it("a malformed bib dispatches the load error via SET_ITEMS", () => {
+    expect(pluginSource).toContain('{ type: "SET_ITEMS", items, error }');
+    expect(pluginSource).not.toContain("if (error || items.length === 0");
   });
 });
 

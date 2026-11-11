@@ -6,7 +6,7 @@
  * legacy "Normalize to references".
  */
 import { useState, type ReactNode } from 'react';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { AffiliationPicker } from './AffiliationPicker';
 import { clearRorCache } from './ror-client';

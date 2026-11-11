@@ -25,10 +25,7 @@ export function useCitationState(editorRef: React.MutableRefObject<Editor | null
     const editor = editorRef.current;
     if (!editor) return;
 
-    let view: import('@milkdown/kit/prose/view').EditorView | null = null;
-    editor.action((ctx) => {
-      view = ctx.get(editorViewCtx);
-    });
+    const view = editor.action((ctx) => ctx.get(editorViewCtx)) as import('@milkdown/kit/prose/view').EditorView | null;
     if (!view) return;
 
     // Sync initial state

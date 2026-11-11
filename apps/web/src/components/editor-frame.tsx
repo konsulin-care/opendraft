@@ -6,10 +6,6 @@ import type { SourceEditorHandle } from './SourceEditor';
 
 /** Props for {@link EditorFrame}. */
 interface EditorFrameProps {
-  /** Editing mode of the rendered surface. */
-  editorMode: 'wysiwyg' | 'source';
-  /** Formatting-toolbar visibility preference, owned by the app shell. */
-  formattingToolbar: boolean;
   /** Workspace path of the edited file (config-warning source). */
   path: string;
   /** Current source markdown (config-warning source). */
@@ -21,20 +17,19 @@ interface EditorFrameProps {
 }
 
 /**
- * Chrome shared by the rich and source-only editor variants: the toolbars,
- * the opendraft.yml config warning, and the surface slot.
+ * Chrome shared by the source-only editor: the toolbars (bound to the
+ * source command set, so the formatting controls stay disabled), the
+ * opendraft.yml config warning, and the surface slot.
  *
  * @param props - See {@link EditorFrameProps}.
  */
-export function EditorFrame({ editorMode, formattingToolbar, path, sourceMarkdown, sourceEditorRef, children }: EditorFrameProps) {
-  const commands = useEditorCommands(editorMode, () => sourceEditorRef.current?.getView() ?? null);
+export function EditorFrame({ path, sourceMarkdown, sourceEditorRef, children }: EditorFrameProps) {
+  const commands = useEditorCommands('source', () => sourceEditorRef.current?.getView() ?? null);
   const { open: keyboardOpen, bottomOffset } = useVirtualKeyboard();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <EditorToolbars
         commands={commands}
-        formattingToolbar={formattingToolbar}
-        mode={editorMode}
         open={keyboardOpen}
         bottomOffset={bottomOffset}
       />

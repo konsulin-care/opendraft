@@ -77,27 +77,21 @@ afterEach(() => { vi.useRealTimers(); if (originalMatchMedia) Object.definePrope
 
 describe('AuthorsDialog single form', () => {
   it('opening author 2 of 3 shows the Author order header and no card list', async () => {
-    await boot(); fireEvent.click(screen.getByTestId('byline-author-1'));
-    expect(screen.getByTestId('authors-dialog')).toBeDefined();
+    await boot(); fireEvent.click(screen.getByTestId('byline-author-1')); expect(screen.getByTestId('authors-dialog')).toBeDefined();
     const header = screen.getByTestId('author-position-header'); const position = screen.getByTestId('author-position') as HTMLSelectElement;
     expect(screen.getByText('Author order:')).toBeDefined(); expect(header.textContent).toMatch(/^Author order:.*of 3$/);
-    expect(position.value).toBe('2');
-    expect(position.getAttribute('aria-label')).toBe('Author order');
-    expect(position.getAttribute('title')).toBe("Changes this author's position in the author list");
+    expect(position.value).toBe('2'); expect(position.getAttribute('aria-label')).toBe('Author order'); expect(position.getAttribute('title')).toBe("Changes this author's position in the author list");
     expect(header.className).toContain('pb-3'); expect(screen.queryByTestId('authors-close')).toBeNull();
-    expect(screen.getByTestId('author-card-1')).toBeDefined();
-    expect((screen.getByTestId('author-given') as HTMLInputElement).value).toBe('Budi');
+    expect(screen.getByTestId('author-card-1')).toBeDefined(); expect((screen.getByTestId('author-given') as HTMLInputElement).value).toBe('Budi');
     expect((screen.getByTestId('author-family') as HTMLInputElement).value).toBe('Lee');
     expect(screen.queryByTestId('author-card-0')).toBeNull(); expect(screen.queryByTestId('author-card-2')).toBeNull();
     for (const testid of ['author-slot-0', 'author-slot-1', 'author-slot-2', 'author-select-0', 'author-select-1', 'author-select-2', 'author-move-up-1', 'author-move-down-1']) expect(screen.queryByTestId(testid)).toBeNull();
   });
 
   it("choosing position 1 moves the author to the front of _author.yml", async () => {
-    const ws = await boot();
-    fireEvent.click(screen.getByTestId('byline-author-1'));
+    const ws = await boot(); fireEvent.click(screen.getByTestId('byline-author-1'));
     fireEvent.change(screen.getByTestId('author-position'), { target: { value: '1' } });
-    expect((screen.getByTestId('author-position') as HTMLSelectElement).value).toBe('1');
-    await flushWrites();
+    expect((screen.getByTestId('author-position') as HTMLSelectElement).value).toBe('1'); await flushWrites();
     expect((await readAuthors(ws)).map((author) => author['id'])).toEqual(['lee', 'smith', 'dwg']);
   });
 
@@ -110,17 +104,23 @@ describe('AuthorsDialog single form', () => {
 
 describe('AuthorsDialog form content', () => {
   it('person form keeps degrees, status, on-behalf-of, CRediT, email and the affiliation section', async () => {
-    const ws = await boot();
-    fireEvent.click(screen.getByTestId('byline-author-1'));
+    const ws = await boot(); fireEvent.click(screen.getByTestId('byline-author-1'));
     expect(screen.getByTestId('author-affiliation-section').className).not.toMatch(/\bpx-2\b/);
     expect(screen.getByTestId('author-type-person').getAttribute('aria-pressed')).toBe('true');
-    const degree = screen.getByTestId('author-degree-field');
+    const degree = screen.getByTestId('author-degree-field') as HTMLInputElement;
+    expect(screen.getByText('Degree')).toBeDefined(); expect(degree.hasAttribute('placeholder')).toBe(false); expect(degree.getAttribute('aria-label')).toBe('Degree');
     fireEvent.change(degree, { target: { value: 'MD' } }); fireEvent.keyDown(degree, { key: 'Enter' });
     expect(screen.getByTestId('author-degree-chip').textContent).toContain('MD');
     fireEvent.click(screen.getByTestId('author-corresponding'));
     fireEvent.change(screen.getByTestId('author-on-behalf-of'), { target: { value: 'dwg' } });
     fireEvent.click(screen.getByTestId('credit-conceptualization'));
-    fireEvent.change(screen.getByTestId('author-email'), { target: { value: 'budi@example.edu' } });
+    const email = screen.getByTestId('author-email') as HTMLInputElement;
+    expect(screen.getByText('Email')).toBeDefined(); expect(email.hasAttribute('placeholder')).toBe(false); expect(email.getAttribute('aria-label')).toBe('Email');
+    fireEvent.change(email, { target: { value: 'budi@example.edu' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Show author details' }));
+    Object.entries({ url: 'Website URL', phone: 'Phone', fax: 'Fax', note: 'Note', acknowledgements: 'Acknowledgements' })
+      .forEach(([key, label]) => { const field = screen.getByTestId(`author-${key}`) as HTMLInputElement;
+        expect(screen.getByText(label)).toBeDefined(); expect(field.hasAttribute('placeholder')).toBe(false); expect(field.getAttribute('aria-label')).toBe(label); });
     await flushWrites();
     const authors = await readAuthors(ws);
     expect(authors[1]).toMatchObject({ degrees: ['MD'], corresponding: true, 'on-behalf-of': 'dwg',
@@ -178,8 +178,8 @@ describe('AuthorsDialog draft author', () => {
 
   it('stores a single draft name as a literal person with author-type metadata', async () => {
     const ws = await boot(); fireEvent.click(screen.getByTestId('add-author')); fireEvent.click(screen.getByTestId('author-single-name'));
-    expect(screen.queryByTestId('author-given')).toBeNull(); expect(screen.getByPlaceholderText('Name')).toBeDefined();
-    fireEvent.change(screen.getByPlaceholderText('Name'), { target: { value: 'Dewi' } }); await flushWrites();
+    expect(screen.queryByTestId('author-given')).toBeNull(); expect(screen.getByText('Name')).toBeDefined();
+    expect((screen.getByTestId('author-literal') as HTMLInputElement).hasAttribute('placeholder')).toBe(false); fireEvent.change(screen.getByTestId('author-literal'), { target: { value: 'Dewi' } }); await flushWrites();
     const authors = await readAuthors(ws);
     expect(authors).toHaveLength(4); expect(authors[3]).toMatchObject({ name: { literal: 'Dewi' }, metadata: { 'author-type': 'person' } });
   });

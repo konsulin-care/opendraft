@@ -22,11 +22,6 @@ async function manuscriptFiles(ws: MemoryWorkspace): Promise<string[]> {
   return ws.listFiles(MANUSCRIPT_DIR);
 }
 
-/** Extract the starter block path from a scaffolded container article. */
-function starterBlockPath(article: string): string {
-  return /\{\{< include (blocks\/[a-z0-9-]+\.qmd) >\}\}/.exec(article)?.[1] as string;
-}
-
 describe('scaffoldProject — opendraft.yml', () => {
   it('writes a spec-conformant opendraft.yml', async () => {
     const ws = new MemoryWorkspace();
@@ -60,36 +55,31 @@ describe('scaffoldProject — opendraft.yml', () => {
 });
 
 describe('scaffoldProject — container article.qmd', () => {
-  it('writes the container article with the include and refs fence', async () => {
+  it('writes the container article with no include shortcodes', async () => {
     const ws = new MemoryWorkspace();
     await scaffoldProject(ws, { manuscriptId: 'my-paper' });
 
     const article = (await ws.readFile(`${MANUSCRIPT_DIR}/article.qmd`)) as string;
-    expect(/\{\{< include (blocks\/[a-z0-9-]+\.qmd) >\}\}/.test(article)).toBe(true);
-
-    const blockPath = starterBlockPath(article);
-    expect(blockPath).toMatch(/^blocks\/[a-z0-9-]+\.qmd$/);
+    expect(article).not.toMatch(/\{\{< include/);
     expect(article).toBe(`---
 metadata-files:
 - _author.yml
 - _abstract.yml
 - _frontmatter.yml
+bibliography: ../references.bib
 ---
-
-{{< include ${blockPath} >}}
 
 ::: {#refs}
 :::
 `);
   });
 
-  it('writes an empty starter block file', async () => {
+  it('creates no starter block file under blocks/', async () => {
     const ws = new MemoryWorkspace();
     await scaffoldProject(ws, { manuscriptId: 'my-paper' });
 
-    const article = (await ws.readFile(`${MANUSCRIPT_DIR}/article.qmd`)) as string;
-    const block = await ws.readFile(`${MANUSCRIPT_DIR}/${starterBlockPath(article)}`);
-    expect(block).toBe('');
+    expect(await ws.listFiles(`${MANUSCRIPT_DIR}/blocks`)).toEqual([]);
+    expect(await ws.readFile(`${MANUSCRIPT_DIR}/blocks`)).toBeNull();
   });
 
   it('scaffolds an assembly that passes validateAssembly', async () => {
@@ -97,13 +87,10 @@ metadata-files:
     await scaffoldProject(ws, { manuscriptId: 'my-paper' });
 
     const article = (await ws.readFile(`${MANUSCRIPT_DIR}/article.qmd`)) as string;
-    const blockPath = starterBlockPath(article);
-    const slug = blockPath.replace(/^blocks\//, '').replace(/\.qmd$/, '');
-
     const result = validateAssembly({
       assembly: article,
-      blockFiles: { [blockPath]: '' },
-      files: [`${slug}.qmd`],
+      blockFiles: {},
+      files: [],
     });
     expect(result.errors).toEqual([]);
     expect(result.valid).toBe(true);
@@ -116,15 +103,32 @@ describe('templates/manuscript/article.qmd', () => {
       resolve(__dirname, '../../../../templates/manuscript/article.qmd'),
       'utf8',
     );
-    const templateBlock = /\{\{< include (blocks\/[a-z0-9-]+\.qmd) >\}\}/.exec(template)?.[1] as string;
-    expect(templateBlock).toMatch(/^blocks\/[a-z0-9-]+\.qmd$/);
+    // The static template keeps one example include for copy-paste users;
+    // the scaffold ships with none, so compare modulo that line.
+    const templateWithoutInclude = template.replace(/\{\{< include [^\n]+ >\}\}\n\n/, '');
+    expect(templateWithoutInclude).not.toMatch(/\{\{< include/);
 
     const ws = new MemoryWorkspace();
     await scaffoldProject(ws, { manuscriptId: 'my-paper' });
     const article = (await ws.readFile(`${MANUSCRIPT_DIR}/article.qmd`)) as string;
-    const scaffoldBlock = starterBlockPath(article);
 
-    expect(template.replace(templateBlock, scaffoldBlock)).toBe(article);
+    expect(templateWithoutInclude).toBe(article);
+  });
+});
+
+describe('scaffoldProject — manuscripts/references.bib', () => {
+  it('writes the shared bib with the starter doe2024 entry', async () => {
+    const ws = new MemoryWorkspace();
+    await scaffoldProject(ws, { manuscriptId: 'my-paper' });
+    expect(await ws.readFile('manuscripts/references.bib')).toContain('@article{doe2024,');
+  });
+
+  it('leaves an existing shared bib unchanged', async () => {
+    const ws = new MemoryWorkspace();
+    await scaffoldProject(ws, { manuscriptId: 'first' });
+    await ws.writeFile('manuscripts/references.bib', '@misc{keep,}\n');
+    await scaffoldProject(ws, { manuscriptId: 'second' });
+    expect(await ws.readFile('manuscripts/references.bib')).toBe('@misc{keep,}\n');
   });
 });
 
@@ -228,8 +232,8 @@ describe('scaffoldProject — manuscript layout', () => {
       '_author.yml',
       '_frontmatter.yml',
       'article.qmd',
-      'references.bib',
     ]);
+    expect(files).not.toContain('references.bib');
     expect(validateManuscript('my-paper', files).valid).toBe(true);
   });
 

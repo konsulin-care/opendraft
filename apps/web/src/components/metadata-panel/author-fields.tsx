@@ -2,9 +2,9 @@
  * Shared icon fields of the author card.
  *
  * {@link IconField} renders a leading lucide icon (or a text badge)
- * next to a placeholder input carrying an aria-label and the light
- * grey bottom border. The degree, email and collapsible contact
- * fields of the author card build on it.
+ * beside a visible text label and an input carrying an aria-label but
+ * no placeholder, over the light grey bottom border. The degree,
+ * email and collapsible contact fields build on it.
  */
 import { useState, type ComponentPropsWithRef, type ReactNode } from 'react';
 import { GraduationCap, HeartHandshake, Link, Mail, Phone, Printer, StickyNote, type LucideIcon } from 'lucide-react';
@@ -20,22 +20,25 @@ export interface IconFieldProps extends ComponentPropsWithRef<'input'> {
   testid: string;
   /** Accessible name of the input. */
   ariaLabel: string;
+  /** Visible text label in front of the input; replaces a placeholder. */
+  label?: string;
 }
 
 /**
- * One-line input with a leading icon or badge, a placeholder and the
- * light grey bottom border.
+ * One-line input with a leading icon or badge, a visible text label
+ * (no placeholder) and the light grey bottom border.
  *
  * @param props - See {@link IconFieldProps}; remaining props are
  *                spread onto the underlying input element.
- * @returns A flex wrapper holding the icon at left and the input.
+ * @returns A flex label holding the icon, the label text and the input.
  */
-export function IconField({ icon, testid, ariaLabel, className, ...rest }: IconFieldProps): ReactNode {
+export function IconField({ icon, testid, ariaLabel, label, className, ...rest }: IconFieldProps): ReactNode {
   return (
-    <div className="flex items-center gap-1.5">
+    <label className="flex items-center gap-1.5">
       <span aria-hidden="true" className="flex shrink-0 items-center text-muted">{icon}</span>
+      {label && <span className="text-sm">{label}</span>}
       <input {...rest} data-testid={testid} aria-label={ariaLabel} className={`${INPUT} ${className ?? ''}`} />
-    </div>
+    </label>
   );
 }
 
@@ -87,7 +90,7 @@ export function Degrees({ degrees, onSet }: DegreesProps): ReactNode {
         ))}
       </div>
       <IconField icon={<GraduationCap aria-hidden className="size-4" />} testid="author-degree-field"
-        ariaLabel="Degree" placeholder="Add degree" value={text} onChange={(event) => setText(event.target.value)}
+        ariaLabel="Degree" label="Degree" value={text} onChange={(event) => setText(event.target.value)}
         onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); add(); } }} />
     </div>
   );
@@ -125,7 +128,7 @@ export function MoreFields({ author, onChange }: MoreFieldsProps): ReactNode {
       <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="text-sm text-muted hover:bg-hover">{open ? 'Hide author details' : 'Show author details'}</button>
       {open && CONTACT_FIELDS.map(([key, label, Icon]) => (
         <IconField key={key} icon={<Icon aria-hidden className="size-4" />} testid={`author-${key}`} ariaLabel={label}
-          placeholder={label} value={typeof author[key] === 'string' ? author[key] : ''}
+          label={label} value={typeof author[key] === 'string' ? author[key] : ''}
           onChange={(event) => onChange(setStr(author, key, event.target.value))} />
       ))}
     </>
@@ -154,7 +157,7 @@ export function EmailField({ author, apply }: EmailFieldProps): ReactNode {
   const email = typeof author.email === 'string' ? author.email : '';
   return (
     <>
-      <IconField icon={<Mail aria-hidden className="size-4" />} testid="author-email" ariaLabel="Email" placeholder="Email"
+      <IconField icon={<Mail aria-hidden className="size-4" />} testid="author-email" ariaLabel="Email" label="Email"
         value={email}
         onChange={(event) => { setInvalid(false); apply(setStr(author, 'email', event.target.value)); }}
         onBlur={(event) => setInvalid(event.target.value !== '' && !EMAIL_PATTERN.test(event.target.value))} />

@@ -5,18 +5,20 @@ import { projectRegistry } from './useProjects';
 
 /** Value returned by {@link useActiveFile}. */
 export interface UseActiveFileResult {
-  /** Repo-relative path of the file to show, or null while unresolved. */
+  /** Repo-relative path of the active file or manuscript directory, or null while unresolved. */
   activePath: string | null;
-  /** Open a file: sets it active and remembers it as the project's last path. */
+  /** Open a path (file or directory): sets it active and remembers it as the project's last path. */
   openFile: (path: string) => Promise<void>;
 }
 
 /**
- * Track the active file of a project.
+ * Track the active path of a project.
  *
- * On mount (and whenever the workspace or project changes) the default file
+ * On mount (and whenever the workspace or project changes) the default path
  * is resolved via {@link resolveDefaultFile} using the registry's stored
- * last path, so the previously opened file is reopened after a remount.
+ * last path, so the previously opened file or manuscript directory is
+ * reopened after a remount. The active path may be a manuscript directory
+ * (`manuscripts/<id>`), which the app renders as the manuscript view.
  * Every open persists the path back to the registry via `setLastPath`.
  *
  * @param ws - Workspace of the active project, or null before boot completes.

@@ -1,14 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { loadTurtle, validateShacl } from '../src/index.js';
 import type { ShaclValidationReport } from '../src/types.js';
+import { fileURLToPath } from 'node:url';
 
-const ARTICLE_SHAPES = 'protocol/article.shacl.ttl';
-const VALID_ARTICLE = 'protocol/examples/article.ttl';
-const VALID_COLLECTION = 'protocol/registry.ttl';
-const VALID_PUB_REGISTRY = 'protocol/examples/publication-registry.ttl';
-const INVALID_MISSING_TITLE = 'tests/conformance/fixtures/invalid/article-missing-title.ttl';
-const INVALID_BAD_REVISION = 'tests/conformance/fixtures/invalid/article-invalid-revision.ttl';
-const INVALID_MIXED_REGISTRY = 'tests/conformance/fixtures/invalid/registry-mixed-types.ttl';
+// Repo-root paths, resolved from this file: suites run with cwd = packages/rdf.
+const protocol = (path: string): string => fileURLToPath(new URL(`../../../protocol/${path}`, import.meta.url));
+const conformance = (path: string): string => fileURLToPath(new URL(`../../../tests/conformance/${path}`, import.meta.url));
+
+const ARTICLE_SHAPES = protocol('article.shacl.ttl');
+const VALID_ARTICLE = protocol('examples/article.ttl');
+const VALID_COLLECTION = protocol('registry.ttl');
+const VALID_PUB_REGISTRY = protocol('examples/publication-registry.ttl');
+const REGISTRY_SHAPES = protocol('registry.shacl.ttl');
+const INVALID_MISSING_TITLE = conformance('fixtures/invalid/article-missing-title.ttl');
+const INVALID_BAD_REVISION = conformance('fixtures/invalid/article-invalid-revision.ttl');
+const INVALID_MIXED_REGISTRY = conformance('fixtures/invalid/registry-mixed-types.ttl');
 
 describe('loadTurtle', () => {
   it('parses a Turtle file into an RDF/JS dataset', async () => {
@@ -52,19 +58,19 @@ describe('validateShacl', () => {
   });
 
   it('validates a collection registry against registry shapes', async () => {
-    const [shapes, data] = await Promise.all([loadTurtle('protocol/registry.shacl.ttl'), loadTurtle(VALID_COLLECTION)]);
+    const [shapes, data] = await Promise.all([loadTurtle(REGISTRY_SHAPES), loadTurtle(VALID_COLLECTION)]);
     const report: ShaclValidationReport = await validateShacl(data, shapes);
     expect(report.conforms).toBe(true);
   });
 
   it('validates a publication registry against registry shapes', async () => {
-    const [shapes, data] = await Promise.all([loadTurtle('protocol/registry.shacl.ttl'), loadTurtle(VALID_PUB_REGISTRY)]);
+    const [shapes, data] = await Promise.all([loadTurtle(REGISTRY_SHAPES), loadTurtle(VALID_PUB_REGISTRY)]);
     const report: ShaclValidationReport = await validateShacl(data, shapes);
     expect(report.conforms).toBe(true);
   });
 
   it('rejects a mixed collection/publication registry', async () => {
-    const [shapes, data] = await Promise.all([loadTurtle('protocol/registry.shacl.ttl'), loadTurtle(INVALID_MIXED_REGISTRY)]);
+    const [shapes, data] = await Promise.all([loadTurtle(REGISTRY_SHAPES), loadTurtle(INVALID_MIXED_REGISTRY)]);
     const report: ShaclValidationReport = await validateShacl(data, shapes);
     expect(report.conforms).toBe(false);
     expect(report.results.length).toBeGreaterThan(0);

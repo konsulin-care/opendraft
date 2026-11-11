@@ -43,6 +43,12 @@ run = "pnpm exec eslint . --fix"
 description = "Run TypeScript type checker"
 run = "pnpm exec tsc --noEmit"
 
+[tasks.typecheck-web]
+description = "Run TypeScript type checker for apps/web"
+run = "pnpm run typecheck"
+
+dir = "apps/web"
+
 [tasks.build]
 description = "Build (placeholder)"
 run = "echo 'Placeholder for build script'"

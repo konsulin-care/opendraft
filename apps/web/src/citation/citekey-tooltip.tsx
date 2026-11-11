@@ -6,7 +6,7 @@ import { formatAPA } from './apa-format';
 interface CitekeyTooltipProps {
   reference: Reference | null;
   anchorEl: HTMLElement | null;
-  onClose: () => void;
+  onClose?: () => void;
 }
 
 /**
@@ -30,11 +30,11 @@ export function CitekeyTooltip({ reference, anchorEl }: CitekeyTooltipProps) {
 
     /** Compute and apply position to the tooltip element. */
     async function update() {
-      const { x, y } = await computePosition(anchorEl!, el, {
+      const { x, y } = await computePosition(anchorEl!, el!, {
         placement: 'bottom',
         middleware: [offset(8), flip(), shift({ padding: 8 })],
       });
-      Object.assign(el.style, { top: `${y}px`, left: `${x}px` });
+      Object.assign(el!.style, { top: `${y}px`, left: `${x}px` });
     }
 
     update();

@@ -109,10 +109,10 @@ function extractAuthors(data: Record<string, unknown>): AuthorMetadata[] {
 }
 
 /**
- * Read and parse BibTeX references if present.
+ * Read and parse BibTeX references from the manuscript's parent directory, if present.
  */
 function readReferences(dir: string): ReferenceMetadata[] | undefined {
-  const bibPath = join(dir, 'references.bib');
+  const bibPath = join(dir, '..', 'references.bib');
   if (!existsSync(bibPath)) {
     return undefined;
   }

@@ -13,8 +13,6 @@ export interface KeyboardBarProps {
   open: boolean;
   /** `innerHeight` minus `visualViewport.height`; the bar is fixed this far from the bottom. */
   bottomOffset: number;
-  /** Formatting-toolbar visibility preference from the app shell. */
-  formattingToolbar: boolean;
 }
 
 /** Props for {@link FormattingControls}. */
@@ -65,10 +63,10 @@ function FormattingControls({ commands, active, run }: FormattingControlsProps) 
 /**
  * On-screen keyboard action bar for mobile. Fixed at the bottom of the layout
  * viewport, `bottomOffset` pixels up so it sits above the software keyboard.
- * Renders Undo, Redo, Paragraph style, Bullet list, Citation, and Insert when
- * the formatting-toolbar preference is on; only Undo and Redo when it is off.
- * In source mode (`canFormat` false) formatting controls are disabled while
- * Undo and Redo stay enabled. Renders nothing while the keyboard is closed.
+ * Renders Undo, Redo, Paragraph style, Bullet list, Citation, and Insert
+ * whenever the keyboard is open. In source mode (`canFormat` false) formatting
+ * controls are disabled while Undo and Redo stay enabled. Renders nothing
+ * while the keyboard is closed.
  *
  * @param props - See {@link KeyboardBarProps}.
  * @returns The bar element, or null when the keyboard is closed.
@@ -77,7 +75,6 @@ export function KeyboardBar({
   commands,
   open,
   bottomOffset,
-  formattingToolbar,
 }: KeyboardBarProps) {
   const [active, refresh] = useActiveState(commands);
 
@@ -98,7 +95,7 @@ export function KeyboardBar({
     >
       <ToolbarButton label="Undo" icon={Undo2} onClick={() => run(commands.undo)} />
       <ToolbarButton label="Redo" icon={Redo2} onClick={() => run(commands.redo)} />
-      {formattingToolbar && <FormattingControls commands={commands} active={active} run={run} />}
+      <FormattingControls commands={commands} active={active} run={run} />
     </div>
   );
 }

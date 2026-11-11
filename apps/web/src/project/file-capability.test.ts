@@ -1,49 +1,59 @@
 import { describe, expect, it } from 'vitest';
 
-import { getFileCapability, isManuscriptBlockPath } from './file-capability';
+import {
+  getFileCapability,
+  isManuscriptArticlePath,
+  isManuscriptBlockPath,
+} from './file-capability';
 
-/** A valid manuscript block path: manuscripts/<id>/blocks/<26-char lowercase ULID>.qmd. */
-const BLOCK_PATH = 'manuscripts/2024-01/blocks/01hxyz00000000000000000000.qmd';
+/** A manuscript block path with a plain slug stem: manuscripts/<id>/blocks/<slug>.qmd. */
+const BLOCK_PATH = 'manuscripts/2024-01/blocks/intro.qmd';
+
+/** The assembly file of a manuscript: rich (block-editor entry point). */
+const ARTICLE_PATH = 'manuscripts/2024-01/article.qmd';
 
 describe('getFileCapability', () => {
-  it('classifies manuscript block files as rich', () => {
+  it('classifies manuscripts/<id>/blocks/<slug>.qmd as rich for any valid slug stem', () => {
     expect(getFileCapability(BLOCK_PATH, '# Heading\n')).toBe('rich');
     expect(getFileCapability(BLOCK_PATH, '')).toBe('rich');
+    expect(getFileCapability('manuscripts/p/blocks/sec-2.qmd', 'x')).toBe('rich');
+    expect(getFileCapability('manuscripts/p/blocks/a.qmd', 'x')).toBe('rich');
+    expect(getFileCapability('manuscripts/p/blocks/readme.qmd', 'x')).toBe('rich');
+    expect(getFileCapability('manuscripts/p/blocks/2024-summary.qmd', 'x')).toBe('rich');
+    // Legacy ULID-named blocks stay valid: a ULID stem is also a valid slug.
+    expect(getFileCapability('manuscripts/p/blocks/01hxyz00000000000000000000.qmd', 'x')).toBe('rich');
   });
 
-  it('classifies root .md and .qmd files as text, not rich', () => {
+  it('classifies manuscripts/<id>/article.qmd as rich', () => {
+    const container = '---\nmetadata-files:\n- _author.yml\n\n{{< include blocks/intro.qmd >}}\n::: {#refs}\n:::\n';
+    expect(getFileCapability(ARTICLE_PATH, container)).toBe('rich');
+    expect(getFileCapability('manuscripts/untitled-project/article.qmd', '')).toBe('rich');
+  });
+
+  it('classifies files outside a manuscript blocks/ directory as text', () => {
+    const container = '---\nmetadata-files:\n- _author.yml\n\n{{< include blocks/intro.qmd >}}\n::: {#refs}\n:::\n';
+    // The root-level article.qmd is not a manuscript assembly: text.
+    expect(getFileCapability('article.qmd', container)).toBe('text');
     expect(getFileCapability('manuscript.md', '# Heading\n')).toBe('text');
     expect(getFileCapability('notes.qmd', '# Heading\n')).toBe('text');
     expect(getFileCapability('a/x.qmd', '# Heading\n')).toBe('text');
-  });
-
-  it('classifies the container article.qmd as text', () => {
-    const container = '---\nmetadata-files:\n- _author.yml\n\n{{< include blocks/01hx.qmd >}}\n::: {#refs}\n:::\n';
-    expect(getFileCapability('manuscripts/2024-01/article.qmd', container)).toBe('text');
-    expect(getFileCapability('article.qmd', container)).toBe('text');
-  });
-
-  it('requires exactly 26 ULID characters in the blocks/ segment', () => {
-    expect(getFileCapability('manuscripts/2024-01/blocks/01hx.qmd', 'x')).toBe('text');
-    expect(getFileCapability('manuscripts/2024-01/blocks/01hxyz000000000000000000000.qmd', 'x')).toBe('text');
-    expect(getFileCapability('manuscripts/2024-01/blocks/readme.qmd', 'x')).toBe('text');
-  });
-
-  it('requires the lowercase ULID alphabet in the blocks/ segment', () => {
-    expect(getFileCapability('manuscripts/2024-01/blocks/01HXYZ00000000000000000000.qmd', 'x')).toBe('text');
-    expect(getFileCapability('manuscripts/2024-01/blocks/01hxy-z0000000000000000000.qmd', 'x')).toBe('text');
-  });
-
-  it('requires the manuscripts/<id>/blocks/ prefix for rich files', () => {
-    expect(getFileCapability('blocks/01hxyz00000000000000000000.qmd', 'x')).toBe('text');
-    expect(getFileCapability('manuscripts/2024-01/sections/01hxyz00000000000000000000.qmd', 'x')).toBe('text');
-    expect(getFileCapability('manuscripts/2024-01/blocks/nested/01hxyz00000000000000000000.qmd', 'x')).toBe('text');
-  });
-
-  it('classifies other files with normal text as text', () => {
+    expect(getFileCapability('blocks/intro.qmd', 'x')).toBe('text');
+    expect(getFileCapability('manuscripts/2024-01/sections/intro.qmd', 'x')).toBe('text');
+    expect(getFileCapability('manuscripts/2024-01/blocks/nested/intro.qmd', 'x')).toBe('text');
+    expect(getFileCapability('manuscripts/2024-01/references.bib', 'x')).toBe('text');
     expect(getFileCapability('refs.bib', 'normal text')).toBe('text');
     expect(getFileCapability('opendraft.yml', 'manuscripts: []')).toBe('text');
     expect(getFileCapability('notes', 'no extension here')).toBe('text');
+  });
+
+  it('rejects invalid slug stems in the blocks/ segment', () => {
+    expect(getFileCapability('manuscripts/p/blocks/-intro.qmd', 'x')).toBe('text');
+    expect(getFileCapability('manuscripts/p/blocks/intro-.qmd', 'x')).toBe('text');
+    expect(getFileCapability('manuscripts/p/blocks/Intro.qmd', 'x')).toBe('text');
+    expect(getFileCapability('manuscripts/p/blocks/sec_1.qmd', 'x')).toBe('text');
+    expect(getFileCapability('manuscripts/p/blocks/intro.mdown', 'x')).toBe('text');
+    expect(getFileCapability('manuscripts/p/blocks/.qmd', 'x')).toBe('text');
+    expect(getFileCapability('manuscripts/p/blocks/intro.txt', 'x')).toBe('text');
   });
 
   it('treats tab, newline and carriage return as normal text characters', () => {
@@ -54,36 +64,29 @@ describe('getFileCapability', () => {
 describe('getFileCapability — binary detection', () => {
   it('classifies content containing a NUL character as binary', () => {
     expect(getFileCapability('data.bin', 'abc\u0000def')).toBe('binary');
-    expect(getFileCapability(BLOCK_PATH, 'abc\u0000def')).toBe('binary');
   });
 
-  it('classifies content with more than 10% control characters as binary', () => {
-    // 11 control characters out of 100 total => 11% > 10%.
-    const content = '\u0001'.repeat(11) + 'a'.repeat(89);
-    expect(getFileCapability('data.bin', content)).toBe('binary');
+  it('classifies content with dense control characters as binary', () => {
+    expect(getFileCapability('data.bin', 'ab\u0001\u0002\u0003\u0004')).toBe('binary');
   });
 
-  it('keeps content at or under 10% control characters as text', () => {
-    // 10 control characters out of 100 total => exactly 10%, not more.
-    const content = '\u0001'.repeat(10) + 'a'.repeat(90);
-    expect(getFileCapability('data.bin', content)).toBe('text');
+  it('keeps sparse control characters as text', () => {
+    expect(getFileCapability('notes', 'a\u0001bcdefghijkl')).toBe('text');
   });
 });
 
-describe('isManuscriptBlockPath', () => {
-  it('accepts manuscripts/<id>/blocks/<26-char lowercase ULID>.qmd', () => {
-    expect(isManuscriptBlockPath(BLOCK_PATH)).toBe(true);
-    expect(isManuscriptBlockPath('manuscripts/untitled-project/blocks/01jx8v2k4m5n6p7q8r9s0t1w2x.qmd')).toBe(true);
+describe('path helpers', () => {
+  it('isManuscriptBlockPath matches only manuscript blocks/ files with a valid slug', () => {
+    expect(isManuscriptBlockPath('manuscripts/p/blocks/intro.qmd')).toBe(true);
+    expect(isManuscriptBlockPath('manuscripts/p/article.qmd')).toBe(false);
+    expect(isManuscriptBlockPath('manuscripts/p/blocks/nested/intro.qmd')).toBe(false);
+    expect(isManuscriptBlockPath('blocks/intro.qmd')).toBe(false);
   });
 
-  it('rejects every other path shape', () => {
-    expect(isManuscriptBlockPath('manuscript.md')).toBe(false);
-    expect(isManuscriptBlockPath('article.qmd')).toBe(false);
-    expect(isManuscriptBlockPath('manuscripts/p/article.qmd')).toBe(false);
-    expect(isManuscriptBlockPath('manuscripts/p/blocks/short.qmd')).toBe(false);
-    expect(isManuscriptBlockPath('manuscripts/p/blocks/01HXYZ00000000000000000000.qmd')).toBe(false);
-    expect(isManuscriptBlockPath('manuscripts/p/blocks/01hxyz00000000000000000000.txt')).toBe(false);
-    expect(isManuscriptBlockPath('opendraft.yml')).toBe(false);
-    expect(isManuscriptBlockPath('refs.bib')).toBe(false);
+  it('isManuscriptArticlePath matches only manuscripts/<id>/article.qmd', () => {
+    expect(isManuscriptArticlePath('manuscripts/2024-01/article.qmd')).toBe(true);
+    expect(isManuscriptArticlePath('article.qmd')).toBe(false);
+    expect(isManuscriptArticlePath('manuscripts/p/blocks/intro.qmd')).toBe(false);
+    expect(isManuscriptArticlePath('manuscripts/p/sections/article.qmd')).toBe(false);
   });
 });

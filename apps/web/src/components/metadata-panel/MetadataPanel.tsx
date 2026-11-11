@@ -46,6 +46,17 @@ export function manuscriptRootFromPath(path: string): string | null {
 }
 
 /**
+ * Folder id of a manuscript root: `manuscripts/alpha` -> `alpha`.
+ *
+ * @param root - Repo-relative manuscript directory.
+ * @returns The trailing folder id used as the empty-title fallback.
+ */
+function manuscriptFolderId(root: string): string {
+  const segments = root.split('/');
+  return segments[segments.length - 1] ?? '';
+}
+
+/**
  * Derive an author's display name: literal for groups, otherwise
  * given then family (with optional particle and suffix).
  *
@@ -65,16 +76,17 @@ export function authorBylineName(author: MetadataAuthor): string {
 
 /**
  * Resolve the initial expanded state of the panel. A stored preference
- * always wins; without one, an untitled manuscript starts expanded.
+ * always wins; without one the panel starts expanded regardless of the
+ * title.
  *
- * @param title - Current manuscript title ('' when missing).
+ * @param title - Current manuscript title; not consulted by the default.
  * @param stored - Persisted state ('expanded' | 'collapsed') or null.
  * @returns Whether the panel starts expanded.
  */
 export function initialExpanded(title: string, stored: string | null): boolean {
   if (stored === 'expanded') return true;
   if (stored === 'collapsed') return false;
-  return title.trim() === '';
+  return true;
 }
 
 /** Read the persisted state for a project; null when absent or unreadable. */
@@ -95,18 +107,20 @@ interface ExpandedDecision {
 /**
  * Collapsed/expanded state decided during render once the metadata has
  * loaded, persisted per project in localStorage. Deciding in render
- * guarantees no collapsed frame escapes for an expanded panel.
+ * guarantees no collapsed frame escapes for an expanded panel. The
+ * session-only setter flips the state without writing storage, used by
+ * the overlay scroll-out collapse.
  *
  * @param projectKey - Project identifier used for the storage key.
  * @param title - Current manuscript title.
  * @param loaded - Whether the metadata load has settled.
- * @returns The expanded flag and a persisting setter.
+ * @returns The expanded flag, a persisting setter and a session-only setter.
  */
 function useExpandedState(
   projectKey: string,
   title: string,
   loaded: boolean,
-): [boolean, (next: boolean) => void] {
+): [boolean, (next: boolean) => void, (next: boolean) => void] {
   const [decision, setDecision] = useState<ExpandedDecision | null>(null);
   if (loaded && (decision === null || decision.key !== projectKey)) {
     // Render-phase adjustment: React re-runs before committing, so no
@@ -127,7 +141,10 @@ function useExpandedState(
       // Storage unavailable: keep the state session-only.
     }
   }, [projectKey]);
-  return [decision?.key === projectKey ? decision.expanded : false, setPersisted];
+  const setSession = useCallback((next: boolean) => {
+    setDecision({ key: projectKey, expanded: next });
+  }, [projectKey]);
+  return [decision?.key === projectKey ? decision.expanded : false, setPersisted, setSession];
 }
 
 /**
@@ -208,8 +225,11 @@ function PanelBody({ meta, expanded, bodyRef, dialogIndex, saveStatus, onClose }
  * editor container collapses the expanded panel progressively (1:1)
  * and re-expands it at the top; scroll collapse is never persisted.
  * When the expanded body is taller than the editor viewport the panel
- * renders as an editor-area overlay with its own vertical scroll and
- * scroll collapse is disabled.
+ * renders as an editor-area overlay with its own vertical scroll: the
+ * overlay scroll then drives the same progress fade and collapses the
+ * panel session-only once the body is fully scrolled out, closing the
+ * overlay. Overlay and sheet wrap the bar and body in the shared
+ * `.reading-column` so side padding matches the editor.
  *
  * @param props - See {@link MetadataPanelProps}.
  * @returns The panel section, or null when outside a loaded manuscript.
@@ -220,25 +240,26 @@ export function MetadataPanel({
   const meta = useManuscriptMetadata(workspace, manuscriptRoot);
   const { loaded, title, authors, affiliations, abstract, frontmatter } = meta;
   const narrow = useMediaQuery(NARROW_QUERY);
-  const [expanded, setExpanded] = useExpandedState(projectKey, title, loaded);
-  const issues = useMemo(() => publishIssues({ title, authors, affiliations, abstract, frontmatter }),
-    [title, authors, affiliations, abstract, frontmatter]);
+  const [expanded, setExpanded, setSessionExpanded] = useExpandedState(projectKey, title, loaded);
+  const issues = useMemo(() => publishIssues({ title, authors, affiliations, abstract, frontmatter }), [title, authors, affiliations, abstract, frontmatter]);
   const byline = useMemo(() => authors.map(authorBylineName).filter(Boolean).join(', '), [authors]);
   const issueFocus = useIssueFocus(expanded, setExpanded);
   const openIssues = useCallback(() => setExpanded(true), [setExpanded]);
   const panelRef = useRef<HTMLElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
-  const fallbackScrollRef = useRef<HTMLElement | null>(null);
-  const scrollRef = editorFocusRef ?? fallbackScrollRef;
+  const fallbackScrollRef = useRef<HTMLElement | null>(null); const scrollRef = editorFocusRef ?? fallbackScrollRef;
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+  // Overlay scroll-out: collapse for this session only, never persisted.
+  const collapseFromOverlay = useCallback(() => setSessionExpanded(false), [setSessionExpanded]);
   // Overlay detection, scroll collapse and the chevron/Escape controls.
   const layout = usePanelLayout({ expanded, setExpanded, narrow, loaded, manuscriptRoot,
-    panelRef, bodyRef, scrollRef, editorFocusRef });
+    panelRef, bodyRef, scrollRef, editorFocusRef, overlayRef, onOverlayScrollOut: collapseFromOverlay });
   if (!manuscriptRoot || !loaded) return null;
   // Below 640px the expanded panel is a full-screen sheet.
   const sheet = expanded && narrow;
   const content = (
-    <OverlayLayer overlay={layout.overlay}>
-      <PinnedBar title={title} byline={narrow ? `${authors.length} authors` : byline}
+    <OverlayLayer overlay={layout.overlay} scrollerRef={overlayRef}>
+      <PinnedBar title={title} folderId={manuscriptFolderId(manuscriptRoot)} byline={narrow ? `${authors.length} authors` : byline}
         expanded={layout.panelExpanded} collapseProgress={layout.progress} narrow={narrow} onToggle={layout.toggle}
         badge={<ValidationBadge issues={issues} onSelect={issueFocus.select} onOpen={openIssues} />} />
       <PanelBody meta={meta} expanded={expanded} bodyRef={bodyRef}
@@ -259,7 +280,7 @@ export function MetadataPanel({
           ? 'absolute inset-0 z-20 overflow-hidden bg-white'
           : 'contents'}
     >
-      {sheet ? <div className="reading-column">{content}</div> : content}
+      <div className={sheet ? 'reading-column' : layout.overlay ? 'reading-column h-full' : 'contents'}>{content}</div>
     </section>
   );
 }

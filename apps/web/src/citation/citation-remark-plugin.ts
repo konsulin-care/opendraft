@@ -1,4 +1,4 @@
-import type { Plugin } from 'unified';
+import type { Processor, Transformer } from 'unified';
 
 /** Characters allowed in a citekey (word chars + special bibTeX chars + @). */
 const CITEKEY_CHARS = '[\\w@:.#$%&\\-+?<>~/]';
@@ -40,7 +40,7 @@ export function stripCitationEscapes(text: string): string {
  *
  * Non-citation underscores (e.g. _emphasis_) are still escaped normally.
  */
-export function citationRemarkPlugin(): Plugin {
+export function citationRemarkPlugin(this: Processor): Transformer {
   return () => {
     // Wrap the compiler set by remark-stringify.
     // The compiler calls toMarkdown(tree, options) which serializes the AST.

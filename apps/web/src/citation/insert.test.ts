@@ -1,6 +1,37 @@
 import { describe, it, expect } from 'vitest';
-import { insertCitation } from './insert';
+import { applyCitekeySelection, insertCitation } from './insert';
 import type { CitationTrigger } from './types';
+import { EditorState, TextSelection } from '@milkdown/kit/prose/state';
+import type { Transaction } from '@milkdown/kit/prose/state';
+import { Schema } from '@milkdown/kit/prose/model';
+import type { EditorView } from '@milkdown/kit/prose/view';
+
+/** Minimal editor view over a single-paragraph doc for insertion tests. */
+function createMockView(text: string, cursorPos: number) {
+  const schema = new Schema({
+    nodes: {
+      doc: { content: 'block+' },
+      paragraph: { group: 'block', content: 'inline*' },
+      text: { group: 'inline' },
+    },
+  });
+  const doc = schema.nodes.doc.create(null, [
+    schema.nodes.paragraph.create(null, schema.text(text)),
+  ]);
+  let state = EditorState.create({
+    doc,
+    selection: TextSelection.create(doc, cursorPos),
+  });
+  const view = {
+    get state() {
+      return state;
+    },
+    dispatch(tr: Transaction) {
+      state = state.apply(tr);
+    },
+  };
+  return { view: view as unknown as EditorView, getState: () => state };
+}
 
 describe('insertCitation — non-bracketed', () => {
   it('replaces @query with @citekey (non-bracketed)', () => {
@@ -66,5 +97,44 @@ describe('insertCitation — bracketed', () => {
     const result = insertCitation('[@', 'k', trigger, 2);
 
     expect(result.startsWith('[')).toBe(true);
+  });
+});
+
+describe('applyCitekeySelection — mock view', () => {
+  it('replaces only the @query range in non-bracketed mode', () => {
+    const { view, getState } = createMockView('hello @world today', 13);
+    applyCitekeySelection(view, 'doe2024', { from: 7, bracketed: false });
+    const state = getState();
+
+    expect(state.doc.textContent).toBe('hello @doe2024 today');
+    expect(state.selection.from).toBe(15);
+  });
+
+  it('appends ] in bracketed mode when the group lacks a closing bracket', () => {
+    const { view, getState } = createMockView('[@world', 8);
+    applyCitekeySelection(view, 'doe2024', { from: 2, bracketed: true });
+    const state = getState();
+
+    expect(state.doc.textContent).toBe('[@doe2024]');
+    expect(state.selection.from).toBe(10);
+  });
+
+  it('does not duplicate ] when the group already has a closing bracket', () => {
+    const { view, getState } = createMockView('[@world]', 8);
+    applyCitekeySelection(view, 'doe2024', { from: 2, bracketed: true });
+    const state = getState();
+
+    expect(state.doc.textContent).toBe('[@doe2024]');
+    expect(state.selection.from).toBe(10);
+  });
+
+  it('places the cursor immediately before the closing bracket', () => {
+    const { view, getState } = createMockView('[@world', 8);
+    applyCitekeySelection(view, 'doe2024', { from: 2, bracketed: true });
+    const { $from } = getState().selection;
+
+    expect(
+      getState().doc.textBetween($from.pos, $from.end(), undefined, '\uFFFD'),
+    ).toBe(']');
   });
 });

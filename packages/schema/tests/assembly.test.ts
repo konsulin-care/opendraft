@@ -76,3 +76,89 @@ describe('validateAssembly: drafts and paths', () => {
     expect(result.valid).toBe(false);
   });
 });
+
+describe('validateAssembly: heading anchors', () => {
+  it("rejects an included block whose heading anchor differs from 'sec-<file stem>'", () => {
+    const result = validateAssembly({
+      assembly: '{{< include blocks/intro.qmd >}}',
+      blockFiles: { 'blocks/intro.qmd': '# Intro {#sec-other .deo-intro}\n\nbody' },
+      files: ['intro.qmd'],
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.message.includes('anchor'))).toBe(true);
+    expect(result.errors.some((e) => e.message.includes('sec-intro'))).toBe(true);
+  });
+
+  it("accepts an included block whose heading anchor equals 'sec-<file stem>'", () => {
+    const result = validateAssembly({
+      assembly: '{{< include blocks/intro.qmd >}}',
+      blockFiles: { 'blocks/intro.qmd': '# Intro {#sec-intro .deo-intro}\n\nbody' },
+      files: ['intro.qmd'],
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('reports no anchor error for an included block with no heading line', () => {
+    const result = validateAssembly({
+      assembly: '{{< include blocks/intro.qmd >}}',
+      blockFiles: { 'blocks/intro.qmd': 'plain body text\nsecond line' },
+      files: ['intro.qmd'],
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.errors.some((e) => e.message.includes('anchor'))).toBe(false);
+  });
+});
+
+describe('validateAssembly: optional role class', () => {
+  it('accepts anchor headings with an optional role class and with no class', () => {
+    const withClass = validateAssembly({
+      assembly: '{{< include blocks/intro.qmd >}}',
+      blockFiles: { 'blocks/intro.qmd': '# Intro {#sec-intro .deo-intro}\n\nbody' },
+      files: ['intro.qmd'],
+    });
+    const withoutClass = validateAssembly({
+      assembly: '{{< include blocks/intro.qmd >}}',
+      blockFiles: { 'blocks/intro.qmd': '# Intro {#sec-intro}\n\nbody' },
+      files: ['intro.qmd'],
+    });
+
+    expect(withClass.valid).toBe(true);
+    expect(withClass.errors).toEqual([]);
+    expect(withoutClass.valid).toBe(true);
+    expect(withoutClass.errors).toEqual([]);
+  });
+});
+
+describe('validateAssembly: outcomes unchanged by anchor check', () => {
+  it('keeps existing include/orphan/duplicate validation outcomes unchanged', () => {
+    const missing = validateAssembly({
+      assembly: '{{< include blocks/ghost.qmd >}}',
+      blockFiles: {},
+      files: [],
+    });
+    expect(missing.valid).toBe(false);
+    expect(missing.errors.some((e) => e.message.includes('ghost.qmd'))).toBe(true);
+
+    const duplicate = validateAssembly({
+      assembly: ['{{< include blocks/intro.qmd >}}', '{{< include blocks/intro.qmd >}}'].join('\n'),
+      blockFiles: { 'blocks/intro.qmd': '# Intro {#sec-intro}\n\nbody' },
+      files: ['intro.qmd'],
+    });
+    expect(duplicate.valid).toBe(false);
+    expect(duplicate.errors.some((e) => e.message.includes('duplicate'))).toBe(true);
+
+    const orphan = validateAssembly({
+      assembly: '{{< include blocks/intro.qmd >}}',
+      blockFiles: { 'blocks/intro.qmd': '# Intro {#sec-intro}\n\nbody' },
+      files: ['intro.qmd', 'scratch.qmd'],
+    });
+    expect(orphan.valid).toBe(true);
+    expect(orphan.errors).toEqual([]);
+    expect(orphan.warnings.some((w) => w.message.includes('scratch.qmd'))).toBe(true);
+  });
+});

@@ -104,9 +104,46 @@ describe('FileTree structure', () => {
     fireEvent.click(screen.getByRole('treeitem', { name: 'refs.bib' }));
     expect(onOpen).toHaveBeenCalledWith('manuscripts/p/refs.bib');
   });
+
+  it('opens a manuscript folder on label click', async () => {
+    const { onOpen } = await renderTree();
+
+    fireEvent.click(screen.getByRole('treeitem', { name: 'p' }));
+    expect(onOpen).toHaveBeenCalledWith('manuscripts/p');
+  });
+
+  it('marks the active directory selected', async () => {
+    await renderTree({ activePath: 'manuscripts/p' });
+
+    expect(screen.getByRole('treeitem', { name: 'p' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('treeitem', { name: 'article.qmd' }).getAttribute('aria-selected')).toBe('false');
+  });
 });
 
+/** Chevron toggles folder collapse without opening the folder. */
+async function expectChevronTogglesCollapse(): Promise<void> {
+  const { onOpen } = await renderTree();
+  const folder = screen.getByRole('treeitem', { name: 'p' });
+  const chevron = folder.querySelector('[aria-hidden="true"]') as HTMLElement;
+  expect(chevron).not.toBeNull();
+  expect(folder.getAttribute('aria-expanded')).toBe('true');
+
+  fireEvent.click(chevron);
+  expect(onOpen).not.toHaveBeenCalled();
+  expect(folder.getAttribute('aria-expanded')).toBe('false');
+  expect(screen.queryByRole('treeitem', { name: 'article.qmd' })).toBeNull();
+
+  fireEvent.click(chevron);
+  expect(onOpen).not.toHaveBeenCalled();
+  expect(folder.getAttribute('aria-expanded')).toBe('true');
+  expect(screen.getByRole('treeitem', { name: 'article.qmd' })).not.toBeNull();
+}
+
 describe('FileTree interaction', () => {
+  it('chevron toggles folder collapse without opening the folder', async () => {
+    await expectChevronTogglesCollapse();
+  });
+
   it('marks binary files disabled and refuses to open them', async () => {
     const { onOpen } = await renderTree();
     await waitForBinaryClassification();

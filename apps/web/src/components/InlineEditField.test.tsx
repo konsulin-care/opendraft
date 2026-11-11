@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { InlineEditField } from './InlineEditField';
 import type { InlineEditFieldProps } from './InlineEditField';
 
@@ -54,6 +54,26 @@ describe('InlineEditField pen icon', () => {
   });
 });
 
+describe('InlineEditField auto-sized input', () => {
+  it('drops w-full, sizes the input to its text and keeps SquarePen as the adjacent sibling', () => {
+    const { container } = renderField();
+    const input = screen.getByRole('textbox', { name: 'Test field' }) as HTMLInputElement;
+
+    const classes = input.className.split(/\s+/);
+    expect(classes).not.toContain('w-full');
+    expect(classes).toContain('field-sizing-content');
+    expect(input.size).toBe('Test Project'.length);
+
+    fireEvent.change(input, { target: { value: 'A much longer project title' } });
+    expect(input.size).toBe('A much longer project title'.length);
+
+    const pen = input.nextElementSibling as Element | null;
+    expect(pen).not.toBeNull();
+    expect(pen?.classList.contains('lucide-square-pen')).toBe(true);
+    expect(container.querySelector('.lucide-square-pen')).toBe(pen);
+  });
+});
+
 describe('InlineEditField save and revert', () => {
   it('saves the trimmed value on Enter', () => {
     const onSave = vi.fn();
@@ -83,5 +103,42 @@ describe('InlineEditField save and revert', () => {
     fireEvent.keyDown(input, { key: 'Escape' });
     expect(onSave).not.toHaveBeenCalled();
     expect(input.value).toBe('Test Project');
+  });
+});
+
+describe('InlineEditField commits a value once', () => {
+  it('calls onSave exactly once when Enter is followed by blur before the save settles', async () => {
+    let settle: () => void = () => {};
+    const onSave = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          settle = resolve;
+        }),
+    );
+    renderField({ onSave });
+    const input = screen.getByRole('textbox', { name: 'Test field' }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'New Name' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.blur(input);
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave).toHaveBeenCalledWith('New Name');
+    await act(async () => {
+      settle();
+    });
+    expect(onSave).toHaveBeenCalledTimes(1);
+  });
+
+  it('saves again with a new value after the previous save settles', async () => {
+    const onSave = vi.fn(async () => {});
+    renderField({ onSave });
+    const input = screen.getByRole('textbox', { name: 'Test field' }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'First' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onSave).toHaveBeenCalledTimes(1);
+    await act(async () => {});
+    fireEvent.change(input, { target: { value: 'Second' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onSave).toHaveBeenCalledTimes(2);
+    expect(onSave).toHaveBeenLastCalledWith('Second');
   });
 });

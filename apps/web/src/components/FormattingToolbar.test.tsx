@@ -39,19 +39,13 @@ function fakeCommands(active: ActiveState = INACTIVE_STATE, canFormat = true): E
 
 /** Accessible aria-label of every inline row button, More trigger included. */
 function inlineNames(container: HTMLElement): Array<string | null> {
-  const toolbar = container.querySelector('[role="toolbar"]')!;
-  return within(toolbar as HTMLElement).getAllByRole('button').map((button) => button.getAttribute('aria-label'));
+  return within(container.querySelector('[role="toolbar"]') as HTMLElement).getAllByRole('button').map((button) => button.getAttribute('aria-label'));
 }
 
 /** The inner row div holding the inline items and the More trigger. */
-function rowOf(container: HTMLElement): HTMLElement {
-  return container.querySelector('[role="toolbar"] > div') as HTMLElement;
-}
+function rowOf(container: HTMLElement): HTMLElement { return container.querySelector('[role="toolbar"] > div') as HTMLElement; }
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  overflow.visibleCount = 6;
-});
+beforeEach(() => { vi.clearAllMocks(); overflow.visibleCount = 6; });
 
 describe('FormattingToolbar inline row (visible count 6)', () => {
   it('renders the first six items inline in priority order, then More, no Insert', () => {
@@ -71,7 +65,6 @@ describe('FormattingToolbar dividers (visible groups only)', () => {
     // Between Redo and Paragraph style, and between Paragraph style and Bold.
     expect(dividerIndexes).toEqual([2, 4]);
   });
-
   it('renders one divider between the two visible groups, none for empty groups', () => {
     overflow.visibleCount = 1;
     const { container } = render(<FormattingToolbar commands={fakeCommands()} />);
@@ -138,7 +131,6 @@ describe('FormattingToolbar More menu overflow entries', () => {
       expect(item.querySelector('svg')?.getAttribute('class')).toContain(icon);
     }
   });
-
   it('portals to document.body and closes after selecting an item', () => {
     const commands = fakeCommands();
     const { container } = render(<FormattingToolbar commands={commands} />);
@@ -185,15 +177,13 @@ describe('FormattingToolbar button behavior', () => {
 });
 
 describe('FormattingToolbar menus', () => {
-  it('Paragraph style menu offers Paragraph and H1-H3 and runs setHeading', () => {
+  it('Paragraph style menu offers exactly Paragraph, Heading 2 and Heading 3', () => {
     const commands = fakeCommands();
     render(<FormattingToolbar commands={commands} />);
     fireEvent.click(screen.getByRole('button', { name: 'Paragraph style' }));
     const items = screen.getAllByRole('menuitemradio');
-    expect(items.map((item) => item.getAttribute('aria-label'))).toEqual(['Paragraph', 'Heading 1', 'Heading 2', 'Heading 3']);
+    expect(items.map((item) => item.getAttribute('aria-label'))).toEqual(['Paragraph', 'Heading 2', 'Heading 3']);
     expect(items[0]).toHaveAttribute('aria-checked', 'true');
-    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Heading 1' }));
-    expect(commands.setHeading).toHaveBeenCalledWith(1);
   });
 });
 
@@ -206,11 +196,14 @@ describe('FormattingToolbar in source mode (canFormat false)', () => {
 });
 
 describe('FormattingToolbar visibility and responsiveness', () => {
-  it('renders through EditorToolbars only when the preference is on', () => {
-    const off = render(<EditorToolbars commands={fakeCommands()} formattingToolbar={false} />);
-    expect(off.container.querySelector('[role="toolbar"]')).toBeNull();
-    const on = render(<EditorToolbars commands={fakeCommands()} formattingToolbar={true} />);
-    expect(on.container.querySelector('[role="toolbar"]')).not.toBeNull();
+  it('renders the formatting toolbar in wysiwyg mode without a formattingToolbar prop', () => {
+    const { container } = render(<EditorToolbars commands={fakeCommands()} />);
+    expect(container.querySelector('[role="toolbar"]')).not.toBeNull();
+  });
+
+  it('renders no toolbar row through EditorToolbars in the source view', () => {
+    const { container } = render(<EditorToolbars commands={fakeCommands()} mode="source" />);
+    expect(container.querySelector('[role="toolbar"]')).toBeNull();
   });
 
   it('hides below md; row uses the shared reading column and the outer wrapper keeps w-full', () => {
@@ -224,8 +217,8 @@ describe('FormattingToolbar visibility and responsiveness', () => {
 });
 
 describe('FormattingToolbar collapse transition', () => {
-  it('wraps the toolbar in the collapse container, open when the preference is on', () => {
-    const { container } = render(<EditorToolbars commands={fakeCommands()} formattingToolbar />);
+  it('wraps the toolbar in the collapse container, open in wysiwyg mode', () => {
+    const { container } = render(<EditorToolbars commands={fakeCommands()} />);
     const wrap = container.querySelector('.editor-toolbar-collapse')!;
     expect(wrap.className).toContain('is-open');
     expect(wrap.querySelector('[role="toolbar"]')).not.toBeNull();
@@ -234,8 +227,8 @@ describe('FormattingToolbar collapse transition', () => {
   it('collapses over 150 ms: mounted while closing, unmounted after the timer', () => {
     vi.useFakeTimers();
     try {
-      const { container, rerender } = render(<EditorToolbars commands={fakeCommands()} formattingToolbar />);
-      rerender(<EditorToolbars commands={fakeCommands()} formattingToolbar={false} />);
+      const { container, rerender } = render(<EditorToolbars commands={fakeCommands()} />);
+      rerender(<EditorToolbars commands={fakeCommands()} mode="source" />);
       const wrap = container.querySelector('.editor-toolbar-collapse')!;
       expect(wrap.className).toContain('is-closed');
       // Still mounted so the max-height/opacity transition can run.
@@ -259,7 +252,6 @@ describe('index.css responsive layout (source scan)', () => {
     const closed = css.slice(css.indexOf('.editor-toolbar-collapse.is-closed'));
     expect(closed).toMatch(/max-height: 0[\s\S]*opacity: 0/);
   });
-
   it('drops the transition under prefers-reduced-motion', () => expect(css.slice(css.indexOf('prefers-reduced-motion'))).toMatch(/\.editor-toolbar-collapse\s*\{[^}]*transition:\s*none/));
 
   it('uses one shared 80% reading column, capped, and full-width editor surfaces', () => {
@@ -277,11 +269,15 @@ describe('index.css responsive layout (source scan)', () => {
 describe('Responsive header actions (source scan)', () => {
   const read = (name: string) => readFileSync(resolve(__dirname, name), 'utf-8');
 
-  it('keeps the mode toggle and Commit hidden below md, in the overflow menu instead', () => {
-    expect(read('ModeSwitch.tsx')).toMatch(/className="[^"]*\bhidden\b[^"]*\bmd:flex\b/);
+  it('keeps the Commit button hidden below md, in the overflow menu instead', () => {
     expect(read('AppHeader.tsx')).toMatch(/bg-black text-white hover:bg-gray-900[^\n]*hidden md:inline-flex/);
     expect(read('AppHeader.tsx')).toMatch(/className=\{COMMIT_BUTTON\}/);
     expect(read('HeaderOverflowMenu.tsx')).toMatch(/className="relative md:hidden"/);
+  });
+
+  it('renders no mode switch anywhere in the header sources', () => {
+    expect(read('AppHeader.tsx')).not.toContain('ModeSwitch');
+    expect(read('HeaderOverflowMenu.tsx')).not.toContain('onSelectMode');
   });
 });
 

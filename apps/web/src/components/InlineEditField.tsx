@@ -18,7 +18,7 @@ export interface InlineEditFieldProps {
 const SAVE_ERROR = 'Could not rename.';
 
 const INPUT_CLASS =
-  'w-full min-w-0 border-0 p-0 text-sm font-medium leading-tight text-gray-900 focus:outline-none';
+  'field-sizing-content min-w-0 border-0 p-0 text-sm font-medium leading-tight text-gray-900 focus:outline-none';
 
 /**
  * Draft state for the inline edit: tracks the edited value, the last
@@ -32,14 +32,16 @@ function useEditDraft(value: string, onSave?: (value: string) => void | Promise<
   const [draft, setDraft] = useState(value);
   const [error, setError] = useState<string | null>(null);
   const lastSaved = useRef(value);
+  const saving = useRef(false);
 
   useEffect(() => {
     lastSaved.current = value;
     setDraft(value);
   }, [value]);
 
-  /** Save the trimmed value, restoring the old value when it is empty. */
+  /** Save the trimmed value; ignored while a save is in flight. */
   const save = () => {
+    if (saving.current) return;
     const trimmed = draft.trim();
     if (trimmed === '' || trimmed === lastSaved.current) {
       setDraft(lastSaved.current);
@@ -47,15 +49,19 @@ function useEditDraft(value: string, onSave?: (value: string) => void | Promise<
     }
     setDraft(trimmed);
     setError(null);
+    saving.current = true;
     try {
-      Promise.resolve(onSave?.(trimmed)).then(
-        () => {
+      Promise.resolve(onSave?.(trimmed))
+        .then(() => {
           lastSaved.current = trimmed;
-        },
-        () => setError(SAVE_ERROR),
-      );
+        })
+        .catch(() => setError(SAVE_ERROR))
+        .finally(() => {
+          saving.current = false;
+        });
     } catch {
       setError(SAVE_ERROR);
+      saving.current = false;
     }
   };
 
@@ -96,6 +102,7 @@ export function InlineEditField({ value, label, testId, onSave, inputClassName }
         aria-label={label}
         data-testid={testId}
         value={draft}
+        size={Math.max(draft.length, 1)}
         onChange={(event) => setDraft(event.target.value)}
         onFocus={moveCaretToEnd}
         onClick={moveCaretToEnd}
