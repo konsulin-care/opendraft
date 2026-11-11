@@ -178,8 +178,8 @@ describe('AuthorsDialog draft author', () => {
 
   it('stores a single draft name as a literal person with author-type metadata', async () => {
     const ws = await boot(); fireEvent.click(screen.getByTestId('add-author')); fireEvent.click(screen.getByTestId('author-single-name'));
-    expect(screen.queryByTestId('author-given')).toBeNull(); expect(screen.getByPlaceholderText('Name')).toBeDefined();
-    fireEvent.change(screen.getByPlaceholderText('Name'), { target: { value: 'Dewi' } }); await flushWrites();
+    expect(screen.queryByTestId('author-given')).toBeNull(); expect(screen.getByText('Name')).toBeDefined();
+    expect((screen.getByTestId('author-literal') as HTMLInputElement).hasAttribute('placeholder')).toBe(false); fireEvent.change(screen.getByTestId('author-literal'), { target: { value: 'Dewi' } }); await flushWrites();
     const authors = await readAuthors(ws);
     expect(authors).toHaveLength(4); expect(authors[3]).toMatchObject({ name: { literal: 'Dewi' }, metadata: { 'author-type': 'person' } });
   });

@@ -1,12 +1,12 @@
 /**
- * Placeholder-only name editing for person authors.
+ * Visible-label name editing for person authors.
  *
- * The given/family inputs carry no visible labels — only placeholders
- * and aria-labels. The "This person has only one name" checkbox stores
- * the name as `{ literal }` together with `metadata.author-type: person`
- * and restores `{ given, family }` (family taken from the literal) when
- * unticked. Particle/suffix fields sit behind the "More name options"
- * toggle.
+ * The given, family and literal inputs each render a visible text label
+ * and an aria-label but no placeholder. The "This person has only one
+ * name" checkbox stores the name as `{ literal }` together with
+ * `metadata.author-type: person` and restores `{ given, family }`
+ * (family taken from the literal) when unticked. Particle/suffix fields
+ * sit behind the "More name options" toggle.
  */
 import { useState, type ClipboardEvent, type ReactNode } from 'react';
 import type { MetadataAuthor } from './use-manuscript-metadata';
@@ -68,11 +68,11 @@ const isSingleName = (name: Record<string, string>): boolean =>
   typeof name.literal === 'string' && !('given' in name) && !('family' in name);
 
 /**
- * Placeholder-only given/family inputs, the single-name checkbox and
- * the particle/suffix options of one person author.
+ * Labeled given/family inputs, the single-name checkbox and the
+ * particle/suffix options of one person author.
  *
  * @param props - See {@link AuthorNameFieldsProps}.
- * @returns The name inputs and toggles; no visible field labels.
+ * @returns The name inputs with visible labels; no placeholders.
  */
 export function AuthorNameFields({ author, name, apply }: AuthorNameFieldsProps): ReactNode {
   const setName = (patch: Record<string, string>): void => apply({ name: patch });
@@ -92,18 +92,24 @@ export function AuthorNameFields({ author, name, apply }: AuthorNameFieldsProps)
   return (
     <>
       {!single && (
-        <input data-testid="author-given" placeholder="Given name(s)" aria-label="Given name(s)"
-          value={name.given ?? ''} className={INPUT}
-          onChange={(event) => setName({ ...name, given: event.target.value })} />
+        <label className="block text-sm">Given name(s)
+          <input data-testid="author-given" aria-label="Given name(s)"
+            value={name.given ?? ''} className={INPUT}
+            onChange={(event) => setName({ ...name, given: event.target.value })} />
+        </label>
       )}
       {single ? (
-        <input data-testid="author-literal" placeholder="Name" aria-label="Name"
-          value={name.literal ?? ''} className={INPUT}
-          onChange={(event) => setName({ ...name, literal: event.target.value })} />
+        <label className="block text-sm">Name
+          <input data-testid="author-literal" aria-label="Name"
+            value={name.literal ?? ''} className={INPUT}
+            onChange={(event) => setName({ ...name, literal: event.target.value })} />
+        </label>
       ) : (
-        <input data-testid="author-family" placeholder="Family name" aria-label="Family name"
-          value={name.family ?? ''} className={INPUT}
-          onChange={(event) => setName({ ...name, family: event.target.value })} onPaste={onPaste} />
+        <label className="block text-sm">Family name
+          <input data-testid="author-family" aria-label="Family name"
+            value={name.family ?? ''} className={INPUT}
+            onChange={(event) => setName({ ...name, family: event.target.value })} onPaste={onPaste} />
+        </label>
       )}
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" data-testid="author-single-name" checked={single} className="accent-black"
