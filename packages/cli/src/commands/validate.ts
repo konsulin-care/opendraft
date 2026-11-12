@@ -8,6 +8,7 @@ import {
   validateOpendraft,
   type MetadataType,
 } from '@opendraft/schema';
+import { checkCitekeys } from '../checks/citekeys.js';
 
 /** Metadata files validated when present in a manuscript directory. */
 const METADATA_FILES: readonly MetadataType[] = ['author', 'abstract', 'frontmatter'];
@@ -205,8 +206,8 @@ function checkAnchors(
 }
 
 /**
- * Validate a manuscript's assembly: article includes, block files and
- * anchor contract; unreferenced files surface as warnings.
+ * Validate a manuscript's assembly: article includes, block files, anchor
+ * contract and block citekeys; unreferenced files surface as warnings.
  *
  * @param root - Project root directory.
  * @param manuscript - Manuscript entry from opendraft.yml.
@@ -246,6 +247,7 @@ function checkAssembly(root: string, manuscript: ManuscriptEntry, findings: Find
     });
   }
   checkAnchors(manuscript, assembly, blockFiles, findings);
+  findings.push(...checkCitekeys(root, manuscript.path, assembly, blockFiles));
 }
 
 /**
