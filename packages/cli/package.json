@@ -1,0 +1,40 @@
+{
+  "name": "@konsulin/opendraft",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "OpenDraft command-line tools: validate, init, and manage manuscript blocks.",
+  "license": "AGPL-3.0-only",
+  "bin": {
+    "opendraft": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/konsulin-care/opendraft",
+    "directory": "packages/cli"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@opendraft/manuscript": "workspace:*",
+    "@opendraft/references": "workspace:*",
+    "@opendraft/schema": "workspace:*",
+    "@opendraft/workspace": "workspace:*",
+    "@types/node": "^24.19.2",
+    "tsup": "^9.0.0",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.5",
+    "yaml": "^2.9.1"
+  }
+}

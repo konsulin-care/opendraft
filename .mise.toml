@@ -49,6 +49,12 @@ run = "pnpm run typecheck"
 
 dir = "apps/web"
 
+[tasks.serve]
+description = "Run the apps/web Vite dev server on 127.0.0.1:5173"
+run = "pnpm exec vite --host 127.0.0.1 --port 5173"
+
+dir = "apps/web"
+
 [tasks.build]
 description = "Build (placeholder)"
 run = "echo 'Placeholder for build script'"
@@ -101,4 +107,28 @@ dir = "apps/bff"
 
 [tasks.validate-project]
 description = "Validate opendraft.yml and manuscript structure"
-run = "node --import tsx packages/schema/src/cli.ts"
+run = "node --import tsx packages/cli/src/index.ts validate"
+
+[tasks.build-cli]
+description = "Bundle the CLI into packages/cli/dist with tsup"
+run = "pnpm run build"
+dir = "packages/cli"
+
+[tasks.smoke-cli]
+description = "Smoke-test the packaged CLI tarball"
+run = "bash packages/cli/scripts/smoke.sh"
+
+[tasks.publish]
+description = "Bump the CLI version and publish it (mise run publish [patch|minor|major])"
+dir = "packages/cli"
+depends = ["build-cli", "smoke-cli"]
+usage = '''
+arg "[bump]" default="patch" help="Version increment passed to pnpm version" {
+  choices "patch" "minor" "major"
+}
+'''
+run = "pnpm version \"${usage_bump?}\" && pnpm publish"
+
+[tasks.cli]
+description = "Run the OpenDraft CLI from source (mise run cli -- validate)"
+run = "node --import tsx packages/cli/src/index.ts"

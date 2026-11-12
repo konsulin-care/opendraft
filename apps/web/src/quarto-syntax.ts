@@ -2,26 +2,14 @@ import type { Plugin } from 'unified';
 import { ViewPlugin, Decoration, DecorationSet, EditorView } from '@codemirror/view';
 
 /**
- * Match Quarto-style code fence language:
- * - `{r}` → 'r'
- * - `{python}` → 'python'
- * - `{r init}` → 'r' (with label)
- * - `{{python}}` → 'python' (double braces)
+ * Remark plugin that preserves Quarto-style code fence headers.
  *
- * Note: remark splits `{python my-label}` into lang=`{python` and meta=`my-label}`.
- * So we need to match both `{lang}` and `{lang` patterns.
- */
-const QUARTO_LANG_PATTERN = /^\{(\w+)(?:\s+\w+)?\}$/;
-const QUARTO_LANG_NO_BRACE = /^\{(\w+)$/;
-const QUARTO_DOUBLE_BRACE_PATTERN = /^\{\{(\w+)\}\}$/;
-
-/**
- * Remark plugin that normalizes Quarto-style code fences.
- *
- * Transforms:
- * - ` ```{r} ` → ` ```r `
- * - ` ```{python my-label} ` → ` ```python `
- * - ` ```{{julia}} ` → ` ```julia `
+ * remark splits a fence info string at the first space, so
+ * ` ```{r label, echo=FALSE} ` parses as lang=`{r` +
+ * meta=`label, echo=FALSE}`. Milkdown's code_block schema serializes
+ * only `node.lang`, so this plugin rejoins the split parts into
+ * `lang` (and clears `meta`) to keep the original header intact
+ * across parse/stringify round trips.
  *
  * Standard fences like ` ```r ` are left unchanged.
  */
@@ -31,44 +19,12 @@ export const quartoRemarkPlugin = {
       return (tree: object) => {
         visitCodeBlocks(tree, (node: Record<string, unknown>) => {
           const lang = node.lang as string | undefined;
-          if (!lang) return;
-
-          // Try single-brace pattern: {r}, {python init}, etc.
-          // Note: remark may split `{python my-label}` into lang=`{python` and meta=`my-label}`
-          const singleMatch = lang.match(QUARTO_LANG_PATTERN);
-          if (singleMatch) {
-            node.data = node.data || {};
-            const data = node.data as Record<string, unknown>;
-            data.hProperties = data.hProperties || {};
-            const hProps = data.hProperties as Record<string, unknown>;
-            hProps.quartoLang = lang;
-            node.lang = singleMatch[1];
-            return;
-          }
-
-          // Handle case where remark split the lang (e.g., `{python` from `{python my-label}`)
-          const noBraceMatch = lang.match(QUARTO_LANG_NO_BRACE);
-          if (noBraceMatch) {
-            node.data = node.data || {};
-            const data = node.data as Record<string, unknown>;
-            data.hProperties = data.hProperties || {};
-            const hProps = data.hProperties as Record<string, unknown>;
-            hProps.quartoLang = lang + (node.meta ? ' ' + node.meta : '');
-            node.lang = noBraceMatch[1];
-            node.meta = null;
-            return;
-          }
-
-          // Try double-brace pattern: {{python}}, {{r}}, etc.
-          const doubleMatch = lang.match(QUARTO_DOUBLE_BRACE_PATTERN);
-          if (doubleMatch) {
-            node.data = node.data || {};
-            const data = node.data as Record<string, unknown>;
-            data.hProperties = data.hProperties || {};
-            const hProps = data.hProperties as Record<string, unknown>;
-            hProps.quartoLang = lang;
-            node.lang = doubleMatch[1];
-          }
+          // Only Quarto-style fences carry brace-wrapped info; leave
+          // standard fences (```r) untouched.
+          if (!lang || !lang.startsWith('{')) return;
+          const meta = node.meta as string | undefined;
+          node.lang = meta ? `${lang} ${meta}` : lang;
+          node.meta = null;
         });
       };
     };
@@ -77,11 +33,87 @@ export const quartoRemarkPlugin = {
   options: {},
 };
 
+// --- remark-stringify code handler ---
+
+/** Subset of an mdast code node used by {@link quartoCodeHandler}. */
+interface CodeNode {
+  lang?: string | null;
+  meta?: string | null;
+  value?: string;
+}
+
+/** Subset of the mdast-util-to-markdown state used by {@link quartoCodeHandler}. */
+interface StringifyState {
+  options: { fence?: string | null; fences?: boolean | null };
+  indentLines: (value: string, map: (line: string, index: number, blank: boolean) => string) => string;
+}
+
 /**
- * Remark plugin that handles inline Quarto code: `{r} expr`.
+ * remark-stringify `code` handler that writes fence info verbatim.
  *
- * Transforms `` `{r} radius` `` into an inlineCode node with
- * `data.hProperties.quartoLang = 'r'` and `value = 'radius'`.
+ * The stock handler runs `state.safe()` on `node.lang` inside the
+ * `codeFencedLang` construct, whose unsafe rules encode spaces as
+ * `&#x20;` — mangling Quarto headers such as `{r label, echo=FALSE}`
+ * that {@link quartoRemarkPlugin} merges into `lang`. This handler
+ * replicates the default fence logic (indented fallback, backtick
+ * streak sizing) but emits `lang`/`meta` raw, escaping only backtick
+ * characters, and never enters the `codeFencedLang*` constructs.
+ *
+ * @param node - mdast code node being serialized.
+ * @param _parent - Parent node (unused).
+ * @param state - Serializer state (fence options and indentLines).
+ * @returns The serialized fenced or indented code block.
+ */
+export function quartoCodeHandler(node: CodeNode, _parent: unknown, state: StringifyState): string {
+  const marker = state.options.fence === '~' ? '~' : '`';
+  const raw = node.value ?? '';
+  // Indented fallback mirrors mdast-util-to-markdown's formatCodeAsIndented.
+  if (
+    state.options.fences === false &&
+    raw &&
+    !node.lang &&
+    /[^\n\r ]/.test(raw) &&
+    !/^[\t ]*(?:[\n\r]|$)|(?:^|[\n\r])[\t ]*$/.test(raw)
+  ) {
+    return state.indentLines(raw, (line, _index, blank) => (blank ? '' : '    ') + line);
+  }
+  const sequence = marker.repeat(Math.max(longestStreak(raw, marker) + 1, 3));
+  let value = sequence;
+  if (node.lang) value += escapeBackticks(node.lang);
+  if (node.lang && node.meta) value += ' ' + escapeBackticks(node.meta);
+  value += '\n';
+  if (raw) value += raw + '\n';
+  value += sequence;
+  return value;
+}
+
+/** Escape backtick characters so they cannot close the fence. */
+function escapeBackticks(value: string): string {
+  return value.replace(/`/g, '&#x60;');
+}
+
+/** Longest run of `sub` in `value` (mirrors the longest-streak utility). */
+function longestStreak(value: string, sub: string): number {
+  let index = value.indexOf(sub);
+  let expected = index;
+  let count = 0;
+  let max = 0;
+  while (index !== -1) {
+    count = index === expected ? count + 1 : 1;
+    if (count > max) max = count;
+    expected = index + sub.length;
+    index = value.indexOf(sub, expected);
+  }
+  return max;
+}
+
+/**
+ * Remark plugin that tags inline Quarto code: `` `{r} radius` ``.
+ *
+ * Attaches `data.quartoLang = 'r'` as metadata but leaves `value`
+ * verbatim: Milkdown's inlineCode mark is attrs-less and stores the
+ * text as-is, so stripping the `{lang} ` prefix would be lost — and
+ * unrepresentable — on parse/stringify round trips.
  */
 export const quartoInlineCodePlugin = {
   plugin: (() => {
@@ -95,11 +127,11 @@ export const quartoInlineCodePlugin = {
           const match = value.match(/^\{(\w+)\}\s+(.+)$/);
           if (!match) return;
 
-          const [, lang, expr] = match;
+          const [, lang] = match;
 
-          // Transform this node into a standard inlineCode with metadata
+          // Keep `value` verbatim (the attrs-less inlineCode mark
+          // round-trips text as-is); record the language as metadata.
           node.type = 'inlineCode';
-          node.value = expr;
           node.data = node.data || {};
           const data = node.data as Record<string, unknown>;
           data.quartoLang = lang;
