@@ -49,6 +49,12 @@ run = "pnpm run typecheck"
 
 dir = "apps/web"
 
+[tasks.serve]
+description = "Run the apps/web Vite dev server on 127.0.0.1:5173"
+run = "pnpm exec vite --host 127.0.0.1 --port 5173"
+
+dir = "apps/web"
+
 [tasks.build]
 description = "Build (placeholder)"
 run = "echo 'Placeholder for build script'"
