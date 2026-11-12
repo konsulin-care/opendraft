@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeShortName, uniqueShortName } from './slug';
+import { normalizeShortName, uniqueShortName } from '../src/slug';
+import {
+  normalizeShortName as webNormalizeShortName,
+  uniqueShortName as webUniqueShortName,
+} from '../../../apps/web/src/block-editor/slug';
 
 describe('normalizeShortName', () => {
   it("normalizes 'Like This' to 'like-this'", () => {
     expect(normalizeShortName('Like This')).toBe('like-this');
+  });
+
+  it("turns 'Results & Discussion' into a lowercase hyphenated short name", () => {
+    expect(normalizeShortName('Results & Discussion')).toBe('results-discussion');
   });
 
   it('strips accents and lowercases', () => {
@@ -35,9 +43,9 @@ describe('uniqueShortName', () => {
     expect(uniqueShortName('Like This', () => false)).toBe('like-this');
   });
 
-  it('appends a 6-char lowercase ULID suffix to a taken candidate', () => {
+  it('appends a 6-digit numeric suffix to a taken candidate', () => {
     const result = uniqueShortName('Like This', (name) => name === 'like-this');
-    expect(result).toMatch(/^like-this-[0-9abcdefghjkmnpqrstuvwxyz]{6}$/);
+    expect(result).toMatch(/^like-this-[0-9]{6}$/);
     expect(result.length).toBeLessThanOrEqual(40);
   });
 
@@ -53,12 +61,36 @@ describe('uniqueShortName', () => {
   });
 
   it('regenerates the suffix when the suffixed candidate collides again', () => {
-    const suffixes = ['aaaaaa', 'bbbbbb'];
+    const suffixes = ['111111', '222222'];
     let index = 0;
-    const nextSuffix = (): string => suffixes[index++] ?? 'cccccc';
-    const used = new Set(['like-this', 'like-this-aaaaaa']);
+    const nextSuffix = (): string => suffixes[index++] ?? '333333';
+    const used = new Set(['like-this', 'like-this-111111']);
     const result = uniqueShortName('Like This', (name) => used.has(name), nextSuffix);
-    expect(result).toBe('like-this-bbbbbb');
+    expect(result).toBe('like-this-222222');
     expect(index).toBe(2);
+  });
+});
+
+describe('apps/web block-editor slug shim', () => {
+  it('re-exports the package functions with identical results', () => {
+    const titles = [
+      'Like This',
+      'Results & Discussion',
+      'Café RÉsumé',
+      '!!!',
+      'abcdefghij '.repeat(5),
+      'word '.repeat(20),
+    ];
+    for (const title of titles) {
+      expect(webNormalizeShortName(title)).toBe(normalizeShortName(title));
+    }
+    const isTaken = (name: string): boolean => name === 'results-discussion';
+    const nextSuffix = (): string => '123456';
+    expect(webUniqueShortName('Results & Discussion', isTaken, nextSuffix)).toBe(
+      uniqueShortName('Results & Discussion', isTaken, nextSuffix),
+    );
+    expect(webUniqueShortName('Results & Discussion', isTaken, nextSuffix)).toBe(
+      'results-discussion-123456',
+    );
   });
 });
