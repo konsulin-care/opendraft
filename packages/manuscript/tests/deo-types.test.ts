@@ -4,7 +4,13 @@ import {
   sectionTypeClass,
   sectionTypePresets,
   sectionTypeRole,
-} from './deo-types';
+} from '../src/deo-types';
+import {
+  extendedSectionTypePresets as webExtendedSectionTypePresets,
+  sectionTypeClass as webSectionTypeClass,
+  sectionTypePresets as webSectionTypePresets,
+  sectionTypeRole as webSectionTypeRole,
+} from '../../../apps/web/src/block-editor/deo-types';
 
 describe('sectionTypePresets', () => {
   it('returns the preset list Introduction, Methods, Results, Discussion, Conclusion with a title, short name and class for each', () => {
@@ -41,6 +47,11 @@ describe('sectionTypeClass', () => {
 
   it("maps a generic section to 'doco-section'", () => {
     expect(sectionTypeClass('section')).toBe('doco-section');
+  });
+
+  it('falls back to the generic class for an unknown type', () => {
+    expect(sectionTypeClass('custom-section')).toBe('doco-section');
+    expect(sectionTypeClass('my-notes')).toBe('doco-section');
   });
 });
 
@@ -111,5 +122,18 @@ describe('sectionTypeRole', () => {
     const role = sectionTypeRole('author-contribution');
     expect(role?.title).toBe('Author Contribution');
     expect(sectionTypeClass('author-contribution')).toBe('deo-author-contribution');
+  });
+});
+
+describe('apps/web block-editor deo-types shim', () => {
+  it('re-exports the package presets with identical results', () => {
+    expect(webSectionTypePresets()).toEqual(sectionTypePresets());
+    expect(webExtendedSectionTypePresets()).toEqual(extendedSectionTypePresets());
+    expect(webSectionTypeRole('author-contribution')).toEqual(
+      sectionTypeRole('author-contribution'),
+    );
+    expect(webSectionTypeRole('section')).toBeNull();
+    expect(webSectionTypeClass('methods')).toBe(sectionTypeClass('methods'));
+    expect(webSectionTypeClass('custom-section')).toBe(sectionTypeClass('custom-section'));
   });
 });
