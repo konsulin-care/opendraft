@@ -1,4 +1,5 @@
 import { initCommand } from './commands/init.js';
+import { manuscriptCommand } from './commands/manuscript.js';
 import { validateCommand } from './commands/validate.js';
 
 const USAGE = [
@@ -29,6 +30,7 @@ export function runCli(args: string[]): number {
   }
   if (command === 'validate') return validateCommand(rest);
   if (command === 'init') return initCommand(rest);
+  if (command === 'manuscript') return manuscriptCommand(rest);
   console.error(USAGE);
   return 2;
 }
