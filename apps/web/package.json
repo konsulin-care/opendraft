@@ -24,6 +24,7 @@
     "@milkdown/plugin-slash": "^7.23.0",
     "@milkdown/react": "7.23.0",
     "@opendraft/git": "workspace:*",
+    "@opendraft/manuscript": "workspace:*",
     "@opendraft/references": "workspace:*",
     "@opendraft/schema": "workspace:*",
     "@opendraft/workspace": "workspace:*",
