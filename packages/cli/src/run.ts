@@ -1,6 +1,13 @@
 import { validateCommand } from './commands/validate.js';
 
-const USAGE = 'usage: opendraft <command> [arguments]\ncommands:\n  validate [dir]  Validate config, metadata and assemblies';
+const USAGE = [
+  'usage: opendraft <command> [arguments]',
+  'commands:',
+  '  validate [dir] [--json]  Validate config, metadata and assemblies',
+  '  init [dir]              Scaffold a new project',
+  '  manuscript              Manage manuscripts',
+  '  block                   Manage blocks',
+].join('\n');
 
 /**
  * Run the OpenDraft CLI with the given arguments.
@@ -15,6 +22,10 @@ const USAGE = 'usage: opendraft <command> [arguments]\ncommands:\n  validate [di
  */
 export function runCli(args: string[]): number {
   const [command, ...rest] = args;
+  if (command === '--help') {
+    console.log(USAGE);
+    return 0;
+  }
   if (command === 'validate') return validateCommand(rest);
   console.error(USAGE);
   return 2;

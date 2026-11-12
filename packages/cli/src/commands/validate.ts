@@ -9,6 +9,7 @@ import {
   type MetadataType,
 } from '@opendraft/schema';
 import { checkCitekeys } from '../checks/citekeys.js';
+import { printReport, type Finding } from '../output.js';
 
 /** Metadata files validated when present in a manuscript directory. */
 const METADATA_FILES: readonly MetadataType[] = ['author', 'abstract', 'frontmatter'];
@@ -19,13 +20,6 @@ const METADATA_FILE: Record<MetadataType, string> = {
   abstract: '_abstract.yml',
   frontmatter: '_frontmatter.yml',
 };
-
-/** One finding: the file it concerns, its level, and the message. */
-interface Finding {
-  level: 'error' | 'warning';
-  location: string;
-  message: string;
-}
 
 /** Manuscript entry of a validated opendraft.yml. */
 interface ManuscriptEntry {
@@ -69,19 +63,19 @@ function readConfig(root: string, findings: Finding[]): ManuscriptEntry[] | null
   const location = 'opendraft.yml';
   const text = readText(join(root, location));
   if (text === null) {
-    findings.push({ level: 'error', location, message: 'File not found.' });
+    findings.push({ level: 'error', location, path: '', message: 'File not found.' });
     return null;
   }
   let data: unknown;
   try {
     data = parseYaml(text);
   } catch (err) {
-    findings.push({ level: 'error', location, message: yamlMessage(err) });
+    findings.push({ level: 'error', location, path: '', message: yamlMessage(err) });
     return null;
   }
   const result = validateOpendraft(data);
   for (const error of result.errors) {
-    findings.push({ level: 'error', location, message: `${error.path}: ${error.message}` });
+    findings.push({ level: 'error', location, path: error.path, message: error.message });
   }
   if (!result.valid) return null;
   return (data as { manuscripts: ManuscriptEntry[] }).manuscripts;
@@ -104,11 +98,11 @@ function checkMetadata(root: string, manuscript: ManuscriptEntry, findings: Find
     try {
       data = parseYaml(text);
     } catch (err) {
-      findings.push({ level: 'error', location, message: yamlMessage(err) });
+      findings.push({ level: 'error', location, path: '', message: yamlMessage(err) });
       continue;
     }
     for (const error of validateMetadata(data, type).errors) {
-      findings.push({ level: 'error', location, message: `${error.path}: ${error.message}` });
+      findings.push({ level: 'error', location, path: error.path, message: error.message });
     }
   }
 }
@@ -163,6 +157,7 @@ function readBlockFiles(
       findings.push({
         level: 'error',
         location: `${manuscript.path}/blocks/${file}`,
+        path: '',
         message: 'File not found.',
       });
       continue;
@@ -197,6 +192,7 @@ function checkAnchors(
       findings.push({
         level: 'error',
         location: `${manuscript.path}/article.qmd`,
+        path: 'assembly',
         message: `duplicate anchor ${anchor}: ${previous} and ${path}`,
       });
       continue;
@@ -220,6 +216,7 @@ function checkAssembly(root: string, manuscript: ManuscriptEntry, findings: Find
     findings.push({
       level: 'error',
       location: `${manuscript.path}/article.qmd`,
+      path: '',
       message: 'File not found.',
     });
     return;
@@ -236,6 +233,7 @@ function checkAssembly(root: string, manuscript: ManuscriptEntry, findings: Find
     findings.push({
       level: 'error',
       location: blockLocation(manuscript, error.path),
+      path: error.path,
       message: error.message,
     });
   }
@@ -243,49 +241,32 @@ function checkAssembly(root: string, manuscript: ManuscriptEntry, findings: Find
     findings.push({
       level: 'warning',
       location: blockLocation(manuscript, warning.path),
+      path: warning.path,
       message: warning.message,
     });
   }
   checkAnchors(manuscript, assembly, blockFiles, findings);
-  findings.push(...checkCitekeys(root, manuscript.path, assembly, blockFiles));
-}
-
-/**
- * Print collected findings: errors to stderr, warnings to stderr, and a
- * success line when no errors were found.
- *
- * @param findings - All findings from the run, in discovery order.
- */
-function report(findings: Finding[]): void {
-  const errors = findings.filter((finding) => finding.level === 'error');
-  for (const finding of findings) {
-    if (finding.level === 'warning') {
-      console.warn(`warning: ${finding.location}: ${finding.message}`);
-    }
-  }
-  if (errors.length === 0) {
-    console.log('✓ Project validation passed.');
-    return;
-  }
-  console.error('✗ Project validation failed:');
-  for (const error of errors) {
-    console.error(`  ${error.location}: ${error.message}`);
-  }
+  const citekeys = checkCitekeys(root, manuscript.path, assembly, blockFiles);
+  findings.push(...citekeys.map((finding) => ({ ...finding, path: '' })));
 }
 
 /**
  * Run the `validate` command: config, metadata and assembly checks.
  *
  * Reads `opendraft.yml` from the project root, validates each listed
- * manuscript's metadata files and assembly, and prints the result.
- * Warnings (e.g. orphan draft blocks) never fail the run.
+ * manuscript's metadata files and assembly, and prints the result in the
+ * requested output mode. Warnings (e.g. orphan draft blocks) never fail
+ * the run.
  *
- * @param args - Arguments after the command name; optional project root
- *               (defaults to the current working directory).
+ * @param args - Arguments after the command name: optional project root
+ *               (defaults to the current working directory) and the
+ *               `--json` flag for the machine-readable report.
  * @returns Exit code: 0 when no errors (warnings allowed), 1 otherwise.
  */
 export function validateCommand(args: string[]): number {
-  const root = args[0] ?? process.cwd();
+  const json = args.includes('--json');
+  const positional = args.filter((arg) => !arg.startsWith('--'));
+  const root = positional[0] ?? process.cwd();
   const findings: Finding[] = [];
   const manuscripts = readConfig(root, findings);
   if (manuscripts !== null) {
@@ -294,6 +275,6 @@ export function validateCommand(args: string[]): number {
       checkAssembly(root, manuscript, findings);
     }
   }
-  report(findings);
+  printReport(findings, json);
   return findings.some((finding) => finding.level === 'error') ? 1 : 0;
 }
