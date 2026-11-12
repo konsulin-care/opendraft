@@ -17,3 +17,5 @@ export {
   sectionTypeRole,
 } from './deo-types.js';
 export type { SectionTypePreset } from './deo-types.js';
+export { OPENDRAFT_CONFIG_PATH, SHARED_BIB_PATH, scaffoldProject } from './scaffold.js';
+export type { ProtocolBlock, ScaffoldOptions } from './scaffold.js';
