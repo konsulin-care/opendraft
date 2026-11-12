@@ -102,3 +102,12 @@ dir = "apps/bff"
 [tasks.validate-project]
 description = "Validate opendraft.yml and manuscript structure"
 run = "node --import tsx packages/cli/src/index.ts validate"
+
+[tasks.build-cli]
+description = "Bundle the CLI into packages/cli/dist with tsup"
+run = "pnpm run build"
+dir = "packages/cli"
+
+[tasks.cli]
+description = "Run the OpenDraft CLI from source (mise run cli -- validate)"
+run = "node --import tsx packages/cli/src/index.ts"
