@@ -10,6 +10,7 @@ import {
 } from '@opendraft/schema';
 import { checkCitekeys } from '../checks/citekeys.js';
 import { printReport, type Finding } from '../output.js';
+import { checkProtocolPin } from '../protocol.js';
 
 /** Metadata files validated when present in a manuscript directory. */
 const METADATA_FILES: readonly MetadataType[] = ['author', 'abstract', 'frontmatter'];
@@ -25,6 +26,12 @@ const METADATA_FILE: Record<MetadataType, string> = {
 interface ManuscriptEntry {
   id: string;
   path: string;
+}
+
+/** Validated opendraft.yml: manuscript entries plus the pinned protocol commit. */
+interface ProjectConfig {
+  manuscripts: ManuscriptEntry[];
+  protocolCommit: string;
 }
 
 /**
@@ -57,9 +64,9 @@ function readText(path: string): string | null {
  *
  * @param root - Project root directory.
  * @param findings - Collector pushed onto.
- * @returns Manuscript entries, or null when the config is unusable.
+ * @returns Project config, or null when the config is unusable.
  */
-function readConfig(root: string, findings: Finding[]): ManuscriptEntry[] | null {
+function readConfig(root: string, findings: Finding[]): ProjectConfig | null {
   const location = 'opendraft.yml';
   const text = readText(join(root, location));
   if (text === null) {
@@ -78,7 +85,8 @@ function readConfig(root: string, findings: Finding[]): ManuscriptEntry[] | null
     findings.push({ level: 'error', location, path: error.path, message: error.message });
   }
   if (!result.valid) return null;
-  return (data as { manuscripts: ManuscriptEntry[] }).manuscripts;
+  const valid = data as { manuscripts: ManuscriptEntry[]; protocol: { commit: string } };
+  return { manuscripts: valid.manuscripts, protocolCommit: valid.protocol.commit };
 }
 
 /**
@@ -254,9 +262,10 @@ function checkAssembly(root: string, manuscript: ManuscriptEntry, findings: Find
  * Run the `validate` command: config, metadata and assembly checks.
  *
  * Reads `opendraft.yml` from the project root, validates each listed
- * manuscript's metadata files and assembly, and prints the result in the
- * requested output mode. Warnings (e.g. orphan draft blocks) never fail
- * the run.
+ * manuscript's metadata files and assembly, checks the protocol pin
+ * against the embedded protocol commit, and prints the result in the
+ * requested output mode. Warnings (e.g. orphan draft blocks or a
+ * mismatched protocol commit) never fail the run.
  *
  * @param args - Arguments after the command name: optional project root
  *               (defaults to the current working directory) and the
@@ -268,9 +277,10 @@ export function validateCommand(args: string[]): number {
   const positional = args.filter((arg) => !arg.startsWith('--'));
   const root = positional[0] ?? process.cwd();
   const findings: Finding[] = [];
-  const manuscripts = readConfig(root, findings);
-  if (manuscripts !== null) {
-    for (const manuscript of manuscripts) {
+  const config = readConfig(root, findings);
+  if (config !== null) {
+    checkProtocolPin(config.protocolCommit, findings);
+    for (const manuscript of config.manuscripts) {
       checkMetadata(root, manuscript, findings);
       checkAssembly(root, manuscript, findings);
     }
