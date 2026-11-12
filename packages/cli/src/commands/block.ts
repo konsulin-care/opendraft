@@ -1,13 +1,15 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { addBlock, extractIncludes } from '@opendraft/manuscript';
+import { addBlock, extractIncludes, splitHeading } from '@opendraft/manuscript';
 import type { CreateBlockDraft } from '@opendraft/manuscript';
 import { NodeFsWorkspace } from '@opendraft/workspace/node';
 import { resolveManuscript } from '../resolve-manuscript.js';
 
-/** Usage line printed for usage errors. */
-const BLOCK_USAGE =
-  'usage: opendraft block add <title> [dir] [-m <id>] [--after <short>] [--type <type>]';
+/** Usage lines printed for usage errors. */
+const BLOCK_USAGE = [
+  'usage: opendraft block add <title> [dir] [-m <id>] [--after <short>] [--type <type>]',
+  '       opendraft block ls [dir] [-m <id>]',
+].join('\n');
 
 /** Section type pattern: lowercase alphanumeric groups joined by hyphens. */
 const TYPE_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -73,6 +75,88 @@ function parseArgs(args: string[]): BlockAddArgs {
   return parsed;
 }
 
+/** Parsed `block ls` arguments. */
+interface BlockLsArgs {
+  /** Project directory (only positional), or null when absent. */
+  dir: string | null;
+  /** Manuscript id from `-m`/`--manuscript`, or null when omitted. */
+  manuscriptId: string | null;
+  /** True when a flag is unknown, lacks its value, or a second positional appears. */
+  invalid: boolean;
+}
+
+/**
+ * Parse `block ls` arguments: one optional positional plus value flags.
+ *
+ * @param args - Arguments after `block ls`.
+ * @returns Parsed directory, manuscript id and an invalid-argument marker.
+ */
+function parseLsArgs(args: string[]): BlockLsArgs {
+  const parsed: BlockLsArgs = { dir: null, manuscriptId: null, invalid: false };
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (arg === '-m' || arg === '--manuscript') {
+      const value = args[i + 1];
+      if (value === undefined || value.startsWith('-')) {
+        parsed.invalid = true;
+        return parsed;
+      }
+      parsed.manuscriptId = value;
+      i += 1;
+      continue;
+    }
+    if (arg.startsWith('-')) {
+      parsed.invalid = true;
+      continue;
+    }
+    if (parsed.dir === null) parsed.dir = arg;
+    else parsed.invalid = true;
+  }
+  return parsed;
+}
+
+/**
+ * Run the `block ls` command: print one line per included block.
+ *
+ * Resolves the target manuscript from `opendraft.yml` the same way as
+ * `block add` — an explicit `-m` id must be listed, otherwise the
+ * project's only manuscript is used — and prints the failure message
+ * with exit code 1 for unknown ids. On success every include line of
+ * `article.qmd` yields `short<TAB>title` on stdout, in include order,
+ * with the block file's heading title falling back to the short name
+ * when the file or heading is missing. All output is printed before
+ * the command returns.
+ *
+ * @param args - Arguments after the command name: `ls` followed by an
+ *               optional project directory (defaults to the current
+ *               working directory) and the `-m`/`--manuscript` flag.
+ * @returns Exit code: 0 on success, 1 on resolution failures, 2 on
+ *          usage errors.
+ */
+function blockLs(args: string[]): number {
+  const parsed = parseLsArgs(args);
+  if (parsed.invalid) {
+    console.error(BLOCK_USAGE);
+    return 2;
+  }
+  const root = parsed.dir ?? process.cwd();
+  const resolved = resolveManuscript(root, parsed.manuscriptId);
+  if (!resolved.ok) {
+    console.error(resolved.message);
+    return 1;
+  }
+  const entry = resolved.entry;
+  const articlePath = join(root, entry.path, 'article.qmd');
+  const article = existsSync(articlePath) ? readFileSync(articlePath, 'utf8') : '';
+  for (const short of extractIncludes(article)) {
+    const blockPath = join(root, entry.path, 'blocks', `${short}.qmd`);
+    const text = existsSync(blockPath) ? readFileSync(blockPath, 'utf8') : null;
+    const title = text === null ? short : (splitHeading(text).title ?? short);
+    console.log(`${short}\t${title}`);
+  }
+  return 0;
+}
+
 /**
  * Run the `block add` command: write a block file and its include line.
  *
@@ -84,14 +168,19 @@ function parseArgs(args: string[]): BlockAddArgs {
  * block file and assembly are written asynchronously through
  * {@link addBlock}; the returned code reflects the pre-write checks.
  *
+ * Dispatches `ls` to {@link blockLs} and `add` to the writer below;
+ * anything else prints the usage and exits 2.
+ *
  * @param args - Arguments after the command name: `add` followed by the
  *               block title, an optional project directory (defaults to
- *               the current working directory) and the flags above.
- * @returns Exit code: 0 when the write starts, 1 on resolution failures,
- *          2 on usage errors.
+ *               the current working directory) and the flags above; or
+ *               `ls` with an optional directory and `-m <id>`.
+ * @returns Exit code: 0 when the operation succeeds or a write starts,
+ *          1 on resolution failures, 2 on usage errors.
  */
 export function blockCommand(args: string[]): number {
   const [subcommand, ...rest] = args;
+  if (subcommand === 'ls') return blockLs(rest);
   if (subcommand !== 'add') {
     console.error(BLOCK_USAGE);
     return 2;
