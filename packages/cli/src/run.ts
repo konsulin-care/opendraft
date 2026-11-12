@@ -1,3 +1,4 @@
+import { blockCommand } from './commands/block.js';
 import { initCommand } from './commands/init.js';
 import { manuscriptCommand } from './commands/manuscript.js';
 import { validateCommand } from './commands/validate.js';
@@ -31,6 +32,7 @@ export function runCli(args: string[]): number {
   if (command === 'validate') return validateCommand(rest);
   if (command === 'init') return initCommand(rest);
   if (command === 'manuscript') return manuscriptCommand(rest);
+  if (command === 'block') return blockCommand(rest);
   console.error(USAGE);
   return 2;
 }
