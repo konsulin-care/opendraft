@@ -6,13 +6,14 @@ import { addBlock, scaffoldProject } from '@opendraft/manuscript';
 import type { ProtocolBlock } from '@opendraft/manuscript';
 import { NodeFsWorkspace } from '@opendraft/workspace/node';
 import { runCli } from '../src/index.js';
+import { EMBEDDED_PROTOCOL_COMMIT } from '../src/protocol.js';
 
-/** Protocol block accepted by the opendraft.yml schema. */
+/** Protocol block accepted by the opendraft.yml schema (pinned to the embedded commit). */
 const PROTOCOL: ProtocolBlock = {
   name: 'opendraft',
-  version: 'e849ba8a46528d523d5f3d18f5f0171853f13030',
+  version: EMBEDDED_PROTOCOL_COMMIT,
   repository: 'https://github.com/konsulin-care/opendraft',
-  commit: 'e849ba8a46528d523d5f3d18f5f0171853f13030',
+  commit: EMBEDDED_PROTOCOL_COMMIT,
 };
 
 /** Manuscript directory written by the scaffold for id `demo`. */
