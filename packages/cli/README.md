@@ -99,31 +99,32 @@ manuscript.
 
 ## Manual publish
 
-Publishing is manual and runs from `packages/cli`:
+Publishing is manual and runs from the repository root. The `publish`
+task runs the bundle build and the smoke test first, then bumps the
+version and publishes from `packages/cli`:
 
-1. Build the bundle:
-
-   ```bash
-   mise run build-cli
-   ```
-
-2. Run the smoke test against the packed tarball:
+1. Bump the version and publish (git tree must be clean):
 
    ```bash
-   bash packages/cli/scripts/smoke.sh
+   mise run publish patch   # or minor / major; defaults to patch
    ```
 
-3. Bump the version (from `packages/cli`):
+   This runs `pnpm version <bump> && pnpm publish`. `pnpm version`
+   requires a clean working tree and commits the bump with an annotated
+   `v<version>` tag.
+
+2. Push the release commit and tag:
 
    ```bash
-   npm version patch   # or minor / major
+   git push --follow-tags
    ```
 
-4. Publish from `packages/cli`:
+The prerequisites can also be run standalone:
 
-   ```bash
-   npm publish --access public
-   ```
+```bash
+mise run build-cli
+mise run smoke-cli
+```
 
 ## License
 
