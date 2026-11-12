@@ -8,6 +8,7 @@ export {
   setBlockTitle,
 } from './blocks.js';
 export type { BlockListItem, CreateBlockDraft } from './blocks.js';
+export { extractCitekeys } from './citekeys.js';
 export { joinHeading, retitleHeading, splitHeading } from './heading.js';
 export type { BlockHeading, SplitHeading } from './heading.js';
 export {
