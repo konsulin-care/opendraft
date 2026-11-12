@@ -114,6 +114,21 @@ description = "Bundle the CLI into packages/cli/dist with tsup"
 run = "pnpm run build"
 dir = "packages/cli"
 
+[tasks.smoke-cli]
+description = "Smoke-test the packaged CLI tarball"
+run = "bash packages/cli/scripts/smoke.sh"
+
+[tasks.publish]
+description = "Bump the CLI version and publish it (mise run publish [patch|minor|major])"
+dir = "packages/cli"
+depends = ["build-cli", "smoke-cli"]
+usage = '''
+arg "[bump]" default="patch" help="Version increment passed to pnpm version" {
+  choices "patch" "minor" "major"
+}
+'''
+run = "pnpm version \"${usage_bump?}\" && pnpm publish"
+
 [tasks.cli]
 description = "Run the OpenDraft CLI from source (mise run cli -- validate)"
 run = "node --import tsx packages/cli/src/index.ts"
