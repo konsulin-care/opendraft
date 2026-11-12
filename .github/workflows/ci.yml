@@ -71,6 +71,19 @@ jobs:
         run: mise run build-go
         working-directory: apps/bff
 
+  cli:
+    name: CLI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - run: mise install
+      - run: pnpm install --frozen-lockfile
+      - name: Build CLI bundle
+        run: mise run build-cli
+      - name: Smoke test packed CLI
+        run: bash packages/cli/scripts/smoke.sh
+
   security:
     name: Security
     runs-on: ubuntu-latest
