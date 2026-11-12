@@ -101,4 +101,4 @@ dir = "apps/bff"
 
 [tasks.validate-project]
 description = "Validate opendraft.yml and manuscript structure"
-run = "node --import tsx packages/schema/src/cli.ts"
+run = "node --import tsx packages/cli/src/index.ts validate"
