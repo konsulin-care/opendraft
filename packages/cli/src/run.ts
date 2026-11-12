@@ -1,10 +1,11 @@
+import { initCommand } from './commands/init.js';
 import { validateCommand } from './commands/validate.js';
 
 const USAGE = [
   'usage: opendraft <command> [arguments]',
   'commands:',
   '  validate [dir] [--json]  Validate config, metadata and assemblies',
-  '  init [dir]              Scaffold a new project',
+  '  init [dir] --manuscript <id>  Scaffold a new project',
   '  manuscript              Manage manuscripts',
   '  block                   Manage blocks',
 ].join('\n');
@@ -27,6 +28,7 @@ export function runCli(args: string[]): number {
     return 0;
   }
   if (command === 'validate') return validateCommand(rest);
+  if (command === 'init') return initCommand(rest);
   console.error(USAGE);
   return 2;
 }
