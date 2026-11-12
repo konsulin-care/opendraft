@@ -1,6 +1,6 @@
 {
   "name": "@konsulin/opendraft",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "type": "module",
   "description": "OpenDraft command-line tools: validate, init, and manage manuscript blocks.",
   "license": "AGPL-3.0-only",
