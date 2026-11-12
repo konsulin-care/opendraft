@@ -41,6 +41,7 @@ function roundTrip(md: string): string {
   return unified()
     .use(remarkParse)
     .use(quartoRemarkPlugin.plugin, quartoRemarkPlugin.options)
+    .use(quartoInlineCodePlugin.plugin, quartoInlineCodePlugin.options)
     .use(remarkStringify, { handlers: { code: quartoCodeHandler } })
     .processSync(md)
     .toString();
@@ -177,7 +178,7 @@ describe('quartoInlineCodePlugin — inline code', () => {
     const para = root.children![0] as MdastNode;
     const inline = para.children![1];
     expect(inline.type).toBe('inlineCode');
-    expect(inline.value).toBe('radius');
+    expect(inline.value).toBe('{r} radius');
     expect(inline.data?.quartoLang).toBe('r');
   });
 
@@ -186,7 +187,7 @@ describe('quartoInlineCodePlugin — inline code', () => {
     const para = root.children![0] as MdastNode;
     const inline = para.children![1];
     expect(inline.type).toBe('inlineCode');
-    expect(inline.value).toBe('x + 1');
+    expect(inline.value).toBe('{python} x + 1');
     expect(inline.data?.quartoLang).toBe('python');
   });
 
@@ -204,7 +205,7 @@ describe('quartoInlineCodePlugin — inline code', () => {
     const para = root.children![0] as MdastNode;
     const inline = para.children![0];
     expect(inline.type).toBe('inlineCode');
-    expect(inline.value).toBe('sqrt(2)');
+    expect(inline.value).toBe('{julia} sqrt(2)');
     expect(inline.data?.quartoLang).toBe('julia');
   });
 
@@ -213,8 +214,26 @@ describe('quartoInlineCodePlugin — inline code', () => {
     const para = root.children![0] as MdastNode;
     const inline = para.children![0];
     expect(inline.type).toBe('inlineCode');
-    expect(inline.value).toBe('data');
+    expect(inline.value).toBe('{ojs} data');
     expect(inline.data?.quartoLang).toBe('ojs');
+  });
+});
+
+describe('quartoInlineCodePlugin — round-trip', () => {
+  it('round-trips a paragraph containing inline `{r} x` unchanged', () => {
+    const result = roundTrip('Let `{r} x` be the value');
+    expect(result.trimEnd()).toBe('Let `{r} x` be the value');
+  });
+
+  it('preserves `` `{r} radius` `` verbatim with no escape backslashes', () => {
+    const result = roundTrip('The radius is `{r} radius`.');
+    expect(result.trimEnd()).toBe('The radius is `{r} radius`.');
+    expect(result).not.toContain('\\');
+  });
+
+  it('round-trips a plain inline code span without a Quarto prefix unchanged', () => {
+    const result = roundTrip('Use `code` here');
+    expect(result.trimEnd()).toBe('Use `code` here');
   });
 });
 

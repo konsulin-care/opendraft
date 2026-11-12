@@ -108,10 +108,12 @@ function longestStreak(value: string, sub: string): number {
 }
 
 /**
- * Remark plugin that handles inline Quarto code: `{r} expr`.
+ * Remark plugin that tags inline Quarto code: `` `{r} radius` ``.
  *
- * Transforms `` `{r} radius` `` into an inlineCode node with
- * `data.hProperties.quartoLang = 'r'` and `value = 'radius'`.
+ * Attaches `data.quartoLang = 'r'` as metadata but leaves `value`
+ * verbatim: Milkdown's inlineCode mark is attrs-less and stores the
+ * text as-is, so stripping the `{lang} ` prefix would be lost — and
+ * unrepresentable — on parse/stringify round trips.
  */
 export const quartoInlineCodePlugin = {
   plugin: (() => {
@@ -125,11 +127,11 @@ export const quartoInlineCodePlugin = {
           const match = value.match(/^\{(\w+)\}\s+(.+)$/);
           if (!match) return;
 
-          const [, lang, expr] = match;
+          const [, lang] = match;
 
-          // Transform this node into a standard inlineCode with metadata
+          // Keep `value` verbatim (the attrs-less inlineCode mark
+          // round-trips text as-is); record the language as metadata.
           node.type = 'inlineCode';
-          node.value = expr;
           node.data = node.data || {};
           const data = node.data as Record<string, unknown>;
           data.quartoLang = lang;
