@@ -3,7 +3,12 @@ import { describe, it, expect } from 'vitest';
 import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import remarkStringify from 'remark-stringify';
-import { quartoRemarkPlugin, quartoChunkOptionPlugin, quartoInlineCodePlugin } from './quarto-syntax';
+import {
+  quartoRemarkPlugin,
+  quartoChunkOptionPlugin,
+  quartoInlineCodePlugin,
+  quartoCodeHandler,
+} from './quarto-syntax';
 
 interface MdastNode {
   type: string;
@@ -36,75 +41,75 @@ function roundTrip(md: string): string {
   return unified()
     .use(remarkParse)
     .use(quartoRemarkPlugin.plugin, quartoRemarkPlugin.options)
-    .use(remarkStringify)
+    .use(remarkStringify, { handlers: { code: quartoCodeHandler } })
     .processSync(md)
     .toString();
 }
 
 describe('quartoRemarkPlugin — basic code fences', () => {
-  it('normalizes {r} to r', () => {
+  it('keeps the {r} fence info', () => {
     const root = parseQuarto('```{r}\ncode\n```');
     const code = root.children![0];
     expect(code.type).toBe('code');
-    expect(code.lang).toBe('r');
+    expect(code.lang).toBe('{r}');
   });
 
-  it('normalizes {python} to python', () => {
+  it('keeps the {python} fence info', () => {
     const root = parseQuarto('```{python}\ncode\n```');
     const code = root.children![0];
     expect(code.type).toBe('code');
-    expect(code.lang).toBe('python');
+    expect(code.lang).toBe('{python}');
   });
 
-  it('normalizes {julia} to julia', () => {
+  it('keeps the {julia} fence info', () => {
     const root = parseQuarto('```{julia}\ncode\n```');
     const code = root.children![0];
     expect(code.type).toBe('code');
-    expect(code.lang).toBe('julia');
+    expect(code.lang).toBe('{julia}');
   });
 
-  it('normalizes {ojs} to ojs', () => {
+  it('keeps the {ojs} fence info', () => {
     const root = parseQuarto('```{ojs}\ncode\n```');
     const code = root.children![0];
     expect(code.type).toBe('code');
-    expect(code.lang).toBe('ojs');
+    expect(code.lang).toBe('{ojs}');
   });
 
-  it('normalizes {bash} to bash', () => {
+  it('keeps the {bash} fence info', () => {
     const root = parseQuarto('```{bash}\ncode\n```');
     const code = root.children![0];
     expect(code.type).toBe('code');
-    expect(code.lang).toBe('bash');
+    expect(code.lang).toBe('{bash}');
   });
 });
 
 describe('quartoRemarkPlugin — labels and double braces', () => {
-  it('strips label from {r init} to r', () => {
+  it('keeps the label in {r init}', () => {
     const root = parseQuarto('```{r init}\ncode\n```');
     const code = root.children![0];
     expect(code.type).toBe('code');
-    expect(code.lang).toBe('r');
+    expect(code.lang).toBe('{r init}');
   });
 
-  it('strips label from {python my-label} to python', () => {
+  it('keeps the label in {python my-label}', () => {
     const root = parseQuarto('```{python my-label}\ncode\n```');
     const code = root.children![0];
     expect(code.type).toBe('code');
-    expect(code.lang).toBe('python');
+    expect(code.lang).toBe('{python my-label}');
   });
 
-  it('handles double braces {{python}} to python', () => {
+  it('keeps double braces {{python}}', () => {
     const root = parseQuarto('```{{python}}\ncode\n```');
     const code = root.children![0];
     expect(code.type).toBe('code');
-    expect(code.lang).toBe('python');
+    expect(code.lang).toBe('{{python}}');
   });
 
-  it('handles double braces {{r}} to r', () => {
+  it('keeps double braces {{r}}', () => {
     const root = parseQuarto('```{{r}}\ncode\n```');
     const code = root.children![0];
     expect(code.type).toBe('code');
-    expect(code.lang).toBe('r');
+    expect(code.lang).toBe('{{r}}');
   });
 });
 
@@ -129,7 +134,7 @@ describe('quartoRemarkPlugin — preserves content', () => {
     const root = parseQuarto('```{r}\n#| echo: false\ncode\n```');
     const code = root.children![0];
     expect(code.type).toBe('code');
-    expect(code.lang).toBe('r');
+    expect(code.lang).toBe('{r}');
     expect(code.value).toContain('#| echo: false');
   });
 
@@ -142,21 +147,27 @@ describe('quartoRemarkPlugin — preserves content', () => {
 });
 
 describe('quartoRemarkPlugin — round-trip', () => {
-  it('outputs ```r instead of ```{r}', () => {
+  it('preserves ```{r} instead of normalizing to ```r', () => {
     const result = roundTrip('```{r}\ncode\n```');
-    expect(result).toContain('```r\n');
-    expect(result).not.toContain('{r}');
+    expect(result).toContain('```{r}\n');
+    expect(result).not.toContain('```r\n');
   });
 
-  it('outputs ```python instead of ```{python}', () => {
+  it('preserves ```{r label, echo=FALSE} with its label and options', () => {
+    const result = roundTrip('```{r label, echo=FALSE}\ncode\n```');
+    expect(result).toContain('```{r label, echo=FALSE}\n');
+  });
+
+  it('preserves ```{python} instead of normalizing to ```python', () => {
     const result = roundTrip('```{python}\ncode\n```');
-    expect(result).toContain('```python\n');
-    expect(result).not.toContain('{python}');
+    expect(result).toContain('```{python}\n');
+    expect(result).not.toContain('```python\n');
   });
 
   it('standard fences remain unchanged', () => {
     const result = roundTrip('```r\ncode\n```');
     expect(result).toContain('```r\n');
+    expect(result).not.toContain('{r}');
   });
 });
 
