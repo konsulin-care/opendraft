@@ -7,7 +7,7 @@ import { $prose, getMarkdown } from '@milkdown/kit/utils';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { createCitationPlugin } from '../citation/plugin';
 import type { CitationState } from '../citation/types';
-import { quartoRemarkPlugin, quartoInlineCodePlugin, quartoChunkOptionPlugin } from '../quarto-syntax';
+import { quartoRemarkPlugin, quartoInlineCodePlugin, quartoChunkOptionPlugin, quartoCodeHandler } from '../quarto-syntax';
 import { citationRemarkPlugin } from '../citation/citation-remark-plugin';
 import { createTestApi, focusBlockEditor, fulfillPendingFocus, registerBlockEditor, type EditorTestApi } from '../caret-mode-switch';
 import type { DebouncedSaver } from './editor/autosave';
@@ -32,18 +32,16 @@ interface CrepeConfigOptions {
 }
 
 /**
- * Create the Crepe instance for a manuscript block file: features, the
- * citation plugin, and serializer options (visual edits serialize lists
- * with '-' bullets instead of the remark default '*'; config callbacks
- * run at ConfigReady, before InitReady snapshots remarkStringifyOptionsCtx
- * into the serializer).
+ * Build the unmounted Crepe with the block-body feature set: no top
+ * bar, AI or placeholder; non-virtual cursor; the Quarto chunk-option
+ * CodeMirror extension; a slash menu without an H1 action.
  *
- * @param options - See {@link CrepeConfigOptions}.
- * @returns The configured Crepe instance, not yet mounted.
+ * @param root - Container the editor mounts into.
+ * @param defaultValue - Seed markdown for the document.
+ * @returns A new Crepe instance, not yet created.
  */
-export function createCrepeConfig(options: CrepeConfigOptions): Crepe {
-  const { root, defaultValue, workspace, onStateChangeRef, bibPath } = options;
-  const crepe = new Crepe({
+function createBaseCrepe(root: HTMLElement, defaultValue: string): Crepe {
+  return new Crepe({
     root,
     defaultValue,
     features: {
@@ -69,11 +67,35 @@ export function createCrepeConfig(options: CrepeConfigOptions): Crepe {
       },
     },
   });
+}
+
+/**
+ * Create the Crepe instance for a manuscript block file: features, the
+ * citation plugin, and serializer options (visual edits serialize lists
+ * with '-' bullets instead of the remark default '*'; config callbacks
+ * run at ConfigReady, before InitReady snapshots remarkStringifyOptionsCtx
+ * into the serializer).
+ *
+ * @param options - See {@link CrepeConfigOptions}.
+ * @returns The configured Crepe instance, not yet mounted.
+ */
+export function createCrepeConfig(options: CrepeConfigOptions): Crepe {
+  const { root, defaultValue, workspace, onStateChangeRef, bibPath } = options;
+  const crepe = createBaseCrepe(root, defaultValue);
   crepe.addFeature((editor) => {
     editor.use($prose(() => createCitationPlugin(workspace, onStateChangeRef.current, bibPath)));
   });
   crepe.editor.config((ctx) => {
-    ctx.update(remarkStringifyOptionsCtx, (options) => ({ ...options, bullet: '-' as const }));
+    ctx.update(remarkStringifyOptionsCtx, (options) => ({
+      ...options,
+      bullet: '-' as const,
+      // Custom `code` handler emits fence info verbatim (Quarto
+      // headers like `{r label, echo=FALSE}` get mangled by the
+      // stock handler's unsafe rules). Spread so Milkdown's
+      // text/strong/emphasis customizations survive; its defaults
+      // carry no code entry.
+      handlers: { ...options.handlers, code: quartoCodeHandler },
+    }));
     // Register remark plugins here, at ConfigReady: the editor reduces
     // remarkPluginsCtx into the processor exactly once at SchemaReady,
     // so registering after create() (wireEditor) never reaches the

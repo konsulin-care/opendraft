@@ -1,7 +1,53 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getMarkdown } from '@milkdown/kit/utils';
 import { MemoryWorkspace } from '@opendraft/workspace';
 import { createCrepeConfig } from './crepe-config';
+
+/**
+ * Stand-in IntersectionObserver that reports every observed element as
+ * intersecting on the next frame, so lazily mounted editors mount.
+ * (jsdom has no IntersectionObserver; Milkdown's code-block node view
+ * creates a shared one as soon as a fence renders.)
+ */
+class FakeIntersectionObserver implements IntersectionObserver {
+  readonly root: Element | Document | null = null;
+  readonly rootMargin = '0px';
+  readonly scrollMargin = '0px';
+  readonly thresholds: ReadonlyArray<number> = [0];
+  private readonly callback: IntersectionObserverCallback;
+  private readonly targets: Element[] = [];
+
+  constructor(callback: IntersectionObserverCallback) {
+    this.callback = callback;
+  }
+
+  observe(target: Element): void {
+    this.targets.push(target);
+    const entry = { target, isIntersecting: true } as IntersectionObserverEntry;
+    queueMicrotask(() => this.callback([entry], this));
+  }
+
+  unobserve(target: Element): void {
+    const index = this.targets.indexOf(target);
+    if (index >= 0) this.targets.splice(index, 1);
+  }
+
+  disconnect(): void {
+    this.targets.length = 0;
+  }
+
+  takeRecords(): IntersectionObserverEntry[] {
+    return [];
+  }
+}
+
+beforeEach(() => {
+  vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 /**
  * Mount a Crepe instance configured the way a block body is (same
