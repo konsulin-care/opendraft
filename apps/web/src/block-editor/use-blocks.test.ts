@@ -13,36 +13,18 @@ const ARTICLE = `${DIR}/article.qmd`;
 /** Path of the block directory under test. */
 const BLOCKS = `${DIR}/blocks`;
 
-/**
- * Build an assembly listing the given short names as include lines.
- *
- * @param shorts - Block short names in include order.
- * @returns article.qmd text with front matter and a refs fence.
- */
+/** Build an assembly listing the given short names as include lines. */
 function articleWith(...shorts: string[]): string {
   const includes = shorts.map((short) => `{{< include blocks/${short}.qmd >}}`).join('\n\n');
   return `---\nmetadata-files:\n- _author.yml\n---\n\n${includes}\n\n::: {#refs}\n:::\n`;
 }
 
-/**
- * Build canonical block file text.
- *
- * @param title - Heading title.
- * @param anchor - Heading anchor including the `sec-` prefix.
- * @param type - Section type without the `deo-` prefix.
- * @param body - Section body after the heading line.
- * @returns Block file text opening with a canonical heading.
- */
+/** Build canonical block file text opening with a typed heading. */
 function blockFile(title: string, anchor: string, type: string, body = ''): string {
   return `# ${title} {#${anchor} .deo-${type}}\n${body}`;
 }
 
-/**
- * Write fixture files into a fresh workspace and render the hook.
- *
- * @param files - Repo-relative paths mapped to file contents.
- * @returns The workspace plus the rendered hook result.
- */
+/** Write fixture files into a fresh workspace and render the hook. */
 async function setup(files: Record<string, string>) {
   const ws = new MemoryWorkspace();
   for (const [path, content] of Object.entries(files)) {
@@ -63,13 +45,31 @@ async function includeOrder(ws: WorkspaceAdapter): Promise<string[]> {
   const article = (await ws.readFile(ARTICLE)) ?? '';
   const shorts: string[] = [];
   for (const line of article.split('\n')) {
-    const match = /\{\{< include\s+blocks\/([a-z0-9-]+)\.qmd\s*>\}\}/.exec(line.trim());
+    const match = /\{\{< include\s+blocks\/_?([a-z0-9-]+)\.qmd\s*>\}\}/.exec(line.trim());
     if (match) shorts.push(match[1]);
   }
   return shorts;
 }
 
 describe('loadBlocks', () => {
+  it('renames a legacy block file and rewrites its include before the list loads', async () => {
+    const { result, ws } = await setup({
+      [ARTICLE]: articleWith('intro'),
+      [`${BLOCKS}/intro.qmd`]: blockFile('Introduction', 'sec-intro', 'intro'),
+    });
+
+    // The legacy file was renamed and the include canonicalized by the
+    // time the hook finished its initial load.
+    expect(await ws.readFile(`${BLOCKS}/intro.qmd`)).toBeNull();
+    expect(await ws.readFile(`${BLOCKS}/_intro.qmd`)).toBe(
+      blockFile('Introduction', 'sec-intro', 'intro'),
+    );
+    expect(await ws.readFile(ARTICLE)).toContain('{{< include blocks/_intro.qmd >}}');
+    expect(result.current.blocks).toEqual([
+      { short: 'intro', title: 'Introduction', wordCount: 0 },
+    ]);
+  });
+
   it('returns the block list in article.qmd include order', async () => {
     const { result } = await setup({
       [ARTICLE]: articleWith('methods', 'intro'),
@@ -111,7 +111,7 @@ describe('createBlock', () => {
       await result.current.createBlock(1, 'Methods');
     });
 
-    const created = (await ws.readFile(`${BLOCKS}/methods.qmd`)) ?? '';
+    const created = (await ws.readFile(`${BLOCKS}/_methods.qmd`)) ?? '';
     expect(created).toContain('# Methods {#sec-methods .doco-section}');
     expect(await includeOrder(ws)).toEqual(['alpha', 'methods', 'beta']);
     expect(result.current.blocks.map((block) => block.short)).toEqual(['alpha', 'methods', 'beta']);
@@ -133,15 +133,15 @@ describe('createBlock', () => {
 
     // The pre-existing block's file stays untouched; the new block gets a
     // suffixed file name and its own include line.
-    expect(await ws.readFile(`${BLOCKS}/intro.qmd`)).toBe(
+    expect(await ws.readFile(`${BLOCKS}/_intro.qmd`)).toBe(
       blockFile('Introduction', 'sec-intro', 'intro'),
     );
     const files = await ws.listFiles(BLOCKS);
-    expect(files).toContain('intro.qmd');
-    const createdName = files.find((file) => file !== 'intro.qmd');
-    expect(createdName).toMatch(/^intro-[a-z0-9]{6}\.qmd$/);
-    const createdShort = createdName?.replace(/\.qmd$/, '');
-    const created = (await ws.readFile(`${BLOCKS}/${createdShort}.qmd`)) ?? '';
+    expect(files).toContain('_intro.qmd');
+    const createdName = files.find((file) => file !== '_intro.qmd');
+    expect(createdName).toMatch(/^_intro-[a-z0-9]{6}\.qmd$/);
+    const createdShort = createdName?.replace(/^_/, '').replace(/\.qmd$/, '');
+    const created = (await ws.readFile(`${BLOCKS}/_${createdShort}.qmd`)) ?? '';
     expect(created).toContain('.deo-introduction');
     expect(await includeOrder(ws)).toEqual(['intro', createdShort]);
     expect(result.current.blocks.map((block) => block.short)).toEqual(['intro', createdShort]);
@@ -159,7 +159,7 @@ describe('createBlock drafts', () => {
       await result.current.createBlock(1, { title: 'Methods', short: 'methods', role: 'methods' });
     });
 
-    const created = (await ws.readFile(`${BLOCKS}/methods.qmd`)) ?? '';
+    const created = (await ws.readFile(`${BLOCKS}/_methods.qmd`)) ?? '';
     expect(created).toContain('# Methods {#sec-methods .deo-methods}');
     expect(await includeOrder(ws)).toEqual(['intro', 'methods']);
     expect(result.current.blocks.map((block) => block.short)).toEqual(['intro', 'methods']);
@@ -175,7 +175,7 @@ describe('createBlock drafts', () => {
       await result.current.createBlock(1, { title: 'Custom', short: 'custom' });
     });
 
-    const created = (await ws.readFile(`${BLOCKS}/custom.qmd`)) ?? '';
+    const created = (await ws.readFile(`${BLOCKS}/_custom.qmd`)) ?? '';
     expect(created.split('\n')[0]).toBe('# Custom {#sec-custom .doco-section}');
     expect(created).not.toContain('.deo-');
     expect(await includeOrder(ws)).toEqual(['intro', 'custom']);
@@ -195,7 +195,7 @@ describe('deleteBlock', () => {
       await result.current.deleteBlock('alpha');
     });
 
-    expect(await ws.readFile(`${BLOCKS}/alpha.qmd`)).toBeNull();
+    expect(await ws.readFile(`${BLOCKS}/_alpha.qmd`)).toBeNull();
     expect(await includeOrder(ws)).toEqual(['beta']);
     expect(result.current.blocks.map((block) => block.short)).toEqual(['beta']);
   });
@@ -213,11 +213,11 @@ describe('renameBlock', () => {
       await result.current.renameBlock('intro', 'overview');
     });
 
-    expect(await ws.readFile(`${BLOCKS}/intro.qmd`)).toBeNull();
-    const renamed = (await ws.readFile(`${BLOCKS}/overview.qmd`)) ?? '';
+    expect(await ws.readFile(`${BLOCKS}/_intro.qmd`)).toBeNull();
+    const renamed = (await ws.readFile(`${BLOCKS}/_overview.qmd`)) ?? '';
     expect(renamed).toContain('{#sec-overview');
     expect(await includeOrder(ws)).toEqual(['overview', 'methods']);
-    const methods = (await ws.readFile(`${BLOCKS}/methods.qmd`)) ?? '';
+    const methods = (await ws.readFile(`${BLOCKS}/_methods.qmd`)) ?? '';
     expect(methods).toContain('@sec-overview');
     expect(methods).not.toContain('@sec-intro');
   });
@@ -238,11 +238,11 @@ describe('renameBlock', () => {
       await result.current.renameBlock('intro', 'overview');
     });
 
-    const renamed = (await ws.readFile(`${BLOCKS}/overview.qmd`)) ?? '';
+    const renamed = (await ws.readFile(`${BLOCKS}/_overview.qmd`)) ?? '';
     expect(renamed).toBe('# Introduction {#sec-overview}\nBody.\n');
     expect(renamed).not.toContain('.deo-');
-    expect(await ws.readFile(`${BLOCKS}/intro.qmd`)).toBeNull();
-    const methods = (await ws.readFile(`${BLOCKS}/methods.qmd`)) ?? '';
+    expect(await ws.readFile(`${BLOCKS}/_intro.qmd`)).toBeNull();
+    const methods = (await ws.readFile(`${BLOCKS}/_methods.qmd`)) ?? '';
     expect(methods).toContain('@sec-overview');
   });
 });
@@ -258,9 +258,9 @@ describe('setTitle', () => {
       await result.current.setTitle('intro', 'Background');
     });
 
-    const retitle = (await ws.readFile(`${BLOCKS}/intro.qmd`)) ?? '';
+    const retitle = (await ws.readFile(`${BLOCKS}/_intro.qmd`)) ?? '';
     expect(retitle).toContain('# Background {#sec-intro .deo-intro}');
-    expect(await ws.listFiles(BLOCKS)).toEqual(['intro.qmd']);
+    expect(await ws.listFiles(BLOCKS)).toEqual(['_intro.qmd']);
     expect(await includeOrder(ws)).toEqual(['intro']);
   });
 
@@ -274,10 +274,10 @@ describe('setTitle', () => {
       await result.current.setTitle('intro', 'Background');
     });
 
-    expect(await ws.readFile(`${BLOCKS}/intro.qmd`)).toBe(
+    expect(await ws.readFile(`${BLOCKS}/_intro.qmd`)).toBe(
       '# Background {#sec-intro .deo-intro}\n\nBody.\n',
     );
-    expect(await ws.listFiles(BLOCKS)).toEqual(['intro.qmd']);
+    expect(await ws.listFiles(BLOCKS)).toEqual(['_intro.qmd']);
     expect(await includeOrder(ws)).toEqual(['intro']);
   });
 
@@ -291,9 +291,9 @@ describe('setTitle', () => {
       await result.current.setTitle('intro', 'Background');
     });
 
-    const retitle = (await ws.readFile(`${BLOCKS}/intro.qmd`)) ?? '';
+    const retitle = (await ws.readFile(`${BLOCKS}/_intro.qmd`)) ?? '';
     expect(retitle).toBe('# Background {#sec-intro}\nBody.\n');
     expect(retitle).not.toContain('.deo-');
-    expect(await ws.listFiles(BLOCKS)).toEqual(['intro.qmd']);
+    expect(await ws.listFiles(BLOCKS)).toEqual(['_intro.qmd']);
   });
 });

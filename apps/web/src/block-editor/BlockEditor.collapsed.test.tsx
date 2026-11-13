@@ -68,7 +68,7 @@ class FakeIntersectionObserver implements IntersectionObserver {
  * @returns article.qmd text with front matter and a refs fence.
  */
 function articleWith(...shorts: string[]): string {
-  const includes = shorts.map((short) => `{{< include blocks/${short}.qmd >}}`).join('\n\n');
+  const includes = shorts.map((short) => `{{< include blocks/_${short}.qmd >}}`).join('\n\n');
   return `---\nmetadata-files:\n- _author.yml\n---\n\n${includes}\n\n::: {#refs}\n:::\n`;
 }
 
@@ -104,11 +104,11 @@ describe('collapsed block header word count', () => {
     const ws = new MemoryWorkspace();
     await ws.writeFile(ARTICLE, articleWith('intro', 'methods'));
     await ws.writeFile(
-      `${BLOCKS}/intro.qmd`,
+      `${BLOCKS}/_intro.qmd`,
       blockFile('intro', 'Introduction', 'One two three four five.\n'),
     );
     await ws.writeFile(
-      `${BLOCKS}/methods.qmd`,
+      `${BLOCKS}/_methods.qmd`,
       blockFile('methods', 'Methods', 'Alpha beta gamma.\n'),
     );
 
