@@ -80,7 +80,7 @@ async function scaffoldedProject(): Promise<NodeFsWorkspace> {
  */
 async function blockWithCitation(ws: NodeFsWorkspace, citation: string): Promise<string> {
   await addBlock(ws, MANUSCRIPT_DIR, 0, 'Introduction');
-  const blockPath = join(dir, MANUSCRIPT_DIR, 'blocks', 'introduction.qmd');
+  const blockPath = join(dir, MANUSCRIPT_DIR, 'blocks', '_introduction.qmd');
   appendFileSync(blockPath, `\n${citation}\n`);
   return blockPath;
 }

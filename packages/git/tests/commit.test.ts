@@ -11,11 +11,11 @@ describe('preCommitAssembly', () => {
 
   async function setupValidWorkspace(): Promise<void> {
     await workspace.writeFile('article.qmd', [
-      '{{< include blocks/intro.qmd >}}',
-      '{{< include blocks/methods.qmd >}}',
+      '{{< include blocks/_intro.qmd >}}',
+      '{{< include blocks/_methods.qmd >}}',
     ].join('\n'));
-    await workspace.writeFile('blocks/intro.qmd', '# Introduction\n\nThis is the intro.');
-    await workspace.writeFile('blocks/methods.qmd', '# Methods\n\nThese are the methods.');
+    await workspace.writeFile('blocks/_intro.qmd', '# Introduction\n\nThis is the intro.');
+    await workspace.writeFile('blocks/_methods.qmd', '# Methods\n\nThese are the methods.');
   }
 
   it('validates and normalizes a consistent assembly', async () => {
@@ -25,8 +25,8 @@ describe('preCommitAssembly', () => {
     expect(result.success).toBe(true);
     expect(result.errors).toHaveLength(0);
     expect(result.warnings).toHaveLength(0);
-    expect(result.article).toContain('{{< include blocks/intro.qmd >}}');
-    expect(result.article).toContain('{{< include blocks/methods.qmd >}}');
+    expect(result.article).toContain('{{< include blocks/_intro.qmd >}}');
+    expect(result.article).toContain('{{< include blocks/_methods.qmd >}}');
   });
 
   it('fails when the assembly file is missing', async () => {
@@ -36,7 +36,7 @@ describe('preCommitAssembly', () => {
   });
 
   it('fails when an include references a missing block file', async () => {
-    await workspace.writeFile('article.qmd', '{{< include blocks/ghost.qmd >}}');
+    await workspace.writeFile('article.qmd', '{{< include blocks/_ghost.qmd >}}');
     const result = await preCommitAssembly(workspace);
 
     expect(result.success).toBe(false);
@@ -45,7 +45,7 @@ describe('preCommitAssembly', () => {
 
   it('reports orphan drafts as warnings without failing', async () => {
     await setupValidWorkspace();
-    await workspace.writeFile('blocks/scratch.qmd', '# Scratch\n\nnotes');
+    await workspace.writeFile('blocks/_scratch.qmd', '# Scratch\n\nnotes');
     const result = await preCommitAssembly(workspace);
 
     expect(result.success).toBe(true);

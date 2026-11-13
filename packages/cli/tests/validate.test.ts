@@ -118,7 +118,7 @@ describe('runCli — validate: assembly', () => {
     const article = readFileSync(articlePath, 'utf8');
     writeFileSync(
       articlePath,
-      article.replace('::: {#refs}', '{{< include blocks/ghost.qmd >}}\n::: {#refs}'),
+      article.replace('::: {#refs}', '{{< include blocks/_ghost.qmd >}}\n::: {#refs}'),
     );
 
     const run = runValidate(dir);
@@ -132,7 +132,7 @@ describe('runCli — validate: assembly', () => {
     await addBlock(ws, MANUSCRIPT_DIR, 0, 'Introduction');
     await addBlock(ws, MANUSCRIPT_DIR, 1, 'Methods');
     writeFileSync(
-      join(dir, MANUSCRIPT_DIR, 'blocks', 'methods.qmd'),
+      join(dir, MANUSCRIPT_DIR, 'blocks', '_methods.qmd'),
       '# Methods {#sec-introduction}\n',
     );
 
@@ -145,7 +145,7 @@ describe('runCli — validate: assembly', () => {
   it('reports an orphan block file as a warning and returns 0', async () => {
     const ws = await scaffoldedProject();
     await addBlock(ws, MANUSCRIPT_DIR, 0, 'Introduction');
-    await ws.writeFile(`${MANUSCRIPT_DIR}/blocks/scratch.qmd`, '# Scratch {#sec-scratch}\n');
+    await ws.writeFile(`${MANUSCRIPT_DIR}/blocks/_scratch.qmd`, '# Scratch {#sec-scratch}\n');
 
     const run = runValidate(dir);
 
