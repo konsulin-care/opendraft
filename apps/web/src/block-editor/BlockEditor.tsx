@@ -5,7 +5,7 @@
  */
 import { useEffect, useState } from 'react';
 import { listBlocks } from '@opendraft/manuscript';
-import { blockFileName } from '@opendraft/schema';
+import { blockFileName, legacyBlockShort, parseBlockFileName } from '@opendraft/schema';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import type { SaveStatus } from '../components/AppHeader';
 import { AddSectionDialog } from './AddSectionDialog';
@@ -34,6 +34,9 @@ export interface BlockEditorProps {
  * Collect every `@sec-<short>` reference in other block files that
  * would break on delete, one entry per occurrence, sorted.
  *
+ * File names parse through `parseBlockFileName` with `legacyBlockShort`
+ * as fallback: the target is skipped by identity, sources named by short.
+ *
  * @param ws - Workspace holding the manuscript.
  * @param dir - Manuscript directory.
  * @param short - Short name of the block about to be deleted.
@@ -47,11 +50,11 @@ async function findBreakingRefs(
   const token = `@sec-${short}`;
   const refs: string[] = [];
   for (const file of await ws.listFiles(`${dir}/blocks`)) {
-    if (file === `${short}.qmd` || file === `_${short}.qmd`) continue;
+    const source = parseBlockFileName(file) ?? legacyBlockShort(file);
+    if (source === null || source === short) continue;
     const text = await ws.readFile(`${dir}/blocks/${file}`);
     if (text === null) continue;
     const pattern = new RegExp(`${token}(?![a-z0-9-])`, 'g');
-    const source = file.replace(/\.qmd$/, '');
     for (let i = 1; i <= (text.match(pattern)?.length ?? 0); i += 1) {
       refs.push(`${token} in ${source}`);
     }
@@ -210,8 +213,7 @@ function BlockRow({
   onClose,
   onTitleSave,
 }: BlockRowProps) {
-  // Seed from the list-loaded body count; the mounted editor's live
-  // count overrides it through onWordCount once it reports.
+  // Seed from the list-loaded count; the live count overrides via onWordCount.
   const [wordCount, setWordCount] = useState(block.wordCount);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   return (
@@ -273,10 +275,8 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
     notifyFilesChanged();
   };
   const closeDelete = (): void => setDeleting(null);
-  // Gate until loading and the first file-name pass resolve.
-  if (loading || (shorts.length > 0 && Object.keys(files).length === 0)) return null;
-  // Loaded with zero blocks: the preset picker replaces the whole list.
-  if (blocks.length === 0) return <EmptyState onCreate={createAt(0)} />;
+  if (loading || (shorts.length > 0 && Object.keys(files).length === 0)) return null; // Gate until list + file names resolve.
+  if (blocks.length === 0) return <EmptyState onCreate={createAt(0)} />; // Zero blocks: preset picker replaces the list.
   return (
     <div className="space-y-2">
       {blocks.map((block, index) => (
