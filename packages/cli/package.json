@@ -28,8 +28,11 @@
   },
   "devDependencies": {
     "@opendraft/manuscript": "workspace:*",
+    "@opendraft/metadata": "workspace:*",
+    "@opendraft/rdf": "workspace:*",
     "@opendraft/references": "workspace:*",
     "@opendraft/schema": "workspace:*",
+    "@opendraft/validate": "workspace:*",
     "@opendraft/workspace": "workspace:*",
     "@types/node": "^24.19.2",
     "tsup": "^9.0.0",

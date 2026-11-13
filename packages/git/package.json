@@ -17,6 +17,7 @@
     "@isomorphic-git/lightning-fs": "^4.10.3",
     "@opendraft/metadata": "workspace:*",
     "@opendraft/schema": "workspace:*",
+    "@opendraft/validate": "workspace:*",
     "@opendraft/workspace": "workspace:*",
     "isomorphic-git": "^1.44.6"
   },
