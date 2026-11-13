@@ -31,7 +31,7 @@ describe('validateManuscript — legacy layout valid input', () => {
   });
 });
 
-describe('validateManuscript — identifier validation', () => {
+describe('validateManuscript — identifier validation (accepted)', () => {
   it('accepts simple lowercase identifier', () => {
     const result = validateManuscript('article', LEGACY_REQUIRED_FILES);
     expect(result.valid).toBe(true);
@@ -46,7 +46,9 @@ describe('validateManuscript — identifier validation', () => {
     const result = validateManuscript('article1', LEGACY_REQUIRED_FILES);
     expect(result.valid).toBe(true);
   });
+});
 
+describe('validateManuscript — identifier validation (rejected)', () => {
   it('rejects uppercase letters', () => {
     const result = validateManuscript('My-Article', LEGACY_REQUIRED_FILES);
     expect(result.valid).toBe(false);
@@ -55,6 +57,12 @@ describe('validateManuscript — identifier validation', () => {
 
   it('rejects underscores', () => {
     const result = validateManuscript('my_article', LEGACY_REQUIRED_FILES);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.path === 'id')).toBe(true);
+  });
+
+  it("rejects 'My_Article' with an id error", () => {
+    const result = validateManuscript('My_Article', LEGACY_REQUIRED_FILES);
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.path === 'id')).toBe(true);
   });
@@ -127,50 +135,59 @@ describe('validateManuscript — legacy layout required files', () => {
   });
 });
 
-describe('validateManuscript — block-based layout', () => {
-  it('accepts valid block-based layout without article.qmd', () => {
+describe('validateManuscript — manifest-listed layout (ADR-020)', () => {
+  it('requires article.qmd even when blocks/manifest.json is listed', () => {
     const result = validateManuscript('my-article', BLOCK_REQUIRED_FILES);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.path.includes('article.qmd'))).toBe(true);
+  });
+
+  it('accepts manifest layout with all required files', () => {
+    const files = [...BLOCK_REQUIRED_FILES, 'article.qmd'];
+    const result = validateManuscript('my-article', files);
     expect(result.valid).toBe(true);
     expect(result.errors).toEqual([]);
   });
 
-  it('accepts block-based layout with article.qmd present', () => {
-    const files = [...BLOCK_REQUIRED_FILES, 'article.qmd'];
-    const result = validateManuscript('my-article', files);
-    expect(result.valid).toBe(true);
+  it('reports all four required files when only the manifest is listed', () => {
+    const result = validateManuscript('my-article', ['blocks/manifest.json']);
+    expect(result.valid).toBe(false);
+    expect(result.errors.length).toBe(4);
   });
 
-  it('rejects block layout missing _author.yml', () => {
+  it('rejects manifest layout missing _author.yml', () => {
     const files = BLOCK_REQUIRED_FILES.filter((f) => f !== '_author.yml');
     const result = validateManuscript('my-article', files);
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.path.includes('_author.yml'))).toBe(true);
   });
+});
 
-  it('rejects block layout missing _abstract.yml', () => {
+describe('validateManuscript — manifest-listed layout metadata files', () => {
+  it('rejects manifest layout missing _abstract.yml', () => {
     const files = BLOCK_REQUIRED_FILES.filter((f) => f !== '_abstract.yml');
     const result = validateManuscript('my-article', files);
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.path.includes('_abstract.yml'))).toBe(true);
   });
 
-  it('rejects block layout missing _frontmatter.yml', () => {
+  it('rejects manifest layout missing _frontmatter.yml', () => {
     const files = BLOCK_REQUIRED_FILES.filter((f) => f !== '_frontmatter.yml');
     const result = validateManuscript('my-article', files);
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.path.includes('_frontmatter.yml'))).toBe(true);
   });
 
-  it('accepts block layout without references.bib', () => {
-    const files = BLOCK_REQUIRED_FILES.filter((f) => f !== 'references.bib');
+  it('accepts manifest layout without references.bib', () => {
+    const files = [
+      'article.qmd',
+      '_author.yml',
+      '_abstract.yml',
+      '_frontmatter.yml',
+      'blocks/manifest.json',
+    ];
     const result = validateManuscript('my-article', files);
     expect(result.valid).toBe(true);
     expect(result.errors).toEqual([]);
-  });
-
-  it('does not require article.qmd in block layout', () => {
-    const result = validateManuscript('my-article', BLOCK_REQUIRED_FILES);
-    expect(result.valid).toBe(true);
-    expect(result.errors.some((e) => e.path.includes('article.qmd'))).toBe(false);
   });
 });
