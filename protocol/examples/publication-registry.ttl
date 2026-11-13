@@ -1,17 +1,26 @@
 # OpenDraft Example: Publication Registry
 #
-# A working example of a publication registry (OD-014). It references
-# articles by IRI and must not contain other registries.
+# A working example of a publication registry (OD-014). It is a
+# fabio:ExpressionCollection whose frbr:part lists publications and
+# must not contain other registries.
 #
 # Validates clean against protocol/registry.shacl.ttl.
 
-@prefix od: <urn:opendraft:ontology#> .
+@prefix od: <https://w3id.org/opendraft/ontology#> .
+@prefix fabio: <http://purl.org/spar/fabio/> .
+@prefix frbr: <http://purl.org/vocab/frbr/core#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 
 # The publication registry itself. Lists publications available in a
-# collection; the referenced article lives in protocol/examples/article.ttl.
-od:example-publication-registry
-    a od:PublicationRegistry ;
+# collection; the full publication description lives in
+# protocol/examples/article.ttl.
+<https://example.org/example-publication-registry>
+    a fabio:ExpressionCollection ;
     dcterms:title "OpenDraft Example Publication Registry" ;
     dcterms:description "A publication registry containing example publications." ;
-    od:containsPublication od:example-publication .
+    frbr:part <https://example.org/example-publication> .
+
+# The referenced article, typed inline so the frbr:part sh:class
+# constraint holds within this file alone.
+<https://example.org/example-publication>
+    a od:Publication .

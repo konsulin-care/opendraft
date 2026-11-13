@@ -4,7 +4,9 @@
  * Loads protocol/opendraft.ttl and asserts the SPAR/OCDM alignment:
  * - od:Publication is a subclass of fabio:Expression
  * - deleted terms (od:PublicationVersion, od:hasSubject,
- *   od:isCorrespondingAuthor, od:creditRole) have no triples
+ *   od:isCorrespondingAuthor, od:creditRole, od:Registry,
+ *   od:CollectionRegistry, od:PublicationRegistry, od:containsRegistry,
+ *   od:containsPublication) have no triples
  * - exactly 14 NISO CRediT role IRIs are declared as pro:Role
  * - od:isDeceased and od:onBehalfOf are declared
  * - no owl:imports triple (reference-only prefixes)
@@ -38,7 +40,17 @@ const FABIO_SUBJECT_TERM = 'http://purl.org/spar/fabio/SubjectTerm';
 const CREDIT = 'https://credit.niso.org/contributor-roles/';
 
 /** Deleted od: terms that must not appear as subjects (ADR-018 precedent). */
-const DELETED_TERMS = ['PublicationVersion', 'hasSubject', 'isCorrespondingAuthor', 'creditRole'];
+const DELETED_TERMS = [
+  'PublicationVersion',
+  'hasSubject',
+  'isCorrespondingAuthor',
+  'creditRole',
+  'Registry',
+  'CollectionRegistry',
+  'PublicationRegistry',
+  'containsRegistry',
+  'containsPublication',
+];
 
 /** Namespaces that must only be referenced, never defined, by the ontology. */
 const REFERENCE_ONLY_NAMESPACES = [

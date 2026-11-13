@@ -1,16 +1,27 @@
-# Invalid fixture: collection registry that also contains a publication
+# Invalid fixture: registry whose frbr:part mixes a publication and a
+# collection
 #
-# Violates protocol/registry.shacl.ttl — a od:CollectionRegistry must
-# contain at least one registry AND must not contain publications.
-# This fixture has both od:containsRegistry and od:containsPublication,
-# triggering both exclusion rules. Parses as valid Turtle but must FAIL
+# Violates protocol/registry.shacl.ttl — frbr:part values must be
+# either only od:Publication or only fabio:ExpressionCollection,
+# never both. The child registry below is itself valid so the mixing
+# node is the sole violator. Parses as valid Turtle but must FAIL
 # registry SHACL validation.
 
-@prefix od: <urn:opendraft:ontology#> .
+@prefix od: <https://w3id.org/opendraft/ontology#> .
+@prefix fabio: <http://purl.org/spar/fabio/> .
+@prefix frbr: <http://purl.org/vocab/frbr/core#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 
-od:mixed-registry
-    a od:CollectionRegistry ;
+<https://example.org/mixed-registry>
+    a fabio:ExpressionCollection ;
     dcterms:title "Mixed registry" ;
-    od:containsRegistry od:example-publication-registry ;
-    od:containsPublication od:example-publication .
+    frbr:part <https://example.org/example-publication> ,
+              <https://example.org/example-child-registry> .
+
+<https://example.org/example-publication>
+    a od:Publication .
+
+# The child registry conforms on its own: only publications in frbr:part.
+<https://example.org/example-child-registry>
+    a fabio:ExpressionCollection ;
+    frbr:part <https://example.org/example-publication> .
