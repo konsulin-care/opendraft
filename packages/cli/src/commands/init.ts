@@ -63,19 +63,21 @@ function parseArgs(args: string[]): InitArgs {
 /**
  * Run the `init` command: scaffold a new project into a directory.
  *
- * Synchronously rejects a target that already contains `opendraft.yml`
- * (writing nothing) and an invalid manuscript id, then scaffolds the
- * project through a {@link NodeFsWorkspace} using the embedded protocol
- * revision. The scaffold writes complete asynchronously before the
- * process exits; the returned code reflects the pre-write checks.
+ * Rejects a target that already contains `opendraft.yml` (writing
+ * nothing) and an invalid manuscript id, then scaffolds the project
+ * through a {@link NodeFsWorkspace} using the embedded protocol
+ * revision. The scaffold is awaited, so when the command resolves
+ * every scaffold file — including `opendraft.yml` and the initial
+ * manuscript — is on disk.
  *
  * @param args - Arguments after the command name: optional project
  *               directory (defaults to the current working directory)
  *               and the required `--manuscript <id>` flag.
- * @returns Exit code: 0 when the scaffold starts, 1 when the target
- *          already has a config or the id is invalid, 2 on usage errors.
+ * @returns Promise of the exit code: 0 when the scaffold completes, 1
+ *          when the target already has a config, the id is invalid or
+ *          a write fails, 2 on usage errors.
  */
-export function initCommand(args: string[]): number {
+export async function initCommand(args: string[]): Promise<number> {
   const { dir, manuscriptId, invalid } = parseArgs(args);
   if (invalid || manuscriptId === null) {
     console.error(INIT_USAGE);
@@ -92,17 +94,12 @@ export function initCommand(args: string[]): number {
     );
     return 1;
   }
-  void scaffold(new NodeFsWorkspace(root), manuscriptId);
+  try {
+    await scaffoldProject(new NodeFsWorkspace(root), { manuscriptId, protocol: PROTOCOL });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(message);
+    return 1;
+  }
   return 0;
-}
-
-/**
- * Write the scaffolded project into the workspace.
- *
- * @param ws - Workspace rooted at the target directory.
- * @param manuscriptId - Identifier for the initial manuscript.
- * @returns Resolves once every scaffold file is written.
- */
-async function scaffold(ws: NodeFsWorkspace, manuscriptId: string): Promise<void> {
-  await scaffoldProject(ws, { manuscriptId, protocol: PROTOCOL });
 }
