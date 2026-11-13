@@ -16,7 +16,7 @@ const FOAF = 'http://xmlns.com/foaf/0.1/';
 const DCTERMS = 'http://purl.org/dc/terms/';
 const DATACITE = 'http://purl.org/datacite/ontology/';
 const LITERAL = 'https://w3id.org/literal/';
-const OD = 'urn:opendraft:ontology#';
+const OD = 'https://w3id.org/opendraft/ontology#';
 const CREDIT = 'https://credit.niso.org/contributor-roles/';
 const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
 

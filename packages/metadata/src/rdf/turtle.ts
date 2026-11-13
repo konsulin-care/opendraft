@@ -34,7 +34,7 @@ export const LITERAL = '<https://w3id.org/literal/';
 /** skos: subject concept vocabulary. */
 export const SKOS = '<http://www.w3.org/2004/02/skos/core#';
 /** OpenDraft ontology namespace (ODM, ADR-021). */
-export const OD = '<urn:opendraft:ontology#';
+export const OD = '<https://w3id.org/opendraft/ontology#';
 /** CRediT contributor role namespace (NISO). */
 export const CREDIT = '<https://credit.niso.org/contributor-roles/';
 /** XML Schema datatype namespace. */

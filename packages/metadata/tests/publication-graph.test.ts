@@ -23,7 +23,7 @@ const CITO = 'http://purl.org/spar/cito/';
 const FRBR = 'http://purl.org/vocab/frbr/core#';
 const DATACITE = 'http://purl.org/datacite/ontology/';
 const LITERAL = 'https://w3id.org/literal/';
-const OD = 'urn:opendraft:ontology#';
+const OD = 'https://w3id.org/opendraft/ontology#';
 const SKOS = 'http://www.w3.org/2004/02/skos/core#';
 const XSD = 'http://www.w3.org/2001/XMLSchema#';
 
@@ -166,6 +166,11 @@ describe('SHACL conformance and determinism', () => {
 });
 
 describe('Work and version identity', () => {
+  it('emits od:Publication under the w3id ontology namespace', () => {
+    expect(turtle).toContain('<https://w3id.org/opendraft/ontology#Publication>');
+    expect(turtle).not.toContain('urn:opendraft:ontology#');
+  });
+
   it('realizes a fabio:Work whose IRI differs from the publication IRI', () => {
     expect(subjects(RDF_TYPE, `${OD}Publication`)).toEqual([VERSION_IRI]);
     expect(subjects(RDF_TYPE, `${FABIO}Work`)).toContain(CONCEPT_IRI);

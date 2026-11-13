@@ -9,6 +9,7 @@
  * - od:isDeceased and od:onBehalfOf are declared
  * - no owl:imports triple (reference-only prefixes)
  */
+import { readFile } from 'node:fs/promises';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { loadTurtle, type TurtleDataset } from '@opendraft/rdf';
 
@@ -16,7 +17,7 @@ type Quad = TurtleDataset extends Iterable<infer Q> ? Q : never;
 
 const ONTOLOGY = 'protocol/opendraft.ttl';
 
-const OD = 'urn:opendraft:ontology#';
+const OD = 'https://w3id.org/opendraft/ontology#';
 const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
 const RDFS_SUBCLASS_OF = 'http://www.w3.org/2000/01/rdf-schema#subClassOf';
 const RDFS_DOMAIN = 'http://www.w3.org/2000/01/rdf-schema#domain';
@@ -54,6 +55,17 @@ const REFERENCE_ONLY_NAMESPACES = [
 ];
 
 let quads: Quad[];
+let raw = '';
+
+/** True when any IRI term in the graph lives under the legacy urn: namespace. */
+function hasLegacyUrnIri(): boolean {
+  return quads.some(
+    (quad) =>
+      quad.subject.value.includes('urn:opendraft:ontology') ||
+      quad.predicate.value.includes('urn:opendraft:ontology') ||
+      quad.object.value.includes('urn:opendraft:ontology'),
+  );
+}
 
 /** Returns every quad with the given subject IRI. */
 function withSubject(iri: string): Quad[] {
@@ -87,6 +99,19 @@ function isReferenceOnlyQuad(quad: Quad): boolean {
 
 beforeAll(async () => {
   quads = [...(await loadTurtle(ONTOLOGY))];
+  raw = await readFile(ONTOLOGY, 'utf8');
+});
+
+describe('protocol/opendraft.ttl namespace', () => {
+  it('declares od: as https://w3id.org/opendraft/ontology#', () => {
+    expect(raw).toContain('@prefix od: <https://w3id.org/opendraft/ontology#>');
+    expect(OD).toBe('https://w3id.org/opendraft/ontology#');
+  });
+
+  it('contains no urn:opendraft:ontology# IRI', () => {
+    expect(raw).not.toContain('urn:opendraft:ontology#');
+    expect(hasLegacyUrnIri()).toBe(false);
+  });
 });
 
 describe('protocol/opendraft.ttl class hierarchy', () => {

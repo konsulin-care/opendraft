@@ -1,7 +1,7 @@
 # OpenDraft Ontology
 #
 # The canonical RDF vocabulary for the OpenDraft protocol.
-# Namespace: urn:opendraft:ontology#
+# Namespace: https://w3id.org/opendraft/ontology#
 # Prefix: od:
 #
 # The protocol reuses established vocabularies instead of defining
@@ -24,7 +24,7 @@
 #   - Subject assignment reification (who assigned, when)
 #   - Author flags: isDeceased, onBehalfOf
 
-@prefix od: <urn:opendraft:ontology#> .
+@prefix od: <https://w3id.org/opendraft/ontology#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
