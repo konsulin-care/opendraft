@@ -36,3 +36,30 @@ export function runCli(args: string[]): number {
   console.error(USAGE);
   return 2;
 }
+
+/**
+ * Run the OpenDraft CLI asynchronously with the given arguments.
+ *
+ * Dispatches exactly like {@link runCli} but awaits each command
+ * handler, so commands that migrate to `Promise<number>` are fully
+ * settled before the exit code is returned. Like `runCli`, it never
+ * touches `process.argv`, never calls `process.exit`, and never mutates
+ * process state.
+ *
+ * @param args - CLI arguments, excluding the node executable and script.
+ * @returns Promise of the exit code: 0 on success, 1 on validation
+ *          failure, 2 on usage errors.
+ */
+export async function runCommand(args: string[]): Promise<number> {
+  const [command, ...rest] = args;
+  if (command === '--help') {
+    console.log(USAGE);
+    return 0;
+  }
+  if (command === 'validate') return await validateCommand(rest);
+  if (command === 'init') return await initCommand(rest);
+  if (command === 'manuscript') return await manuscriptCommand(rest);
+  if (command === 'block') return await blockCommand(rest);
+  console.error(USAGE);
+  return 2;
+}

@@ -1,8 +1,8 @@
 import { realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { runCli } from './run.js';
+import { runCli, runCommand } from './run.js';
 
-export { runCli };
+export { runCli, runCommand };
 
 /**
  * Decide whether this module is the invoked executable entry.
@@ -26,8 +26,9 @@ function isDirectInvocation(invokedPath: string): boolean {
 // Executable entry for the `opendraft` bin. The guard keeps importing
 // this module side-effect free: only a direct `node dist/index.js` (or
 // installed bin) invocation runs the CLI; test imports just receive
-// `runCli`.
+// `runCli` and `runCommand`. The awaited runCommand settles every
+// command handler before the exit code is assigned.
 const invokedPath = process.argv[1];
 if (invokedPath !== undefined && isDirectInvocation(invokedPath)) {
-  process.exitCode = runCli(process.argv.slice(2));
+  process.exitCode = await runCommand(process.argv.slice(2));
 }
