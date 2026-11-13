@@ -10,6 +10,7 @@
  *   od:assignedSubject, od:assignedBy, od:assignedAt) have no triples
  * - exactly 14 NISO CRediT role IRIs are declared as pro:Role
  * - od:isDeceased is declared and od:onBehalfOf is gone (SCoRO agent role)
+ * - od:protocolRevision is gone (replaced by dcterms:conformsTo)
  * - no owl:imports triple (reference-only prefixes)
  */
 import { readFile } from 'node:fs/promises';
@@ -53,6 +54,7 @@ const DELETED_TERMS = [
   'assignedBy',
   'assignedAt',
   'onBehalfOf',
+  'protocolRevision',
 ];
 
 /** Namespaces that must only be referenced, never defined, by the ontology. */
@@ -171,6 +173,11 @@ describe('protocol/opendraft.ttl author properties', () => {
   it('no longer declares od:onBehalfOf (replaced by the SCoRO agent role)', () => {
     expect(withSubject(`${OD}onBehalfOf`)).toEqual([]);
     expect(raw).not.toContain('onBehalfOf');
+  });
+
+  it('no longer declares od:protocolRevision (replaced by dcterms:conformsTo)', () => {
+    expect(withSubject(`${OD}protocolRevision`)).toEqual([]);
+    expect(raw).not.toContain('protocolRevision');
   });
 });
 

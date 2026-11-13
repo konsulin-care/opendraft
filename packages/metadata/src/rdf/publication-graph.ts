@@ -61,6 +61,8 @@ export interface PublicationGraphInput {
   manuscriptPath: string;
   /** 40-character Git commit SHA the manuscript was compiled from. */
   sourceRevision: string;
+  /** Git repository hosting the protocol (e.g. https://github.com/owner/repo). */
+  protocolRepository: string;
   /** 40-character Git commit SHA of the protocol revision used. */
   protocolRevision: string;
   /** Version DOI of this publication (publication IRI). */
@@ -111,6 +113,17 @@ function subjectTermIri(subject: PublicationSubject): string {
     ? subject.authority
     : `${subject.authority}/`;
   return `${base}${subject.term}`;
+}
+
+/**
+ * Build the dcterms:conformsTo IRI for the pinned protocol revision.
+ *
+ * @param input - Publication input with the protocol repository and revision.
+ * @returns Absolute IRI `<repo>/tree/<sha>/protocol`.
+ */
+function conformsToIri(input: PublicationGraphInput): string {
+  const repo = input.protocolRepository.replace(/\/+$/, '');
+  return `${repo}/tree/${input.protocolRevision}/protocol`;
 }
 
 /** The Work block: concept DOI IRI typed as a named fabio:Work. */
@@ -170,7 +183,7 @@ function publicationPairs(
     `${OD}repositoryUrl> ${literalString(input.repositoryUrl)}^^${XSD}anyURI>`,
     `${OD}manuscriptPath> ${literalString(input.manuscriptPath)}`,
     `${OD}sourceRevision> ${literalString(input.sourceRevision)}`,
-    `${OD}protocolRevision> ${literalString(input.protocolRevision)}`,
+    `${DCTERMS}conformsTo> ${termRef(conformsToIri(input))}`,
     `${FRBR}realizationOf> ${termRef(conceptDoi.iri)}`,
   ];
   if (input.previousVersionDoi) {
@@ -198,7 +211,8 @@ function publicationPairs(
  * Compile the publication graph as deterministic Turtle.
  *
  * Emits the fabio:Work (concept DOI), the od:Publication (version DOI)
- * with provenance scalars, license, funding grant, keywords, subject
+ * with provenance scalars and the dcterms:conformsTo protocol link,
+ * license, funding grant, keywords, subject
  * term and cito:cites references, plus the OCDM authorship graph in
  * YAML author order. The output is byte-identical across runs.
  *

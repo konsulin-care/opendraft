@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { loadTurtle, validateShacl } from '@opendraft/rdf';
-import type { ShaclValidationReport, TurtleDataset } from '@opendraft/rdf';
+import type { ShaclValidationReport, ShaclValidationResult, TurtleDataset } from '@opendraft/rdf';
 import { compilePublicationGraph } from '../src/rdf/publication-graph.js';
 import type { PublicationGraphInput } from '../src/rdf/publication-graph.js';
 import type { AuthorObject, RegistryAffiliation } from '../src/types/author.js';
@@ -92,6 +92,7 @@ const FULL: PublicationGraphInput = {
   repositoryUrl: 'https://github.com/konsulin-care/opendraft',
   manuscriptPath: 'manuscripts/distributed-scientific-publication/article.qmd',
   sourceRevision: '1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d',
+  protocolRepository: 'https://github.com/konsulin-care/opendraft',
   protocolRevision: '0000000000000000000000000000000000000000',
   versionDoi: VERSION_DOI,
   conceptDoi: CONCEPT_DOI,
@@ -235,7 +236,10 @@ describe('provenance and citations', () => {
     expect(values(VERSION_IRI, `${OD}manuscriptPath`))
       .toEqual(['manuscripts/distributed-scientific-publication/article.qmd']);
     expect(values(VERSION_IRI, `${OD}sourceRevision`)).toEqual([FULL.sourceRevision]);
-    expect(values(VERSION_IRI, `${OD}protocolRevision`)).toEqual([FULL.protocolRevision]);
+    expect(values(VERSION_IRI, `${DCTERMS}conformsTo`))
+      .toEqual([`https://github.com/konsulin-care/opendraft/tree/${FULL.protocolRevision}/protocol`]);
+    expect(values(VERSION_IRI, `${OD}protocolRevision`)).toEqual([]);
+    expect(turtle).not.toContain(`${OD}protocolRevision`);
     const node = values(VERSION_IRI, `${DATACITE}hasIdentifier`)[0] ?? '';
     expect(values(node, `${DATACITE}usesIdentifierScheme`)).toEqual([`${DATACITE}doi`]);
     expect(values(node, `${LITERAL}hasLiteralValue`)).toEqual([VERSION_DOI]);
@@ -269,5 +273,25 @@ describe('missing license', () => {
     expect(noLicense.results).toHaveLength(1);
     expect(noLicense.results[0]?.severity.value).toBe(SH_WARNING);
     expect(noLicense.results[0]?.path?.value).toBe(`${DCTERMS}license`);
+  });
+});
+
+describe('dcterms:conformsTo protocol link', () => {
+  const PRED = '<http://purl.org/dc/terms/conformsTo>';
+  const CONFORMS = `${DCTERMS}conformsTo`;
+
+  /** SHACL violations naming dcterms:conformsTo for mutated Turtle. */
+  async function conformsViolations(text: string): Promise<ShaclValidationResult[]> {
+    const data = await parseFragment(text);
+    const result = await validateShacl(data, shapes);
+    return result.results.filter((r) => r.severity.value === SH_VIOLATION && r.path?.value === CONFORMS);
+  }
+
+  it('flags missing, non-matching, or non-IRI dcterms:conformsTo', async () => {
+    const missing = turtle.split('\n').filter((l) => !l.includes('conformsTo')).join('\n');
+    const swap = (term: string) => turtle.replace(new RegExp(`${PRED} \\S+`), `${PRED} ${term}`);
+    expect(await conformsViolations(missing)).not.toHaveLength(0);
+    expect(await conformsViolations(swap('<https://github.com/konsulin-care/opendraft>'))).not.toHaveLength(0);
+    expect(await conformsViolations(swap('"https://github.com/konsulin-care/opendraft"'))).not.toHaveLength(0);
   });
 });

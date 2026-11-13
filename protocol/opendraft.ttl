@@ -20,7 +20,8 @@
 # this ontology does NOT owl:import them (reference-only prefixes).
 #
 # Custom od: terms cover only what existing vocabularies do not express:
-#   - Git-specific provenance (source revision, protocol revision, repository URL)
+#   - Git-specific provenance (source revision, repository URL); the
+#     pinned protocol revision is expressed as dcterms:conformsTo
 #   - Author flags: isDeceased
 #
 # Subject assignments follow the W3C Web Annotation Data Model
@@ -58,7 +59,7 @@ od:Publication
     rdf:type owl:Class ;
     rdfs:subClassOf fabio:Expression ;
     rdfs:label "Publication" ;
-    rdfs:comment "A published version of an article: one fabio:Expression that is the sole frbr:realizationOf a fabio:Work. Identified by its version DOI. Carries repository URL, source revision, and protocol revision." .
+    rdfs:comment "A published version of an article: one fabio:Expression that is the sole frbr:realizationOf a fabio:Work. Identified by its version DOI. Carries repository URL, source revision, and a dcterms:conformsTo link to the pinned protocol revision." .
 
 
 # =============================================================================
@@ -78,13 +79,6 @@ od:sourceRevision
     rdfs:range xsd:string ;
     rdfs:label "source revision" ;
     rdfs:comment "Full 40-character Git commit SHA of the source revision." .
-
-od:protocolRevision
-    rdf:type owl:DatatypeProperty ;
-    rdfs:domain od:Publication ;
-    rdfs:range xsd:string ;
-    rdfs:label "protocol revision" ;
-    rdfs:comment "Full 40-character Git commit SHA of the OpenDraft protocol revision." .
 
 od:manuscriptPath
     rdf:type owl:DatatypeProperty ;

@@ -68,12 +68,12 @@ od:PublicationShape
         sh:message "A publication must have exactly one source revision: a 40-character hexadecimal Git commit SHA." ;
     ] ;
     sh:property [
-        sh:path od:protocolRevision ;
-        sh:datatype xsd:string ;
+        sh:path dcterms:conformsTo ;
+        sh:nodeKind sh:IRI ;
         sh:minCount 1 ;
         sh:maxCount 1 ;
-        sh:pattern "^[0-9a-f]{40}$" ;
-        sh:message "A publication must have exactly one protocol revision: a 40-character hexadecimal Git commit SHA." ;
+        sh:pattern "^https://github\\.com/[^/]+/[^/]+/tree/[0-9a-f]{40}/protocol$" ;
+        sh:message "A publication must have exactly one dcterms:conformsTo IRI: https://github.com/<owner>/<repo>/tree/<40-character SHA>/protocol." ;
     ] .
     # Identifier requirement lives in od:PublicationIdentifierShape below:
     # either dcterms:identifier or an OCDM datacite:hasIdentifier node.
