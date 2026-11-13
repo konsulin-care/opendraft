@@ -11,7 +11,7 @@ import { blockFileName, includeLine } from '@opendraft/schema';
 import { resolveBlockFile, resolveFromFileList } from './block-files.js';
 import { joinHeading, retitleHeading, splitHeading } from './heading.js';
 import type { BlockHeading } from './heading.js';
-import { uniqueShortName } from './slug.js';
+import { normalizeShortName, uniqueShortName } from './slug.js';
 
 /** Draft selecting a new block's own identity instead of deriving it. */
 export interface CreateBlockDraft {
@@ -217,7 +217,7 @@ async function rewriteOtherRefs(
   newShort: string,
 ): Promise<void> {
   for (const file of await ws.listFiles(blocksDir)) {
-    if (file === `${newShort}.qmd`) continue;
+    if (file === blockFileName(newShort) || file === `${newShort}.qmd`) continue;
     const path = `${blocksDir}/${file}`;
     const text = await ws.readFile(path);
     if (text === null) continue;
@@ -229,11 +229,16 @@ async function rewriteOtherRefs(
 /**
  * Rename a block: file, include line and cross-block references.
  *
+ * `newShort` is normalized with `normalizeShortName`; the rename throws
+ * before any write when the target short is included or its block file
+ * exists; the include and `@sec-<old>` refs are rewritten to the new short.
+ *
  * @param ws - Workspace holding the manuscript.
  * @param dir - Manuscript directory, e.g. `manuscripts/demo`.
  * @param oldShort - Current short name.
- * @param newShort - Replacement short name.
- * @returns Resolves once the file, include and refs are updated.
+ * @param newShort - Replacement short name or human-readable title.
+ * @returns Resolves once the file, include and refs are updated; throws
+ *          before any write when the target short is already in use.
  */
 export async function renameBlock(
   ws: WorkspaceAdapter,
@@ -242,20 +247,24 @@ export async function renameBlock(
   newShort: string,
 ): Promise<void> {
   const blocksDir = `${dir}/blocks`;
-  const oldPath = `${blocksDir}/${oldShort}.qmd`;
-  const text = await ws.readFile(oldPath);
-  if (text === null) return;
-  await ws.writeFile(`${blocksDir}/${newShort}.qmd`, renameIdentity(text, oldShort, newShort));
-  await ws.deleteFile(oldPath);
   const articlePath = `${dir}/article.qmd`;
+  const short = normalizeShortName(newShort);
   const article = await ws.readFile(articlePath);
+  const files = await ws.listFiles(blocksDir);
+  const taken = extractIncludes(article ?? '').includes(short) ||
+    files.includes(blockFileName(short)) || files.includes(`${short}.qmd`);
+  if (taken) throw new Error(`block short name '${short}' is already in use`);
+  const oldFile = resolveFromFileList(files, oldShort);
+  const text = await ws.readFile(`${blocksDir}/${oldFile}`);
+  if (text === null) return;
+  await ws.writeFile(`${blocksDir}/${blockFileName(short)}`, renameIdentity(text, oldShort, short));
+  await ws.deleteFile(`${blocksDir}/${oldFile}`);
   if (article !== null) {
-    await ws.writeFile(
-      articlePath,
-      article.replaceAll(`blocks/${oldShort}.qmd`, `blocks/${newShort}.qmd`),
-    );
+    // Both include forms match; the canonical line replaces either.
+    const includeRe = new RegExp(`\\{\\{< include\\s+blocks\\/_?${oldShort}\\.qmd\\s*>\\}\\}`, 'g');
+    await ws.writeFile(articlePath, article.replace(includeRe, includeLine(short)));
   }
-  await rewriteOtherRefs(ws, blocksDir, oldShort, newShort);
+  await rewriteOtherRefs(ws, blocksDir, oldShort, short);
 }
 
 /**

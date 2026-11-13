@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MemoryWorkspace } from '@opendraft/workspace';
-import { addBlock, deleteBlock, listBlocks, setBlockTitle } from '../src/blocks';
+import { addBlock, deleteBlock, listBlocks, renameBlock, setBlockTitle } from '../src/blocks';
 
 /** Manuscript directory used by every fixture. */
 const DIR = 'manuscripts/demo';
@@ -28,10 +28,22 @@ function articleWith(...shorts: string[]): string {
  * @param title - Heading title.
  * @param anchor - Heading anchor including the `sec-` prefix.
  * @param type - Section type without the `deo-` prefix.
+ * @param body - Section body after the heading line.
  * @returns Block file text opening with a canonical heading.
  */
-function blockFile(title: string, anchor: string, type: string): string {
-  return `# ${title} {#${anchor} .deo-${type}}\n`;
+function blockFile(title: string, anchor: string, type: string, body = ''): string {
+  return `# ${title} {#${anchor} .deo-${type}}\n${body}`;
+}
+
+/**
+ * Build an assembly listing the given short names as prefixed include lines.
+ *
+ * @param shorts - Block short names in include order.
+ * @returns article.qmd text with front matter and a refs fence.
+ */
+function articlePrefixed(...shorts: string[]): string {
+  const includes = shorts.map((short) => `{{< include blocks/_${short}.qmd >}}`).join('\n\n');
+  return `---\nmetadata-files:\n- _author.yml\n---\n\n${includes}\n\n::: {#refs}\n:::\n`;
 }
 
 /**
@@ -182,6 +194,66 @@ describe('listBlocks file names', () => {
 
     expect(blocks.map((block) => block.short)).toEqual(['intro', 'methods']);
     expect(blocks.map((block) => block.file)).toEqual(['intro.qmd', '_methods.qmd']);
+  });
+});
+
+describe('renameBlock', () => {
+  it('normalizes the new short, writes the prefixed file and rewrites the include and refs', async () => {
+    const ws = await setup({
+      [ARTICLE]: articlePrefixed('intro', 'methods'),
+      [`${BLOCKS}/_intro.qmd`]: blockFile('Introduction', 'sec-intro', 'intro', 'See @sec-methods.\n'),
+      [`${BLOCKS}/_methods.qmd`]: blockFile('Methods', 'sec-methods', 'methods', 'Background in @sec-intro.\n'),
+    });
+
+    await renameBlock(ws, DIR, 'intro', 'Study Design');
+
+    const renamed = (await ws.readFile(`${BLOCKS}/_study-design.qmd`)) ?? '';
+    expect(renamed).toBe('# Introduction {#sec-study-design .deo-intro}\nSee @sec-methods.\n');
+    expect(await ws.readFile(`${BLOCKS}/_intro.qmd`)).toBeNull();
+    expect(await ws.readFile(ARTICLE)).toContain('{{< include blocks/_study-design.qmd >}}');
+    expect(await includeOrder(ws)).toEqual(['study-design', 'methods']);
+    const methods = (await ws.readFile(`${BLOCKS}/_methods.qmd`)) ?? '';
+    expect(methods).toContain('Background in @sec-study-design.');
+    expect(methods).not.toContain('@sec-intro');
+  });
+
+  it('rewrites a legacy blocks/intro.qmd include to the canonical include line', async () => {
+    const ws = await setup({
+      [ARTICLE]: articleWith('intro'),
+      [`${BLOCKS}/intro.qmd`]: blockFile('Introduction', 'sec-intro', 'intro'),
+    });
+
+    await renameBlock(ws, DIR, 'intro', 'background');
+
+    expect(await ws.readFile(`${BLOCKS}/_background.qmd`)).toBe(
+      '# Introduction {#sec-background .deo-intro}\n',
+    );
+    expect(await ws.readFile(`${BLOCKS}/intro.qmd`)).toBeNull();
+    expect(await ws.readFile(ARTICLE)).toContain('{{< include blocks/_background.qmd >}}');
+    expect(await includeOrder(ws)).toEqual(['background']);
+  });
+});
+
+describe('renameBlock name collisions', () => {
+  it('throws when the target short is taken and changes nothing', async () => {
+    const article = articlePrefixed('intro', 'methods');
+    const intro = blockFile('Introduction', 'sec-intro', 'intro', 'Body.\n');
+    const methods = blockFile('Methods', 'sec-methods', 'methods', 'Body.\n');
+    const ws = await setup({
+      [ARTICLE]: article,
+      [`${BLOCKS}/_intro.qmd`]: intro,
+      [`${BLOCKS}/_methods.qmd`]: methods,
+      [`${BLOCKS}/results.qmd`]: blockFile('Results', 'sec-results', 'results'),
+    });
+
+    // 'methods' is already included; 'results' exists as a block file.
+    await expect(renameBlock(ws, DIR, 'intro', 'methods')).rejects.toThrow();
+    await expect(renameBlock(ws, DIR, 'intro', 'results')).rejects.toThrow();
+
+    expect(await ws.readFile(ARTICLE)).toBe(article);
+    expect(await ws.readFile(`${BLOCKS}/_intro.qmd`)).toBe(intro);
+    expect(await ws.readFile(`${BLOCKS}/_methods.qmd`)).toBe(methods);
+    expect(await ws.listFiles(BLOCKS)).toEqual(['_intro.qmd', '_methods.qmd', 'results.qmd']);
   });
 });
 
