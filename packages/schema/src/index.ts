@@ -23,3 +23,15 @@ export { validateManifest, validateBlockStructure } from './manifest.js';
 export type { ManifestData } from './manifest.js';
 export { validateAssembly, collectIncludes } from './assembly.js';
 export type { AssemblyResult, AssemblyInput } from './assembly.js';
+export {
+  MANUSCRIPT_ID_PATTERN,
+  SHORT_NAME_PATTERN,
+  BLOCK_INCLUDE_RE,
+  SECTION_ROLES,
+  blockFileName,
+  parseBlockFileName,
+  legacyBlockShort,
+  includeLine,
+  sectionAnchor,
+  sectionClass,
+} from './naming.js';
