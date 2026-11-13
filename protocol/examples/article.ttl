@@ -14,7 +14,8 @@
 #
 # Validates clean against protocol/article.shacl.ttl.
 
-@prefix od: <urn:opendraft:ontology#> .
+@prefix od: <https://w3id.org/opendraft/ontology#> .
+@prefix ex: <https://example.org/> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix fabio: <http://purl.org/spar/fabio/> .
 @prefix pro: <http://purl.org/spar/pro/> .
@@ -35,36 +36,36 @@
 # The Work behind the manuscript: one fabio:Work per manuscript with a
 # concept DOI. Every published version realizes this Work; Work and
 # Expression never share a DOI.
-od:example-work
+ex:example-work
     a fabio:Work ;
     dcterms:title "Example Publication: OpenDraft Protocol" ;
     dcterms:identifier <https://doi.org/10.5555/example-opendraft-concept> .
 
 # The previous version (v1) of this publication: an earlier
 # fabio:Expression revised by v2 below.
-od:example-publication-v1
+ex:example-publication-v1
     a fabio:Expression ;
     dcterms:identifier <https://doi.org/10.5555/example-opendraft-2026-v1> ;
     prism:versionIdentifier "1" .
 
 # The publication itself. Identified by version DOI; carries full
 # provenance scalars plus the authorship document context.
-od:example-publication
+ex:example-publication
     a od:Publication ;
 
     dcterms:title "Example Publication: OpenDraft Protocol" ;
     dcterms:creator <https://orcid.org/0000-0002-1825-0097> ,
                     _:budi-lee ,
-                    od:group-who-diabetes ;
+                    ex:group-who-diabetes ;
     dcterms:identifier <https://doi.org/10.5555/example-opendraft-2026> ;
     od:repositoryUrl "https://github.com/konsulin-care/opendraft"^^xsd:anyURI ;
     od:manuscriptPath "manuscripts/distributed-scientific-publication/article.qmd" ;
     od:sourceRevision "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d" ;
-    od:protocolRevision "0000000000000000000000000000000000000000" ;
+    dcterms:conformsTo <https://github.com/konsulin-care/opendraft/tree/0000000000000000000000000000000000000000/protocol> ;
 
     # Work/version identity: v2 realizes the Work and revises v1.
-    frbr:realizationOf od:example-work ;
-    frbr:revisionOf od:example-publication-v1 ;
+    frbr:realizationOf ex:example-work ;
+    frbr:revisionOf ex:example-publication-v1 ;
     prism:versionIdentifier "2" ;
 
     # OCDM identifier node alongside the DOI IRI.
@@ -74,34 +75,35 @@ od:example-publication
     ] ;
 
     dcterms:license <http://creativecommons.org/licenses/by/4.0/> ;
-    frapo:isFundedBy od:example-grant ;
+    frapo:isFundedBy ex:example-grant ;
     cito:cites <https://doi.org/10.5555/related-study-2025> ;
 
     dcterms:abstract "A canonical example publication used to demonstrate the OpenDraft protocol." ;
 
     # Authorship roles live in the document context of the publication.
-    pro:isDocumentContextFor od:role-alice-author ,
-                             od:role-alice-ui ,
-                             od:role-alice-rscm ,
-                             od:role-budi-author ,
-                             od:role-budi-rscm ,
-                             od:role-group-author ;
+    pro:isDocumentContextFor ex:role-alice-author ,
+                             ex:role-alice-ui ,
+                             ex:role-alice-rscm ,
+                             ex:role-budi-author ,
+                             ex:role-budi-agent ,
+                             ex:role-budi-rscm ,
+                             ex:role-group-author ;
 
     prism:keyword "distributed scientific publication" ,
                   "research data" ;
-    fabio:hasSubjectTerm od:concept-distributed-scientific-publication ;
-    dcterms:subject od:concept-distributed-scientific-publication .
+    fabio:hasSubjectTerm ex:concept-distributed-scientific-publication ;
+    dcterms:subject ex:concept-distributed-scientific-publication .
 
 # The subject assignment as a W3C Web Annotation: the publication is
 # classified with the SKOS subject term, with agent and timestamp.
 [] a oa:Annotation ;
    oa:motivatedBy oa:classifying ;
-   oa:hasTarget od:example-publication ;
-   oa:hasBody od:concept-distributed-scientific-publication ;
+   oa:hasTarget ex:example-publication ;
+   oa:hasBody ex:concept-distributed-scientific-publication ;
    dcterms:creator <https://orcid.org/0000-0002-1825-0097> ;
    dcterms:created "2026-01-15T09:00:00"^^xsd:dateTime .
 
-od:concept-distributed-scientific-publication
+ex:concept-distributed-scientific-publication
     a skos:Concept , fabio:SubjectTerm ;
     skos:prefLabel "Distributed scientific publication"@en .
 
@@ -110,25 +112,25 @@ od:concept-distributed-scientific-publication
 # Head of the oco:hasNext author chain; also the corresponding author
 # and an equal contributor. Carries CRediT roles alongside the PRO and
 # SCoRO role values.
-od:role-alice-author
+ex:role-alice-author
     a pro:RoleInTime ;
     pro:withRole pro:author ,
                  scoro:corresponding-author ,
                  credit:conceptualization ,
                  credit:writing-original-draft ;
     pro:isHeldBy <https://orcid.org/0000-0002-1825-0097> ;
-    scoro:isEqualToRoleInTime od:role-budi-author ;
-    oco:hasNext od:role-budi-author .
+    scoro:isEqualToRoleInTime ex:role-budi-author ;
+    oco:hasNext ex:role-budi-author .
 
 # Affiliate roles: one per affiliation, each pointing at one
 # ROR-identified organization. Alice shares rscm with Budi.
-od:role-alice-ui
+ex:role-alice-ui
     a pro:RoleInTime ;
     pro:withRole scoro:affiliate ;
     pro:isHeldBy <https://orcid.org/0000-0002-1825-0097> ;
     pro:relatesToOrganization <https://ror.org/0116zj450> .
 
-od:role-alice-rscm
+ex:role-alice-rscm
     a pro:RoleInTime ;
     pro:withRole scoro:affiliate ;
     pro:isHeldBy <https://orcid.org/0000-0002-1825-0097> ;
@@ -146,17 +148,25 @@ od:role-alice-rscm
 
 # Second author: no ORCID, holds the author role on behalf of the
 # group, equal contributor, CRediT roles.
-od:role-budi-author
+ex:role-budi-author
     a pro:RoleInTime ;
     pro:withRole pro:author ,
                  credit:investigation ,
                  credit:software ;
     pro:isHeldBy _:budi-lee ;
-    od:onBehalfOf od:group-who-diabetes ;
-    scoro:isEqualToRoleInTime od:role-alice-author ;
-    oco:hasNext od:role-group-author .
+    scoro:isEqualToRoleInTime ex:role-alice-author ;
+    oco:hasNext ex:role-group-author .
 
-od:role-budi-rscm
+# On-behalf-of authorship as an extra scoro:agent role in the document
+# context: held by the author and related to the group. It never joins
+# the oco:hasNext chain.
+ex:role-budi-agent
+    a pro:RoleInTime ;
+    pro:withRole scoro:agent ;
+    pro:isHeldBy _:budi-lee ;
+    pro:relatesToEntity ex:group-who-diabetes .
+
+ex:role-budi-rscm
     a pro:RoleInTime ;
     pro:withRole scoro:affiliate ;
     pro:isHeldBy _:budi-lee ;
@@ -169,12 +179,12 @@ _:budi-lee
     foaf:familyName "Lee" .
 
 # Tail of the author chain: a named group author with members.
-od:role-group-author
+ex:role-group-author
     a pro:RoleInTime ;
     pro:withRole pro:author ;
-    pro:isHeldBy od:group-who-diabetes .
+    pro:isHeldBy ex:group-who-diabetes .
 
-od:group-who-diabetes
+ex:group-who-diabetes
     a foaf:Group ;
     foaf:name "WHO Diabetes Work Group" ;
     foaf:member _:member-sari , _:member-dewi .
@@ -197,7 +207,7 @@ od:group-who-diabetes
     ] .
 
 # FRAPO funding: the publication is funded by a grant.
-od:example-grant
+ex:example-grant
     a frapo:Grant ;
     dcterms:title "OpenDraft Example Grant" .
 
