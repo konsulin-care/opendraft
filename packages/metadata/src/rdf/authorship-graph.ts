@@ -6,6 +6,22 @@
  */
 import { isGroupAuthor } from '@opendraft/schema';
 import { normalizeOrcid, normalizeRor } from './identifiers.js';
+import {
+  block,
+  literalString,
+  termRef,
+  CREDIT,
+  DATACITE,
+  DCTERMS,
+  FOAF,
+  LITERAL,
+  OD,
+  OCO,
+  PRO,
+  ROR_PREFIX,
+  SCORO,
+  XSD,
+} from './turtle.js';
 import type {
   AffiliationObject,
   AffiliationRef,
@@ -24,20 +40,6 @@ export interface AuthorshipGraphInput {
   /** Top-level affiliation registry resolving {ref} affiliation items. */
   affiliations?: RegistryAffiliation[];
 }
-
-// Namespace constants include the opening angle bracket so that
-// `${PRO}withRole>` expands to a wrapped Turtle IRI reference.
-const PRO = '<http://purl.org/spar/pro/';
-const SCORO = '<http://purl.org/spar/scoro/';
-const OCO = '<https://w3id.org/oc/ontology/';
-const FOAF = '<http://xmlns.com/foaf/0.1/';
-const DCTERMS = '<http://purl.org/dc/terms/';
-const DATACITE = '<http://purl.org/datacite/ontology/';
-const LITERAL = '<https://w3id.org/literal/';
-const OD = '<urn:opendraft:ontology#';
-const CREDIT = '<https://credit.niso.org/contributor-roles/';
-const XSD = '<http://www.w3.org/2001/XMLSchema#';
-const ROR_PREFIX = 'https://ror.org/';
 
 /** A shared organization node keyed by ROR IRI, registry id or name. */
 interface OrgNode {
@@ -64,21 +66,6 @@ interface AuthorshipContext {
   roleLabels: string[];
   affiliates: AffiliateRole[];
   orgs: OrgNode[];
-}
-
-/** Escape a value as a Turtle string literal. */
-function literalString(value: string): string {
-  const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-    .replace(/\n/g, '\\n').replace(/\r/g, '\\r');
-  return `"${escaped}"`;
-}
-
-function termRef(iri: string): string {
-  return `<${iri}>`;
-}
-
-function block(subject: string, pairs: string[]): string {
-  return `${subject}\n    ${pairs.join(' ;\n    ')} .`;
 }
 
 /** Emit an inline OCDM datacite:hasIdentifier node. */

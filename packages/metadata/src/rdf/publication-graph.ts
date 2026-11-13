@@ -8,6 +8,22 @@
  */
 import { emitAuthorshipGraph } from './authorship-graph.js';
 import { normalizeDoi } from './identifiers.js';
+import {
+  block,
+  literalString,
+  termRef,
+  CITO,
+  DATACITE,
+  DCTERMS,
+  FABIO,
+  FRAPO,
+  FRBR,
+  LITERAL,
+  OD,
+  PRISM,
+  SKOS,
+  XSD,
+} from './turtle.js';
 import type { NormalizedIdentifier } from './identifiers.js';
 import type { AuthorObject, RegistryAffiliation } from '../types/author.js';
 
@@ -59,20 +75,6 @@ export interface PublicationGraphInput {
   references?: string[];
 }
 
-// Namespace constants include the opening angle bracket so that
-// `${FABIO}Work>` expands to a wrapped Turtle IRI reference.
-const OD = '<urn:opendraft:ontology#';
-const DCTERMS = '<http://purl.org/dc/terms/';
-const FABIO = '<http://purl.org/spar/fabio/';
-const FRBR = '<http://purl.org/vocab/frbr/core#';
-const PRISM = '<http://prismstandard.org/namespaces/basic/2.0/';
-const FRAPO = '<http://purl.org/spar/frapo/';
-const CITO = '<http://purl.org/spar/cito/';
-const DATACITE = '<http://purl.org/datacite/ontology/';
-const LITERAL = '<https://w3id.org/literal/';
-const SKOS = '<http://www.w3.org/2004/02/skos/core#';
-const XSD = '<http://www.w3.org/2001/XMLSchema#';
-
 /** License presets mapped to their canonical deed URIs. */
 const LICENSE_URIS: Record<string, string> = {
   'cc by 4.0': 'http://creativecommons.org/licenses/by/4.0/',
@@ -81,21 +83,6 @@ const LICENSE_URIS: Record<string, string> = {
   cc0: 'http://creativecommons.org/publicdomain/zero/1.0/',
   'cc0 1.0': 'http://creativecommons.org/publicdomain/zero/1.0/',
 };
-
-/** Escape a value as a Turtle string literal. */
-function literalString(value: string): string {
-  const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-    .replace(/\n/g, '\\n').replace(/\r/g, '\\r');
-  return `"${escaped}"`;
-}
-
-function termRef(iri: string): string {
-  return `<${iri}>`;
-}
-
-function block(subject: string, pairs: string[]): string {
-  return `${subject}\n    ${pairs.join(' ;\n    ')} .`;
-}
 
 /** Normalize a DOI or throw naming the offending input field. */
 function requireDoi(input: string | undefined, label: string): NormalizedIdentifier {
