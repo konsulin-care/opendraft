@@ -4,12 +4,14 @@ import { addBlock, extractIncludes, listBlocks, normalizeBlockFiles } from '@ope
 import type { CreateBlockDraft } from '@opendraft/manuscript';
 import { SECTION_ROLES } from '@opendraft/schema';
 import { NodeFsWorkspace } from '@opendraft/workspace/node';
+import { blockNormalize } from './block-normalize.js';
 import { resolveManuscript } from '../resolve-manuscript.js';
 
 /** Usage lines printed for usage errors. */
 const BLOCK_USAGE = [
   'usage: opendraft block add <title> [dir] [-m <id>] [--after <short>] [--type <type>]',
   '       opendraft block ls [dir] [-m <id>]',
+  '       opendraft block normalize [dir] [-m <id>]',
 ].join('\n');
 
 /** Parsed `block add` arguments. */
@@ -250,15 +252,16 @@ async function blockAdd(args: string[]): Promise<number> {
 }
 
 /**
- * Run the `block` command: dispatch `ls`, `add`, or print usage.
+ * Run the `block` command: dispatch `ls`, `add`, `normalize`, or print usage.
  *
- * Dispatches `ls` to {@link blockLs} and `add` to {@link blockAdd};
- * anything else prints the usage and exits 2.
+ * Dispatches `ls` to {@link blockLs}, `add` to {@link blockAdd} and
+ * `normalize` to {@link blockNormalize}; anything else prints the
+ * usage and exits 2.
  *
  * @param args - Arguments after the command name: `add` followed by the
  *               block title, an optional project directory and the
- *               flags above; or `ls` with an optional directory and
- *               `-m <id>`.
+ *               flags above; `ls` or `normalize` with an optional
+ *               directory and `-m <id>`.
  * @returns Promise of the exit code: 0 when the operation succeeds,
  *          1 on resolution, type or write failures, 2 on usage errors.
  */
@@ -266,6 +269,7 @@ export async function blockCommand(args: string[]): Promise<number> {
   const [subcommand, ...rest] = args;
   if (subcommand === 'ls') return await blockLs(rest);
   if (subcommand === 'add') return await blockAdd(rest);
+  if (subcommand === 'normalize') return await blockNormalize(rest);
   console.error(BLOCK_USAGE);
   return 2;
 }
