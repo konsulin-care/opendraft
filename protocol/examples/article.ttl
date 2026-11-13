@@ -9,7 +9,8 @@
 # Demonstrates: an ORCID corresponding author, a non-ORCID person
 # writing on behalf of a named group, a group author with members,
 # equal contribution (scoro:isEqualToRoleInTime), affiliations shared
-# between authors, CRediT roles, keywords and a subject assignment.
+# between authors, CRediT roles, keywords, and a subject assignment
+# recorded as a W3C Web Annotation (oa:classifying).
 #
 # Validates clean against protocol/article.shacl.ttl.
 
@@ -29,6 +30,7 @@
 @prefix frapo: <http://purl.org/spar/frapo/> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix oa: <http://www.w3.org/ns/oa#> .
 
 # The Work behind the manuscript: one fabio:Work per manuscript with a
 # concept DOI. Every published version realizes this Work; Work and
@@ -88,15 +90,16 @@ od:example-publication
     prism:keyword "distributed scientific publication" ,
                   "research data" ;
     fabio:hasSubjectTerm od:concept-distributed-scientific-publication ;
-    dcterms:subject od:concept-distributed-scientific-publication ;
-    od:hasAssignment _:subject-assignment .
+    dcterms:subject od:concept-distributed-scientific-publication .
 
-# A reified subject assignment binding the SKOS term with provenance.
-_:subject-assignment
-    a od:SubjectAssignment ;
-    od:assignedSubject od:concept-distributed-scientific-publication ;
-    od:assignedBy <https://orcid.org/0000-0002-1825-0097> ;
-    od:assignedAt "2026-01-15T09:00:00"^^xsd:dateTime .
+# The subject assignment as a W3C Web Annotation: the publication is
+# classified with the SKOS subject term, with agent and timestamp.
+[] a oa:Annotation ;
+   oa:motivatedBy oa:classifying ;
+   oa:hasTarget od:example-publication ;
+   oa:hasBody od:concept-distributed-scientific-publication ;
+   dcterms:creator <https://orcid.org/0000-0002-1825-0097> ;
+   dcterms:created "2026-01-15T09:00:00"^^xsd:dateTime .
 
 od:concept-distributed-scientific-publication
     a skos:Concept , fabio:SubjectTerm ;

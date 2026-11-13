@@ -6,7 +6,8 @@
  * - deleted terms (od:PublicationVersion, od:hasSubject,
  *   od:isCorrespondingAuthor, od:creditRole, od:Registry,
  *   od:CollectionRegistry, od:PublicationRegistry, od:containsRegistry,
- *   od:containsPublication) have no triples
+ *   od:containsPublication, od:SubjectAssignment, od:hasAssignment,
+ *   od:assignedSubject, od:assignedBy, od:assignedAt) have no triples
  * - exactly 14 NISO CRediT role IRIs are declared as pro:Role
  * - od:isDeceased and od:onBehalfOf are declared
  * - no owl:imports triple (reference-only prefixes)
@@ -35,7 +36,6 @@ const FOAF_AGENT = 'http://xmlns.com/foaf/0.1/Agent';
 const PRO_ROLE = 'http://purl.org/spar/pro/Role';
 const PRO_ROLE_IN_TIME = 'http://purl.org/spar/pro/RoleInTime';
 const FABIO_EXPRESSION = 'http://purl.org/spar/fabio/Expression';
-const FABIO_SUBJECT_TERM = 'http://purl.org/spar/fabio/SubjectTerm';
 
 const CREDIT = 'https://credit.niso.org/contributor-roles/';
 
@@ -50,6 +50,11 @@ const DELETED_TERMS = [
   'PublicationRegistry',
   'containsRegistry',
   'containsPublication',
+  'SubjectAssignment',
+  'hasAssignment',
+  'assignedSubject',
+  'assignedBy',
+  'assignedAt',
 ];
 
 /** Namespaces that must only be referenced, never defined, by the ontology. */
@@ -64,6 +69,7 @@ const REFERENCE_ONLY_NAMESPACES = [
   'http://purl.org/spar/cito/',
   'http://purl.org/datacite/ontology/',
   'https://w3id.org/literal/',
+  'http://www.w3.org/ns/oa#',
 ];
 
 let quads: Quad[];
@@ -130,11 +136,6 @@ describe('protocol/opendraft.ttl class hierarchy', () => {
   it('declares od:Publication rdfs:subClassOf fabio:Expression', () => {
     expect(hasTriple(`${OD}Publication`, RDFS_SUBCLASS_OF, FABIO_EXPRESSION)).toBe(true);
     expect(hasTriple(`${OD}Publication`, RDF_TYPE, OWL_CLASS)).toBe(true);
-  });
-
-  it('gives od:assignedSubject the range fabio:SubjectTerm', () => {
-    expect(hasTriple(`${OD}assignedSubject`, RDF_TYPE, OWL_OBJECT_PROPERTY)).toBe(true);
-    expect(hasTriple(`${OD}assignedSubject`, RDFS_RANGE, FABIO_SUBJECT_TERM)).toBe(true);
   });
 });
 

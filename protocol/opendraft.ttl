@@ -21,8 +21,11 @@
 #
 # Custom od: terms cover only what existing vocabularies do not express:
 #   - Git-specific provenance (source revision, protocol revision, repository URL)
-#   - Subject assignment reification (who assigned, when)
 #   - Author flags: isDeceased, onBehalfOf
+#
+# Subject assignments follow the W3C Web Annotation Data Model
+# (oa:Annotation motivated by oa:classifying); the oa: prefix below is
+# declared for reference only.
 
 @prefix od: <https://w3id.org/opendraft/ontology#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
@@ -44,6 +47,7 @@
 @prefix datacite: <http://purl.org/datacite/ontology/> .
 @prefix literal: <https://w3id.org/literal/> .
 @prefix credit: <https://credit.niso.org/contributor-roles/> .
+@prefix oa: <http://www.w3.org/ns/oa#> .
 
 
 # =============================================================================
@@ -54,12 +58,7 @@ od:Publication
     rdf:type owl:Class ;
     rdfs:subClassOf fabio:Expression ;
     rdfs:label "Publication" ;
-    rdfs:comment "A published version of an article: one fabio:Expression that is the sole frbr:realizationOf a fabio:Work. Identified by its version DOI. Carries repository URL, source revision, protocol revision, and subject assignments." .
-
-od:SubjectAssignment
-    rdf:type owl:Class ;
-    rdfs:label "Subject Assignment" ;
-    rdfs:comment "A reified assertion linking a publication to a SKOS subject concept, with provenance about who assigned it and when. Distinguishes author-declared from indexer-assigned subjects." .
+    rdfs:comment "A published version of an article: one fabio:Expression that is the sole frbr:realizationOf a fabio:Work. Identified by its version DOI. Carries repository URL, source revision, and protocol revision." .
 
 
 # =============================================================================
@@ -93,39 +92,6 @@ od:manuscriptPath
     rdfs:range xsd:string ;
     rdfs:label "manuscript path" ;
     rdfs:comment "Path to the manuscript file within the source repository." .
-
-
-# =============================================================================
-# PROPERTIES — Subject assignment (reified pattern)
-# =============================================================================
-
-od:hasAssignment
-    rdf:type owl:ObjectProperty ;
-    rdfs:domain od:Publication ;
-    rdfs:range od:SubjectAssignment ;
-    rdfs:label "has subject assignment" ;
-    rdfs:comment "Links a publication to a subject assignment. Each assignment binds one SKOS subject term to the publication with provenance." .
-
-od:assignedSubject
-    rdf:type owl:ObjectProperty ;
-    rdfs:domain od:SubjectAssignment ;
-    rdfs:range fabio:SubjectTerm ;
-    rdfs:label "assigned subject" ;
-    rdfs:comment "The SKOS subject term (fabio:SubjectTerm) that was assigned to the publication." .
-
-od:assignedBy
-    rdf:type owl:ObjectProperty ;
-    rdfs:domain od:SubjectAssignment ;
-    rdfs:range foaf:Agent ;
-    rdfs:label "assigned by" ;
-    rdfs:comment "The agent (person or indexer) who performed the subject assignment." .
-
-od:assignedAt
-    rdf:type owl:DatatypeProperty ;
-    rdfs:domain od:SubjectAssignment ;
-    rdfs:range xsd:dateTime ;
-    rdfs:label "assigned at" ;
-    rdfs:comment "Timestamp when the subject was assigned." .
 
 
 # =============================================================================
