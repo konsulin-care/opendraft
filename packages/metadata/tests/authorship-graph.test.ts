@@ -1,9 +1,10 @@
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { loadTurtle } from '@opendraft/rdf';
-import type { TurtleDataset } from '@opendraft/rdf';
+import { loadTurtle, validateShacl } from '@opendraft/rdf';
+import type { ShaclValidationReport, TurtleDataset } from '@opendraft/rdf';
 import { emitAuthorshipGraph } from '../src/rdf/authorship-graph.js';
 import type { AuthorObject, RegistryAffiliation } from '../src/types/author.js';
 
@@ -19,6 +20,8 @@ const LITERAL = 'https://w3id.org/literal/';
 const OD = 'https://w3id.org/opendraft/ontology#';
 const CREDIT = 'https://credit.niso.org/contributor-roles/';
 const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
+// Repo-root protocol/ resolved from this file: suites run with cwd = packages/metadata.
+const ARTICLE_SHAPES = fileURLToPath(new URL('../../../protocol/article.shacl.ttl', import.meta.url));
 
 // Four-author fixture: ORCID corresponding person, non-ORCID person,
 // equal contributor, group with 2 members and on-behalf-of.
@@ -76,6 +79,7 @@ interface Seen {
 let seen: Seen[] = [];
 let chain: string[] = [];
 let holders: string[] = [];
+let report: ShaclValidationReport;
 
 /** Parse an emitted Turtle fragment via a temp file. */
 async function loadFragment(turtle: string): Promise<TurtleDataset> {
@@ -127,7 +131,8 @@ function subjects(predicate: string, object: string): string[] {
 
 beforeAll(async () => {
   const turtle = emitAuthorshipGraph({ publication: PUB, authors: AUTHORS, affiliations: REGISTRY });
-  seen = [...(await loadFragment(turtle))].map((q) => ({
+  const dataset = await loadFragment(turtle);
+  seen = [...dataset].map((q) => ({
     s: q.subject.value,
     skind: q.subject.termType,
     p: q.predicate.value,
@@ -137,6 +142,7 @@ beforeAll(async () => {
   }));
   chain = walkChain(subjects(`${PRO}withRole`, `${PRO}author`));
   holders = chain.map((role) => values(role, `${PRO}isHeldBy`)[0] ?? '');
+  report = await validateShacl(dataset, await loadTurtle(ARTICLE_SHAPES));
 });
 
 describe('author roles and order', () => {
@@ -183,8 +189,11 @@ describe('role flags and agents', () => {
     );
   });
 
-  it('records od:onBehalfOf and models the group with members', () => {
-    const group = values(chain[1], `${OD}onBehalfOf`)[0] ?? '';
+  it('emits a scoro:agent role for an author writing on behalf of a group', () => {
+    const roles = subjects(`${PRO}withRole`, `${SCORO}agent`);
+    expect(roles).toHaveLength(1);
+    expect(values(roles[0], `${PRO}isHeldBy`)).toEqual([holders[1]]);
+    const group = values(roles[0], `${PRO}relatesToEntity`)[0] ?? '';
     expect(seen.find((q) => q.s === group && q.p === RDF_TYPE)?.o).toBe(`${FOAF}Group`);
     expect(values(group, `${FOAF}name`)).toEqual(['WHO Diabetes Work Group']);
     const members = values(group, `${FOAF}member`);
@@ -194,6 +203,12 @@ describe('role flags and agents', () => {
     }
     expect(seen.some((q) => q.s === members[1] && q.p === `${FOAF}name` && q.o === 'Dewi Suharto'))
       .toBe(true);
+  });
+
+  it('emits no od:onBehalfOf triple and conforms to article.shacl.ttl', () => {
+    expect(seen.filter((q) => q.p === `${OD}onBehalfOf`)).toHaveLength(0);
+    expect(report.conforms).toBe(true);
+    expect(report.results).toHaveLength(0);
   });
 
   it('flags deceased authors with od:isDeceased', () => {
@@ -241,7 +256,7 @@ describe('identifiers, organizations and shortcuts', () => {
 
   it('lists every author and affiliate role in the publication context', () => {
     const context = values(PUB, `${PRO}isDocumentContextFor`);
-    expect(context).toHaveLength(8);
+    expect(context).toHaveLength(9);
     expect(chain.every((role) => context.includes(role))).toBe(true);
   });
 });

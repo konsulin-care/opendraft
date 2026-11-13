@@ -56,6 +56,13 @@ interface AffiliateRole {
   org: OrgNode;
 }
 
+/** A scoro:agent role linking an on-behalf-of author to their group. */
+interface BehalfRole {
+  label: string;
+  holder: string;
+  group: string;
+}
+
 /** Shared context threaded through the emission sections. */
 interface AuthorshipContext {
   publication: string;
@@ -65,6 +72,7 @@ interface AuthorshipContext {
   equal: number[];
   roleLabels: string[];
   affiliates: AffiliateRole[];
+  behalfs: BehalfRole[];
   orgs: OrgNode[];
 }
 
@@ -148,8 +156,16 @@ function buildContext(input: AuthorshipGraphInput): AuthorshipContext {
   const orgKeys = new Map<string, OrgNode>();
   const roleLabels: string[] = [];
   const affiliates: AffiliateRole[] = [];
+  const behalfs: BehalfRole[] = [];
   input.authors.forEach((author, index) => {
     roleLabels.push(`_:role-${index}`);
+    const behalf = author['on-behalf-of'];
+    const group = typeof behalf === 'string' ? groups.get(behalf) : undefined;
+    if (group) {
+      const label = `_:role-${index}-behalf`;
+      roleLabels.push(label);
+      behalfs.push({ label, holder: agents[index], group });
+    }
     (author.affiliations ?? []).forEach((item, slot) => {
       const entry = resolveAffiliation(item, registry);
       if (!entry) return;
@@ -166,6 +182,7 @@ function buildContext(input: AuthorshipGraphInput): AuthorshipContext {
     equal,
     roleLabels,
     affiliates,
+    behalfs,
     orgs,
   };
 }
@@ -199,9 +216,6 @@ function authorRoleBlock(author: AuthorObject, index: number, ctx: AuthorshipCon
     const peers = ctx.equal.filter((peer) => peer !== index).map((peer) => `_:role-${peer}`);
     if (peers.length > 0) pairs.push(`${SCORO}isEqualToRoleInTime> ${peers.join(' , ')}`);
   }
-  const behalf = author['on-behalf-of'];
-  const group = typeof behalf === 'string' ? ctx.groups.get(behalf) : undefined;
-  if (group) pairs.push(`${OD}onBehalfOf> ${group}`);
   return block(`_:role-${index}`, pairs);
 }
 
@@ -211,6 +225,15 @@ function affiliateBlock(role: AffiliateRole): string {
     `${PRO}withRole> ${SCORO}affiliate>`,
     `${PRO}isHeldBy> ${role.holder}`,
     `${PRO}relatesToOrganization> ${role.org.term}`,
+  ]);
+}
+
+function behalfBlock(role: BehalfRole): string {
+  return block(role.label, [
+    `a ${PRO}RoleInTime>`,
+    `${PRO}withRole> ${SCORO}agent>`,
+    `${PRO}isHeldBy> ${role.holder}`,
+    `${PRO}relatesToEntity> ${role.group}`,
   ]);
 }
 
@@ -267,6 +290,7 @@ export function emitAuthorshipGraph(input: AuthorshipGraphInput): string {
   if (publication.length > 0) blocks.push(publication);
   ctx.authors.forEach((author, index) => blocks.push(authorRoleBlock(author, index, ctx)));
   ctx.affiliates.forEach((role) => blocks.push(affiliateBlock(role)));
+  ctx.behalfs.forEach((role) => blocks.push(behalfBlock(role)));
   ctx.authors.forEach((author, index) => {
     blocks.push(agentBlock(author, index, ctx));
     blocks.push(...memberBlocks(author, index));

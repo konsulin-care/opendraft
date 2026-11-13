@@ -9,7 +9,7 @@
 #   - SPAR: FaBiO (fabio: Expression, Work, SubjectTerm,
 #     ExpressionCollection), FRBR (frbr: realizationOf, revisionOf,
 #     part), PRO (pro: Role, RoleInTime, isHeldBy,
-#     withRole), SCoRO (scoro: corresponding-author, affiliate)
+#     withRole), SCoRO (scoro: agent, corresponding-author, affiliate)
 #   - OpenCitations: OCO (oco: hasNext for author order); OCDM patterns
 #     via the DataCite (datacite:) and Literal (literal:) ontologies
 #   - PRISM (prism: versionIdentifier, keyword), FRAPO (frapo: Grant),
@@ -21,7 +21,7 @@
 #
 # Custom od: terms cover only what existing vocabularies do not express:
 #   - Git-specific provenance (source revision, protocol revision, repository URL)
-#   - Author flags: isDeceased, onBehalfOf
+#   - Author flags: isDeceased
 #
 # Subject assignments follow the W3C Web Annotation Data Model
 # (oa:Annotation motivated by oa:classifying); the oa: prefix below is
@@ -104,13 +104,6 @@ od:isDeceased
     rdfs:range xsd:boolean ;
     rdfs:label "deceased" ;
     rdfs:comment "True if this person is deceased. Rendered with the ‡ symbol in bylines." .
-
-od:onBehalfOf
-    rdf:type owl:ObjectProperty ;
-    rdfs:domain pro:RoleInTime ;
-    rdfs:range foaf:Agent ;
-    rdfs:label "on behalf of" ;
-    rdfs:comment "The agent (typically a foaf:Group or consortium) that an author role is held on behalf of." .
 
 
 # =============================================================================

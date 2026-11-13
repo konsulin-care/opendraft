@@ -9,7 +9,7 @@
  *   od:containsPublication, od:SubjectAssignment, od:hasAssignment,
  *   od:assignedSubject, od:assignedBy, od:assignedAt) have no triples
  * - exactly 14 NISO CRediT role IRIs are declared as pro:Role
- * - od:isDeceased and od:onBehalfOf are declared
+ * - od:isDeceased is declared and od:onBehalfOf is gone (SCoRO agent role)
  * - no owl:imports triple (reference-only prefixes)
  */
 import { readFile } from 'node:fs/promises';
@@ -28,13 +28,10 @@ const RDFS_RANGE = 'http://www.w3.org/2000/01/rdf-schema#range';
 const RDFS_LABEL = 'http://www.w3.org/2000/01/rdf-schema#label';
 const OWL_CLASS = 'http://www.w3.org/2002/07/owl#Class';
 const OWL_DATATYPE_PROPERTY = 'http://www.w3.org/2002/07/owl#DatatypeProperty';
-const OWL_OBJECT_PROPERTY = 'http://www.w3.org/2002/07/owl#ObjectProperty';
 const OWL_IMPORTS = 'http://www.w3.org/2002/07/owl#imports';
 const XSD_BOOLEAN = 'http://www.w3.org/2001/XMLSchema#boolean';
 const FOAF_PERSON = 'http://xmlns.com/foaf/0.1/Person';
-const FOAF_AGENT = 'http://xmlns.com/foaf/0.1/Agent';
 const PRO_ROLE = 'http://purl.org/spar/pro/Role';
-const PRO_ROLE_IN_TIME = 'http://purl.org/spar/pro/RoleInTime';
 const FABIO_EXPRESSION = 'http://purl.org/spar/fabio/Expression';
 
 const CREDIT = 'https://credit.niso.org/contributor-roles/';
@@ -55,6 +52,7 @@ const DELETED_TERMS = [
   'assignedSubject',
   'assignedBy',
   'assignedAt',
+  'onBehalfOf',
 ];
 
 /** Namespaces that must only be referenced, never defined, by the ontology. */
@@ -170,11 +168,9 @@ describe('protocol/opendraft.ttl author properties', () => {
     expect(hasTriple(`${OD}isDeceased`, RDFS_DOMAIN, FOAF_PERSON)).toBe(true);
   });
 
-  it('declares od:onBehalfOf from pro:RoleInTime to foaf:Agent', () => {
-    const onBehalfOf = withSubject(`${OD}onBehalfOf`);
-    expect(onBehalfOf.some((quad) => quad.object.value === OWL_OBJECT_PROPERTY)).toBe(true);
-    expect(hasTriple(`${OD}onBehalfOf`, RDFS_DOMAIN, PRO_ROLE_IN_TIME)).toBe(true);
-    expect(hasTriple(`${OD}onBehalfOf`, RDFS_RANGE, FOAF_AGENT)).toBe(true);
+  it('no longer declares od:onBehalfOf (replaced by the SCoRO agent role)', () => {
+    expect(withSubject(`${OD}onBehalfOf`)).toEqual([]);
+    expect(raw).not.toContain('onBehalfOf');
   });
 });
 

@@ -372,6 +372,10 @@ od:PublicationAuthorshipShape
         sh:message "A publication must have at least one corresponding-author role whose holder has a foaf:mbox." ;
     ] .
 
+# On-behalf-of authors are modeled as an extra scoro:agent role in the
+# document context: held by the author (pro:isHeldBy) and related to the
+# group (pro:relatesToEntity). It never joins the oco:hasNext chain —
+# the chain shapes above only match roles carrying pro:withRole pro:author.
 od:AuthorshipRoleShape
     a sh:NodeShape ;
     sh:targetClass pro:RoleInTime ;
@@ -396,6 +400,7 @@ od:AuthorshipRoleShape
         sh:path pro:withRole ;
         sh:in (
             pro:author
+            scoro:agent
             scoro:corresponding-author
             scoro:affiliate
             scoro:consortium-author
