@@ -75,8 +75,8 @@ describe('EmptyState preset chips', () => {
     });
 
     expect(screen.getByTestId('has-blocks')).toBeInTheDocument();
-    expect(await ws.readFile(`${BLOCKS}/methods.qmd`)).toContain('# Methods {#sec-methods');
-    expect(await ws.readFile(ARTICLE)).toContain('{{< include blocks/methods.qmd >}}');
+    expect(await ws.readFile(`${BLOCKS}/_methods.qmd`)).toContain('# Methods {#sec-methods');
+    expect(await ws.readFile(ARTICLE)).toContain('{{< include blocks/_methods.qmd >}}');
   });
 
   it('calls onCreate with title, short and role when a core chip is clicked', () => {

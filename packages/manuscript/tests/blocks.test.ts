@@ -74,8 +74,9 @@ describe('addBlock', () => {
 
     await addBlock(ws, DIR, 1, 'Methods');
 
-    const created = (await ws.readFile(`${BLOCKS}/methods.qmd`)) ?? '';
+    const created = (await ws.readFile(`${BLOCKS}/_methods.qmd`)) ?? '';
     expect(created).toBe('# Methods {#sec-methods .doco-section}\n');
+    expect(await ws.readFile(ARTICLE)).toContain('{{< include blocks/_methods.qmd >}}');
     expect(await includeOrder(ws)).toEqual(['alpha', 'methods', 'beta']);
   });
 
@@ -85,10 +86,13 @@ describe('addBlock', () => {
     await addBlock(ws, DIR, 0, 'Intro');
 
     const article = (await ws.readFile(ARTICLE)) ?? '';
-    const includeAt = article.indexOf('{{< include blocks/intro.qmd >}}');
+    const includeAt = article.indexOf('{{< include blocks/_intro.qmd >}}');
     const refsAt = article.indexOf('::: {#refs}');
     expect(includeAt).toBeGreaterThan(-1);
     expect(includeAt).toBeLessThan(refsAt);
+    expect(await ws.readFile(`${BLOCKS}/_intro.qmd`)).toBe(
+      '# Intro {#sec-intro .doco-section}\n',
+    );
     expect(await includeOrder(ws)).toEqual(['intro']);
   });
 
@@ -111,8 +115,9 @@ describe('addBlock de-duplication', () => {
     const files = await ws.listFiles(BLOCKS);
     expect(files).toContain('intro.qmd');
     const createdName = files.find((file) => file !== 'intro.qmd');
-    expect(createdName).toMatch(/^intro-\d{6}\.qmd$/);
-    expect(await includeOrder(ws)).toEqual(['intro', createdName?.replace(/\.qmd$/, '')]);
+    expect(createdName).toMatch(/^_intro-\d{6}\.qmd$/);
+    const createdShort = createdName?.replace(/^_/, '').replace(/\.qmd$/, '');
+    expect(await includeOrder(ws)).toEqual(['intro', createdShort]);
   });
 
   it('de-duplicates a short name already used by a block file', async () => {
@@ -127,11 +132,12 @@ describe('addBlock de-duplication', () => {
     const files = await ws.listFiles(BLOCKS);
     expect(files).toContain('orphan.qmd');
     const createdName = files.find((file) => file !== 'orphan.qmd' && file !== 'alpha.qmd');
-    expect(createdName).toMatch(/^orphan-\d{6}\.qmd$/);
+    expect(createdName).toMatch(/^_orphan-\d{6}\.qmd$/);
     expect(await ws.readFile(`${BLOCKS}/orphan.qmd`)).toBe(
       blockFile('Orphan', 'sec-orphan', 'orphan'),
     );
-    expect(await includeOrder(ws)).toEqual(['alpha', createdName?.replace(/\.qmd$/, '')]);
+    const createdShort = createdName?.replace(/^_/, '').replace(/\.qmd$/, '');
+    expect(await includeOrder(ws)).toEqual(['alpha', createdShort]);
   });
 });
 

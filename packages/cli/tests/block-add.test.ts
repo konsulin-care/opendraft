@@ -90,7 +90,7 @@ function writeProject(ids: string[], articleId: string, article: string): void {
 function includesOf(article: string): string[] {
   const shorts: string[] = [];
   for (const line of article.split('\n')) {
-    const match = /\{\{< include\s+blocks\/([a-z0-9-]+)\.qmd\s*>\}\}/.exec(line.trim());
+    const match = /\{\{< include\s+blocks\/_?([a-z0-9-]+)\.qmd\s*>\}\}/.exec(line.trim());
     if (match !== null) shorts.push(match[1]);
   }
   return shorts;
@@ -118,7 +118,7 @@ async function writesBlockAndAppendsInclude(): Promise<void> {
   expect(add.code).toBe(0);
   await vi.waitFor(() => {
     const block = readFileSync(
-      join(dir, 'manuscripts', 'first-paper', 'blocks', 'methods.qmd'),
+      join(dir, 'manuscripts', 'first-paper', 'blocks', '_methods.qmd'),
       'utf8',
     );
     expect(block).toBe('# Methods {#sec-methods .doco-section}\n');
@@ -163,7 +163,7 @@ async function insertsAfterAndAppliesType(): Promise<void> {
     const article = readFileSync(join(dir, 'manuscripts', 'first-paper', 'article.qmd'), 'utf8');
     expect(includesOf(article)).toEqual(['intro', 'methods']);
     const block = readFileSync(
-      join(dir, 'manuscripts', 'first-paper', 'blocks', 'methods.qmd'),
+      join(dir, 'manuscripts', 'first-paper', 'blocks', '_methods.qmd'),
       'utf8',
     );
     expect(block).toBe('# Methods {#sec-methods .deo-methods}\n');
@@ -189,7 +189,7 @@ function returnsOneListingManuscripts(): void {
 
 describe('runCli — block add', () => {
   it(
-    'writes blocks/methods.qmd with its heading and appends its include in a single-manuscript project',
+    'writes blocks/_methods.qmd with its heading and appends its include in a single-manuscript project',
     writesBlockAndAppendsInclude,
   );
   it(

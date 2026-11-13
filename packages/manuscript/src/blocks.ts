@@ -7,6 +7,7 @@
  * operations take a {@link WorkspaceAdapter} and a manuscript directory.
  */
 import type { WorkspaceAdapter } from '@opendraft/workspace';
+import { blockFileName, includeLine } from '@opendraft/schema';
 import { resolveBlockFile, resolveFromFileList } from './block-files.js';
 import { joinHeading, retitleHeading, splitHeading } from './heading.js';
 import type { BlockHeading } from './heading.js';
@@ -58,8 +59,10 @@ export function extractIncludes(article: string): string[] {
 /**
  * Splice an include shortcode into the assembly at `position`.
  *
- * With no existing include the line goes directly before `::: {#refs}`
- * (or at the end when there is no refs fence).
+ * The line is the canonical prefixed form
+ * `{{< include blocks/_<short>.qmd >}}`. With no existing include the
+ * line goes directly before `::: {#refs}` (or at the end when there is
+ * no refs fence).
  *
  * @param article - Full `article.qmd` text.
  * @param short - Short name of the block to include.
@@ -72,7 +75,7 @@ function insertInclude(article: string, short: string, position: number): string
   lines.forEach((line, index) => {
     if (INCLUDE_PATTERN.test(line.trim())) indices.push(index);
   });
-  const include = `{{< include blocks/${short}.qmd >}}`;
+  const include = includeLine(short);
   if (indices.length === 0) {
     const refs = lines.findIndex((line) => line.trim() === '::: {#refs}');
     lines.splice(refs === -1 ? lines.length : refs, 0, include, '');
@@ -118,11 +121,13 @@ export async function listBlocks(
 /**
  * Write a new block file and splice its include into the assembly.
  *
- * The short name is de-duplicated against existing includes and block
- * files, so a taken name never overwrites an existing block. A string
- * draft derives the identity from its title; a {@link CreateBlockDraft}
- * chooses it, defaulting to the generic `.doco-section` class when no
- * role is given.
+ * The block file is the prefixed `blocks/_<short>.qmd` form and the
+ * include is the canonical `{{< include blocks/_<short>.qmd >}}` line.
+ * The short name is de-duplicated against existing includes and both
+ * block file forms (`_<short>.qmd` and legacy `<short>.qmd`), so a taken
+ * name never overwrites an existing block. A string draft derives the
+ * identity from its title; a {@link CreateBlockDraft} chooses it,
+ * defaulting to the generic `.doco-section` class when no role is given.
  *
  * @param ws - Workspace holding the manuscript.
  * @param dir - Manuscript directory, e.g. `manuscripts/demo`.
@@ -141,12 +146,14 @@ export async function addBlock(
   const taken = new Set(extractIncludes(article));
   const files = await ws.listFiles(`${dir}/blocks`);
   const isTaken = (candidate: string): boolean =>
-    taken.has(candidate) || files.includes(`${candidate}.qmd`);
+    taken.has(candidate) ||
+    files.includes(blockFileName(candidate)) ||
+    files.includes(`${candidate}.qmd`);
   const title = typeof draft === 'string' ? draft : draft.title;
   const short = uniqueShortName(typeof draft === 'string' ? title : draft.short, isTaken);
   const role = typeof draft === 'string' ? GENERIC_BLOCK_TYPE : (draft.role ?? GENERIC_BLOCK_TYPE);
   const heading: BlockHeading = { title, anchor: `sec-${short}`, type: role };
-  await ws.writeFile(`${dir}/blocks/${short}.qmd`, joinHeading(heading, ''));
+  await ws.writeFile(`${dir}/blocks/${blockFileName(short)}`, joinHeading(heading, ''));
   await ws.writeFile(articlePath, insertInclude(article, short, position));
 }
 

@@ -74,12 +74,12 @@ async function setup(files: Record<string, string>): Promise<WorkspaceAdapter> {
  * @returns The block file's heading line.
  */
 async function headingLine(ws: WorkspaceAdapter, short: string): Promise<string> {
-  const text = (await ws.readFile(`${BLOCKS}/${short}.qmd`)) ?? '';
+  const text = (await ws.readFile(`${BLOCKS}/_${short}.qmd`)) ?? '';
   return text.split('\n')[0];
 }
 
 describe('BlockEditor preset drafts', () => {
-  it("writes the Introduction preset's full draft to blocks/introduction.qmd", async () => {
+  it("writes the Introduction preset's full draft to blocks/_introduction.qmd", async () => {
     const ws = await setup({
       [ARTICLE]: articleWith('alpha'),
       [`${BLOCKS}/alpha.qmd`]: blockFile('alpha', 'Alpha'),
@@ -93,7 +93,7 @@ describe('BlockEditor preset drafts', () => {
     expect(await headingLine(ws, 'introduction')).toBe(
       '# Introduction {#sec-introduction .deo-introduction}',
     );
-    expect(await ws.readFile(ARTICLE)).toContain('{{< include blocks/introduction.qmd >}}');
+    expect(await ws.readFile(ARTICLE)).toContain('{{< include blocks/_introduction.qmd >}}');
     expect(screen.queryByRole('dialog', { name: 'Add section' })).toBeNull();
   });
 });
@@ -112,10 +112,10 @@ describe('BlockEditor custom draft without a role', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     });
 
-    const created = (await ws.readFile(`${BLOCKS}/follow-up.qmd`)) ?? '';
+    const created = (await ws.readFile(`${BLOCKS}/_follow-up.qmd`)) ?? '';
     expect(created.split('\n')[0]).toBe('# Follow-up {#sec-follow-up .doco-section}');
     expect(created).not.toContain('.deo-');
-    expect(await ws.readFile(ARTICLE)).toContain('{{< include blocks/follow-up.qmd >}}');
+    expect(await ws.readFile(ARTICLE)).toContain('{{< include blocks/_follow-up.qmd >}}');
   });
 });
 
@@ -137,12 +137,13 @@ describe('BlockEditor taken draft short name', () => {
     );
     const files = await ws.listFiles(BLOCKS);
     const createdName = files.find((file) => file !== 'introduction.qmd');
-    expect(createdName).toMatch(/^introduction-[a-z0-9]{6}\.qmd$/);
+    expect(createdName).toMatch(/^_introduction-[a-z0-9]{6}\.qmd$/);
     const article = (await ws.readFile(ARTICLE)) ?? '';
     expect(article).toContain('{{< include blocks/introduction.qmd >}}');
     expect(article).toContain(`{{< include blocks/${createdName} >}}`);
     const created = (await ws.readFile(`${BLOCKS}/${createdName}`)) ?? '';
     expect(created).toContain('.deo-introduction');
-    expect(created).toContain(`{#sec-${createdName?.replace(/\.qmd$/, '')}`);
+    const createdShort = createdName?.replace(/^_/, '').replace(/\.qmd$/, '');
+    expect(created).toContain(`{#sec-${createdShort}`);
   });
 });
