@@ -37,7 +37,7 @@ const AUTHORS: AuthorObject[] = [
     affiliations: [{ ref: 'ui' }, { ref: 'rscm' }],
   },
   {
-    id: 'budi',
+    id: 'budi-lee',
     name: { given: 'Budi', family: 'Lee' },
     email: 'budi.lee@example.edu',
     'equal-contributor': true,
@@ -161,13 +161,16 @@ describe('author roles and order', () => {
     }
   });
 
-  it('holds roles by the ORCID person and blank nodes for the rest', () => {
+  it('holds roles by the ORCID person and publication-scoped persons', () => {
     expect(holders[0]).toBe(ALICE_IRI);
     const alice = seen.find((q) => q.s === holders[0] && q.p === RDF_TYPE);
     expect(alice?.o).toBe(`${FOAF}Person`);
-    for (const holder of holders.slice(1)) {
-      expect(seen.find((q) => q.s === holder && q.p === RDF_TYPE)?.skind).toBe('BlankNode');
+    expect(holders[1]).toBe(`${PUB}#author-budi-lee`);
+    expect(holders[2]).toBe(`${PUB}#author-vina`);
+    for (const holder of [holders[1], holders[2]]) {
+      expect(seen.find((q) => q.s === holder && q.p === RDF_TYPE)?.o).toBe(`${FOAF}Person`);
     }
+    expect(seen.find((q) => q.s === holders[3] && q.p === RDF_TYPE)?.skind).toBe('BlankNode');
   });
 });
 
@@ -246,6 +249,7 @@ describe('identifiers, organizations and shortcuts', () => {
     const creators = objs(PUB, `${DCTERMS}creator`);
     expect(creators).toHaveLength(4);
     expect(creators.map((q) => q.o)).toContain(ALICE_IRI);
+    expect(creators.map((q) => q.o)).toContain(`${PUB}#author-budi-lee`);
   });
 
   it('restricts CRediT role IRIs to the NISO namespace', () => {
@@ -269,7 +273,8 @@ describe('single-name authors and explicit author type', () => {
     });
     const person = rows.find((q) => q.p === RDF_TYPE && q.o === `${FOAF}Person`);
     expect(person).toBeDefined();
-    expect(person?.skind).toBe('BlankNode');
+    expect(person?.skind).toBe('NamedNode');
+    expect(person?.s).toBe(`${PUB}#author-0`);
     expect(rows.filter((q) => q.p === RDF_TYPE && q.o === `${FOAF}Group`)).toHaveLength(0);
     expect(rows.filter((q) => q.p === `${FOAF}name`).map((q) => q.o)).toEqual(['Plato']);
   });

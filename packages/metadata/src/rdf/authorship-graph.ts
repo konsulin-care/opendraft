@@ -100,10 +100,10 @@ function namePairs(name: NameValue): string[] {
   return pairs;
 }
 
-function agentTerm(author: AuthorObject, index: number): string {
+function agentTerm(author: AuthorObject, index: number, publication: string): string {
   if (isGroupAuthor(author)) return `_:group-${index}`;
   const orcid = normalizeOrcid(author.orcid);
-  return orcid ? termRef(orcid.iri) : `_:author-${index}`;
+  return orcid ? termRef(orcid.iri) : termRef(`${publication}#author-${author.id ?? index}`);
 }
 
 function memberTerm(index: number, slot: number, member: MemberObject): string {
@@ -144,7 +144,7 @@ function resolveOrg(
 /** Collect agents, groups, equal contributors, roles and organizations. */
 function buildContext(input: AuthorshipGraphInput): AuthorshipContext {
   const registry = input.affiliations ?? [];
-  const agents = input.authors.map((author, index) => agentTerm(author, index));
+  const agents = input.authors.map((author, index) => agentTerm(author, index, input.publication));
   const groups = new Map<string, string>();
   input.authors.forEach((author, index) => {
     if (author.id && isGroupAuthor(author)) groups.set(author.id, agents[index]);
