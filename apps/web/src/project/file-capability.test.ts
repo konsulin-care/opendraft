@@ -6,22 +6,22 @@ import {
   isManuscriptBlockPath,
 } from './file-capability';
 
-/** A manuscript block path with a plain slug stem: manuscripts/<id>/blocks/<slug>.qmd. */
-const BLOCK_PATH = 'manuscripts/2024-01/blocks/intro.qmd';
+/** A manuscript block path with the required prefix: manuscripts/<id>/blocks/_<short>.qmd. */
+const BLOCK_PATH = 'manuscripts/2024-01/blocks/_intro.qmd';
 
 /** The assembly file of a manuscript: rich (block-editor entry point). */
 const ARTICLE_PATH = 'manuscripts/2024-01/article.qmd';
 
 describe('getFileCapability', () => {
-  it('classifies manuscripts/<id>/blocks/<slug>.qmd as rich for any valid slug stem', () => {
+  it('classifies manuscripts/<id>/blocks/_<short>.qmd as rich for any valid short name', () => {
     expect(getFileCapability(BLOCK_PATH, '# Heading\n')).toBe('rich');
     expect(getFileCapability(BLOCK_PATH, '')).toBe('rich');
-    expect(getFileCapability('manuscripts/p/blocks/sec-2.qmd', 'x')).toBe('rich');
-    expect(getFileCapability('manuscripts/p/blocks/a.qmd', 'x')).toBe('rich');
-    expect(getFileCapability('manuscripts/p/blocks/readme.qmd', 'x')).toBe('rich');
-    expect(getFileCapability('manuscripts/p/blocks/2024-summary.qmd', 'x')).toBe('rich');
-    // Legacy ULID-named blocks stay valid: a ULID stem is also a valid slug.
-    expect(getFileCapability('manuscripts/p/blocks/01hxyz00000000000000000000.qmd', 'x')).toBe('rich');
+    expect(getFileCapability('manuscripts/p/blocks/_sec-2.qmd', 'x')).toBe('rich');
+    expect(getFileCapability('manuscripts/p/blocks/_a.qmd', 'x')).toBe('rich');
+    expect(getFileCapability('manuscripts/p/blocks/_readme.qmd', 'x')).toBe('rich');
+    expect(getFileCapability('manuscripts/p/blocks/_2024-summary.qmd', 'x')).toBe('rich');
+    // A ULID short name stays valid once it carries the required `_` prefix.
+    expect(getFileCapability('manuscripts/p/blocks/_01hxyz00000000000000000000.qmd', 'x')).toBe('rich');
   });
 
   it('classifies manuscripts/<id>/article.qmd as rich', () => {
@@ -46,16 +46,22 @@ describe('getFileCapability', () => {
     expect(getFileCapability('notes', 'no extension here')).toBe('text');
   });
 
-  it('rejects invalid slug stems in the blocks/ segment', () => {
-    expect(getFileCapability('manuscripts/p/blocks/-intro.qmd', 'x')).toBe('text');
-    expect(getFileCapability('manuscripts/p/blocks/intro-.qmd', 'x')).toBe('text');
-    expect(getFileCapability('manuscripts/p/blocks/Intro.qmd', 'x')).toBe('text');
-    expect(getFileCapability('manuscripts/p/blocks/sec_1.qmd', 'x')).toBe('text');
+  it('rejects legacy unprefixed block files and invalid short names', () => {
+    // Legacy un-prefixed block files are not rich block files any more.
+    expect(getFileCapability('manuscripts/p/blocks/intro.qmd', 'x')).toBe('text');
+    expect(getFileCapability('manuscripts/p/blocks/_-intro.qmd', 'x')).toBe('text');
+    expect(getFileCapability('manuscripts/p/blocks/_intro-.qmd', 'x')).toBe('text');
+    expect(getFileCapability('manuscripts/p/blocks/_Intro.qmd', 'x')).toBe('text');
+    expect(getFileCapability('manuscripts/p/blocks/_sec_1.qmd', 'x')).toBe('text');
     expect(getFileCapability('manuscripts/p/blocks/intro.mdown', 'x')).toBe('text');
-    expect(getFileCapability('manuscripts/p/blocks/.qmd', 'x')).toBe('text');
+    expect(getFileCapability('manuscripts/p/blocks/_.qmd', 'x')).toBe('text');
     expect(getFileCapability('manuscripts/p/blocks/intro.txt', 'x')).toBe('text');
+    // A short name longer than 40 characters is not valid.
+    expect(getFileCapability(`manuscripts/p/blocks/_${'a'.repeat(41)}.qmd`, 'x')).toBe('text');
   });
+});
 
+describe('getFileCapability — whitespace is plain text', () => {
   it('treats tab, newline and carriage return as normal text characters', () => {
     expect(getFileCapability('notes', 'line1\nline2\tcol\r\nend\n')).toBe('text');
   });
@@ -76,17 +82,21 @@ describe('getFileCapability — binary detection', () => {
 });
 
 describe('path helpers', () => {
-  it('isManuscriptBlockPath matches only manuscript blocks/ files with a valid slug', () => {
-    expect(isManuscriptBlockPath('manuscripts/p/blocks/intro.qmd')).toBe(true);
+  it('isManuscriptBlockPath matches only prefixed manuscript blocks/ files with a valid short name', () => {
+    expect(isManuscriptBlockPath('manuscripts/p/blocks/_intro.qmd')).toBe(true);
+    // The 40-character short-name boundary: 40 is valid, 41 is not.
+    expect(isManuscriptBlockPath(`manuscripts/p/blocks/_${'a'.repeat(40)}.qmd`)).toBe(true);
+    expect(isManuscriptBlockPath('manuscripts/p/blocks/intro.qmd')).toBe(false);
+    expect(isManuscriptBlockPath(`manuscripts/p/blocks/_${'a'.repeat(41)}.qmd`)).toBe(false);
     expect(isManuscriptBlockPath('manuscripts/p/article.qmd')).toBe(false);
-    expect(isManuscriptBlockPath('manuscripts/p/blocks/nested/intro.qmd')).toBe(false);
-    expect(isManuscriptBlockPath('blocks/intro.qmd')).toBe(false);
+    expect(isManuscriptBlockPath('manuscripts/p/blocks/nested/_intro.qmd')).toBe(false);
+    expect(isManuscriptBlockPath('blocks/_intro.qmd')).toBe(false);
   });
 
   it('isManuscriptArticlePath matches only manuscripts/<id>/article.qmd', () => {
     expect(isManuscriptArticlePath('manuscripts/2024-01/article.qmd')).toBe(true);
     expect(isManuscriptArticlePath('article.qmd')).toBe(false);
-    expect(isManuscriptArticlePath('manuscripts/p/blocks/intro.qmd')).toBe(false);
+    expect(isManuscriptArticlePath('manuscripts/p/blocks/_intro.qmd')).toBe(false);
     expect(isManuscriptArticlePath('manuscripts/p/sections/article.qmd')).toBe(false);
   });
 });

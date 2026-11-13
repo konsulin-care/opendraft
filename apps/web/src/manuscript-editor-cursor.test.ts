@@ -10,7 +10,7 @@ import { ManuscriptEditor } from './components/ManuscriptEditor';
 
 const DOC = '# Introduction\n\nFirst paragraph of the manuscript.\n\nSecond paragraph.';
 /** Manuscript block path: opens in the source-only editor. */
-const DOC_PATH = 'manuscripts/p/blocks/01hxyz000000000000000000000000.qmd';
+const DOC_PATH = 'manuscripts/p/blocks/_01hxyz000000000000000000000000.qmd';
 /** Source text of the crepe block-editor config, for the source-scan assertion. */
 const crepeConfigSource = readFileSync(
   resolve(__dirname, 'components/crepe-config.ts'),

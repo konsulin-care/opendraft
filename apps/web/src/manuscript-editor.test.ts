@@ -18,7 +18,7 @@ vi.mock("./persistence", async (importOriginal) => {
 });
 
 /** Manuscript block path: opens in the source-only editor. */
-const DOC_PATH = "manuscripts/p/blocks/01hxyz000000000000000000000000.qmd";
+const DOC_PATH = "manuscripts/p/blocks/_01hxyz000000000000000000000000.qmd";
 /** Manuscript assembly path: opens in the source-only editor. */
 const ARTICLE_PATH = "manuscripts/p/article.qmd";
 /** Every workspace file type under test: assembly, block, config, loose files. */

@@ -7,7 +7,7 @@ import { ManuscriptEditor } from './components/ManuscriptEditor';
 // @vitest-environment jsdom
 
 /** Manuscript block path: every workspace file opens in the source-only editor. */
-const DOC_PATH = 'manuscripts/p/blocks/01hxyz00000000000000000000.qmd';
+const DOC_PATH = 'manuscripts/p/blocks/_01hxyz00000000000000000000.qmd';
 
 /**
  * Wait until the workspace holds text containing the expected fragment.
