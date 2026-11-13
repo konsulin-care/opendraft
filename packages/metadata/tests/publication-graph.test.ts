@@ -11,6 +11,7 @@ import type { AuthorObject, RegistryAffiliation } from '../src/types/author.js';
 
 // Repo-root protocol/, resolved from this file: suites run with cwd = packages/metadata.
 const ARTICLE_SHAPES = fileURLToPath(new URL('../../../protocol/article.shacl.ttl', import.meta.url));
+const RELEASE_SHAPES = ARTICLE_SHAPES.replace('article.shacl.ttl', 'article-release.shacl.ttl');
 const SH_VIOLATION = 'http://www.w3.org/ns/shacl#Violation';
 const SH_WARNING = 'http://www.w3.org/ns/shacl#Warning';
 
@@ -146,12 +147,16 @@ beforeAll(async () => {
   shapes = await loadTurtle(ARTICLE_SHAPES);
   report = await validateShacl(dataset, shapes);
 });
-
 describe('SHACL conformance and determinism', () => {
-  it('conforms to protocol/article.shacl.ttl', () => {
+  it('conforms to protocol/article.shacl.ttl and the release shape union', async () => {
     expect(violations(report)).toHaveLength(0);
     expect(report.conforms).toBe(true);
     expect(report.results).toHaveLength(0);
+    const union = await loadTurtle(RELEASE_SHAPES);
+    for (const quad of shapes) union.add(quad);
+    const releaseReport = await validateShacl(await parseFragment(turtle), union);
+    expect(violations(releaseReport)).toHaveLength(0);
+    expect(releaseReport.conforms).toBe(true);
   });
 
   it('is byte-identical across two runs', () => {
@@ -226,7 +231,6 @@ describe('publication properties', () => {
     expect(values(term, RDF_TYPE)).toContain(`${SKOS}Concept`);
     expect(values(term, `${SKOS}prefLabel`)).toEqual(['Distributed scientific publication']);
   });
-
 });
 
 describe('provenance and citations', () => {
@@ -286,7 +290,6 @@ describe('dcterms:conformsTo protocol link', () => {
     const result = await validateShacl(data, shapes);
     return result.results.filter((r) => r.severity.value === SH_VIOLATION && r.path?.value === CONFORMS);
   }
-
   it('flags missing, non-matching, or non-IRI dcterms:conformsTo', async () => {
     const missing = turtle.split('\n').filter((l) => !l.includes('conformsTo')).join('\n');
     const swap = (term: string) => turtle.replace(new RegExp(`${PRED} \\S+`), `${PRED} ${term}`);

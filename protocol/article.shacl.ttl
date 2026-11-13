@@ -3,6 +3,8 @@
 # Validates that an article RDF graph conforms to the OpenDraft protocol.
 # Phase 01: full required field set plus optional-field capability shapes.
 # Provenance scalars live directly on od:Publication (see ADR-018).
+# Release-only constraints (identifier, FRBR work, od:repositoryUrl,
+# od:sourceRevision) live in protocol/article-release.shacl.ttl.
 # ADR-021: authorship follows the OCDM role model — every role node is
 # linked from the publication via pro:isDocumentContextFor, roles are
 # held by agents (pro:isHeldBy), and author order is an oco:hasNext
@@ -46,26 +48,11 @@ od:PublicationShape
         sh:message "A publication must have at least one creator." ;
     ] ;
     sh:property [
-        sh:path od:repositoryUrl ;
-        sh:datatype xsd:anyURI ;
-        sh:minCount 1 ;
-        sh:maxCount 1 ;
-        sh:message "A publication must have exactly one repository URL with datatype xsd:anyURI." ;
-    ] ;
-    sh:property [
         sh:path od:manuscriptPath ;
         sh:datatype xsd:string ;
         sh:minCount 1 ;
         sh:maxCount 1 ;
         sh:message "A publication must have exactly one manuscript path." ;
-    ] ;
-    sh:property [
-        sh:path od:sourceRevision ;
-        sh:datatype xsd:string ;
-        sh:minCount 1 ;
-        sh:maxCount 1 ;
-        sh:pattern "^[0-9a-f]{40}$" ;
-        sh:message "A publication must have exactly one source revision: a 40-character hexadecimal Git commit SHA." ;
     ] ;
     sh:property [
         sh:path dcterms:conformsTo ;
@@ -75,74 +62,9 @@ od:PublicationShape
         sh:pattern "^https://github\\.com/[^/]+/[^/]+/tree/[0-9a-f]{40}/protocol$" ;
         sh:message "A publication must have exactly one dcterms:conformsTo IRI: https://github.com/<owner>/<repo>/tree/<40-character SHA>/protocol." ;
     ] .
-    # Identifier requirement lives in od:PublicationIdentifierShape below:
-    # either dcterms:identifier or an OCDM datacite:hasIdentifier node.
-
-# =============================================================================
-# Work / Version Shape — FRBR Work–Expression model (ADR-021)
-#
-# The manuscript is a fabio:Work (concept DOI); each published version
-# is an od:Publication that realizes exactly one Work and may revise at
-# most one earlier version. A publication IRI can never double as its
-# own Work IRI (concept and version DOIs must differ).
-# =============================================================================
-
-od:PublicationWorkShape
-    a sh:NodeShape ;
-    sh:targetClass od:Publication ;
-
-    sh:property [
-        sh:path frbr:realizationOf ;
-        sh:minCount 1 ;
-        sh:maxCount 1 ;
-        sh:qualifiedValueShape [
-            a sh:NodeShape ;
-            sh:class fabio:Work ;
-        ] ;
-        sh:qualifiedMinCount 1 ;
-        sh:message "A publication must have exactly one frbr:realizationOf pointing to a fabio:Work." ;
-    ] ;
-    sh:property [
-        sh:path frbr:revisionOf ;
-        sh:maxCount 1 ;
-        sh:message "A publication may revise at most one earlier version (frbr:revisionOf)." ;
-    ] ;
-    sh:not [
-        a sh:NodeShape ;
-        sh:class fabio:Work ;
-    ] ;
-    sh:message "A publication IRI must differ from its Work IRI: an od:Publication may not also be a fabio:Work." .
-
-# =============================================================================
-# Identifier Shape — classic dcterms:identifier or OCDM identifier nodes
-# =============================================================================
-
-od:PublicationIdentifierShape
-    a sh:NodeShape ;
-    sh:targetClass od:Publication ;
-
-    sh:property [
-        sh:path datacite:hasIdentifier ;
-        sh:node [
-            a sh:NodeShape ;
-            sh:property [
-                sh:path datacite:usesIdentifierScheme ;
-                sh:minCount 1 ;
-                sh:message "An OCDM identifier node must declare datacite:usesIdentifierScheme." ;
-            ] ;
-            sh:property [
-                sh:path literal:hasLiteralValue ;
-                sh:minCount 1 ;
-                sh:message "An OCDM identifier node must declare literal:hasLiteralValue." ;
-            ] ;
-        ] ;
-        sh:message "A datacite:hasIdentifier node must declare a scheme and a literal value." ;
-    ] ;
-    sh:or (
-        [ sh:property [ sh:path dcterms:identifier ; sh:minCount 1 ] ]
-        [ sh:property [ sh:path datacite:hasIdentifier ; sh:minCount 1 ] ]
-    ) ;
-    sh:message "A publication must declare at least one identifier: dcterms:identifier or an OCDM datacite:hasIdentifier node." .
+    # Release-only constraints (identifier, frbr:realizationOf,
+    # od:repositoryUrl, od:sourceRevision) live in
+    # protocol/article-release.shacl.ttl; drafts validate without them.
 
 # =============================================================================
 # License and Citation Shapes — warnings (do not affect conformance)
