@@ -15,6 +15,9 @@
 @prefix od: <https://w3id.org/opendraft/ontology#> .
 @prefix fabio: <http://purl.org/spar/fabio/> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix doco: <http://purl.org/spar/doco/> .
+@prefix deo: <http://purl.org/spar/deo/> .
 @prefix pro: <http://purl.org/spar/pro/> .
 @prefix scoro: <http://purl.org/spar/scoro/> .
 @prefix oco: <https://w3id.org/oc/ontology/> .
@@ -61,6 +64,11 @@ od:PublicationShape
         sh:maxCount 1 ;
         sh:pattern "^https://github\\.com/[^/]+/[^/]+/tree/[0-9a-f]{40}/protocol$" ;
         sh:message "A publication must have exactly one dcterms:conformsTo IRI: https://github.com/<owner>/<repo>/tree/<40-character SHA>/protocol." ;
+    ] ;
+    sh:property [
+        sh:path dcterms:hasPart ;
+        sh:class doco:Section ;
+        sh:message "dcterms:hasPart values must be doco:Section nodes." ;
     ] .
     # Release-only constraints (identifier, frbr:realizationOf,
     # od:repositoryUrl, od:sourceRevision) live in
@@ -352,4 +360,78 @@ od:GroupShape
         sh:path foaf:name ;
         sh:minCount 1 ;
         sh:message "A foaf:Group author must have a foaf:name." ;
+    ] .
+
+# =============================================================================
+# Section Shape — manuscript sections (doco:Section, deo roles)
+#
+# A section is linked from its publication via dcterms:hasPart,
+# titled exactly once, carrying at most one deo role class, chained
+# to its successor with oco:hasNext, and sourced over https. The
+# release-only dcterms:source requirement lives in
+# protocol/article-release.shacl.ttl.
+# =============================================================================
+
+od:SectionShape
+    a sh:NodeShape ;
+    sh:targetClass doco:Section ;
+
+    sh:property [
+        sh:path dcterms:title ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "A section must have exactly one dcterms:title." ;
+    ] ;
+    sh:property [
+        sh:path rdf:type ;
+        sh:qualifiedValueShape [
+            sh:in (
+                deo:Introduction
+                deo:Methods
+                deo:Results
+                deo:Discussion
+                deo:Conclusion
+                deo:Acknowledgements
+                deo:AuthorContribution
+                deo:Background
+                deo:Biography
+                deo:Contribution
+                deo:Data
+                deo:DatasetDescription
+                deo:Dedication
+                deo:Epilogue
+                deo:Evaluation
+                deo:ExternalResourceDescription
+                deo:FutureWork
+                deo:Materials
+                deo:Model
+                deo:Motivation
+                deo:Postscript
+                deo:ProblemStatement
+                deo:Prologue
+                deo:RelatedWork
+                deo:Scenario
+                deo:SupplementaryInformationDescription
+            ) ;
+        ] ;
+        sh:qualifiedMaxCount 1 ;
+        sh:message "A section may have at most one deo role class." ;
+    ] ;
+    sh:property [
+        sh:path oco:hasNext ;
+        sh:maxCount 1 ;
+        sh:class doco:Section ;
+        sh:message "A section may have at most one successor section (oco:hasNext)." ;
+    ] ;
+    sh:property [
+        sh:path [ sh:inversePath oco:hasNext ] ;
+        sh:maxCount 1 ;
+        sh:message "A section may have at most one predecessor section (oco:hasNext)." ;
+    ] ;
+    sh:property [
+        sh:path dcterms:source ;
+        sh:maxCount 1 ;
+        sh:nodeKind sh:IRI ;
+        sh:pattern "^https://" ;
+        sh:message "A section dcterms:source must be an IRI starting with https://." ;
     ] .

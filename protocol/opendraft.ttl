@@ -9,7 +9,8 @@
 #   - SPAR: FaBiO (fabio: Expression, Work, SubjectTerm,
 #     ExpressionCollection), FRBR (frbr: realizationOf, revisionOf,
 #     part), PRO (pro: Role, RoleInTime, isHeldBy,
-#     withRole), SCoRO (scoro: agent, corresponding-author, affiliate)
+#     withRole), SCoRO (scoro: agent, corresponding-author, affiliate),
+#     DOCO (doco: Section) and DEO (deo: section roles)
 #   - OpenCitations: OCO (oco: hasNext for author order); OCDM patterns
 #     via the DataCite (datacite:) and Literal (literal:) ontologies
 #   - PRISM (prism: versionIdentifier, keyword), FRAPO (frapo: Grant),
@@ -49,6 +50,8 @@
 @prefix literal: <https://w3id.org/literal/> .
 @prefix credit: <https://credit.niso.org/contributor-roles/> .
 @prefix oa: <http://www.w3.org/ns/oa#> .
+@prefix doco: <http://purl.org/spar/doco/> .
+@prefix deo: <http://purl.org/spar/deo/> .
 
 
 # =============================================================================

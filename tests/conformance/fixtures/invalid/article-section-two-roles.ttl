@@ -1,0 +1,51 @@
+# Invalid fixture: section typed with two deo role classes (T27)
+#
+# Violates protocol/article.shacl.ttl — od:SectionShape allows at
+# most one rdf:type value from the deo role list
+# (sh:qualifiedMaxCount 1). The publication and the section's title,
+# source and chain position are otherwise fully conforming, so the
+# second role class is the only defect.
+
+@prefix od: <https://w3id.org/opendraft/ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix pro: <http://purl.org/spar/pro/> .
+@prefix scoro: <http://purl.org/spar/scoro/> .
+@prefix doco: <http://purl.org/spar/doco/> .
+@prefix deo: <http://purl.org/spar/deo/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix ex: <https://example.org/> .
+
+ex:two-roles-publication
+    a od:Publication ;
+    dcterms:title "Two role classes" ;
+    dcterms:creator ex:alice ;
+    od:manuscriptPath "manuscripts/two-roles/article.qmd" ;
+    dcterms:conformsTo <https://github.com/konsulin-care/opendraft/tree/1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d/protocol> ;
+    dcterms:hasPart ex:two-roles-sec ;
+    pro:isDocumentContextFor ex:author-role , ex:affiliate-role .
+
+ex:two-roles-sec
+    a doco:Section , deo:Introduction , deo:Methods ;
+    dcterms:title "Introduction" ;
+    dcterms:source <https://raw.githubusercontent.com/konsulin-care/opendraft/1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d/blocks/_intro.qmd> .
+
+ex:author-role
+    a pro:RoleInTime ;
+    pro:withRole pro:author , scoro:corresponding-author ;
+    pro:isHeldBy ex:alice .
+
+ex:affiliate-role
+    a pro:RoleInTime ;
+    pro:withRole scoro:affiliate ;
+    pro:isHeldBy ex:alice ;
+    pro:relatesToOrganization ex:org .
+
+ex:alice
+    a foaf:Person ;
+    foaf:givenName "Alice" ;
+    foaf:familyName "Smith" ;
+    foaf:mbox <mailto:alice@example.edu> .
+
+ex:org
+    a foaf:Organization ;
+    foaf:name "University of Indonesia" .

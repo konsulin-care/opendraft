@@ -17,6 +17,7 @@
 @prefix datacite: <http://purl.org/datacite/ontology/> .
 @prefix literal: <https://w3id.org/literal/> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix doco: <http://purl.org/spar/doco/> .
 
 # =============================================================================
 # Release Provenance Shape — repository URL and source revision
@@ -110,3 +111,21 @@ od:PublicationIdentifierShape
         [ sh:property [ sh:path datacite:hasIdentifier ; sh:minCount 1 ] ]
     ) ;
     sh:message "A release must declare at least one identifier: dcterms:identifier or an OCDM datacite:hasIdentifier node." .
+
+# =============================================================================
+# Section Source Shape — releases pin every section to its block file
+#
+# Drafts may omit section sources (article.shacl.ttl allows an
+# optional https dcterms:source); a release must declare the raw
+# block-file URL for every doco:Section (ADR-018 provenance).
+# =============================================================================
+
+od:SectionSourceShape
+    a sh:NodeShape ;
+    sh:targetClass doco:Section ;
+
+    sh:property [
+        sh:path dcterms:source ;
+        sh:minCount 1 ;
+        sh:message "A release section must declare its dcterms:source block file IRI." ;
+    ] .
