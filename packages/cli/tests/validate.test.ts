@@ -63,6 +63,33 @@ async function scaffoldedProject(): Promise<NodeFsWorkspace> {
 }
 
 /**
+ * Migrate addBlock's legacy block fixtures to the prefixed layout.
+ *
+ * Renames every un-prefixed `blocks/<short>.qmd` to `blocks/_<short>.qmd`
+ * and rewrites the matching include lines in `article.qmd`, so the seeded
+ * project follows the `blocks/_<short>.qmd` convention.
+ *
+ * @param ws - Workspace of the scaffolded project.
+ * @returns Resolves once every block file and include line is prefixed.
+ */
+async function normalizeBlockFixtures(ws: NodeFsWorkspace): Promise<void> {
+  const blocksDir = `${MANUSCRIPT_DIR}/blocks`;
+  const articlePath = `${MANUSCRIPT_DIR}/article.qmd`;
+  for (const file of await ws.listFiles(blocksDir)) {
+    if (file.startsWith('_') || !file.endsWith('.qmd')) continue;
+    const content = await ws.readFile(`${blocksDir}/${file}`);
+    await ws.writeFile(`${blocksDir}/_${file}`, content ?? '');
+    await ws.deleteFile(`${blocksDir}/${file}`);
+    const short = file.replace(/\.qmd$/, '');
+    const article = (await ws.readFile(articlePath)) ?? '';
+    await ws.writeFile(
+      articlePath,
+      article.replaceAll(`blocks/${short}.qmd`, `blocks/_${short}.qmd`),
+    );
+  }
+}
+
+/**
  * Register temp-directory lifecycle hooks for a describe block.
  */
 function useTempDir(): void {
@@ -81,6 +108,7 @@ describe('runCli — validate: config and metadata', () => {
   it('returns 0 for a project built with scaffoldProject plus addBlock', async () => {
     const ws = await scaffoldedProject();
     await addBlock(ws, MANUSCRIPT_DIR, 0, 'Introduction');
+    await normalizeBlockFixtures(ws);
 
     const run = runValidate(dir);
 
@@ -114,6 +142,7 @@ describe('runCli — validate: assembly', () => {
   it('returns 1 when the assembly includes a missing block file', async () => {
     const ws = await scaffoldedProject();
     await addBlock(ws, MANUSCRIPT_DIR, 0, 'Introduction');
+    await normalizeBlockFixtures(ws);
     const articlePath = join(dir, MANUSCRIPT_DIR, 'article.qmd');
     const article = readFileSync(articlePath, 'utf8');
     writeFileSync(
@@ -131,6 +160,7 @@ describe('runCli — validate: assembly', () => {
     const ws = await scaffoldedProject();
     await addBlock(ws, MANUSCRIPT_DIR, 0, 'Introduction');
     await addBlock(ws, MANUSCRIPT_DIR, 1, 'Methods');
+    await normalizeBlockFixtures(ws);
     writeFileSync(
       join(dir, MANUSCRIPT_DIR, 'blocks', '_methods.qmd'),
       '# Methods {#sec-introduction}\n',
@@ -145,6 +175,7 @@ describe('runCli — validate: assembly', () => {
   it('reports an orphan block file as a warning and returns 0', async () => {
     const ws = await scaffoldedProject();
     await addBlock(ws, MANUSCRIPT_DIR, 0, 'Introduction');
+    await normalizeBlockFixtures(ws);
     await ws.writeFile(`${MANUSCRIPT_DIR}/blocks/_scratch.qmd`, '# Scratch {#sec-scratch}\n');
 
     const run = runValidate(dir);

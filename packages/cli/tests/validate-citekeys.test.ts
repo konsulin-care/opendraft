@@ -72,6 +72,33 @@ async function scaffoldedProject(): Promise<NodeFsWorkspace> {
 }
 
 /**
+ * Migrate addBlock's legacy block fixtures to the prefixed layout.
+ *
+ * Renames every un-prefixed `blocks/<short>.qmd` to `blocks/_<short>.qmd`
+ * and rewrites the matching include lines in `article.qmd`, so the seeded
+ * project follows the `blocks/_<short>.qmd` convention.
+ *
+ * @param ws - Workspace of the scaffolded project.
+ * @returns Resolves once every block file and include line is prefixed.
+ */
+async function normalizeBlockFixtures(ws: NodeFsWorkspace): Promise<void> {
+  const blocksDir = `${MANUSCRIPT_DIR}/blocks`;
+  const articlePath = `${MANUSCRIPT_DIR}/article.qmd`;
+  for (const file of await ws.listFiles(blocksDir)) {
+    if (file.startsWith('_') || !file.endsWith('.qmd')) continue;
+    const content = await ws.readFile(`${blocksDir}/${file}`);
+    await ws.writeFile(`${blocksDir}/_${file}`, content ?? '');
+    await ws.deleteFile(`${blocksDir}/${file}`);
+    const short = file.replace(/\.qmd$/, '');
+    const article = (await ws.readFile(articlePath)) ?? '';
+    await ws.writeFile(
+      articlePath,
+      article.replaceAll(`blocks/${short}.qmd`, `blocks/_${short}.qmd`),
+    );
+  }
+}
+
+/**
  * Create the `Introduction` block and append a citation paragraph to it.
  *
  * @param ws - Workspace of the scaffolded project.
@@ -80,6 +107,7 @@ async function scaffoldedProject(): Promise<NodeFsWorkspace> {
  */
 async function blockWithCitation(ws: NodeFsWorkspace, citation: string): Promise<string> {
   await addBlock(ws, MANUSCRIPT_DIR, 0, 'Introduction');
+  await normalizeBlockFixtures(ws);
   const blockPath = join(dir, MANUSCRIPT_DIR, 'blocks', '_introduction.qmd');
   appendFileSync(blockPath, `\n${citation}\n`);
   return blockPath;
