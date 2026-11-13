@@ -81,7 +81,7 @@ describe('validateAssembly: heading anchors', () => {
   it("rejects an included block whose heading anchor differs from 'sec-<short>'", () => {
     const result = validateAssembly({
       assembly: '{{< include blocks/_intro.qmd >}}',
-      blockFiles: { 'blocks/_intro.qmd': '# Intro {#sec-other .deo-intro}\n\nbody' },
+      blockFiles: { 'blocks/_intro.qmd': '# Intro {#sec-other .deo-introduction}\n\nbody' },
       files: ['_intro.qmd'],
     });
 
@@ -93,7 +93,7 @@ describe('validateAssembly: heading anchors', () => {
   it("accepts an included block whose heading anchor equals 'sec-<short>'", () => {
     const result = validateAssembly({
       assembly: '{{< include blocks/_intro.qmd >}}',
-      blockFiles: { 'blocks/_intro.qmd': '# Intro {#sec-intro .deo-intro}\n\nbody' },
+      blockFiles: { 'blocks/_intro.qmd': '# Intro {#sec-intro .deo-introduction}\n\nbody' },
       files: ['_intro.qmd'],
     });
 
@@ -118,7 +118,7 @@ describe('validateAssembly: optional role class', () => {
   it('accepts anchor headings with an optional role class and with no class', () => {
     const withClass = validateAssembly({
       assembly: '{{< include blocks/_intro.qmd >}}',
-      blockFiles: { 'blocks/_intro.qmd': '# Intro {#sec-intro .deo-intro}\n\nbody' },
+      blockFiles: { 'blocks/_intro.qmd': '# Intro {#sec-intro .deo-introduction}\n\nbody' },
       files: ['_intro.qmd'],
     });
     const withoutClass = validateAssembly({
@@ -180,7 +180,7 @@ describe('validateAssembly: prefixed block acceptance', () => {
   it('accepts blocks/_intro.qmd included as {{< include blocks/_intro.qmd >}} with heading anchor sec-intro', () => {
     const result = validateAssembly({
       assembly: '{{< include blocks/_intro.qmd >}}',
-      blockFiles: { 'blocks/_intro.qmd': '# Intro {#sec-intro .deo-intro}\n\nbody' },
+      blockFiles: { 'blocks/_intro.qmd': '# Intro {#sec-intro .deo-introduction}\n\nbody' },
       files: ['_intro.qmd'],
     });
 
@@ -216,5 +216,84 @@ describe('validateAssembly: outcomes unchanged by anchor check', () => {
     expect(orphan.valid).toBe(true);
     expect(orphan.errors).toEqual([]);
     expect(orphan.warnings.some((w) => w.message.includes('scratch.qmd'))).toBe(true);
+  });
+});
+
+describe('validateAssembly: heading classes', () => {
+  it('returns an error for an included block whose heading class is .deo-bogus', () => {
+    const result = validateAssembly({
+      assembly: '{{< include blocks/_intro.qmd >}}',
+      blockFiles: { 'blocks/_intro.qmd': '# Intro {#sec-intro .deo-bogus}\n\nbody' },
+      files: ['_intro.qmd'],
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.message.includes('.deo-bogus'))).toBe(true);
+  });
+
+  it('accepts .doco-section and SECTION_ROLES .deo-<role> heading classes', () => {
+    const generic = validateAssembly({
+      assembly: '{{< include blocks/_intro.qmd >}}',
+      blockFiles: { 'blocks/_intro.qmd': '# Intro {#sec-intro .doco-section}\n\nbody' },
+      files: ['_intro.qmd'],
+    });
+    const role = validateAssembly({
+      assembly: '{{< include blocks/_methods.qmd >}}',
+      blockFiles: { 'blocks/_methods.qmd': '# Methods {#sec-methods .deo-methods}\n\nbody' },
+      files: ['_methods.qmd'],
+    });
+
+    expect(generic.errors).toEqual([]);
+    expect(role.errors).toEqual([]);
+  });
+});
+
+describe('validateAssembly: duplicate anchors', () => {
+  it('returns one error when two included blocks share the anchor sec-intro', () => {
+    const result = validateAssembly({
+      assembly: [
+        '{{< include blocks/_intro.qmd >}}',
+        '{{< include blocks/_other.qmd >}}',
+      ].join('\n'),
+      blockFiles: {
+        'blocks/_intro.qmd': '# Intro {#sec-intro .deo-introduction}\n\nbody',
+        'blocks/_other.qmd': '# Other {#sec-intro .doco-section}\n\nbody',
+      },
+      files: ['_intro.qmd', '_other.qmd'],
+    });
+
+    expect(result.valid).toBe(false);
+    const duplicates = result.errors.filter(
+      (e) => e.message.includes('duplicate anchor') && e.message.includes('sec-intro'),
+    );
+    expect(duplicates).toHaveLength(1);
+  });
+});
+
+describe('validateAssembly: heading warnings', () => {
+  it('warns, not errors, for a block without a heading', () => {
+    const result = validateAssembly({
+      assembly: '{{< include blocks/_intro.qmd >}}',
+      blockFiles: { 'blocks/_intro.qmd': 'plain body text\nsecond line' },
+      files: ['_intro.qmd'],
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings.some((w) => w.message.includes('missing heading'))).toBe(true);
+  });
+
+  it('warns, not errors, for a level-1 heading in the body after the first line', () => {
+    const result = validateAssembly({
+      assembly: '{{< include blocks/_intro.qmd >}}',
+      blockFiles: {
+        'blocks/_intro.qmd': '# Intro {#sec-intro .deo-introduction}\n\n# Stray\n\nbody',
+      },
+      files: ['_intro.qmd'],
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings.some((w) => w.message.includes('level-1 heading'))).toBe(true);
   });
 });

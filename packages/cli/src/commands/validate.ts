@@ -2,7 +2,6 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import {
-  collectIncludes,
   validateAssembly,
   validateMetadata,
   validateOpendraft,
@@ -116,22 +115,6 @@ function checkMetadata(root: string, manuscript: ManuscriptEntry, findings: Find
 }
 
 /**
- * Extract the section anchor from a block's heading line.
- *
- * @param content - Block file content.
- * @returns Anchor label, or null when the heading carries none.
- */
-function headingAnchor(content: string): string | null {
-  for (const line of content.split('\n')) {
-    const trimmed = line.trim();
-    if (!/^#\s/.test(trimmed)) continue;
-    const match = /\{#([^}\s]+)/.exec(trimmed);
-    return match ? match[1] : null;
-  }
-  return null;
-}
-
-/**
  * Map a validator path onto a project-relative file location.
  *
  * @param manuscript - Manuscript entry the finding belongs to.
@@ -176,42 +159,9 @@ function readBlockFiles(
 }
 
 /**
- * Report included blocks that share a `sec-` anchor.
- *
- * @param manuscript - Manuscript entry for finding locations.
- * @param assembly - Container article text.
- * @param blockFiles - Block contents keyed by `blocks/<file>`.
- * @param findings - Collector pushed onto.
- */
-function checkAnchors(
-  manuscript: ManuscriptEntry,
-  assembly: string,
-  blockFiles: Record<string, string>,
-  findings: Finding[],
-): void {
-  const seen = new Map<string, string>();
-  for (const path of collectIncludes(assembly)) {
-    const content = blockFiles[path];
-    if (content === undefined) continue;
-    const anchor = headingAnchor(content);
-    if (anchor === null) continue;
-    const previous = seen.get(anchor);
-    if (previous !== undefined) {
-      findings.push({
-        level: 'error',
-        location: `${manuscript.path}/article.qmd`,
-        path: 'assembly',
-        message: `duplicate anchor ${anchor}: ${previous} and ${path}`,
-      });
-      continue;
-    }
-    seen.set(anchor, path);
-  }
-}
-
-/**
  * Validate a manuscript's assembly: article includes, block files, anchor
  * contract and block citekeys; unreferenced files surface as warnings.
+ * Duplicate anchors are reported once, by validateAssembly.
  *
  * @param root - Project root directory.
  * @param manuscript - Manuscript entry from opendraft.yml.
@@ -253,7 +203,6 @@ function checkAssembly(root: string, manuscript: ManuscriptEntry, findings: Find
       message: warning.message,
     });
   }
-  checkAnchors(manuscript, assembly, blockFiles, findings);
   const citekeys = checkCitekeys(root, manuscript.path, assembly, blockFiles);
   findings.push(...citekeys.map((finding) => ({ ...finding, path: '' })));
 }

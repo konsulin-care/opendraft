@@ -6,6 +6,7 @@ import {
   parseBlockFileName,
   sectionAnchor,
 } from './naming.js';
+import { analyzeBlockHeading, duplicateAnchorError } from './assembly-headings.js';
 
 /** Matches the start of a Quarto include shortcode line. */
 const INCLUDE_LIKE_RE = /^\{\{< include\b/;
@@ -63,25 +64,6 @@ export function collectIncludes(assembly: string): string[] {
   return includes;
 }
 
-/**
- * Extract the section anchor from a block's heading line.
- *
- * The heading is the first line starting with `# `; its `{#label}` is the
- * anchor. Blocks without a heading line, or headings without a label,
- * yield null — there is no anchor contract to check.
- *
- * @param content - Block file content.
- * @returns The anchor label, or null when absent.
- */
-function headingAnchor(content: string): string | null {
-  for (const line of content.split('\n')) {
-    const trimmed = line.trim();
-    if (!/^#\s/.test(trimmed)) continue;
-    const match = /\{#([^}\s]+)/.exec(trimmed);
-    return match ? match[1] : null;
-  }
-  return null;
-}
 
 /**
  * Hint appended to an invalid include that points at a legacy
@@ -162,7 +144,11 @@ function fileFindings(files: string[], seen: Set<string>): FileFindings {
  * anchor use `sec-<short>` (the stem without `_`), legacy un-prefixed
  * files are errors naming `opendraft block normalize`, stems failing
  * SHORT_NAME_PATTERN are errors, and unreferenced files are reported as
- * warnings (they are legitimate drafts).
+ * warnings (they are legitimate drafts). Heading rules: a heading class
+ * that is neither `.doco-section` nor `.deo-<role>` from SECTION_ROLES
+ * is an error, two included blocks sharing an anchor are an error
+ * (reported once), a block without a heading and a level-1 heading in
+ * the body after the first line are warnings.
  *
  * @param input - Assembly text, block contents and directory listing.
  * @returns Validation result with separate warnings.
@@ -172,9 +158,11 @@ export function validateAssembly({ assembly, blockFiles, files }: AssemblyInput)
   const warnings: ValidationError[] = [];
   const includes = collectIncludes(assembly);
   const seen = new Set<string>();
+  const anchorSeen = new Map<string, string>();
 
   for (const path of includes) {
-    if (seen.has(path)) {
+    const repeated = seen.has(path);
+    if (repeated) {
       errors.push({ path: 'assembly', message: `duplicate include: ${path}` });
     }
     seen.add(path);
@@ -184,13 +172,21 @@ export function validateAssembly({ assembly, blockFiles, files }: AssemblyInput)
       errors.push({ path: 'assembly', message: `missing block file: ${path}` });
       continue;
     }
+    if (repeated) continue;
 
-    const anchor = headingAnchor(content);
+    const heading = analyzeBlockHeading(path, content);
+    errors.push(...heading.errors);
+    warnings.push(...heading.warnings);
+
     const short = parseBlockFileName(path)
       ?? path.replace(/^blocks\//, '').replace(/\.qmd$/, '').replace(/^_/, '');
     const expectedAnchor = sectionAnchor(short);
-    if (anchor !== null && anchor !== expectedAnchor) {
-      errors.push({ path, message: `heading anchor mismatch in ${path}: expected ${expectedAnchor}, found ${anchor}` });
+    if (heading.anchor !== null) {
+      if (heading.anchor !== expectedAnchor) {
+        errors.push({ path, message: `heading anchor mismatch in ${path}: expected ${expectedAnchor}, found ${heading.anchor}` });
+      }
+      const duplicate = duplicateAnchorError(anchorSeen, heading.anchor, path);
+      if (duplicate !== null) errors.push(duplicate);
     }
   }
 

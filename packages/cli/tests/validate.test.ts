@@ -156,7 +156,7 @@ describe('runCli — validate: assembly', () => {
     expect(run.output).toContain('ghost.qmd');
   });
 
-  it('returns 1 when two included blocks share the same sec anchor', async () => {
+  it('returns 1 and prints the duplicate anchor once when two included blocks share the same sec anchor', async () => {
     const ws = await scaffoldedProject();
     await addBlock(ws, MANUSCRIPT_DIR, 0, 'Introduction');
     await addBlock(ws, MANUSCRIPT_DIR, 1, 'Methods');
@@ -170,6 +170,7 @@ describe('runCli — validate: assembly', () => {
 
     expect(run.code).toBe(1);
     expect(run.output).toContain('sec-introduction');
+    expect(run.output.match(/duplicate anchor/g) ?? []).toHaveLength(1);
   });
 
   it('reports an orphan block file as a warning and returns 0', async () => {
