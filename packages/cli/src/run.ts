@@ -18,7 +18,9 @@ const USAGE = [
  * Pure dispatch: never touches `process.argv`, never calls
  * `process.exit`, and never mutates process state — it only prints the
  * command's report to the console and returns the exit code, so it is
- * safe to import and call from tests.
+ * safe to import and call from tests. Commands migrated to
+ * `Promise<number>` (currently `block`) are not dispatched here: they
+ * fall through to the usage error, so use {@link runCommand} for them.
  *
  * @param args - CLI arguments, excluding the node executable and script.
  * @returns Exit code: 0 on success, 1 on validation failure, 2 on usage errors.
@@ -32,7 +34,6 @@ export function runCli(args: string[]): number {
   if (command === 'validate') return validateCommand(rest);
   if (command === 'init') return initCommand(rest);
   if (command === 'manuscript') return manuscriptCommand(rest);
-  if (command === 'block') return blockCommand(rest);
   console.error(USAGE);
   return 2;
 }

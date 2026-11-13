@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { addBlock, extractIncludes, splitHeading } from '@opendraft/manuscript';
+import { addBlock, extractIncludes, listBlocks, normalizeBlockFiles } from '@opendraft/manuscript';
 import type { CreateBlockDraft } from '@opendraft/manuscript';
+import { SECTION_ROLES } from '@opendraft/schema';
 import { NodeFsWorkspace } from '@opendraft/workspace/node';
 import { resolveManuscript } from '../resolve-manuscript.js';
 
@@ -10,9 +11,6 @@ const BLOCK_USAGE = [
   'usage: opendraft block add <title> [dir] [-m <id>] [--after <short>] [--type <type>]',
   '       opendraft block ls [dir] [-m <id>]',
 ].join('\n');
-
-/** Section type pattern: lowercase alphanumeric groups joined by hyphens. */
-const TYPE_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /** Parsed `block add` arguments. */
 interface BlockAddArgs {
@@ -121,19 +119,21 @@ function parseLsArgs(args: string[]): BlockLsArgs {
  * Resolves the target manuscript from `opendraft.yml` the same way as
  * `block add` — an explicit `-m` id must be listed, otherwise the
  * project's only manuscript is used — and prints the failure message
- * with exit code 1 for unknown ids. On success every include line of
- * `article.qmd` yields `short<TAB>title` on stdout, in include order,
- * with the block file's heading title falling back to the short name
- * when the file or heading is missing. All output is printed before
- * the command returns.
+ * with exit code 1 for unknown ids. Blocks are then read through
+ * {@link listBlocks}, which resolves each include to the on-disk file
+ * (prefixed `_<short>.qmd` first, legacy `<short>.qmd` as fallback).
+ * On success every include line of `article.qmd` yields
+ * `short<TAB>title` on stdout, in include order, with the block file's
+ * heading title falling back to the short name when the file or heading
+ * is missing. All output is printed before the command returns.
  *
  * @param args - Arguments after the command name: `ls` followed by an
  *               optional project directory (defaults to the current
  *               working directory) and the `-m`/`--manuscript` flag.
- * @returns Exit code: 0 on success, 1 on resolution failures, 2 on
- *          usage errors.
+ * @returns Promise of the exit code: 0 on success, 1 on resolution
+ *          failures, 2 on usage errors.
  */
-function blockLs(args: string[]): number {
+async function blockLs(args: string[]): Promise<number> {
   const parsed = parseLsArgs(args);
   if (parsed.invalid) {
     console.error(BLOCK_USAGE);
@@ -145,16 +145,61 @@ function blockLs(args: string[]): number {
     console.error(resolved.message);
     return 1;
   }
-  const entry = resolved.entry;
-  const articlePath = join(root, entry.path, 'article.qmd');
-  const article = existsSync(articlePath) ? readFileSync(articlePath, 'utf8') : '';
-  for (const short of extractIncludes(article)) {
-    const blockPath = join(root, entry.path, 'blocks', `${short}.qmd`);
-    const text = existsSync(blockPath) ? readFileSync(blockPath, 'utf8') : null;
-    const title = text === null ? short : (splitHeading(text).title ?? short);
-    console.log(`${short}\t${title}`);
+  const items = await listBlocks(new NodeFsWorkspace(root), resolved.entry.path);
+  for (const item of items) {
+    console.log(`${item.short}\t${item.title}`);
   }
   return 0;
+}
+
+/**
+ * Compute the include slot for a new block in the assembly.
+ *
+ * Reads the include short names from the article text (accepting both
+ * canonical and legacy include lines). Without `--after` the slot is
+ * the end of the list; with `--after <short>` it directly follows that
+ * block, or the slot is missing when the target is not included.
+ *
+ * @param article - Full `article.qmd` text, or null when the file is absent.
+ * @param after - Short name from `--after`, or null to append.
+ * @param entryPath - Manuscript path used in the missing-target message.
+ * @returns Insertion index, or -1 when `--after` names no included block.
+ */
+function includePosition(article: string | null, after: string | null, entryPath: string): number {
+  const shorts = article === null ? [] : extractIncludes(article);
+  if (after === null) return shorts.length;
+  const index = shorts.indexOf(after);
+  if (index === -1) {
+    console.error(`No block "${after}" is included in ${entryPath}/article.qmd.`);
+    return -1;
+  }
+  return index + 1;
+}
+
+/**
+ * Normalize legacy block files, then write the new block and include line.
+ *
+ * @param root - Project directory the workspace is rooted at.
+ * @param entryPath - Manuscript path relative to the project root.
+ * @param position - Include slot returned by {@link includePosition}.
+ * @param draft - Block heading title, or a typed draft from `--type`.
+ * @returns Promise of the exit code: 0 on success, 1 on write failure.
+ */
+async function writeNewBlock(
+  root: string,
+  entryPath: string,
+  position: number,
+  draft: string | CreateBlockDraft,
+): Promise<number> {
+  const ws = new NodeFsWorkspace(root);
+  try {
+    await normalizeBlockFiles(ws, entryPath);
+    await addBlock(ws, entryPath, position, draft);
+    return 0;
+  } catch (err: unknown) {
+    console.error(err instanceof Error ? err.message : String(err));
+    return 1;
+  }
 }
 
 /**
@@ -162,36 +207,30 @@ function blockLs(args: string[]): number {
  *
  * Resolves the target manuscript from `opendraft.yml` (an explicit `-m`
  * id, otherwise the project's only manuscript) and rejects ambiguous
- * projects with a message listing the ids before any write. The include
- * slot is computed synchronously from `article.qmd` — `--after <short>`
- * places it directly after that block, otherwise it appends — then the
- * block file and assembly are written asynchronously through
- * {@link addBlock}; the returned code reflects the pre-write checks.
- *
- * Dispatches `ls` to {@link blockLs} and `add` to the writer below;
- * anything else prints the usage and exits 2.
+ * projects with a message listing the ids before any write. A `--type`
+ * value outside `SECTION_ROLES` is rejected with exit code 1 before any
+ * write as well. The include slot is computed from `article.qmd` —
+ * `--after <short>` places it directly after that block, otherwise it
+ * appends — then legacy files are normalized and the block written via
+ * {@link writeNewBlock}; only write failures then produce exit code 1.
  *
  * @param args - Arguments after the command name: `add` followed by the
  *               block title, an optional project directory (defaults to
- *               the current working directory) and the flags above; or
- *               `ls` with an optional directory and `-m <id>`.
- * @returns Exit code: 0 when the operation succeeds or a write starts,
- *          1 on resolution failures, 2 on usage errors.
+ *               the current working directory) and the flags above.
+ * @returns Promise of the exit code: 0 when the operation succeeds,
+ *          1 on resolution, type or write failures, 2 on usage errors.
  */
-export function blockCommand(args: string[]): number {
-  const [subcommand, ...rest] = args;
-  if (subcommand === 'ls') return blockLs(rest);
-  if (subcommand !== 'add') {
-    console.error(BLOCK_USAGE);
-    return 2;
-  }
-  const parsed = parseArgs(rest);
+async function blockAdd(args: string[]): Promise<number> {
+  const parsed = parseArgs(args);
   if (parsed.invalid || parsed.title === null) {
     console.error(BLOCK_USAGE);
     return 2;
   }
-  if (parsed.type !== null && !TYPE_PATTERN.test(parsed.type)) {
-    console.error(`Invalid --type "${parsed.type}": must be lowercase alphanumeric with hyphens.`);
+  if (parsed.type !== null && !SECTION_ROLES.includes(parsed.type)) {
+    console.error(
+      `Invalid --type "${parsed.type}": must be one of the known section types ` +
+        '(e.g. introduction, methods, results, discussion).',
+    );
     return 1;
   }
   const root = parsed.dir ?? process.cwd();
@@ -200,24 +239,33 @@ export function blockCommand(args: string[]): number {
     console.error(resolved.message);
     return 1;
   }
-  const entry = resolved.entry;
-  const articlePath = join(root, entry.path, 'article.qmd');
+  const articlePath = join(root, resolved.entry.path, 'article.qmd');
   const article = existsSync(articlePath) ? readFileSync(articlePath, 'utf8') : null;
-  const shorts = article === null ? [] : extractIncludes(article);
-  let position = shorts.length;
-  if (parsed.after !== null) {
-    const index = article === null ? -1 : shorts.indexOf(parsed.after);
-    if (index === -1) {
-      console.error(`No block "${parsed.after}" is included in ${entry.path}/article.qmd.`);
-      return 1;
-    }
-    position = index + 1;
-  }
+  const position = includePosition(article, parsed.after, resolved.entry.path);
+  if (position === -1) return 1;
   const title = parsed.title;
   const draft: string | CreateBlockDraft =
     parsed.type === null ? title : { title, short: title, role: parsed.type };
-  void addBlock(new NodeFsWorkspace(root), entry.path, position, draft).catch((err: unknown) => {
-    console.error(err instanceof Error ? err.message : String(err));
-  });
-  return 0;
+  return await writeNewBlock(root, resolved.entry.path, position, draft);
+}
+
+/**
+ * Run the `block` command: dispatch `ls`, `add`, or print usage.
+ *
+ * Dispatches `ls` to {@link blockLs} and `add` to {@link blockAdd};
+ * anything else prints the usage and exits 2.
+ *
+ * @param args - Arguments after the command name: `add` followed by the
+ *               block title, an optional project directory and the
+ *               flags above; or `ls` with an optional directory and
+ *               `-m <id>`.
+ * @returns Promise of the exit code: 0 when the operation succeeds,
+ *          1 on resolution, type or write failures, 2 on usage errors.
+ */
+export async function blockCommand(args: string[]): Promise<number> {
+  const [subcommand, ...rest] = args;
+  if (subcommand === 'ls') return await blockLs(rest);
+  if (subcommand === 'add') return await blockAdd(rest);
+  console.error(BLOCK_USAGE);
+  return 2;
 }
