@@ -2,13 +2,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
 import { addManuscript } from '@opendraft/manuscript';
+import { MANUSCRIPT_ID_PATTERN } from '@opendraft/schema';
 import { NodeFsWorkspace } from '@opendraft/workspace/node';
 
 /** Usage line printed for usage errors. */
 const MANUSCRIPT_USAGE = 'usage: opendraft manuscript add <id> [dir]';
-
-/** Manuscript id pattern: lowercase alphanumeric groups joined by hyphens. */
-const MANUSCRIPT_ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /**
  * Extract the registered manuscript ids from `opendraft.yml` text.

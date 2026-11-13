@@ -2,14 +2,12 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { scaffoldProject } from '@opendraft/manuscript';
 import type { ProtocolBlock } from '@opendraft/manuscript';
+import { MANUSCRIPT_ID_PATTERN } from '@opendraft/schema';
 import { NodeFsWorkspace } from '@opendraft/workspace/node';
 import { EMBEDDED_PROTOCOL_COMMIT } from '../protocol.js';
 
 /** Usage line printed for flag errors. */
 const INIT_USAGE = 'usage: opendraft init [dir] --manuscript <id>';
-
-/** Manuscript id pattern: lowercase alphanumeric groups joined by hyphens. */
-const MANUSCRIPT_ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /** Canonical protocol repository recorded in scaffolded configs. */
 const PROTOCOL_REPOSITORY = 'https://github.com/konsulin-care/opendraft';
