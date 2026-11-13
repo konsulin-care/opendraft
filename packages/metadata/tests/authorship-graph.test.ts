@@ -89,11 +89,9 @@ async function loadFragment(turtle: string): Promise<TurtleDataset> {
   return loadTurtle(file);
 }
 
-/** Emit a one-author graph and parse it into Seen rows. */
-async function singleAuthorSeen(author: AuthorObject): Promise<Seen[]> {
-  const turtle = emitAuthorshipGraph({ publication: PUB, authors: [author] });
-  const quads = [...(await loadFragment(turtle))];
-  return quads.map((q) => ({
+/** Convert a parsed Turtle dataset into Seen rows. */
+function toSeen(dataset: TurtleDataset): Seen[] {
+  return [...dataset].map((q) => ({
     s: q.subject.value,
     skind: q.subject.termType,
     p: q.predicate.value,
@@ -101,6 +99,11 @@ async function singleAuthorSeen(author: AuthorObject): Promise<Seen[]> {
     kind: q.object.termType,
     datatype: q.object.termType === 'Literal' ? q.object.datatype.value : undefined,
   }));
+}
+
+/** Emit a graph for the given authors and parse it into Seen rows. */
+async function singleAuthorSeen(...authors: AuthorObject[]): Promise<Seen[]> {
+  return toSeen(await loadFragment(emitAuthorshipGraph({ publication: PUB, authors })));
 }
 
 /** Follow oco:hasNext from the unique head; returns the visited chain. */
@@ -111,8 +114,7 @@ function walkChain(authorRoles: string[]): string[] {
   let current: string | undefined = head;
   while (current && !visited.includes(current)) {
     visited.push(current);
-    const next = values(current, `${OCO}hasNext`);
-    current = next.length > 0 ? next[0] : undefined;
+    current = values(current, `${OCO}hasNext`)[0];
   }
   return visited;
 }
@@ -130,16 +132,8 @@ function subjects(predicate: string, object: string): string[] {
 }
 
 beforeAll(async () => {
-  const turtle = emitAuthorshipGraph({ publication: PUB, authors: AUTHORS, affiliations: REGISTRY });
-  const dataset = await loadFragment(turtle);
-  seen = [...dataset].map((q) => ({
-    s: q.subject.value,
-    skind: q.subject.termType,
-    p: q.predicate.value,
-    o: q.object.value,
-    kind: q.object.termType,
-    datatype: q.object.termType === 'Literal' ? q.object.datatype.value : undefined,
-  }));
+  const dataset = await loadFragment(emitAuthorshipGraph({ publication: PUB, authors: AUTHORS, affiliations: REGISTRY }));
+  seen = toSeen(dataset);
   chain = walkChain(subjects(`${PRO}withRole`, `${PRO}author`));
   holders = chain.map((role) => values(role, `${PRO}isHeldBy`)[0] ?? '');
   report = await validateShacl(dataset, await loadTurtle(ARTICLE_SHAPES));
@@ -170,7 +164,7 @@ describe('author roles and order', () => {
     for (const holder of [holders[1], holders[2]]) {
       expect(seen.find((q) => q.s === holder && q.p === RDF_TYPE)?.o).toBe(`${FOAF}Person`);
     }
-    expect(seen.find((q) => q.s === holders[3] && q.p === RDF_TYPE)?.skind).toBe('BlankNode');
+    expect(holders[3]).toBe(`${PUB}#group-wdwg`);
   });
 });
 
@@ -245,6 +239,11 @@ describe('identifiers, organizations and shortcuts', () => {
     expect(orgs.filter((org) => org === 'https://ror.org/05dxgng32')).toHaveLength(2);
   });
 
+  it('mints a no-ROR affiliation with id unair as PUB#org-unair', async () => {
+    const rows = await singleAuthorSeen({ name: 'Dewi', affiliations: [{ id: 'unair', name: 'Airlangga' }] });
+    expect(rows.find((q) => q.p === `${PRO}relatesToOrganization`)?.o).toBe(`${PUB}#org-unair`);
+  });
+
   it('emits exactly four dcterms:creator triples on the publication', () => {
     const creators = objs(PUB, `${DCTERMS}creator`);
     expect(creators).toHaveLength(4);
@@ -267,10 +266,7 @@ describe('identifiers, organizations and shortcuts', () => {
 
 describe('single-name authors and explicit author type', () => {
   it('emits a literal-only name with author-type person as foaf:Person', async () => {
-    const rows = await singleAuthorSeen({
-      name: { literal: 'Plato' },
-      metadata: { 'author-type': 'person' },
-    });
+    const rows = await singleAuthorSeen({ name: { literal: 'Plato' }, metadata: { 'author-type': 'person' } });
     const person = rows.find((q) => q.p === RDF_TYPE && q.o === `${FOAF}Person`);
     expect(person).toBeDefined();
     expect(person?.skind).toBe('NamedNode');
@@ -284,14 +280,19 @@ describe('single-name authors and explicit author type', () => {
       name: { literal: 'Plato Collective' },
       metadata: { 'author-type': 'group' },
     });
-    expect(rows.find((q) => q.p === RDF_TYPE && q.o === `${FOAF}Group`)).toBeDefined();
+    expect(rows.find((q) => q.p === RDF_TYPE && q.o === `${FOAF}Group`)?.s).toBe(`${PUB}#group-0`);
     expect(rows.filter((q) => q.p === RDF_TYPE && q.o === `${FOAF}Person`)).toHaveLength(0);
     expect(rows.filter((q) => q.p === `${FOAF}name`).map((q) => q.o)).toEqual(['Plato Collective']);
   });
 
   it('keeps legacy literal-only names without author-type as foaf:Group', async () => {
     const rows = await singleAuthorSeen({ name: { literal: 'Legacy Consortium' } });
-    expect(rows.find((q) => q.p === RDF_TYPE && q.o === `${FOAF}Group`)).toBeDefined();
+    expect(rows.find((q) => q.p === RDF_TYPE && q.o === `${FOAF}Group`)?.s).toBe(`${PUB}#group-0`);
     expect(rows.filter((q) => q.p === RDF_TYPE && q.o === `${FOAF}Person`)).toHaveLength(0);
+  });
+
+  it('mints a no-id group at authors index 2 as PUB#group-2', async () => {
+    const rows = await singleAuthorSeen({ name: 'Ann' }, { name: 'Bob' }, { name: { literal: 'C' } });
+    expect(rows.find((q) => q.p === RDF_TYPE && q.o === `${FOAF}Group`)?.s).toBe(`${PUB}#group-2`);
   });
 });

@@ -78,10 +78,7 @@ interface AuthorshipContext {
 
 /** Emit an inline OCDM datacite:hasIdentifier node. */
 function identifierNode(scheme: 'orcid' | 'ror', value: string): string {
-  return (
-    `[ ${DATACITE}usesIdentifierScheme> ${DATACITE}${scheme}> ; ` +
-    `${LITERAL}hasLiteralValue> ${literalString(value)} ]`
-  );
+  return `[ ${DATACITE}usesIdentifierScheme> ${DATACITE}${scheme}> ; ${LITERAL}hasLiteralValue> ${literalString(value)} ]`;
 }
 
 function namePairs(name: NameValue): string[] {
@@ -101,14 +98,15 @@ function namePairs(name: NameValue): string[] {
 }
 
 function agentTerm(author: AuthorObject, index: number, publication: string): string {
-  if (isGroupAuthor(author)) return `_:group-${index}`;
+  if (isGroupAuthor(author)) return termRef(`${publication}#group-${author.id ?? index}`);
   const orcid = normalizeOrcid(author.orcid);
   return orcid ? termRef(orcid.iri) : termRef(`${publication}#author-${author.id ?? index}`);
 }
 
-function memberTerm(index: number, slot: number, member: MemberObject): string {
+function memberTerm(index: number, slot: number, member: MemberObject, publication: string): string {
   const orcid = normalizeOrcid(member.orcid);
-  return orcid ? termRef(orcid.iri) : `_:group-${index}-member-${slot}`;
+  const id = typeof member.id === 'string' ? member.id : null;
+  return orcid ? termRef(orcid.iri) : termRef(`${publication}#member-${id ?? slot}`);
 }
 
 /** Resolve one affiliation item (registry ref or inline object). */
@@ -127,6 +125,7 @@ function resolveOrg(
   entry: AffiliationObject,
   orgs: OrgNode[],
   keys: Map<string, OrgNode>,
+  publication: string,
 ): OrgNode {
   const rorIri = normalizeRor(entry.ror);
   const id = typeof entry.id === 'string' && entry.id.length > 0 ? entry.id : null;
@@ -135,7 +134,7 @@ function resolveOrg(
   if (found) return found;
   const node: OrgNode = rorIri
     ? { term: termRef(rorIri), name: entry.name, rorIri, rorValue: rorIri.slice(ROR_PREFIX.length) }
-    : { term: `_:org-${orgs.length}`, name: entry.name, rorIri: null, rorValue: null };
+    : { term: termRef(`${publication}#org-${id ?? orgs.length}`), name: entry.name, rorIri: null, rorValue: null };
   orgs.push(node);
   keys.set(key, node);
   return node;
@@ -171,7 +170,7 @@ function buildContext(input: AuthorshipGraphInput): AuthorshipContext {
       if (!entry) return;
       const label = `_:role-${index}-aff-${slot}`;
       roleLabels.push(label);
-      affiliates.push({ label, holder: agents[index], org: resolveOrg(entry, orgs, orgKeys) });
+      affiliates.push({ label, holder: agents[index], org: resolveOrg(entry, orgs, orgKeys, input.publication) });
     });
   });
   return {
@@ -251,17 +250,17 @@ function agentBlock(author: AuthorObject, index: number, ctx: AuthorshipContext)
 
 function groupBlock(author: AuthorObject, index: number, ctx: AuthorshipContext): string {
   const pairs = [`a ${FOAF}Group>`, ...namePairs(author.name)];
-  const members = (author.members ?? []).map((member, slot) => memberTerm(index, slot, member));
+  const members = (author.members ?? []).map((member, slot) => memberTerm(index, slot, member, ctx.publication));
   if (members.length > 0) pairs.push(`${FOAF}member> ${members.join(' , ')}`);
   return block(ctx.agents[index], pairs);
 }
 
-function memberBlocks(author: AuthorObject, index: number): string[] {
+function memberBlocks(author: AuthorObject, index: number, ctx: AuthorshipContext): string[] {
   return (author.members ?? []).map((member, slot) => {
     const pairs = [`a ${FOAF}Person>`, ...namePairs(member.name)];
     const orcid = normalizeOrcid(member.orcid);
     if (orcid) pairs.push(`${DATACITE}hasIdentifier> ${identifierNode('orcid', orcid.value)}`);
-    return block(memberTerm(index, slot, member), pairs);
+    return block(memberTerm(index, slot, member, ctx.publication), pairs);
   });
 }
 
@@ -293,7 +292,7 @@ export function emitAuthorshipGraph(input: AuthorshipGraphInput): string {
   ctx.behalfs.forEach((role) => blocks.push(behalfBlock(role)));
   ctx.authors.forEach((author, index) => {
     blocks.push(agentBlock(author, index, ctx));
-    blocks.push(...memberBlocks(author, index));
+    blocks.push(...memberBlocks(author, index, ctx));
   });
   ctx.orgs.forEach((org) => blocks.push(orgBlock(org)));
   return `${blocks.join('\n\n')}\n`;
