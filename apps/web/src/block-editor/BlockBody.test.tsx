@@ -1,13 +1,12 @@
 // @vitest-environment jsdom
 /**
  * BlockBody tests: typing persists the block file with its canonical
- * heading preserved (a class-less heading stays class-less, a file with
- * no leading heading earns the generic class on its first save),
- * mounting without edits performs no write, a loaded body carrying a
- * level-1 heading neither writes nor hides the header's warning badge,
- * and Quarto constructs (::: divs, {#fig-x} attributes, shortcodes and
- * @sec- references) survive load and save unchanged. The mount harness
- * lives in block-body-harness.ts so this file stays under 300 lines.
+ * heading preserved, mounting without edits performs no write, a
+ * loaded level-1 heading neither writes nor hides the warning badge,
+ * Quarto constructs survive load and save, and edits autosave to the
+ * file named by the `file` prop. Mounting uses a local helper seeded
+ * at `_methods.qmd`; the IntersectionObserver harness lives in
+ * block-body-harness.ts.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
@@ -16,14 +15,13 @@ import { MemoryWorkspace } from '@opendraft/workspace';
 import { BlockBody } from './BlockBody';
 import { BlockHeader, reportLoadedBody } from './BlockHeader';
 import { requestFocusForShort } from '../caret-mode-switch';
+import type { EditorTestApi } from '../caret-mode-switch';
 import { createCitationPlugin } from '../citation/plugin';
 import {
   DIR,
   SAVE_WINDOW_MS,
   installBlockBodyHarness,
-  mountBody,
   uninstallBlockBodyHarness,
-  waitForApi,
 } from './block-body-harness';
 
 vi.mock('../citation/plugin', async (importOriginal) => {
@@ -34,6 +32,53 @@ vi.mock('../citation/plugin', async (importOriginal) => {
 beforeEach(installBlockBodyHarness);
 
 afterEach(uninstallBlockBodyHarness);
+
+/** Editor APIs handed by locally mounted bodies, in order. */
+let editorApis: EditorTestApi[] = [];
+
+beforeEach(() => {
+  editorApis = [];
+});
+
+/**
+ * Resolve once a locally mounted body has wired its editor API;
+ * returns the most recent API handed to `onEditorReady`.
+ */
+async function waitForApi(): Promise<EditorTestApi> {
+  await waitFor(() => {
+    expect(editorApis.length).toBeGreaterThan(0);
+  }, { timeout: 10000 });
+  return editorApis[editorApis.length - 1];
+}
+
+/**
+ * Render a block body against a workspace seeded at `_methods.qmd`.
+ *
+ * @param body - Block file text, canonical heading included.
+ * @returns The workspace, a write-count spy, and the seeded path.
+ */
+async function mountBody(body: string) {
+  const ws = new MemoryWorkspace();
+  const path = `${DIR}/blocks/_methods.qmd`;
+  await ws.writeFile(path, body);
+  let writes = 0;
+  const original = ws.writeFile.bind(ws);
+  ws.writeFile = async (target, text) => {
+    writes += 1;
+    return original(target, text);
+  };
+  render(
+    <BlockBody
+      ws={ws}
+      dir={DIR}
+      short="methods"
+      title="Methods"
+      collapsed={false}
+      onEditorReady={(api) => editorApis.push(api)}
+    />,
+  );
+  return { ws, writes, path };
+}
 
 describe('BlockBody autosave', () => {
   it('persists typing to the block file with the canonical heading preserved', async () => {
@@ -143,8 +188,7 @@ describe('BlockBody level-1 load path', () => {
     const { ws, path } = await mountBody(
       '# Methods {#sec-methods .deo-section}\n# Legacy H1\nBody text.',
     );
-    // mountBody returns its write count by value (a snapshot taken
-    // before the load), so count writes on the live spy directly.
+    // mountBody's write count is a snapshot; count writes on the live spy.
     let writes = 0;
     const spied = ws.writeFile.bind(ws);
     ws.writeFile = async (target, text) => {
@@ -165,32 +209,18 @@ describe('BlockBody level-1 load path', () => {
 
 describe('BlockBody level-1 warning badge', () => {
   it('shows the level-1 warning badge in the header after that load', async () => {
-    // Reset the shared per-short registry so the badge must come from
-    // this load, not from an earlier test's report.
+    // Reset the shared per-short registry so the badge comes from this load.
     reportLoadedBody('methods', '## Level two');
     const ws = new MemoryWorkspace();
-    const path = `${DIR}/blocks/methods.qmd`;
+    const path = `${DIR}/blocks/_methods.qmd`;
     await ws.writeFile(
       path,
       '# Methods {#sec-methods .deo-section}\n# Legacy H1\nBody text.',
     );
     render(
       <>
-        <BlockHeader
-          short="methods"
-          title="Methods"
-          collapsed={false}
-          onToggle={() => undefined}
-          wordCount={0}
-          saveStatus="saved"
-        />
-        <BlockBody
-          ws={ws}
-          dir={DIR}
-          short="methods"
-          title="Methods"
-          collapsed={false}
-        />
+        <BlockHeader short="methods" title="Methods" collapsed={false} onToggle={() => undefined} wordCount={0} saveStatus="saved" />
+        <BlockBody ws={ws} dir={DIR} short="methods" title="Methods" collapsed={false} />
       </>,
     );
 
@@ -200,6 +230,38 @@ describe('BlockBody level-1 warning badge', () => {
       },
       { timeout: 10000 },
     );
+  }, 20000);
+});
+
+describe('BlockBody file prop', () => {
+  it('autosaves edits to the file named by its file prop', async () => {
+    const ws = new MemoryWorkspace();
+    const path = `${DIR}/blocks/custom.qmd`;
+    await ws.writeFile(path, '# Custom {#sec-custom .deo-section}\nBody text.\n');
+    render(
+      <BlockBody
+        ws={ws}
+        dir={DIR}
+        short="methods"
+        file="custom.qmd"
+        title="Methods"
+        collapsed={false}
+        onEditorReady={(api) => editorApis.push(api)}
+      />,
+    );
+    const api = await waitForApi();
+
+    await act(async () => {
+      api.insertText(' Extra sentence.');
+    });
+
+    await waitFor(async () => {
+      const saved = await ws.readFile(path);
+      expect(saved).toContain('Extra sentence.');
+      expect(saved).toContain('# Custom {#sec-custom .doco-section}');
+      // Nothing lands on the derived default file name.
+      expect(await ws.readFile(`${DIR}/blocks/_methods.qmd`)).toBeNull();
+    }, { timeout: SAVE_WINDOW_MS + 5000 });
   }, 20000);
 });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MemoryWorkspace } from '@opendraft/workspace';
-import { addBlock, listBlocks } from '../src/blocks';
+import { addBlock, deleteBlock, listBlocks, setBlockTitle } from '../src/blocks';
 
 /** Manuscript directory used by every fixture. */
 const DIR = 'manuscripts/demo';
@@ -58,7 +58,7 @@ async function includeOrder(ws: MemoryWorkspace): Promise<string[]> {
   const article = (await ws.readFile(ARTICLE)) ?? '';
   const shorts: string[] = [];
   for (const line of article.split('\n')) {
-    const match = /\{\{< include\s+blocks\/([a-z0-9-]+)\.qmd\s*>\}\}/.exec(line.trim());
+    const match = /\{\{< include\s+blocks\/_?([a-z0-9-]+)\.qmd\s*>\}\}/.exec(line.trim());
     if (match) shorts.push(match[1]);
   }
   return shorts;
@@ -158,8 +158,64 @@ describe('listBlocks', () => {
     const blocks = await listBlocks(ws, DIR);
 
     expect(blocks).toEqual([
-      { short: 'gone', title: 'gone', body: '' },
-      { short: 'plain', title: 'plain', body: 'Just prose.\n' },
+      { short: 'gone', file: '_gone.qmd', title: 'gone', body: '' },
+      { short: 'plain', file: 'plain.qmd', title: 'plain', body: 'Just prose.\n' },
     ]);
+  });
+});
+
+describe('listBlocks file names', () => {
+  it('returns file intro.qmd for a legacy include and _intro.qmd for a prefixed include', async () => {
+    const ws = await setup({
+      [ARTICLE]: '---\nmetadata-files:\n- _author.yml\n---\n\n{{< include blocks/intro.qmd >}}\n\n{{< include blocks/_methods.qmd >}}\n\n::: {#refs}\n:::\n',
+      [`${BLOCKS}/intro.qmd`]: blockFile('Introduction', 'sec-intro', 'intro'),
+      [`${BLOCKS}/_methods.qmd`]: blockFile('Methods', 'sec-methods', 'methods'),
+    });
+
+    const blocks = await listBlocks(ws, DIR);
+
+    expect(blocks.map((block) => block.short)).toEqual(['intro', 'methods']);
+    expect(blocks.map((block) => block.file)).toEqual(['intro.qmd', '_methods.qmd']);
+  });
+});
+
+describe('legacy block files', () => {
+  it('setBlockTitle rewrites the legacy blocks/intro.qmd included as blocks/intro.qmd', async () => {
+    const ws = await setup({
+      [ARTICLE]: articleWith('intro'),
+      [`${BLOCKS}/intro.qmd`]: blockFile('Introduction', 'sec-intro', 'intro'),
+    });
+
+    await setBlockTitle(ws, DIR, 'intro', 'Background');
+
+    expect(await ws.readFile(`${BLOCKS}/intro.qmd`)).toBe(
+      '# Background {#sec-intro .deo-intro}\n',
+    );
+    expect(await ws.listFiles(BLOCKS)).toEqual(['intro.qmd']);
+  });
+
+  it('deleteBlock removes the legacy include line and deletes blocks/intro.qmd', async () => {
+    const ws = await setup({
+      [ARTICLE]: articleWith('intro', 'methods'),
+      [`${BLOCKS}/intro.qmd`]: blockFile('Introduction', 'sec-intro', 'intro'),
+      [`${BLOCKS}/methods.qmd`]: blockFile('Methods', 'sec-methods', 'methods'),
+    });
+
+    await deleteBlock(ws, DIR, 'intro');
+
+    expect(await ws.readFile(`${BLOCKS}/intro.qmd`)).toBeNull();
+    expect(await includeOrder(ws)).toEqual(['methods']);
+  });
+
+  it('deleteBlock removes a prefixed include line and deletes the prefixed file', async () => {
+    const ws = await setup({
+      [ARTICLE]: '---\nmetadata-files:\n- _author.yml\n---\n\n{{< include blocks/_intro.qmd >}}\n\n::: {#refs}\n:::\n',
+      [`${BLOCKS}/_intro.qmd`]: blockFile('Introduction', 'sec-intro', 'intro'),
+    });
+
+    await deleteBlock(ws, DIR, 'intro');
+
+    expect(await ws.readFile(`${BLOCKS}/_intro.qmd`)).toBeNull();
+    expect(await includeOrder(ws)).toEqual([]);
   });
 });

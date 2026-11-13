@@ -1,18 +1,14 @@
 /**
- * Block body: lazily mounts one Milkdown (Crepe) editor per block. The
- * editor mounts only after the block is expanded and has intersected
- * the viewport (via `useLazyMount`), loads its body through
- * `splitHeading` and persists edits through `joinHeading` + the shared
- * debounced saver. The load never schedules a save; every save
- * reattaches the canonical heading so the block file's first line
- * survives editing, and a heading guard registered on the instance
- * demotes every heading-1 in the body to an H2.
+ * Block body: lazily mounts one Milkdown (Crepe) editor per block,
+ * loads it through `splitHeading`, autosaves edits reattached to the
+ * canonical heading, and demotes every body heading-1 to an H2.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import type { Editor } from '@milkdown/kit/core';
 import { $prose } from '@milkdown/kit/utils';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
+import { blockFileName } from '@opendraft/schema';
 import type { SaveStatus } from '../components/AppHeader';
 import type { EditorTestApi } from '../caret-mode-switch';
 import type { CitationState } from '../citation/types';
@@ -70,6 +66,8 @@ export interface BlockBodyProps {
   dir: string;
   /** Block short name — the file name without `.qmd`. */
   short: string;
+  /** Block file name inside `blocks/`; defaults to `blockFileName(short)`. */
+  file?: string;
   /** Section title used when the block file has no heading of its own. */
   title: string;
   /** Collapsed blocks never earn an editor mount. */
@@ -85,32 +83,31 @@ export interface BlockBodyProps {
 /**
  * Load the block file text once the block has earned mounting.
  *
- * Reads at most once: while a load is pending or done the effect
- * no-ops, and the cleanup marks an in-flight read stale so a torn-down
- * body never applies an outdated result.
+ * Reads at most once per path; a path change triggers a fresh read and
+ * the cleanup marks an in-flight read stale.
  *
  * @param ws - Workspace holding the manuscript.
  * @param path - Path of the block file, e.g. `.../blocks/short.qmd`.
  * @param mounted - Whether the editor has earned mounting.
- * @returns The file text, or `null` while the first load is pending.
+ * @returns The file text, or `null` while the load is pending.
  */
 function useBlockFileText(
   ws: WorkspaceAdapter,
   path: string,
   mounted: boolean,
 ): string | null {
-  const [fileText, setFileText] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState<{ path: string; text: string } | null>(null);
   useEffect(() => {
-    if (!mounted || fileText !== null) return undefined;
+    if (!mounted || loaded?.path === path) return undefined;
     let stale = false;
     void ws.readFile(path).then((text) => {
-      if (!stale) setFileText(text ?? '');
+      if (!stale) setLoaded({ path, text: text ?? '' });
     });
     return () => {
       stale = true;
     };
-  }, [mounted, fileText, ws, path]);
-  return fileText;
+  }, [mounted, loaded, ws, path]);
+  return loaded !== null && loaded.path === path ? loaded.text : null;
 }
 
 /** Options for {@link useCrepeEditor}. */
@@ -251,12 +248,12 @@ function useBodyFlush(short: string, joinedSaver: DebouncedSaver): void {
  * @param props - See {@link BlockBodyProps}.
  * @returns The mount host; the editor root appears once mounted.
  */
-export function BlockBody({ ws, dir, short, title, collapsed, onWordCount, onSaveStatus, onEditorReady }: BlockBodyProps) {
+export function BlockBody({ ws, dir, short, file, title, collapsed, onWordCount, onSaveStatus, onEditorReady }: BlockBodyProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<Editor | null>(null);
   const mounted = useLazyMount(hostRef, !collapsed);
-  const path = `${dir}/blocks/${short}.qmd`;
+  const path = `${dir}/blocks/${file ?? blockFileName(short)}`;
 
   // Callbacks live in refs so their identity never retriggers effects.
   const onWordCountRef = useRef(onWordCount);
