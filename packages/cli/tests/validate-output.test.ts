@@ -69,7 +69,34 @@ function capture(args: string[]): Captured {
 }
 
 /**
- * Scaffold a valid project with one block in the temp directory.
+ * Migrate addBlock's legacy block fixtures to the prefixed layout.
+ *
+ * Renames every un-prefixed `blocks/<short>.qmd` to `blocks/_<short>.qmd`
+ * and rewrites the matching include lines in `article.qmd`, so the seeded
+ * project follows the `blocks/_<short>.qmd` convention.
+ *
+ * @param ws - Workspace of the scaffolded project.
+ * @returns Resolves once every block file and include line is prefixed.
+ */
+async function normalizeBlockFixtures(ws: NodeFsWorkspace): Promise<void> {
+  const blocksDir = `${MANUSCRIPT_DIR}/blocks`;
+  const articlePath = `${MANUSCRIPT_DIR}/article.qmd`;
+  for (const file of await ws.listFiles(blocksDir)) {
+    if (file.startsWith('_') || !file.endsWith('.qmd')) continue;
+    const content = await ws.readFile(`${blocksDir}/${file}`);
+    await ws.writeFile(`${blocksDir}/_${file}`, content ?? '');
+    await ws.deleteFile(`${blocksDir}/${file}`);
+    const short = file.replace(/\.qmd$/, '');
+    const article = (await ws.readFile(articlePath)) ?? '';
+    await ws.writeFile(
+      articlePath,
+      article.replaceAll(`blocks/${short}.qmd`, `blocks/_${short}.qmd`),
+    );
+  }
+}
+
+/**
+ * Scaffold a valid project with one prefixed block in the temp directory.
  *
  * @returns Workspace adapter rooted at the temp directory.
  */
@@ -77,6 +104,7 @@ async function scaffoldedProject(): Promise<NodeFsWorkspace> {
   const ws = new NodeFsWorkspace(dir);
   await scaffoldProject(ws, { manuscriptId: 'demo', protocol: PROTOCOL });
   await addBlock(ws, MANUSCRIPT_DIR, 0, 'Introduction');
+  await normalizeBlockFixtures(ws);
   return ws;
 }
 
@@ -109,7 +137,7 @@ describe('runCli — validate --json', () => {
 
   it('reports warnings in JSON and keeps stderr empty', async () => {
     const ws = await scaffoldedProject();
-    await ws.writeFile(`${MANUSCRIPT_DIR}/blocks/scratch.qmd`, '# Scratch {#sec-scratch}\n');
+    await ws.writeFile(`${MANUSCRIPT_DIR}/blocks/_scratch.qmd`, '# Scratch {#sec-scratch}\n');
 
     const run = capture(['validate', dir, '--json']);
 
@@ -125,7 +153,7 @@ describe('runCli — validate --json', () => {
 describe('runCli — validate human-readable output', () => {
   it('writes finding lines to stderr and a pass line to stdout on success', async () => {
     const ws = await scaffoldedProject();
-    await ws.writeFile(`${MANUSCRIPT_DIR}/blocks/scratch.qmd`, '# Scratch {#sec-scratch}\n');
+    await ws.writeFile(`${MANUSCRIPT_DIR}/blocks/_scratch.qmd`, '# Scratch {#sec-scratch}\n');
 
     const json = capture(['validate', dir, '--json']);
     const human = capture(['validate', dir]);
