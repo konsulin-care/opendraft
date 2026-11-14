@@ -98,6 +98,32 @@ describe('updateManifest — revision pinning', () => {
     ]);
     await expectWrittenFiles(root, manifest);
   });
+  it('preserves a hand-set compatibleSince while refreshing commit and artifacts', async () => {
+    await writeProtocolFiles(root);
+    const existing = await makeManifest(root);
+    existing.protocol.compatibleSince = 'c'.repeat(40);
+    existing.artifacts = [{ path: 'protocol/opendraft.ttl', sha256: 'e'.repeat(64) }];
+    await writeFile(join(root, MANIFEST_PATH), `${JSON.stringify(existing, null, 2)}\n`);
+    const refreshed = 'd'.repeat(40);
+    const manifest = await updateManifest(fakeGitOps({ lastTtlCommit: () => refreshed }), {
+      root,
+      canonical: false,
+      originUrl: 'git@github.com:konsulin-care/opendraft.git',
+    });
+    expect(manifest.protocol.compatibleSince).toBe('c'.repeat(40));
+    expect(manifest.protocol.commit).toBe(refreshed);
+    expect(manifest.protocol.version).toBe(refreshed);
+    expect(manifest.artifacts).toEqual([
+      { path: 'protocol/examples/article.ttl', sha256: await hashFile(join(root, 'protocol/examples/article.ttl')) },
+      { path: 'protocol/opendraft.ttl', sha256: await hashFile(join(root, 'protocol/opendraft.ttl')) },
+    ]);
+    const written = parseManifest(await readFile(join(root, MANIFEST_PATH), 'utf8'));
+    expect(written.protocol.compatibleSince).toBe('c'.repeat(40));
+    expect(written.protocol.commit).toBe(refreshed);
+    const template = parseProtocolBlock(await readFile(join(root, TEMPLATE_PATH), 'utf8'));
+    expect(template.commit).toBe(refreshed);
+    expect(template.compatibleSince).toBeUndefined();
+  });
 });
 
 describe('updateManifest — origin intent gate', () => {

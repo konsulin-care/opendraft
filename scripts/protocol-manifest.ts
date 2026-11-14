@@ -20,8 +20,8 @@ export const GENERATED_BY = 'mise run update-protocol-manifest';
 export const TTL_GLOB_PATHSPEC = ':(glob)protocol/**/*.ttl';
 
 const SHA40 = /^[0-9a-f]{40}$/, SHA256_HEX = /^[0-9a-f]{64}$/;
-/** Protocol revision model: name, version, repository, commit (protocol/versioning.md). */
-export interface ProtocolBlock { name: string; version: string; repository: string; commit: string; }
+/** Protocol revision model: name, version, repository, commit, optional hand-maintained compatibleSince (protocol/versioning.md). */
+export interface ProtocolBlock { name: string; version: string; repository: string; commit: string; compatibleSince?: string; }
 /** One pinned protocol artifact and its expected SHA-256 digest. */
 export interface ArtifactRef { path: string; sha256: string; }
 /** The committed verification manifest. */
@@ -117,7 +117,7 @@ export function parseProtocolBlock(yamlText: string): ProtocolBlock {
 export function renderProtocolYaml(block: ProtocolBlock): string {
   return ['protocol:', `  name: ${block.name}`, `  version: ${block.version}`, `  repository: ${block.repository}`, `  commit: ${block.commit}`, 'manuscripts: []', ''].join('\n');
 }
-/** Parses and structurally validates a manifest document. */
+/** Parses and structurally validates a manifest document, including an optional 40-hex compatibleSince. */
 export function parseManifest(text: string): Manifest {
   const raw = JSON.parse(text) as Partial<Manifest>;
   if (!raw.protocol || !Array.isArray(raw.artifacts)) {
@@ -128,11 +128,10 @@ export function parseManifest(text: string): Manifest {
   }
   const p = raw.protocol as Partial<ProtocolBlock>;
   if (!p.name || !p.version || !p.repository || !p.commit) throw new Error('manifest protocol block is incomplete');
-  return {
-    protocol: { name: p.name, version: p.version, repository: p.repository, commit: p.commit },
-    artifacts: raw.artifacts as ArtifactRef[],
-    generatedBy: raw.generatedBy ?? '',
-  };
+  if (p.compatibleSince !== undefined && (typeof p.compatibleSince !== 'string' || !SHA40.test(p.compatibleSince))) throw new Error(`manifest protocol.compatibleSince '${p.compatibleSince}' is not a 40-hex SHA`);
+  const protocol: ProtocolBlock = { name: p.name, version: p.version, repository: p.repository, commit: p.commit };
+  if (p.compatibleSince !== undefined) protocol.compatibleSince = p.compatibleSince;
+  return { protocol, artifacts: raw.artifacts as ArtifactRef[], generatedBy: raw.generatedBy ?? '' };
 }
 /** Structural equality of two protocol blocks. */
 export function blocksEqual(a: ProtocolBlock, b: ProtocolBlock): boolean { return a.name === b.name && a.version === b.version && a.repository === b.repository && a.commit === b.commit; }
@@ -151,9 +150,7 @@ function schemaFailures(m: Manifest): string[] {
   if (!SHA40.test(p.commit)) failures.push(`protocol.commit '${p.commit}' is not a full SHA`);
   if (p.version !== p.commit) failures.push('protocol.version must equal protocol.commit');
   if (m.artifacts.length === 0) failures.push('manifest lists no artifacts');
-  for (const a of m.artifacts) {
-    if (!SHA256_HEX.test(a.sha256)) failures.push(`artifact ${a.path}: sha256 is not hex`);
-  }
+  for (const a of m.artifacts) if (!SHA256_HEX.test(a.sha256)) failures.push(`artifact ${a.path}: sha256 is not hex`);
   return failures;
 }
 /** Returns local-content failures: artifact set drift, missing or changed files. */
@@ -224,7 +221,7 @@ function resolveRepository(options: ManifestOptions): string {
   if (normalizeOrigin(options.originUrl ?? null) === CANONICAL_REPOSITORY) return CANONICAL_REPOSITORY;
   throw new Error(`origin '${options.originUrl ?? '<none>'}' is not the canonical repository (${CANONICAL_REPOSITORY}); pass --repository <url> to override for an upstream-targeted PR`);
 }
-/** Regenerates the manifest and project template for the current revision. */
+/** Regenerates the manifest and project template, preserving a hand-set compatibleSince verbatim. */
 export async function updateManifest(gitOps: GitOps, options: ManifestOptions): Promise<Manifest> {
   if (!gitOps.ttlTreeClean()) throw new Error('protocol TTL working tree is not clean; commit or revert protocol TTL files first');
   const commit = gitOps.lastTtlCommit();
@@ -237,7 +234,9 @@ export async function updateManifest(gitOps: GitOps, options: ManifestOptions): 
     artifacts.push({ path: relPath, sha256: fileHash });
   }
   if (artifacts.length === 0) throw new Error('no protocol artifacts found under protocol/');
-  const protocol = { name: PROTOCOL_NAME, version: commit, repository: resolveRepository(options), commit };
+  const previous = await readFile(join(options.root, MANIFEST_PATH), 'utf8').then(parseManifest).catch(() => null);
+  const protocol: ProtocolBlock = { name: PROTOCOL_NAME, version: commit, repository: resolveRepository(options), commit };
+  if (previous?.protocol.compatibleSince !== undefined) protocol.compatibleSince = previous.protocol.compatibleSince;
   const manifest: Manifest = { protocol, artifacts, generatedBy: GENERATED_BY };
   await writeFile(join(options.root, MANIFEST_PATH), `${JSON.stringify(manifest, null, 2)}\n`);
   await mkdir(join(options.root, dirname(TEMPLATE_PATH)), { recursive: true });
