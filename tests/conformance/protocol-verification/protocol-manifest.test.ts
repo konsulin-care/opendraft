@@ -107,9 +107,10 @@ describe('parseManifest and template parsing', () => {
       artifacts: [],
       generatedBy: 'test',
     };
-    for (const bad of ['abc123', 'z'.repeat(40), 'A'.repeat(40), 'a'.repeat(41)]) {
+    const badValues: unknown[] = ['abc123', 'z'.repeat(40), 'A'.repeat(40), 'a'.repeat(41), 123, null];
+    for (const bad of badValues) {
       const doc = { ...base, protocol: { ...base.protocol, compatibleSince: bad } };
-      expect(() => parseManifest(JSON.stringify(doc))).toThrow(/compatibleSince '.*' is not a 40-hex SHA/);
+      expect(() => parseManifest(JSON.stringify(doc))).toThrow(/compatibleSince .* is not a 40-hex SHA/);
     }
   });
 });
