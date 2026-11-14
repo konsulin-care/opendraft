@@ -14,6 +14,14 @@
  * protocol/article.shacl.ttl and protocol/article-release.shacl.ttl;
  * drafts validate against article.shacl.ttl alone.
  *
+ * Registry examples (T58): a valid graph containing a triple
+ * `?s a fabio:ExpressionCollection` is a registry graph and is
+ * validated against protocol/registry.shacl.ttl only — never against
+ * the article profile, because its inline
+ * <https://example.org/example-publication> a od:Publication node is
+ * an frbr:part typing device, not an article graph. All other valid
+ * files keep the profile-based article check above.
+ *
  * Valid fixtures: protocol/examples/*.ttl, protocol/registry.ttl and
  * tests/conformance/fixtures/valid/*.ttl (must-conform edge cases).
  * Invalid fixtures: tests/conformance/fixtures/invalid/*.ttl
@@ -35,6 +43,7 @@ const SH_VIOLATION = 'http://www.w3.org/ns/shacl#Violation';
 
 const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
 const OD_PUBLICATION = 'https://w3id.org/opendraft/ontology#Publication';
+const FABIO_EXPRESSION_COLLECTION = 'http://purl.org/spar/fabio/ExpressionCollection';
 /** Predicates whose presence on an od:Publication marks a release graph. */
 const RELEASE_PREDICATES = new Set([
   'http://purl.org/dc/terms/identifier',
@@ -79,6 +88,23 @@ function isRelease(data: TurtleDataset): boolean {
   return false;
 }
 
+/**
+ * Detect a registry example graph: any subject typed
+ * fabio:ExpressionCollection marks the whole graph as a registry
+ * example that must validate against registry shapes only.
+ *
+ * @param data - Parsed fixture graph.
+ * @returns True when the graph contains a registry type triple.
+ */
+function isRegistryExample(data: TurtleDataset): boolean {
+  for (const quad of data) {
+    if (quad.predicate.value === RDF_TYPE && quad.object.value === FABIO_EXPRESSION_COLLECTION) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function fail(message: string): void {
   failures += 1;
   console.error(`FAIL: ${message}`);
@@ -117,15 +143,21 @@ async function main(): Promise<void> {
   for (const quad of articleShapes) releaseShapes.add(quad);
   const registryShapes = await loadTurtle(REGISTRY_SHAPES);
 
-  // Valid fixtures: article examples validate against the profile
-  // shapes (release union or draft-only); registry examples also
-  // validate against registry shapes.
+  // Valid fixtures: registry examples (fabio:ExpressionCollection)
+  // validate against registry shapes only; every other valid file
+  // keeps the profile-based article check (release union or
+  // draft-only) plus the registry shape check.
   const validFiles = [...VALID_FILES];
   for (const dir of VALID_DIRS) {
     validFiles.push(...(await listTtl(dir)));
   }
   for (const file of validFiles) {
     const data = await loadTurtle(file);
+    if (isRegistryExample(data)) {
+      const registryReport = await validateShacl(data, registryShapes);
+      check(true, !hasViolation(registryReport), `${file} (registry shapes only)`);
+      continue;
+    }
     const release = isRelease(data);
     const report = await validateShacl(data, shapesFor(data, articleShapes, releaseShapes));
     check(true, !hasViolation(report), `${file} (${release ? 'article+release shapes' : 'article shapes'})`);
