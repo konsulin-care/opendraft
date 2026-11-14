@@ -1,7 +1,9 @@
 # Invalid fixture: Work IRI shares the publication IRI (shared DOI)
 #
-# Violates protocol/article.shacl.ttl — the Work IRI must differ from
-# the Publication IRI (concept DOI vs version DOI, Zenodo pattern).
+# Violates protocol/article-release.shacl.ttl (od:PublicationWorkShape)
+# — the Work IRI must differ from the Publication IRI (concept DOI vs
+# version DOI, Zenodo pattern). This fixture is a release profile (DOI
+# identifier), so it validates against the article + release shapes.
 # Here the publication realizes itself: ex:shared-doi-publication is
 # typed both od:Publication and fabio:Work, so the publication IRI
 # doubles as its own Work IRI. Everything else conforms, so the shared
