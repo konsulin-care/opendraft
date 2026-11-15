@@ -2,6 +2,8 @@ authors:
   - id: odt
     name:
       literal: OpenDraft Team
+    email: opendraft@example.org
+    corresponding: true
     affiliations:
       - ref: opendraft-project
 affiliations:
