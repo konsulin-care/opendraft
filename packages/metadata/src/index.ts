@@ -11,6 +11,13 @@ export { compilePublicationGraph } from './rdf/publication-graph.js';
 export type { PublicationGraphInput, PublicationSubject } from './rdf/publication-graph.js';
 export type { PublicationMetadata } from './compiler.js';
 export { compileArticle } from './article-compiler.js';
+export { loadManuscriptSnapshot } from './snapshot.js';
+export type {
+  ManuscriptSnapshot,
+  SnapshotContext,
+  SnapshotEntry,
+  SnapshotSection,
+} from './snapshot.js';
 export { migrateToBlockLayout } from './migration.js';
 export type { MigrationResult } from './migration.js';
 
