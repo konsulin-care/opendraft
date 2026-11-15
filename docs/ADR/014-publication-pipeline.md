@@ -24,6 +24,9 @@ SHACL validation
 Static artifacts
 ```
 
+### Amendment (ADR-026)
+RDF/Turtle is compiled from the manuscript sources by `compileManuscriptGraph` (`@opendraft/metadata`), not by Quarto. HTML comes from Quarto. SHACL validation resolves the protocol bundled -> cache -> raw GitHub -> skip, per [ADR-026](026-runtime-validation-and-protocol-distribution.md); revisions older than `compatibleSince` are skipped.
+
 ### Initial Outputs
 - `article.html` — human-readable.
 - `article.ttl` — machine-readable.
