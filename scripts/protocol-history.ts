@@ -13,6 +13,9 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { TTL_GLOB_PATHSPEC, defaultGitOps, type GitOps } from './protocol-manifest';
 
+/** Repository-relative path of the bundled protocol history written by the manifest update. */
+export const HISTORY_PATH = 'packages/rdf/src/protocol-history.generated.json';
+
 /** One protocol .ttl file reference: repository path plus SHA-256 of its content. */
 export interface HistoryFileRef { path: string; sha256: string; }
 /** One revision in the bundled protocol history. */
