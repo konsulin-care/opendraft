@@ -1,6 +1,7 @@
 import { blockCommand } from './commands/block.js';
 import { initCommand } from './commands/init.js';
 import { manuscriptCommand } from './commands/manuscript.js';
+import { protocolUpgradeCommand } from './commands/protocol-upgrade.js';
 import { rdfCommand } from './commands/rdf.js';
 import { validateCommand } from './commands/validate.js';
 
@@ -11,6 +12,7 @@ const USAGE = [
   '  init [dir] --manuscript <id>  Scaffold a new project',
   '  manuscript              Manage manuscripts',
   '  block                   Manage blocks',
+  '  protocol upgrade [dir]  Pin the protocol to the bundled latest revision',
   '  rdf [dir] [-m <id>]     Print the manuscript RDF graph as Turtle',
 ].join('\n');
 
@@ -62,6 +64,7 @@ export async function runCommand(args: string[]): Promise<number> {
   if (command === 'init') return await initCommand(rest);
   if (command === 'manuscript') return await manuscriptCommand(rest);
   if (command === 'block') return await blockCommand(rest);
+  if (command === 'protocol' && rest[0] === 'upgrade') return await protocolUpgradeCommand(rest.slice(1));
   if (command === 'rdf') return await rdfCommand(rest);
   console.error(USAGE);
   return 2;
