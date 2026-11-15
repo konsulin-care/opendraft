@@ -1,6 +1,35 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { buildProtocolHistory, type HistoryGitOps } from '../../../scripts/protocol-history';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { buildProtocolHistory, defaultHistoryGitOps, type HistoryGitOps } from '../../../scripts/protocol-history';
+
+describe('buildProtocolHistory — real git repository', () => {
+  const root = process.cwd();
+  const manifest = JSON.parse(readFileSync(join(root, 'protocol/protocol.manifest.json'), 'utf8')) as {
+    protocol: { commit: string; compatibleSince: string };
+    artifacts: { path: string; sha256: string }[];
+  };
+  const compatibleSince = manifest.protocol.compatibleSince;
+  const history = buildProtocolHistory(defaultHistoryGitOps(root), { compatibleSince });
+  it('returns latest equal to the manifest commit and echoes compatibleSince', () => {
+    expect(history.latest).toBe(manifest.protocol.commit);
+    expect(history.compatibleSince).toBe(compatibleSince);
+  });
+  it('lists the manifest artifacts with matching sha256 on the latest revision', () => {
+    const latest = history.revisions[0];
+    expect(latest.commit).toBe(manifest.protocol.commit);
+    expect(latest.compatible).toBe(true);
+    expect(manifest.artifacts).toHaveLength(7);
+    const expected = manifest.artifacts.map((a) => ({ path: a.path, sha256: a.sha256 }));
+    const byPath = (a: { path: string }, b: { path: string }) => a.path.localeCompare(b.path);
+    expect([...(latest.files ?? [])].sort(byPath)).toEqual([...expected].sort(byPath));
+  });
+  it('lists older revisions as incompatible without files', () => {
+    const older = history.revisions.filter((r) => r.commit !== compatibleSince && !r.compatible);
+    for (const revision of older) expect(revision).toEqual({ commit: revision.commit, compatible: false });
+  });
+});
 
 /** Newest commit in the fake rev-list (git rev-list HEAD -- protocol glob pathspec). */
 const NEWEST = 'a'.repeat(40);
