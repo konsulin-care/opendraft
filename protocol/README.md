@@ -7,10 +7,10 @@ This directory contains the normative RDF artifacts defining the OpenDraft proto
 The canonical OpenDraft namespace is:
 
 ```
-urn:opendraft:ontology#
+https://w3id.org/opendraft/ontology#
 ```
 
-Prefix `od:` is used throughout all TTL files. This namespace is a URN (RFC 3986) because no persistent HTTP domain is currently available. When `opendraft.org` is live, HTTP aliases will be minted that dereference to the same terms.
+Prefix `od:` is used throughout all TTL files. Remaining `od:` terms: `od:Publication`, `od:repositoryUrl`, `od:sourceRevision`, `od:manuscriptPath`, `od:isDeceased`. Registries use `fabio:ExpressionCollection` + `frbr:part`; subject assignment uses `oa:Annotation`; group authorship uses `scoro:agent` roles; protocol revision uses `dcterms:conformsTo`. See [ADR-027](../docs/ADR/027-rdf-sections-and-vocabulary-reuse.md).
 
 ## Artifacts
 
