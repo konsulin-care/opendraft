@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addBlock, scaffoldProject } from '@opendraft/manuscript';
 import type { ProtocolBlock } from '@opendraft/manuscript';
 import { NodeFsWorkspace } from '@opendraft/workspace/node';
-import { runCli } from '../src/index.js';
+import { runCommand } from '../src/index.js';
 
 /** Protocol block accepted by the opendraft.yml schema. */
 const PROTOCOL: ProtocolBlock = {
@@ -43,7 +43,7 @@ let dir: string;
  * @param projectDir - Project root passed to the CLI.
  * @returns Exit code plus the combined printed output.
  */
-function runValidate(projectDir: string): CliRun {
+async function runValidate(projectDir: string): Promise<CliRun> {
   const lines: string[] = [];
   const capture = (...data: unknown[]): void => {
     lines.push(data.map(String).join(' '));
@@ -54,7 +54,8 @@ function runValidate(projectDir: string): CliRun {
     vi.spyOn(console, 'warn').mockImplementation(capture),
   ];
   try {
-    return { code: runCli(['validate', projectDir]), output: lines.join('\n') };
+    const code = await runCommand(['validate', projectDir, '--offline']);
+    return { code, output: lines.join('\n') };
   } finally {
     for (const spy of spies) spy.mockRestore();
   }
@@ -133,7 +134,7 @@ describe('runCli — validate: citekeys against article bibliography', () => {
     const ws = await scaffoldedProject();
     const blockPath = await blockWithCitation(ws, `As shown [@${UNKNOWN_KEY}].`);
 
-    const run = runValidate(dir);
+    const run = await runValidate(dir);
 
     expect(run.code).toBe(1);
     expect(run.output).toContain('introduction.qmd');
@@ -145,7 +146,7 @@ describe('runCli — validate: citekeys against article bibliography', () => {
     const ws = await scaffoldedProject();
     await blockWithCitation(ws, `As shown [@${KNOWN_KEY}].`);
 
-    const run = runValidate(dir);
+    const run = await runValidate(dir);
 
     expect(run.code).toBe(0);
   });
@@ -155,7 +156,7 @@ describe('runCli — validate: citekeys against article bibliography', () => {
     await blockWithCitation(ws, `As shown [@${KNOWN_KEY}].`);
     writeFileSync(join(dir, BIB_FILE), '@article{doe2024 title = {Missing comma}}\n');
 
-    const run = runValidate(dir);
+    const run = await runValidate(dir);
 
     expect(run.code).toBe(1);
     expect(run.output).toContain('references.bib');

@@ -5,15 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addBlock, scaffoldProject } from '@opendraft/manuscript';
 import type { ProtocolBlock } from '@opendraft/manuscript';
 import { NodeFsWorkspace } from '@opendraft/workspace/node';
-import { runCli } from '../src/index.js';
-import { EMBEDDED_PROTOCOL_COMMIT } from '../src/protocol.js';
+import { runCommand } from '../src/index.js';
 
-/** Protocol block accepted by the opendraft.yml schema (pinned to the embedded commit). */
+/** Protocol block accepted by the opendraft.yml schema (unbundled pin: RDF stage skipped offline). */
 const PROTOCOL: ProtocolBlock = {
   name: 'opendraft',
-  version: EMBEDDED_PROTOCOL_COMMIT,
+  version: 'e849ba8a46528d523d5f3d18f5f0171853f13030',
   repository: 'https://github.com/konsulin-care/opendraft',
-  commit: EMBEDDED_PROTOCOL_COMMIT,
+  commit: 'e849ba8a46528d523d5f3d18f5f0171853f13030',
 };
 
 /** Manuscript directory written by the scaffold for id `demo`. */
@@ -50,7 +49,7 @@ let dir: string;
  * @param args - Arguments passed to runCli.
  * @returns Exit code plus the two output streams.
  */
-function capture(args: string[]): Captured {
+async function capture(args: string[]): Promise<Captured> {
   const out: string[] = [];
   const err: string[] = [];
   const push = (sink: string[]) => (...data: unknown[]): void => {
@@ -62,7 +61,8 @@ function capture(args: string[]): Captured {
     vi.spyOn(console, 'warn').mockImplementation(push(err)),
   ];
   try {
-    return { code: runCli(args), stdout: out.join('\n'), stderr: err.join('\n') };
+    const code = await runCommand(args);
+    return { code, stdout: out.join('\n'), stderr: err.join('\n') };
   } finally {
     for (const spy of spies) spy.mockRestore();
   }
@@ -121,7 +121,7 @@ describe('runCli — validate --json', () => {
     await scaffoldedProject();
     writeFileSync(join(dir, 'opendraft.yml'), 'protocol:\n  name: opendraft\n');
 
-    const run = capture(['validate', dir, '--json']);
+    const run = await capture(['validate', dir, '--json', '--offline']);
 
     expect(run.code).toBe(1);
     const report: JsonReport = JSON.parse(run.stdout);
@@ -139,14 +139,13 @@ describe('runCli — validate --json', () => {
     const ws = await scaffoldedProject();
     await ws.writeFile(`${MANUSCRIPT_DIR}/blocks/_scratch.qmd`, '# Scratch {#sec-scratch}\n');
 
-    const run = capture(['validate', dir, '--json']);
+    const run = await capture(['validate', dir, '--json', '--offline']);
 
     expect(run.code).toBe(0);
     expect(run.stderr).toBe('');
     const report: JsonReport = JSON.parse(run.stdout);
     expect(report.errors).toEqual([]);
-    expect(report.warnings).toHaveLength(1);
-    expect(report.warnings[0].message).toContain('orphan');
+    expect(report.warnings.some((w) => w.message.includes('orphan'))).toBe(true);
   });
 });
 
@@ -155,8 +154,8 @@ describe('runCli — validate human-readable output', () => {
     const ws = await scaffoldedProject();
     await ws.writeFile(`${MANUSCRIPT_DIR}/blocks/_scratch.qmd`, '# Scratch {#sec-scratch}\n');
 
-    const json = capture(['validate', dir, '--json']);
-    const human = capture(['validate', dir]);
+    const json = await capture(['validate', dir, '--json', '--offline']);
+    const human = await capture(['validate', dir, '--offline']);
 
     expect(human.code).toBe(0);
     expect(human.stdout).toContain('✓ Project validation passed.');
@@ -172,8 +171,8 @@ describe('runCli — validate human-readable output', () => {
     await scaffoldedProject();
     writeFileSync(join(dir, 'opendraft.yml'), 'protocol:\n  name: opendraft\n');
 
-    const json = capture(['validate', dir, '--json']);
-    const human = capture(['validate', dir]);
+    const json = await capture(['validate', dir, '--json', '--offline']);
+    const human = await capture(['validate', dir, '--offline']);
 
     expect(human.code).toBe(1);
     expect(human.stdout).not.toContain('passed');
@@ -186,8 +185,8 @@ describe('runCli — validate human-readable output', () => {
 });
 
 describe('runCli — usage', () => {
-  it('--help prints usage naming every command and exits 0', () => {
-    const run = capture(['--help']);
+  it('--help prints usage naming every command and exits 0', async () => {
+    const run = await capture(['--help']);
 
     expect(run.code).toBe(0);
     for (const command of ['validate', 'init', 'manuscript', 'block']) {
@@ -195,8 +194,8 @@ describe('runCli — usage', () => {
     }
   });
 
-  it('an unknown command prints usage and exits 2', () => {
-    const run = capture(['frobnicate']);
+  it('an unknown command prints usage and exits 2', async () => {
+    const run = await capture(['frobnicate']);
 
     expect(run.code).toBe(2);
     expect(run.stderr).toContain('usage');

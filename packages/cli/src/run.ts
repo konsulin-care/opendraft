@@ -6,7 +6,7 @@ import { validateCommand } from './commands/validate.js';
 const USAGE = [
   'usage: opendraft <command> [arguments]',
   'commands:',
-  '  validate [dir] [--json]  Validate config, metadata and assemblies',
+  '  validate [dir] [--json] [--offline] [--release]  Validate config, metadata and assemblies',
   '  init [dir] --manuscript <id>  Scaffold a new project',
   '  manuscript              Manage manuscripts',
   '  block                   Manage blocks',
@@ -27,12 +27,11 @@ const USAGE = [
  * @returns Exit code: 0 on success, 1 on validation failure, 2 on usage errors.
  */
 export function runCli(args: string[]): number {
-  const [command, ...rest] = args;
+  const [command] = args;
   if (command === '--help') {
     console.log(USAGE);
     return 0;
   }
-  if (command === 'validate') return validateCommand(rest);
   console.error(USAGE);
   return 2;
 }

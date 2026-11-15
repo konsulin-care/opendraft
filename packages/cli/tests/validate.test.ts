@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addBlock, scaffoldProject } from '@opendraft/manuscript';
 import type { ProtocolBlock } from '@opendraft/manuscript';
 import { NodeFsWorkspace } from '@opendraft/workspace/node';
-import { runCli } from '../src/index.js';
+import { runCommand } from '../src/index.js';
 
 /** Protocol block accepted by the opendraft.yml schema. */
 const PROTOCOL: ProtocolBlock = {
@@ -34,7 +34,7 @@ let dir: string;
  * @param projectDir - Project root passed to the CLI.
  * @returns Exit code plus the combined printed output.
  */
-function runValidate(projectDir: string): CliRun {
+async function runValidate(projectDir: string): Promise<CliRun> {
   const lines: string[] = [];
   const capture = (...data: unknown[]): void => {
     lines.push(data.map(String).join(' '));
@@ -45,7 +45,8 @@ function runValidate(projectDir: string): CliRun {
     vi.spyOn(console, 'warn').mockImplementation(capture),
   ];
   try {
-    return { code: runCli(['validate', projectDir]), output: lines.join('\n') };
+    const code = await runCommand(['validate', projectDir, '--offline']);
+    return { code, output: lines.join('\n') };
   } finally {
     for (const spy of spies) spy.mockRestore();
   }
@@ -110,7 +111,7 @@ describe('runCli — validate: config and metadata', () => {
     await addBlock(ws, MANUSCRIPT_DIR, 0, 'Introduction');
     await normalizeBlockFixtures(ws);
 
-    const run = runValidate(dir);
+    const run = await runValidate(dir);
 
     expect(run.code).toBe(0);
   });
@@ -119,7 +120,7 @@ describe('runCli — validate: config and metadata', () => {
     await scaffoldedProject();
     writeFileSync(join(dir, 'opendraft.yml'), 'protocol:\n  name: opendraft\n');
 
-    const run = runValidate(dir);
+    const run = await runValidate(dir);
 
     expect(run.code).toBe(1);
     expect(run.output).toContain('opendraft.yml');
@@ -129,7 +130,7 @@ describe('runCli — validate: config and metadata', () => {
     await scaffoldedProject();
     writeFileSync(join(dir, MANUSCRIPT_DIR, '_frontmatter.yml'), 'keywords: []\n');
 
-    const run = runValidate(dir);
+    const run = await runValidate(dir);
 
     expect(run.code).toBe(1);
     expect(run.output).toContain('_frontmatter.yml');
@@ -150,7 +151,7 @@ describe('runCli — validate: assembly', () => {
       article.replace('::: {#refs}', '{{< include blocks/_ghost.qmd >}}\n::: {#refs}'),
     );
 
-    const run = runValidate(dir);
+    const run = await runValidate(dir);
 
     expect(run.code).toBe(1);
     expect(run.output).toContain('ghost.qmd');
@@ -166,7 +167,7 @@ describe('runCli — validate: assembly', () => {
       '# Methods {#sec-introduction}\n',
     );
 
-    const run = runValidate(dir);
+    const run = await runValidate(dir);
 
     expect(run.code).toBe(1);
     expect(run.output).toContain('sec-introduction');
@@ -179,7 +180,7 @@ describe('runCli — validate: assembly', () => {
     await normalizeBlockFixtures(ws);
     await ws.writeFile(`${MANUSCRIPT_DIR}/blocks/_scratch.qmd`, '# Scratch {#sec-scratch}\n');
 
-    const run = runValidate(dir);
+    const run = await runValidate(dir);
 
     expect(run.code).toBe(0);
     expect(run.output.toLowerCase()).toContain('orphan');
