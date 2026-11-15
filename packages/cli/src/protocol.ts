@@ -9,7 +9,7 @@ import type { Finding } from './output.js';
  * Protocol commit embedded from `protocol/protocol.manifest.json`
  * (`protocol.commit`). Kept in sync by the protocol-pin test.
  */
-export const EMBEDDED_PROTOCOL_COMMIT = 'f192c95d750b6a71b49134819b08aec509790c84';
+export const EMBEDDED_PROTOCOL_COMMIT = 'ed768fe9db8b357494a08b11871dfd1315d11833';
 
 /**
  * Compare a project's pinned protocol commit against the embedded one.

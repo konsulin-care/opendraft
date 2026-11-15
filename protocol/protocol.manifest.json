@@ -3,7 +3,8 @@
     "name": "opendraft",
     "version": "ed768fe9db8b357494a08b11871dfd1315d11833",
     "repository": "https://github.com/konsulin-care/opendraft",
-    "commit": "ed768fe9db8b357494a08b11871dfd1315d11833"
+    "commit": "ed768fe9db8b357494a08b11871dfd1315d11833",
+    "compatibleSince": "ed768fe9db8b357494a08b11871dfd1315d11833"
   },
   "artifacts": [
     {
