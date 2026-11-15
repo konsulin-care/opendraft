@@ -56,19 +56,21 @@ export interface PublicationGraphInput {
   /** Top-level affiliation registry resolving {ref} affiliation items. */
   affiliations?: RegistryAffiliation[];
   /** Repository URL provenance scalar (od:repositoryUrl). */
-  repositoryUrl: string;
+  repositoryUrl?: string;
+  /** Manuscript id; the root IRI is a draft IRI when no version DOI is given. */
+  manuscriptId?: string;
   /** Manuscript path provenance scalar (od:manuscriptPath). */
   manuscriptPath: string;
   /** 40-character Git commit SHA the manuscript was compiled from. */
-  sourceRevision: string;
+  sourceRevision?: string;
   /** Git repository hosting the protocol (e.g. https://github.com/owner/repo). */
   protocolRepository: string;
   /** 40-character Git commit SHA of the protocol revision used. */
   protocolRevision: string;
   /** Version DOI of this publication (publication IRI). */
-  versionDoi: string;
+  versionDoi?: string;
   /** Concept DOI of the fabio:Work this publication realizes. */
-  conceptDoi: string;
+  conceptDoi?: string;
   /** Version DOI of the earlier version revised (frbr:revisionOf). */
   previousVersionDoi?: string;
   /** prism:versionIdentifier; defaults to 2 with a previous version, else 1. */
@@ -87,7 +89,8 @@ const LICENSE_URIS: Record<string, string> = {
 };
 
 /** Normalize a DOI or throw naming the offending input field. */
-function requireDoi(input: string | undefined, label: string): NormalizedIdentifier {
+function requireDoi(input: string | undefined, label: string): NormalizedIdentifier | null {
+  if (input === undefined || input === '') return null;
   const doi = normalizeDoi(input);
   if (!doi) throw new Error(`compilePublicationGraph: invalid ${label} "${String(input)}"`);
   return doi;
@@ -172,20 +175,23 @@ function versionNumber(input: PublicationGraphInput): string {
 /** Every property pair of the od:Publication node in fixed order. */
 function publicationPairs(
   input: PublicationGraphInput,
-  versionDoi: NormalizedIdentifier,
-  conceptDoi: NormalizedIdentifier,
+  versionDoi: NormalizedIdentifier | null,
+  conceptDoi: NormalizedIdentifier | null,
 ): string[] {
-  const pairs = [
-    `a ${OD}Publication>`,
-    `${DCTERMS}title> ${literalString(input.title)}`,
-    `${DCTERMS}identifier> ${termRef(versionDoi.iri)}`,
-    `${DATACITE}hasIdentifier> ${doiIdentifierNode(versionDoi.value)}`,
-    `${OD}repositoryUrl> ${literalString(input.repositoryUrl)}^^${XSD}anyURI>`,
-    `${OD}manuscriptPath> ${literalString(input.manuscriptPath)}`,
-    `${OD}sourceRevision> ${literalString(input.sourceRevision)}`,
-    `${DCTERMS}conformsTo> ${termRef(conformsToIri(input))}`,
-    `${FRBR}realizationOf> ${termRef(conceptDoi.iri)}`,
-  ];
+  const pairs = [`a ${OD}Publication>`, `${DCTERMS}title> ${literalString(input.title)}`];
+  if (versionDoi) {
+    pairs.push(`${DCTERMS}identifier> ${termRef(versionDoi.iri)}`);
+    pairs.push(`${DATACITE}hasIdentifier> ${doiIdentifierNode(versionDoi.value)}`);
+  }
+  if (input.repositoryUrl) {
+    pairs.push(`${OD}repositoryUrl> ${literalString(input.repositoryUrl)}^^${XSD}anyURI>`);
+  }
+  pairs.push(`${OD}manuscriptPath> ${literalString(input.manuscriptPath)}`);
+  if (input.sourceRevision) {
+    pairs.push(`${OD}sourceRevision> ${literalString(input.sourceRevision)}`);
+  }
+  pairs.push(`${DCTERMS}conformsTo> ${termRef(conformsToIri(input))}`);
+  if (conceptDoi) pairs.push(`${FRBR}realizationOf> ${termRef(conceptDoi.iri)}`);
   if (input.previousVersionDoi) {
     const previous = normalizeDoi(input.previousVersionDoi);
     if (previous) pairs.push(`${FRBR}revisionOf> ${termRef(previous.iri)}`);
@@ -224,10 +230,13 @@ function publicationPairs(
 export function compilePublicationGraph(input: PublicationGraphInput): string {
   const versionDoi = requireDoi(input.versionDoi, 'versionDoi');
   const conceptDoi = requireDoi(input.conceptDoi, 'conceptDoi');
-  const blocks: string[] = [workBlock(conceptDoi.iri, input.title)];
-  blocks.push(block(termRef(versionDoi.iri), publicationPairs(input, versionDoi, conceptDoi)));
+  const root = versionDoi?.iri
+    ?? `https://w3id.org/opendraft/draft/${input.manuscriptId ?? 'manuscript'}`;
+  const blocks: string[] = [];
+  if (conceptDoi) blocks.push(workBlock(conceptDoi.iri, input.title));
+  blocks.push(block(termRef(root), publicationPairs(input, versionDoi, conceptDoi)));
   blocks.push(emitAuthorshipGraph({
-    publication: versionDoi.iri,
+    publication: root,
     authors: input.authors,
     affiliations: input.affiliations,
   }).trimEnd());
