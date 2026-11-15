@@ -4,7 +4,7 @@ import { scaffoldProject } from '@opendraft/manuscript';
 import type { ProtocolBlock } from '@opendraft/manuscript';
 import { MANUSCRIPT_ID_PATTERN } from '@opendraft/schema';
 import { NodeFsWorkspace } from '@opendraft/workspace/node';
-import { EMBEDDED_PROTOCOL_COMMIT } from '../protocol.js';
+import { BUNDLED_PROTOCOL_LATEST } from '../protocol.js';
 
 /** Usage line printed for flag errors. */
 const INIT_USAGE = 'usage: opendraft init [dir] --manuscript <id>';
@@ -15,9 +15,9 @@ const PROTOCOL_REPOSITORY = 'https://github.com/konsulin-care/opendraft';
 /** Protocol block for scaffolded projects: the embedded revision. */
 const PROTOCOL: ProtocolBlock = {
   name: 'opendraft',
-  version: EMBEDDED_PROTOCOL_COMMIT,
+  version: BUNDLED_PROTOCOL_LATEST,
   repository: PROTOCOL_REPOSITORY,
-  commit: EMBEDDED_PROTOCOL_COMMIT,
+  commit: BUNDLED_PROTOCOL_LATEST,
 };
 
 /** Parsed `init` arguments. */

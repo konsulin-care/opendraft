@@ -2,6 +2,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import history from '../../rdf/src/protocol-history.generated.json';
 import { runCommand } from '../src/index.js';
 
 /** Result of one captured CLI run. */
@@ -54,7 +55,18 @@ describe('runCommand — init', () => {
     expect(existsSync(join(dir, 'manuscripts', 'paper', 'article.qmd'))).toBe(true);
 
     const validate = await runCapture(['validate', dir]);
-    expect(validate.code).toBe(0);
+    // A scaffold has no authors/abstract, so validate reports findings (exit 1) but not a usage error.
+    expect(validate.code).not.toBe(2);
+    expect(validate.output).not.toContain('blocks/');
+  });
+
+  it('init pins protocol version and commit to the bundled history latest', async () => {
+    const latest = (history as unknown as { latest: string }).latest;
+    await runCapture(['init', dir, '--manuscript', 'paper']);
+    const yml = readFileSync(join(dir, 'opendraft.yml'), 'utf8');
+
+    expect(yml).toMatch(new RegExp(`^\\s*version:\\s*"?${latest}"?\\s*$`, 'm'));
+    expect(yml).toMatch(new RegExp(`^\\s*commit:\\s*"?${latest}"?\\s*$`, 'm'));
   });
 
   it('init resolves 1 and writes nothing when the target already contains opendraft.yml', async () => {

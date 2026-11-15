@@ -8,6 +8,9 @@ import history from '../../rdf/src/protocol-history.generated.json';
 import type { Finding } from './output.js';
 import { FileProtocolCache } from './protocol-cache.js';
 
+/** Latest protocol revision in the bundled history; the pin for new projects. */
+export const BUNDLED_PROTOCOL_LATEST: string = (history as unknown as { latest: string }).latest;
+
 /**
  * Build resolveProtocol options for the CLI: bundled history, file cache, global fetch.
  *
