@@ -100,7 +100,10 @@ export function defaultHistoryGitOps(dir: string): HistoryGitOps {
   return {
     ...base,
     ttlCommits: () => lines(['rev-list', 'HEAD', '--', TTL_GLOB_PATHSPEC]),
-    ttlPathsAt: (commit) => lines(['ls-tree', '-r', '--name-only', commit, '--', TTL_GLOB_PATHSPEC]).sort(),
+    ttlPathsAt: (commit) =>
+      lines(['ls-tree', '-r', '--name-only', commit, '--', 'protocol'])
+        .filter((path) => path.endsWith('.ttl'))
+        .sort(),
     isAncestorOrSelf: (commit, revision) => {
       try {
         run(['merge-base', '--is-ancestor', commit, revision ?? 'HEAD']);
