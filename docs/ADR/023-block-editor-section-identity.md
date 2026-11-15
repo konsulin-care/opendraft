@@ -2,7 +2,8 @@
 
 **Status:** Accepted  
 **Date:** 2026-09-16  
-**Amends:** ADR-020 (editor model, in part)
+**Amends:** ADR-020 (editor model, in part)  
+**Amended by:** ADR-025 (block files are `_<short>.qmd`)
 
 ## Context
 
@@ -20,14 +21,14 @@ a cross-reference target, and (later) an RDF section node.
 Every section has a **short name**: the normalized section title — Unicode
 NFKD, accents stripped, lowercased, runs of non-alphanumerics collapsed to a
 single hyphen, trimmed, **capped at 40 characters**. An empty result falls
-back to `section`. When the candidate is already taken, a `-` plus the last
-6 characters of a lowercase ULID is appended (the title part is truncated so
+back to `section`. When the candidate is already taken, a `-` plus
+6 decimal digits is appended (the title part is truncated so
 the total stays within 40); a collision on the suffixed name regenerates the
 suffix.
 
 The short name is:
 
-- the block filename: `blocks/<short>.qmd`
+- the block filename: `blocks/_<short>.qmd` (ADR-025)
 - the Quarto cross-reference anchor seed: `# Title {#sec-<short>}` — referenced
   as `@sec-<short>` (Quarto's `sec-` prefix requirement)
 - the DEO class carrier: `{#sec-<short> .deo-<type>}`, or `.doco-section` for
@@ -81,7 +82,7 @@ accepted without an anchor error.
 
 - Cross-references (`@sec-introduction`) survive title edits and block moves.
 - Renames are loud (confirmation + reference rewrite) rather than silent.
-- The 40-character cap keeps refs readable; the 6-char ULID suffix keeps
+- The 40-character cap keeps refs readable; the 6-digit suffix keeps
   duplicates unique without bloat.
 - Short names are user-visible API — treat them like route slugs: stable once
   published.

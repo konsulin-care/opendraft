@@ -33,13 +33,12 @@ manuscripts/
     ├── _abstract.yml
     ├── _frontmatter.yml
     └── blocks/
-        ├── manifest.json     # ordered block list
-        └── <slug>.qmd        # one file per block
+        └── _<short>.qmd      # one file per block (ADR-025)
 ```
 
 **Bibliography:** `manuscripts/references.bib` is shared. Each `article.qmd` sets `bibliography: ../references.bib`.
 
-**Detection:** Presence of `blocks/manifest.json` signals block-based layout.
+**Detection:** Presence of `blocks/` with `_<short>.qmd` files signals block-based layout. Order comes from include lines in `article.qmd`; there is no `manifest.json`.
 
 **Migration:** Use `migrateToBlockLayout()` to convert legacy layout to block-based.
 
@@ -51,8 +50,7 @@ manuscripts/
 | `_author.yml` | Required | Required | Author information |
 | `_abstract.yml` | Required | Required | Abstract text |
 | `_frontmatter.yml` | Required | Required | Title, date, keywords |
-| `blocks/manifest.json` | — | Required | Ordered block list |
-| `blocks/<slug>.qmd` | — | Required | Section-per-block files |
+| `blocks/_<short>.qmd` | — | Required | Section-per-block files |
 
 ### Optional Files
 
@@ -167,5 +165,6 @@ The conventions are enforced by `@opendraft/schema` (`packages/schema`):
 
 - `validateManuscript(id, files)` validates directory structure and identifier.
 - `validateMetadata(data, type)` validates parsed YAML against the corresponding schema.
+- Legacy un-prefixed block files are errors (normalize with `opendraft block normalize`).
 - The pre-push hook (`mise run validate-project`) runs these validators.
 - The client app imports the same validators to check manuscript compliance.

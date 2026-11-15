@@ -31,11 +31,11 @@ metadata-files:
   - _frontmatter.yml
 ---
 
-{{< include blocks/intro.qmd >}}
+{{< include blocks/_intro.qmd >}}
 
 Some glue prose between includes.
 
-{{< include blocks/methods.qmd >}}
+{{< include blocks/_methods.qmd >}}
 
 # References
 
@@ -43,11 +43,11 @@ Some glue prose between includes.
 :::
 ```
 
-Each block file (`blocks/<slug>.qmd`) contains one section with a stable
-slug id on its heading:
+Each block file (`blocks/_<short>.qmd`, ADR-025) contains one section with a
+stable id (no underscore) on its heading:
 
 ```markdown
-# Introduction {#intro}
+# Introduction {#sec-intro .deo-introduction}
 
 This study examines...
 ```
@@ -59,9 +59,9 @@ JSON manifest. A block present in `blocks/` but not included is a **draft**:
 it renders flagged in the editor rail, stays out of the assembly, and is
 reported as a warning (never an error) by the assembly validator.
 
-- `id`: first 8 characters of SHA-256 of block content.
-- `file`: always `<id>.qmd`.
-- Array order = canonical section order.
+Legacy un-prefixed block files are errors; `opendraft validate` blocks the
+commit, the editor autofixes on open, and `opendraft block normalize` fixes
+them. Collision suffixes are `-` plus 6 digits.
 
 ## Metadata Files
 
