@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as entry from '../src/index.js';
 import { runCommand } from '../src/index.js';
+
+describe('entry module exports', () => {
+  it('exports runCommand and no runCli', () => {
+    expect(typeof entry.runCommand).toBe('function');
+    expect('runCli' in entry).toBe(false);
+  });
+});
 
 /** Result of one captured runCommand call, split by stream. */
 interface Captured {

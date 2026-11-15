@@ -17,38 +17,11 @@ const USAGE = [
 ].join('\n');
 
 /**
- * Run the OpenDraft CLI with the given arguments.
- *
- * Pure dispatch: never touches `process.argv`, never calls
- * `process.exit`, and never mutates process state — it only prints the
- * command's report to the console and returns the exit code, so it is
- * safe to import and call from tests. Commands migrated to
- * `Promise<number>` (`init`, `manuscript` and `block`) are not
- * dispatched here: they fall through to the usage error, so use
- * {@link runCommand} for them.
- *
- * @param args - CLI arguments, excluding the node executable and script.
- * @returns Exit code: 0 on success, 1 on validation failure, 2 on usage errors.
- */
-export function runCli(args: string[]): number {
-  const [command] = args;
-  if (command === '--help') {
-    console.log(USAGE);
-    return 0;
-  }
-  console.error(USAGE);
-  return 2;
-}
-
-/**
  * Run the OpenDraft CLI asynchronously with the given arguments.
  *
- * The complete dispatch — every command, including the async
- * `init`, `manuscript` and `block` handlers omitted from {@link
- * runCli} — awaits each handler, so all writes are settled and the
- * exit code reflects the finished operation. Like `runCli`, it never
- * touches `process.argv`, never calls `process.exit`, and never mutates
- * process state.
+ * Awaits each handler, so all writes are settled and the exit code
+ * reflects the finished operation. Never touches `process.argv`, never
+ * calls `process.exit`, and never mutates process state.
  *
  * @param args - CLI arguments, excluding the node executable and script.
  * @returns Promise of the exit code: 0 on success, 1 on validation
