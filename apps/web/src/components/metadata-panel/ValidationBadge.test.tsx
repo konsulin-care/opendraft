@@ -131,6 +131,15 @@ it('shows commit issues as a "{m} to commit" segment', async () => {
   expect(screen.getByTestId('validation-badge').textContent).toBe('1 to commit');
 });
 
+it('counts an author entry without name as a commit issue', async () => {
+  await renderPanel({
+    [`${ROOT}/_frontmatter.yml`]: LICENSED,
+    [`${ROOT}/_abstract.yml`]: ABSTRACT,
+    [`${ROOT}/_author.yml`]: 'authors:\n  - id: smith\n',
+  });
+  expect(screen.getByTestId('validation-badge').textContent).toMatch(/to commit/);
+});
+
 it('is hidden when there are no issues', async () => {
   await renderPanel({
     [`${ROOT}/_frontmatter.yml`]: LICENSED,

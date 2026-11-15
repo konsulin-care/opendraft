@@ -9,7 +9,7 @@
  */
 import { useState, type ReactNode } from 'react';
 import { AlertTriangle, Circle } from 'lucide-react';
-import { checkPublishReadiness, type PublishIssue } from '@opendraft/schema';
+import { checkMetadata, type PublishIssue } from '@opendraft/schema';
 import type { ManuscriptMetadata } from './use-manuscript-metadata';
 
 /** Issue counts per publish-profile level. */
@@ -37,7 +37,7 @@ export interface IssueFocusTarget {
  * @returns Issues ordered commit, publish, warning; [] when ready.
  */
 export function publishIssues(meta: ManuscriptMetadata): PublishIssue[] {
-  return checkPublishReadiness({
+  return checkMetadata({
     frontmatter: meta.frontmatter,
     author: { authors: meta.authors, affiliations: meta.affiliations },
     abstract: typeof meta.abstract === 'string' ? { abstract: meta.abstract } : {},
