@@ -1,6 +1,7 @@
 import { blockCommand } from './commands/block.js';
 import { initCommand } from './commands/init.js';
 import { manuscriptCommand } from './commands/manuscript.js';
+import { rdfCommand } from './commands/rdf.js';
 import { validateCommand } from './commands/validate.js';
 
 const USAGE = [
@@ -10,6 +11,7 @@ const USAGE = [
   '  init [dir] --manuscript <id>  Scaffold a new project',
   '  manuscript              Manage manuscripts',
   '  block                   Manage blocks',
+  '  rdf [dir] [-m <id>]     Print the manuscript RDF graph as Turtle',
 ].join('\n');
 
 /**
@@ -60,6 +62,7 @@ export async function runCommand(args: string[]): Promise<number> {
   if (command === 'init') return await initCommand(rest);
   if (command === 'manuscript') return await manuscriptCommand(rest);
   if (command === 'block') return await blockCommand(rest);
+  if (command === 'rdf') return await rdfCommand(rest);
   console.error(USAGE);
   return 2;
 }
