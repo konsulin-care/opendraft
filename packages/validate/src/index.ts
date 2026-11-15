@@ -1,7 +1,9 @@
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { validateProjectStage } from './project-stage.js';
+import { validateManuscriptStage } from './manuscript-stage.js';
 import type { Finding, ValidateOptions } from './types.js';
 
+export { checkManuscriptAssembly } from './manuscript-stage.js';
 export type { Finding, ValidateOptions } from './types.js';
 
 /**
@@ -13,7 +15,10 @@ export type { Finding, ValidateOptions } from './types.js';
  */
 export async function validateProject(
   ws: WorkspaceAdapter,
-  _options: ValidateOptions = {},
+  options: ValidateOptions = {},
 ): Promise<Finding[]> {
-  return [...(await validateProjectStage(ws))];
+  return [
+    ...(await validateProjectStage(ws)),
+    ...(await validateManuscriptStage(ws, options.release === true)),
+  ];
 }
