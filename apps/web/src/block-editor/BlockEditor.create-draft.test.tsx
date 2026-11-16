@@ -122,8 +122,8 @@ describe('BlockEditor custom draft without a role', () => {
 describe('BlockEditor taken draft short name', () => {
   it("gets a unique suffix instead of overwriting the existing block's file", async () => {
     const ws = await setup({
-      [ARTICLE]: articleWith('introduction'),
-      [`${BLOCKS}/introduction.qmd`]: blockFile('introduction', 'Introduction'),
+      [ARTICLE]: articleWith('_introduction'),
+      [`${BLOCKS}/_introduction.qmd`]: blockFile('introduction', 'Introduction'),
     });
 
     fireEvent.click(screen.getByRole('button', { name: '+ Add section' }));
@@ -132,14 +132,14 @@ describe('BlockEditor taken draft short name', () => {
     });
 
     // The pre-existing block keeps its file; the new block lands beside it.
-    expect(await ws.readFile(`${BLOCKS}/introduction.qmd`)).toBe(
+    expect(await ws.readFile(`${BLOCKS}/_introduction.qmd`)).toBe(
       blockFile('introduction', 'Introduction'),
     );
     const files = await ws.listFiles(BLOCKS);
-    const createdName = files.find((file) => file !== 'introduction.qmd');
+    const createdName = files.find((file) => file !== '_introduction.qmd');
     expect(createdName).toMatch(/^_introduction-[a-z0-9]{6}\.qmd$/);
     const article = (await ws.readFile(ARTICLE)) ?? '';
-    expect(article).toContain('{{< include blocks/introduction.qmd >}}');
+    expect(article).toContain('{{< include blocks/_introduction.qmd >}}');
     expect(article).toContain(`{{< include blocks/${createdName} >}}`);
     const created = (await ws.readFile(`${BLOCKS}/${createdName}`)) ?? '';
     expect(created).toContain('.deo-introduction');

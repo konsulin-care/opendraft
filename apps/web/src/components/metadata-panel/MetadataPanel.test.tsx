@@ -289,7 +289,7 @@ describe('MetadataPanel narrow sheet reading column', () => {
 describe('MetadataPanel editor integration', () => {
   it('is never rendered by the source-only editor', async () => {
     const ws = await seededWorkspace(SEEDED);
-    const { unmount } = render(<ManuscriptEditor workspace={ws} defaultValue="key: value" path="manuscripts/x/blocks/A.qmd" />);
+    const { unmount } = render(<ManuscriptEditor workspace={ws} defaultValue="key: value" path="manuscripts/x/blocks/_a.qmd" />);
     await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined());
     expect(screen.queryByTestId('metadata-panel')).toBeNull();
     unmount();

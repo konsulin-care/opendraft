@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { MemoryWorkspace } from '@opendraft/workspace';
-import { validateProject } from '../src/index.js';
+import { validateProjectStage } from '../src/project-stage.js';
 
 const SHA = 'a'.repeat(40);
 const yml = (id: string, path: string): string =>
@@ -9,7 +9,7 @@ const yml = (id: string, path: string): string =>
 async function run(files: Record<string, string>) {
   const ws = new MemoryWorkspace();
   for (const [p, c] of Object.entries(files)) await ws.writeFile(p, c);
-  return validateProject(ws);
+  return validateProjectStage(ws);
 }
 
 describe('project stage', () => {
