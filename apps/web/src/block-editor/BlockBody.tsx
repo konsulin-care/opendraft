@@ -17,8 +17,9 @@ import { useDebouncedSaver } from '../components/editor/autosave';
 import type { DebouncedSaver } from '../components/editor/autosave';
 import { createHeadingGuard } from './heading-guard';
 import { reportLoadedBody } from './BlockHeader';
-import { joinHeading, splitHeading } from './heading';
+import { joinHeading } from './heading';
 import type { BlockHeading } from './heading';
+import { captureLoadedHeading } from './heading-capture';
 import { useLazyMount } from './use-lazy-mount';
 import { sharedBibPath } from '../citation/references-source';
 
@@ -152,22 +153,20 @@ function useCrepeEditor(options: CrepeEditorOptions): boolean {
   const { mounted, fileText, ws, short, title, bibPath } = options;
   const { rootRef, editorRef, headingRef, citationStateRef, onWordCountRef } = options;
   const [ready, setReady] = useState(false);
+  // Title is only a fallback for heading-less files; a retitle must not recreate the editor from stale text.
+  const titleRef = useRef(title);
+  titleRef.current = title;
   useEffect(() => {
     if (!mounted || fileText === null || rootRef.current === null) return undefined;
-    const parts = splitHeading(fileText);
-    // A class-less heading stays class-less: only a file with no leading heading defaults to the generic type.
-    headingRef.current = {
-      title: parts.title ?? title,
-      anchor: parts.anchor ?? `sec-${short}`,
-      type: parts.title === null ? GENERIC_TYPE : parts.type,
-    };
-    onWordCountRef.current?.(countWords(parts.body));
+    const { heading, body } = captureLoadedHeading(fileText, titleRef.current, short, GENERIC_TYPE);
+    headingRef.current = heading;
+    onWordCountRef.current?.(countWords(body));
     // Surface an H1 already present in the loaded body as a header
     // warning badge; reporting never writes the file back.
-    reportLoadedBody(short, parts.body);
+    reportLoadedBody(short, body);
     const crepe = createCrepeConfig({
       root: rootRef.current,
-      defaultValue: parts.body,
+      defaultValue: body,
       workspace: ws,
       onStateChangeRef: citationStateRef,
       bibPath,
@@ -194,7 +193,7 @@ function useCrepeEditor(options: CrepeEditorOptions): boolean {
       setReady(false);
       crepe.destroy();
     };
-  }, [mounted, fileText, ws, short, title, bibPath]);
+  }, [mounted, fileText, ws, short, bibPath]);
   return ready;
 }
 
