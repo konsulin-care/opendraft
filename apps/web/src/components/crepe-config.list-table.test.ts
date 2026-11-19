@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { editorViewCtx } from '@milkdown/kit/core';
+import { TextSelection } from '@milkdown/kit/prose/state';
+import type { EditorView } from '@milkdown/kit/prose/view';
 import { MemoryWorkspace } from '@opendraft/workspace';
 import { createCrepeConfig } from './crepe-config';
 
@@ -67,6 +70,103 @@ async function mountBody(body: string): Promise<Mounted> {
   await crepe.create();
   mounted = { root, crepe };
   return mounted;
+}
+
+/** A quarto-div code block observed in the mounted document. */
+interface DivBlockInfo {
+  text: string;
+  language: string;
+  cursor: number;
+}
+
+/** Result of driving the fence input rule in a mounted editor. */
+interface TypingResult {
+  handled: boolean;
+  block: DivBlockInfo | undefined;
+  paragraphText: string | null;
+}
+
+/**
+ * Read the ProseMirror view of a mounted Crepe instance.
+ *
+ * @param crepe - Mounted Crepe instance.
+ * @returns Its ProseMirror view.
+ */
+function getView(crepe: Mounted['crepe']): EditorView {
+  return crepe.editor.action((ctx) => ctx.get(editorViewCtx));
+}
+
+/**
+ * Append text to the last paragraph and put the cursor after it.
+ *
+ * @param view - ProseMirror view to mutate.
+ * @param text - Text to insert.
+ * @returns The cursor position after the inserted text, or -1.
+ */
+function insertIntoLastParagraph(view: EditorView, text: string): number {
+  let from = -1;
+  view.state.doc.descendants((node, pos) => {
+    if (node.type.name === 'paragraph') from = pos + 1 + node.content.size;
+  });
+  if (from < 0) return -1;
+  const tr = view.state.tr.insertText(text, from, from);
+  tr.setSelection(TextSelection.create(tr.doc, from + text.length));
+  view.dispatch(tr);
+  return from + text.length;
+}
+
+/**
+ * Find the first quarto-div code block in the document.
+ *
+ * @param view - ProseMirror view to inspect.
+ * @returns Block text, language and cursor offset from content start.
+ */
+function findDivBlock(view: EditorView): DivBlockInfo | undefined {
+  let info: DivBlockInfo | undefined;
+  view.state.doc.descendants((node, pos) => {
+    if (info || node.type.name !== 'code_block') return;
+    const language = String((node.attrs as Record<string, unknown>)['language'] ?? '');
+    if (language !== 'quarto-div') return;
+    info = { text: node.textContent, language, cursor: view.state.selection.from - (pos + 1) };
+  });
+  return info;
+}
+
+/**
+ * Read the last paragraph's text.
+ *
+ * @param view - ProseMirror view to inspect.
+ * @returns Paragraph text, or null when the document has none.
+ */
+function lastParagraphText(view: EditorView): string | null {
+  let text: string | null = null;
+  view.state.doc.descendants((node) => {
+    if (node.type.name === 'paragraph') text = node.textContent;
+  });
+  return text;
+}
+
+/**
+ * Insert a fence prefix into the last paragraph, then type a space
+ * through the input-rule handler exactly as the browser would.
+ *
+ * @param body - Seed markdown for the mounted editor.
+ * @param prefix - Fence text typed into the last paragraph.
+ * @returns Whether the rule handled the space and the resulting document.
+ */
+async function typeFence(body: string, prefix: string): Promise<TypingResult> {
+  const { crepe } = await mountBody(body);
+  const view = getView(crepe);
+  const pos = insertIntoLastParagraph(view, prefix);
+  const deflt = () => view.state.tr.insertText(' ', pos, pos);
+  const handled =
+    view.someProp('handleTextInput', (handler) =>
+      handler(view, pos, pos, ' ', deflt),
+    ) ?? false;
+  if (!handled && pos >= 0) {
+    view.dispatch(view.state.tr.insertText(' ', pos, pos));
+  }
+  return { handled, block: findDivBlock(view), paragraphText: lastParagraphText(view) };
 }
 
 /** A list-table div with a caption, header row and one body row. */
@@ -153,5 +253,32 @@ describe('createCrepeConfig — list-table preview panel', () => {
     });
 
     expect(root.querySelector('.preview-panel table')).toBeNull();
+  });
+});
+
+describe('createCrepeConfig — fenced div input rule', () => {
+  it('turns a bare ::: fence into a quarto-div block with the cursor on line 1', async () => {
+    const { handled, block } = await typeFence('', ':::');
+
+    expect(handled).toBe(true);
+    expect(block?.language).toBe('quarto-div');
+    expect(block?.text).toBe('::: \n\n:::');
+    expect(block?.cursor).toBe(4);
+  });
+
+  it('turns a :::{.list-table} fence into a block with the cursor on the blank body line', async () => {
+    const { handled, block } = await typeFence('', ':::{.list-table}');
+
+    expect(handled).toBe(true);
+    expect(block?.text).toBe(':::{.list-table}\n\n:::');
+    expect(block?.cursor).toBe(':::{.list-table}'.length + 1);
+  });
+
+  it('leaves a paragraph unchanged when the fence follows other text', async () => {
+    const { handled, block, paragraphText } = await typeFence('', 'Existing :::');
+
+    expect(handled).toBe(false);
+    expect(block).toBeUndefined();
+    expect(paragraphText).toBe('Existing ::: ');
   });
 });

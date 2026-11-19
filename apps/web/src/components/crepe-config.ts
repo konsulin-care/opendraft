@@ -14,6 +14,7 @@ import { fencedDivRemarkPlugin } from '../fenced-div';
 import { listTablePlaceholder } from '../list-table/list-table-placeholder';
 import { withListTablePreview } from '../list-table/list-table-preview';
 import { quartoDivDecoration } from '../list-table/quarto-div-decoration';
+import { fencedDivInputRule } from '../list-table/fenced-div-input-rule';
 import { createTestApi, focusBlockEditor, fulfillPendingFocus, registerBlockEditor, type EditorTestApi } from '../caret-mode-switch';
 import type { DebouncedSaver } from './editor/autosave';
 
@@ -92,6 +93,9 @@ export function createCrepeConfig(options: CrepeConfigOptions): Crepe {
   });
   crepe.addFeature((editor) => {
     editor.use(quartoDivDecoration);
+  });
+  crepe.addFeature((editor) => {
+    editor.use(fencedDivInputRule);
   });
   crepe.editor.config((ctx) => {
     ctx.update(remarkStringifyOptionsCtx, (options) => ({
