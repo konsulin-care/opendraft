@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { EditorView } from '@codemirror/view';
 import { Crepe } from '@milkdown/crepe';
+import { codeBlockConfig } from '@milkdown/kit/component/code-block';
 import { editorViewCtx, remarkPluginsCtx, remarkStringifyOptionsCtx, type Editor } from '@milkdown/kit/core';
 import { listenerCtx } from '@milkdown/kit/plugin/listener';
 import { $prose, getMarkdown } from '@milkdown/kit/utils';
@@ -10,6 +11,8 @@ import type { CitationState } from '../citation/types';
 import { quartoRemarkPlugin, quartoInlineCodePlugin, quartoChunkOptionPlugin, quartoCodeHandler } from '../quarto-syntax';
 import { citationRemarkPlugin } from '../citation/citation-remark-plugin';
 import { fencedDivRemarkPlugin } from '../fenced-div';
+import { listTablePlaceholder } from '../list-table/list-table-placeholder';
+import { withListTablePreview } from '../list-table/list-table-preview';
 import { createTestApi, focusBlockEditor, fulfillPendingFocus, registerBlockEditor, type EditorTestApi } from '../caret-mode-switch';
 import type { DebouncedSaver } from './editor/autosave';
 
@@ -55,7 +58,7 @@ function createBaseCrepe(root: HTMLElement, defaultValue: string): Crepe {
       [Crepe.Feature.Cursor]: { virtual: false },
       [Crepe.Feature.CodeMirror]: {
         theme: lightCodeBlockTheme,
-        extensions: [quartoChunkOptionPlugin],
+        extensions: [quartoChunkOptionPlugin, listTablePlaceholder],
       },
       [Crepe.Feature.BlockEdit]: {
         blockHandle: { shouldShow: () => false },
@@ -111,6 +114,14 @@ export function createCrepeConfig(options: CrepeConfigOptions): Crepe {
       quartoInlineCodePlugin,
       ...ps,
     ] as unknown as typeof ps);
+    // Render the table a `.list-table` div describes below its editable
+    // source. Chaining order with Crepe's LaTeX preview is irrelevant:
+    // each handler delegates languages it does not own to the previous
+    // one.
+    ctx.update(codeBlockConfig.key, (prev) => ({
+      ...prev,
+      renderPreview: withListTablePreview(prev.renderPreview),
+    }));
   });
   return crepe;
 }
