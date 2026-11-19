@@ -55,9 +55,18 @@ describe('runCommand — init', () => {
     expect(existsSync(join(dir, 'manuscripts', 'paper', 'article.qmd'))).toBe(true);
 
     const validate = await runCapture(['validate', dir]);
-    // A scaffold has no authors/abstract, so validate reports findings (exit 1) but not a usage error.
-    expect(validate.code).not.toBe(2);
+    // A scaffold has no authors/abstract, so validate reports warnings but no errors.
+    expect(validate.code).toBe(0);
     expect(validate.output).not.toContain('blocks/');
+  });
+
+  it('a freshly initialized project validates offline with exit code 0', async () => {
+    await runCapture(['init', dir, '--manuscript', 'paper']);
+
+    const validate = await runCapture(['validate', dir, '--offline']);
+
+    expect(validate.code).toBe(0);
+    expect(validate.output).not.toContain('A publication must have at least one creator.');
   });
 
   it('init pins protocol version and commit to the bundled history latest', async () => {

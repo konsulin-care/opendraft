@@ -1,19 +1,19 @@
 {
   "protocol": {
     "name": "opendraft",
-    "version": "ed768fe9db8b357494a08b11871dfd1315d11833",
+    "version": "2bdfb86592d0adfea9db8afececc8b3491fd014c",
     "repository": "https://github.com/konsulin-care/opendraft",
-    "commit": "ed768fe9db8b357494a08b11871dfd1315d11833",
+    "commit": "2bdfb86592d0adfea9db8afececc8b3491fd014c",
     "compatibleSince": "ed768fe9db8b357494a08b11871dfd1315d11833"
   },
   "artifacts": [
     {
       "path": "protocol/article-release.shacl.ttl",
-      "sha256": "5914adcf72edbaa8761e70c85bfd944382df4145159598e17a0e4141f0b68312"
+      "sha256": "3095d68065e2a881dd838dde04c16e45ddbc9bc374267876d2ecb84bf7feee09"
     },
     {
       "path": "protocol/article.shacl.ttl",
-      "sha256": "42acd946f331e8870b9f772aa21d49eac3ee7ff1b308a04e75506f361ebab583"
+      "sha256": "238165cae4b81c6dd5a0a1c8a97d005b08bb369046241d04ee8025487dc29c4e"
     },
     {
       "path": "protocol/examples/article.ttl",
