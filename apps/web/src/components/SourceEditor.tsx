@@ -6,6 +6,7 @@ import { autocompletion, completionKeymap as autocompleteCompletionKeymap, close
 import { searchKeymap as searchSearchKeymap } from '@codemirror/search';
 import { history, defaultKeymap, historyKeymap, undo as cmUndo, redo as cmRedo } from '@codemirror/commands';
 import { foldGutter, foldKeymap, indentOnInput, bracketMatching, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
+import { listTablePlaceholder } from '../list-table/list-table-placeholder';
 
 /** Imperative handle for SourceEditor — cursor, scroll, history, and view access. */
 export interface SourceEditorHandle {
@@ -181,7 +182,7 @@ function createState(
         ...autocompleteCompletionKeymap,
         ...searchSearchKeymap,
       ]),
-      ...(language === 'markdown' ? [markdown()] : []),
+      ...(language === 'markdown' ? [markdown(), listTablePlaceholder] : []),
       // Wrap long lines within the viewport instead of scrolling horizontally.
       EditorView.lineWrapping,
       lightEditorTheme,

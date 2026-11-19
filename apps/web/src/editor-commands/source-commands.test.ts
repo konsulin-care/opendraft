@@ -72,12 +72,43 @@ describe('createSourceCommands', () => {
     commands.taskList();
     commands.blockquote();
     commands.codeBlock();
-    commands.table();
     commands.hr();
     commands.image();
     expect(getText()).toBe('plain text');
   });
+});
 
+describe('createSourceCommands table()', () => {
+  it('table() inserts the list-table template on its own lines at the cursor', () => {
+    const { commands, getText, getView } = mountSource('plain text');
+    getView()?.dispatch({ selection: { anchor: 0 } });
+    commands.table();
+    expect(getText()).toBe('::: {.list-table}\n\n:::\nplain text');
+  });
+
+  it('after table() the source cursor sits on the blank body line', () => {
+    const { commands, getView } = mountSource('');
+    getView()?.dispatch({ selection: { anchor: 0 } });
+    commands.table();
+    const view = getView();
+    if (!view) throw new Error('view not mounted');
+    const line = view.state.doc.lineAt(view.state.selection.main.head);
+    expect(line.number).toBe(2);
+    expect(line.text).toBe('');
+  });
+
+  it('the source editor shows the list-table placeholder on the empty body after table()', () => {
+    const { commands, getText, getView } = mountSource('');
+    getView()?.dispatch({ selection: { anchor: 0 } });
+    commands.table();
+    const view = getView();
+    if (!view) throw new Error('view not mounted');
+    expect(view.dom.querySelector('.cm-list-table-placeholder')).not.toBeNull();
+    expect(getText()).not.toContain('Insert your table caption here');
+  });
+});
+
+describe('createSourceCommands history', () => {
   it('undo restores the previous text and redo reapplies the typed text', () => {
     const { commands, getText, type } = mountSource('');
     type('hello');
