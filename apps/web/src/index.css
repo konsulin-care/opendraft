@@ -63,6 +63,14 @@
   display: none;
 }
 
+/* ── Quarto div code blocks ── */
+/* A fenced div is edited as a code block; its language is fixed, so hide
+   the language picker and language button inside it. */
+.quarto-div-block .language-picker,
+.quarto-div-block .language-button {
+  display: none;
+}
+
 /* ── Quarto chunk option lines ── */
 /* Lines starting with #| in code blocks are Quarto chunk options.
    They should be slightly more visible than regular comments (#9ca3af)

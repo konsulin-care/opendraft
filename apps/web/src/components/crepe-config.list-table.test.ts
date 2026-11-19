@@ -83,6 +83,19 @@ const TABLE_DIV = [
   ':::',
 ].join('\n');
 
+/**
+ * Find a mounted code block by a marker in its rendered text.
+ *
+ * @param root - Mounted editor root element.
+ * @param marker - Text expected inside the block.
+ * @returns The matching code block element, if any.
+ */
+function findCodeBlock(root: HTMLElement, marker: string): HTMLElement | undefined {
+  return Array.from(root.querySelectorAll<HTMLElement>('.milkdown-code-block')).find((block) =>
+    block.textContent?.includes(marker),
+  );
+}
+
 beforeEach(() => {
   vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver);
 });
@@ -115,6 +128,21 @@ describe('createCrepeConfig — list-table preview panel', () => {
     });
 
     expect(root.querySelector('.preview-panel table')).toBeNull();
+  });
+
+  it('marks a quarto-div code block but not a python code block', async () => {
+    const { root } = await mountBody(
+      '::: {.callout-note}\n\nText\n:::\n\n```python\nprint(1)\n```',
+    );
+
+    await vi.waitFor(() => {
+      expect(findCodeBlock(root, 'callout-note')).not.toBeUndefined();
+    });
+
+    expect(findCodeBlock(root, 'callout-note')?.classList.contains('quarto-div-block')).toBe(
+      true,
+    );
+    expect(findCodeBlock(root, 'print(1)')?.classList.contains('quarto-div-block')).toBe(false);
   });
 
   it('renders no preview table for a non-list-table div', async () => {

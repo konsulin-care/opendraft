@@ -13,6 +13,7 @@ import { citationRemarkPlugin } from '../citation/citation-remark-plugin';
 import { fencedDivRemarkPlugin } from '../fenced-div';
 import { listTablePlaceholder } from '../list-table/list-table-placeholder';
 import { withListTablePreview } from '../list-table/list-table-preview';
+import { quartoDivDecoration } from '../list-table/quarto-div-decoration';
 import { createTestApi, focusBlockEditor, fulfillPendingFocus, registerBlockEditor, type EditorTestApi } from '../caret-mode-switch';
 import type { DebouncedSaver } from './editor/autosave';
 
@@ -88,6 +89,9 @@ export function createCrepeConfig(options: CrepeConfigOptions): Crepe {
   const crepe = createBaseCrepe(root, defaultValue);
   crepe.addFeature((editor) => {
     editor.use($prose(() => createCitationPlugin(workspace, onStateChangeRef.current, bibPath)));
+  });
+  crepe.addFeature((editor) => {
+    editor.use(quartoDivDecoration);
   });
   crepe.editor.config((ctx) => {
     ctx.update(remarkStringifyOptionsCtx, (options) => ({
