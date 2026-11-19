@@ -102,6 +102,13 @@ function violationPaths(report: ShaclValidationReport): (string | undefined)[] {
     .map((result) => result.path?.value);
 }
 
+/** Messages of every sh:Violation result in a report. */
+function violationMessages(report: ShaclValidationReport): string[] {
+  return report.results
+    .filter((result) => result.severity.value === SH_VIOLATION)
+    .flatMap((result) => result.message.map((m) => m.value));
+}
+
 beforeAll(async () => {
   articleShapes = await loadTurtle(ARTICLE_SHAPES);
   unionShapes = await loadTurtle(RELEASE_SHAPES);
@@ -125,5 +132,64 @@ describe('release profile (T26)', () => {
       `${OD}repositoryUrl`,
       `${OD}sourceRevision`,
     ]));
+  });
+});
+
+/**
+ * A draft publication with title, manuscript path and conformsTo but no
+ * dcterms:creator and no pro:isDocumentContextFor roles: the shape of a
+ * project straight out of `opendraft init`, which has no authors yet.
+ */
+const NO_AUTHORSHIP_DRAFT_TURTLE = `
+@prefix od: <${OD}> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix ex: <https://example.org/> .
+
+ex:no-authors
+    a od:Publication ;
+    dcterms:title "A draft without authors" ;
+    dcterms:license <http://creativecommons.org/licenses/by/4.0/> ;
+    od:manuscriptPath "manuscripts/paper/article.qmd" ;
+    dcterms:conformsTo <https://github.com/konsulin-care/opendraft/tree/0000000000000000000000000000000000000000/protocol> .
+`;
+
+/**
+ * The same graph marked as a release by a DOI dcterms:identifier, so the
+ * release shapes (including the authorship minimums) apply.
+ */
+const NO_AUTHORSHIP_RELEASE_TURTLE = `
+@prefix od: <${OD}> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix ex: <https://example.org/> .
+
+ex:no-authors
+    a od:Publication ;
+    dcterms:title "A draft without authors" ;
+    dcterms:license <http://creativecommons.org/licenses/by/4.0/> ;
+    dcterms:identifier "10.5281/zenodo.0000001" ;
+    od:manuscriptPath "manuscripts/paper/article.qmd" ;
+    dcterms:conformsTo <https://github.com/konsulin-care/opendraft/tree/0000000000000000000000000000000000000000/protocol> .
+`;
+
+describe('authorship minimums are release-only', () => {
+  it('a draft without creators or author roles conforms to article.shacl.ttl alone', async () => {
+    const data = await parseTurtle(NO_AUTHORSHIP_DRAFT_TURTLE);
+
+    const report = await validateShacl(data, articleShapes);
+
+    expect(violationPaths(report)).toEqual([]);
+    expect(report.conforms).toBe(true);
+  });
+
+  it('the same graph as a release violates the union on creator and corresponding author', async () => {
+    const data = await parseTurtle(NO_AUTHORSHIP_RELEASE_TURTLE);
+
+    const report = await validateShacl(data, unionShapes);
+    const messages = violationMessages(report);
+
+    expect(messages).toContain('A publication must have at least one creator.');
+    expect(messages).toContain(
+      'A publication must have at least one corresponding-author role whose holder has a foaf:mbox.',
+    );
   });
 });

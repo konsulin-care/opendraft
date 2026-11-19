@@ -4,7 +4,8 @@
 # Phase 01: full required field set plus optional-field capability shapes.
 # Provenance scalars live directly on od:Publication (see ADR-018).
 # Release-only constraints (identifier, FRBR work, od:repositoryUrl,
-# od:sourceRevision) live in protocol/article-release.shacl.ttl.
+# od:sourceRevision, and the authorship minimums) live in
+# protocol/article-release.shacl.ttl.
 # ADR-021: authorship follows the OCDM role model — every role node is
 # linked from the publication via pro:isDocumentContextFor, roles are
 # held by agents (pro:isHeldBy), and author order is an oco:hasNext
@@ -44,11 +45,6 @@ od:PublicationShape
         sh:minCount 1 ;
         sh:maxCount 1 ;
         sh:message "A publication must have exactly one title." ;
-    ] ;
-    sh:property [
-        sh:path dcterms:creator ;
-        sh:minCount 1 ;
-        sh:message "A publication must have at least one creator." ;
     ] ;
     sh:property [
         sh:path od:manuscriptPath ;
@@ -145,40 +141,18 @@ od:PublicationInfoShape
 # Authorship roles are pro:RoleInTime nodes reachable from the
 # publication via pro:isDocumentContextFor. The author order is a single
 # oco:hasNext chain between roles carrying pro:withRole pro:author.
+# The authorship minimums (at least one creator, at least one author
+# role, one chain head, one corresponding author with a mailbox) are
+# release-only and live in protocol/article-release.shacl.ttl: a draft
+# may still be gathering authors (ADR-026). The shapes here only
+# constrain roles that exist.
 # =============================================================================
 
 od:PublicationAuthorshipShape
     a sh:NodeShape ;
     sh:targetClass od:Publication ;
 
-    # At least one author role in the document context.
-    sh:property [
-        sh:path pro:isDocumentContextFor ;
-        sh:qualifiedValueShape [
-            sh:path pro:withRole ;
-            sh:hasValue pro:author ;
-        ] ;
-        sh:qualifiedMinCount 1 ;
-        sh:message "A publication must have at least one author role (pro:withRole pro:author)." ;
-    ] ;
-
-    # Exactly one author role heads the chain (no incoming oco:hasNext).
-    sh:property [
-        sh:path pro:isDocumentContextFor ;
-        sh:qualifiedValueShape [
-            a sh:NodeShape ;
-            sh:property [
-                sh:path pro:withRole ;
-                sh:hasValue pro:author ;
-            ] ;
-            sh:property [
-                sh:path [ sh:inversePath oco:hasNext ] ;
-                sh:maxCount 0 ;
-            ] ;
-        ] ;
-        sh:qualifiedMinCount 1 ;
-        sh:message "Exactly one author role must head the oco:hasNext author chain." ;
-    ] ;
+    # At most one author role heads the chain (no incoming oco:hasNext).
     sh:property [
         sh:path pro:isDocumentContextFor ;
         sh:qualifiedValueShape [
@@ -278,28 +252,6 @@ od:PublicationAuthorshipShape
         ] ;
         sh:qualifiedMaxCount 0 ;
         sh:message "An affiliate role must have exactly one organization with a foaf:name." ;
-    ] ;
-
-    # At least one corresponding-author role whose holder has a mailbox.
-    sh:property [
-        sh:path pro:isDocumentContextFor ;
-        sh:qualifiedValueShape [
-            a sh:NodeShape ;
-            sh:property [
-                sh:path pro:withRole ;
-                sh:hasValue scoro:corresponding-author ;
-            ] ;
-            sh:property [
-                sh:path pro:isHeldBy ;
-                sh:qualifiedValueShape [
-                    sh:path foaf:mbox ;
-                    sh:minCount 1 ;
-                ] ;
-                sh:qualifiedMinCount 1 ;
-            ] ;
-        ] ;
-        sh:qualifiedMinCount 1 ;
-        sh:message "A publication must have at least one corresponding-author role whose holder has a foaf:mbox." ;
     ] .
 
 # On-behalf-of authors are modeled as an extra scoro:agent role in the

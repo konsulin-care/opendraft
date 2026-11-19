@@ -6,7 +6,10 @@
 # od:Publication carries a DOI identifier (dcterms:identifier or
 # datacite:hasIdentifier) or realizes a fabio:Work via
 # frbr:realizationOf. Drafts may omit the repository URL and source
-# revision; releases must declare them.
+# revision; releases must declare them. The authorship minimums (at
+# least one creator, at least one author role, one oco:hasNext chain
+# head and one corresponding author with a mailbox) are release-only
+# too: a draft may still be gathering authors (ADR-026).
 # SHACL Core only (no SHACL-SPARQL); assumes one publication per graph.
 
 @prefix sh: <http://www.w3.org/ns/shacl#> .
@@ -18,6 +21,10 @@
 @prefix literal: <https://w3id.org/literal/> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix doco: <http://purl.org/spar/doco/> .
+@prefix pro: <http://purl.org/spar/pro/> .
+@prefix scoro: <http://purl.org/spar/scoro/> .
+@prefix oco: <https://w3id.org/oc/ontology/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
 
 # =============================================================================
 # Release Provenance Shape — repository URL and source revision
@@ -128,4 +135,75 @@ od:SectionSourceShape
         sh:path dcterms:source ;
         sh:minCount 1 ;
         sh:message "A release section must declare its dcterms:source block file IRI." ;
+    ] .
+
+# =============================================================================
+# Authorship Shape — releases must declare a complete authorship graph
+#
+# Split from od:PublicationShape and od:PublicationAuthorshipShape: a
+# draft may omit creators and roles entirely, while a release must
+# carry at least one dcterms:creator, an author role, exactly one head
+# of the oco:hasNext author chain and a corresponding author reachable
+# by email (ADR-021, ADR-026).
+# =============================================================================
+
+od:PublicationAuthorshipReleaseShape
+    a sh:NodeShape ;
+    sh:targetClass od:Publication ;
+
+    sh:property [
+        sh:path dcterms:creator ;
+        sh:minCount 1 ;
+        sh:message "A publication must have at least one creator." ;
+    ] ;
+
+    # At least one author role in the document context.
+    sh:property [
+        sh:path pro:isDocumentContextFor ;
+        sh:qualifiedValueShape [
+            sh:path pro:withRole ;
+            sh:hasValue pro:author ;
+        ] ;
+        sh:qualifiedMinCount 1 ;
+        sh:message "A publication must have at least one author role (pro:withRole pro:author)." ;
+    ] ;
+
+    # Exactly one author role heads the chain (no incoming oco:hasNext).
+    sh:property [
+        sh:path pro:isDocumentContextFor ;
+        sh:qualifiedValueShape [
+            a sh:NodeShape ;
+            sh:property [
+                sh:path pro:withRole ;
+                sh:hasValue pro:author ;
+            ] ;
+            sh:property [
+                sh:path [ sh:inversePath oco:hasNext ] ;
+                sh:maxCount 0 ;
+            ] ;
+        ] ;
+        sh:qualifiedMinCount 1 ;
+        sh:message "Exactly one author role must head the oco:hasNext author chain." ;
+    ] ;
+
+    # At least one corresponding-author role whose holder has a mailbox.
+    sh:property [
+        sh:path pro:isDocumentContextFor ;
+        sh:qualifiedValueShape [
+            a sh:NodeShape ;
+            sh:property [
+                sh:path pro:withRole ;
+                sh:hasValue scoro:corresponding-author ;
+            ] ;
+            sh:property [
+                sh:path pro:isHeldBy ;
+                sh:qualifiedValueShape [
+                    sh:path foaf:mbox ;
+                    sh:minCount 1 ;
+                ] ;
+                sh:qualifiedMinCount 1 ;
+            ] ;
+        ] ;
+        sh:qualifiedMinCount 1 ;
+        sh:message "A publication must have at least one corresponding-author role whose holder has a foaf:mbox." ;
     ] .
