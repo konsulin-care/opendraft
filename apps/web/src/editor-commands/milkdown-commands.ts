@@ -23,15 +23,12 @@ import {
   wrapInBlockTypeCommand,
   linkSchema,
 } from '@milkdown/kit/preset/commonmark';
-import {
-  createTable,
-  strikethroughSchema,
-  toggleStrikethroughCommand,
-} from '@milkdown/kit/preset/gfm';
+import { strikethroughSchema, toggleStrikethroughCommand } from '@milkdown/kit/preset/gfm';
 import { undoCommand, redoCommand } from '@milkdown/kit/plugin/history';
 import { toggleLinkCommand } from '@milkdown/kit/component/link-tooltip';
 import { imageBlockSchema } from '@milkdown/kit/component/image-block';
 import { useInstance } from '@milkdown/react';
+import { insertListTable } from '../list-table/insert-list-table';
 import { INACTIVE_STATE, type ActiveState, type BlockLevel, type EditorCommands } from './types';
 
 /**
@@ -170,11 +167,7 @@ function blockCommands(run: Run): BlockCommands {
       run((ctx) =>
         ctx.get(commandsCtx).call(setBlockTypeCommand.key, { nodeType: codeBlockSchema.type(ctx) }),
       ),
-    table: () =>
-      run((ctx) => {
-        const view = ctx.get(editorViewCtx);
-        view.dispatch(view.state.tr.replaceSelectionWith(createTable(ctx, 3, 3)));
-      }),
+    table: () => run((ctx) => insertListTable(ctx)),
     hr: () =>
       run((ctx) => ctx.get(commandsCtx).call(addBlockTypeCommand.key, { nodeType: hrSchema.type(ctx) })),
     image: () =>
