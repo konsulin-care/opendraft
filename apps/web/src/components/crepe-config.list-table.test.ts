@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Ctx } from '@milkdown/kit/ctx';
 import { editorViewCtx } from '@milkdown/kit/core';
 import { TextSelection } from '@milkdown/kit/prose/state';
 import type { EditorView } from '@milkdown/kit/prose/view';
 import { MemoryWorkspace } from '@opendraft/workspace';
+import { LIST_TABLE_TEMPLATE } from '../list-table/insert-list-table';
+import { buildListTableMenu } from '../list-table/list-table-slash-item';
 import { createCrepeConfig } from './crepe-config';
 
 /**
@@ -51,13 +54,7 @@ interface Mounted {
 
 let mounted: Mounted | null = null;
 
-/**
- * Mount a Crepe instance configured the way a block body is, seeded with
- * the given source.
- *
- * @param body - Block body markdown seeded into the editor.
- * @returns The mounted instance and its root element.
- */
+/** Mount a Crepe instance configured the way a block body is. */
 async function mountBody(body: string): Promise<Mounted> {
   const root = document.createElement('div');
   document.body.appendChild(root);
@@ -86,23 +83,12 @@ interface TypingResult {
   paragraphText: string | null;
 }
 
-/**
- * Read the ProseMirror view of a mounted Crepe instance.
- *
- * @param crepe - Mounted Crepe instance.
- * @returns Its ProseMirror view.
- */
+/** Read the ProseMirror view of a mounted Crepe instance. */
 function getView(crepe: Mounted['crepe']): EditorView {
   return crepe.editor.action((ctx) => ctx.get(editorViewCtx));
 }
 
-/**
- * Append text to the last paragraph and put the cursor after it.
- *
- * @param view - ProseMirror view to mutate.
- * @param text - Text to insert.
- * @returns The cursor position after the inserted text, or -1.
- */
+/** Append text to the last paragraph and put the cursor after it. */
 function insertIntoLastParagraph(view: EditorView, text: string): number {
   let from = -1;
   view.state.doc.descendants((node, pos) => {
@@ -115,12 +101,7 @@ function insertIntoLastParagraph(view: EditorView, text: string): number {
   return from + text.length;
 }
 
-/**
- * Find the first quarto-div code block in the document.
- *
- * @param view - ProseMirror view to inspect.
- * @returns Block text, language and cursor offset from content start.
- */
+/** Find the first quarto-div code block in the document. */
 function findDivBlock(view: EditorView): DivBlockInfo | undefined {
   let info: DivBlockInfo | undefined;
   view.state.doc.descendants((node, pos) => {
@@ -132,12 +113,7 @@ function findDivBlock(view: EditorView): DivBlockInfo | undefined {
   return info;
 }
 
-/**
- * Read the last paragraph's text.
- *
- * @param view - ProseMirror view to inspect.
- * @returns Paragraph text, or null when the document has none.
- */
+/** Read the last paragraph's text. */
 function lastParagraphText(view: EditorView): string | null {
   let text: string | null = null;
   view.state.doc.descendants((node) => {
@@ -146,14 +122,7 @@ function lastParagraphText(view: EditorView): string | null {
   return text;
 }
 
-/**
- * Insert a fence prefix into the last paragraph, then type a space
- * through the input-rule handler exactly as the browser would.
- *
- * @param body - Seed markdown for the mounted editor.
- * @param prefix - Fence text typed into the last paragraph.
- * @returns Whether the rule handled the space and the resulting document.
- */
+/** Type a fence prefix and a space through the input-rule handler. */
 async function typeFence(body: string, prefix: string): Promise<TypingResult> {
   const { crepe } = await mountBody(body);
   const view = getView(crepe);
@@ -183,17 +152,34 @@ const TABLE_DIV = [
   ':::',
 ].join('\n');
 
-/**
- * Find a mounted code block by a marker in its rendered text.
- *
- * @param root - Mounted editor root element.
- * @param marker - Text expected inside the block.
- * @returns The matching code block element, if any.
- */
+/** Find a mounted code block by a marker in its rendered text. */
 function findCodeBlock(root: HTMLElement, marker: string): HTMLElement | undefined {
   return Array.from(root.querySelectorAll<HTMLElement>('.milkdown-code-block')).find((block) =>
     block.textContent?.includes(marker),
   );
+}
+
+/** Slash-item fields captured from a fake group builder. */
+interface CapturedSlashItem {
+  key: string;
+  label: string;
+  icon: string;
+  onRun: (ctx: Ctx) => void;
+}
+
+/** Run buildListTableMenu against a fake builder and capture its item. */
+function captureListTableItem(): CapturedSlashItem {
+  let captured: CapturedSlashItem | null = null;
+  buildListTableMenu({
+    getGroup: () => ({
+      addItem: (key, item) => {
+        captured = { key, ...item };
+        return undefined;
+      },
+    }),
+  });
+  if (!captured) throw new Error('list-table item not captured');
+  return captured;
 }
 
 beforeEach(() => {
@@ -253,6 +239,26 @@ describe('createCrepeConfig — list-table preview panel', () => {
     });
 
     expect(root.querySelector('.preview-panel table')).toBeNull();
+  });
+});
+
+describe('createCrepeConfig — list-table slash item', () => {
+  it('adds a Table item to the advanced slash-menu group', () => {
+    const item = captureListTableItem();
+    expect(item.key).toBe('list-table');
+    expect(item.label).toBe('Table');
+    expect(item.icon).toContain('<svg');
+  });
+
+  it('replaces the slash paragraph with the quarto-div template when run', async () => {
+    const item = captureListTableItem();
+    const { crepe } = await mountBody('/');
+    const view = getView(crepe);
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 1, 2)));
+    crepe.editor.action((ctx) => item.onRun(ctx));
+    expect(findDivBlock(view)?.language).toBe('quarto-div');
+    expect(findDivBlock(view)?.text).toBe(LIST_TABLE_TEMPLATE);
+    expect(lastParagraphText(view) ?? '').not.toContain('/');
   });
 });
 

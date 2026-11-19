@@ -15,6 +15,7 @@ import { listTablePlaceholder } from '../list-table/list-table-placeholder';
 import { withListTablePreview } from '../list-table/list-table-preview';
 import { quartoDivDecoration } from '../list-table/quarto-div-decoration';
 import { fencedDivInputRule } from '../list-table/fenced-div-input-rule';
+import { buildListTableMenu } from '../list-table/list-table-slash-item';
 import { createTestApi, focusBlockEditor, fulfillPendingFocus, registerBlockEditor, type EditorTestApi } from '../caret-mode-switch';
 import type { DebouncedSaver } from './editor/autosave';
 
@@ -70,6 +71,10 @@ function createBaseCrepe(root: HTMLElement, defaultValue: string): Crepe {
         // registered in BlockBody is the backstop for every other
         // heading-1 path (input rule, command, paste).
         textGroup: { h1: null },
+        // Replace Crepe's stock pipe-table slash entry with the
+        // Quarto list-table template; the GFM table feature stays on.
+        advancedGroup: { table: null },
+        buildMenu: buildListTableMenu,
       },
     },
   });
