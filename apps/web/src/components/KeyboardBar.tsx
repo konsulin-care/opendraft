@@ -2,8 +2,15 @@ import { AtSign, List, Pilcrow, Plus, Redo2, Undo2 } from 'lucide-react';
 import { ToolbarButton } from './ToolbarButton';
 import { ToolbarMenu } from './ToolbarMenu';
 import { headingItems, insertItems } from './FormattingToolbar';
+import { TOOLBAR_ITEMS } from './toolbar-items';
 import { useActiveState } from '../hooks/useActiveState';
 import type { ActiveState, EditorCommands } from '../editor-commands/types';
+
+/** Insert-menu labels that remain available in source mode. */
+const SOURCE_INSERT_LABELS: ReadonlySet<string> = new Set(
+  TOOLBAR_ITEMS.filter((item) => item.group === 'insert' && item.sourceEnabled === true)
+    .map((item) => item.label),
+);
 
 /** Props for {@link KeyboardBar}. */
 export interface KeyboardBarProps {
@@ -26,14 +33,19 @@ interface FormattingControlsProps {
 }
 
 /**
- * Paragraph style, Bullet list, Citation, and Insert controls. Disabled in
- * source mode (`canFormat` false) while reporting toggle state via aria.
+ * Paragraph style, Bullet list, Citation, and Insert controls. Formatting
+ * controls are disabled in source mode (`canFormat` false) while reporting
+ * toggle state via aria; Insert stays enabled and offers only source-enabled
+ * entries such as Table.
  *
  * @param props - See {@link FormattingControlsProps}.
  * @returns The formatting controls fragment.
  */
 function FormattingControls({ commands, active, run }: FormattingControlsProps) {
   const disabled = !commands.canFormat;
+  const insertMenuItems = insertItems(commands, run).filter(
+    (item) => commands.canFormat || SOURCE_INSERT_LABELS.has(item.label),
+  );
   return (
     <>
       <ToolbarMenu
@@ -55,7 +67,7 @@ function FormattingControls({ commands, active, run }: FormattingControlsProps) 
         disabled={disabled}
         onClick={() => run(commands.insertCitation)}
       />
-      <ToolbarMenu label="Insert" icon={Plus} items={insertItems(commands, run)} disabled={disabled} />
+      <ToolbarMenu label="Insert" icon={Plus} items={insertMenuItems} />
     </>
   );
 }

@@ -50,12 +50,10 @@ beforeEach(() => { vi.clearAllMocks(); overflow.visibleCount = 6; });
 describe('FormattingToolbar inline row (visible count 6)', () => {
   it('renders the first six items inline in priority order, then More, no Insert', () => {
     const { container } = render(<FormattingToolbar commands={fakeCommands()} />);
-    const names = inlineNames(container);
-    expect(names).toEqual([...INLINE_6, 'More']);
+    expect(inlineNames(container)).toEqual([...INLINE_6, 'More']);
     expect(screen.queryByRole('button', { name: 'Insert' })).toBeNull();
   });
 });
-
 describe('FormattingToolbar dividers (visible groups only)', () => {
   it('renders dividers only between adjacent visible groups, never at row ends', () => {
     const { container } = render(<FormattingToolbar commands={fakeCommands()} />);
@@ -73,7 +71,6 @@ describe('FormattingToolbar dividers (visible groups only)', () => {
     expect(screen.queryByRole('button', { name: 'Bold' })).toBeNull();
   });
 });
-
 describe('FormattingToolbar pinned Paragraph style', () => {
   it('stays inline at visible count 1 and never appears in More', () => {
     overflow.visibleCount = 1;
@@ -83,14 +80,12 @@ describe('FormattingToolbar pinned Paragraph style', () => {
     expect(within(screen.getByRole('menu')).queryByRole('menuitem', { name: 'Paragraph style' })).toBeNull();
   });
 });
-
 describe('FormattingToolbar More menu', () => {
   it('lists the hidden items by aria-label when opened', () => {
     render(<FormattingToolbar commands={fakeCommands()} />);
     fireEvent.click(screen.getByRole('button', { name: 'More' }));
     expect(within(screen.getByRole('menu')).getAllByRole('menuitem').map((item) => item.getAttribute('aria-label'))).toEqual(HIDDEN_6);
   });
-
   it('reaches Image, Table, Code block, and Rule through More when they overflow', () => {
     const commands = fakeCommands();
     render(<FormattingToolbar commands={commands} />);
@@ -104,7 +99,6 @@ describe('FormattingToolbar More menu', () => {
     expect(commands.table).toHaveBeenCalledTimes(1);
   });
 });
-
 describe('FormattingToolbar More active state (collapsed format)', () => {
   it('marks More pressed with the active class when the active format is collapsed', () => {
     render(<FormattingToolbar commands={fakeCommands({ ...INACTIVE_STATE, link: true })} />);
@@ -118,7 +112,6 @@ describe('FormattingToolbar More active state (collapsed format)', () => {
     expect(screen.getByRole('button', { name: 'More' })).toHaveAttribute('aria-pressed', 'false');
   });
 });
-
 describe('FormattingToolbar More menu overflow entries', () => {
   it('shows Strikethrough inline but Citation and Inline math in More', () => {
     const { container } = render(<FormattingToolbar commands={fakeCommands()} />);
@@ -150,7 +143,6 @@ describe('FormattingToolbar More menu overflow entries', () => {
     expect(screen.queryByRole('button', { name: 'More' })).toBeNull();
   });
 });
-
 describe('FormattingToolbar button behavior', () => {
   it('clicking Bold calls toggleBold', () => {
     const commands = fakeCommands();
@@ -158,7 +150,6 @@ describe('FormattingToolbar button behavior', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Bold' }));
     expect(commands.toggleBold).toHaveBeenCalledTimes(1);
   });
-
   it('marks Bold pressed with the shared active class when the state reports bold', () => {
     render(<FormattingToolbar commands={fakeCommands({ ...INACTIVE_STATE, bold: true })} />);
     const bold = screen.getByRole('button', { name: 'Bold' });
@@ -175,7 +166,6 @@ describe('FormattingToolbar button behavior', () => {
     expect(fireEvent.pointerDown(bold)).toBe(false);
   });
 });
-
 describe('FormattingToolbar menus', () => {
   it('Paragraph style menu offers exactly Paragraph, Heading 2 and Heading 3', () => {
     const commands = fakeCommands();
@@ -186,15 +176,35 @@ describe('FormattingToolbar menus', () => {
     expect(items[0]).toHaveAttribute('aria-checked', 'true');
   });
 });
-
 describe('FormattingToolbar in source mode (canFormat false)', () => {
-  it('disables visible formatting controls but keeps Undo and Redo enabled', () => {
+  it('disables visible formatting controls but keeps Undo, Redo and More enabled', () => {
     render(<FormattingToolbar commands={fakeCommands(INACTIVE_STATE, false)} />);
-    for (const name of [...INLINE_6.slice(2), 'More']) expect(screen.getByRole('button', { name }), name).toBeDisabled();
-    for (const name of ['Undo', 'Redo']) expect(screen.getByRole('button', { name })).toBeEnabled();
+    for (const name of INLINE_6.slice(2)) expect(screen.getByRole('button', { name }), name).toBeDisabled();
+    for (const name of ['Undo', 'Redo', 'More']) expect(screen.getByRole('button', { name })).toBeEnabled();
+  });
+
+  it('keeps the inline Table button enabled while other formatting buttons stay disabled', () => {
+    overflow.visibleCount = TOOLBAR_ITEMS.length;
+    const commands = fakeCommands(INACTIVE_STATE, false);
+    render(<FormattingToolbar commands={commands} />);
+    expect(screen.getByRole('button', { name: 'Table' })).toBeEnabled();
+    for (const name of ['Paragraph style', 'Bold', 'Italic', 'Image', 'Code block', 'Rule']) {
+      expect(screen.getByRole('button', { name }), name).toBeDisabled();
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Table' }));
+    expect(commands.table).toHaveBeenCalledTimes(1);
+  });
+
+  it('enables More with only Table when Table overflows, and Table calls table()', () => {
+    const commands = fakeCommands(INACTIVE_STATE, false);
+    render(<FormattingToolbar commands={commands} />);
+    fireEvent.click(screen.getByRole('button', { name: 'More' }));
+    const items = within(screen.getByRole('menu')).getAllByRole('menuitem');
+    expect(items.map((item) => item.getAttribute('aria-label'))).toEqual(['Table']);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Table' }));
+    expect(commands.table).toHaveBeenCalledTimes(1);
   });
 });
-
 describe('FormattingToolbar visibility and responsiveness', () => {
   it('renders the formatting toolbar in wysiwyg mode without a formattingToolbar prop', () => {
     const { container } = render(<EditorToolbars commands={fakeCommands()} />);
@@ -215,7 +225,6 @@ describe('FormattingToolbar visibility and responsiveness', () => {
     expect(row).not.toMatch(/\b(w-\[80%\]|w-full|px-4)\b/);
   });
 });
-
 describe('FormattingToolbar collapse transition', () => {
   it('wraps the toolbar in the collapse container, open in wysiwyg mode', () => {
     const { container } = render(<EditorToolbars commands={fakeCommands()} />);
@@ -223,7 +232,6 @@ describe('FormattingToolbar collapse transition', () => {
     expect(wrap.className).toContain('is-open');
     expect(wrap.querySelector('[role="toolbar"]')).not.toBeNull();
   });
-
   it('collapses over 150 ms: mounted while closing, unmounted after the timer', () => {
     vi.useFakeTimers();
     try {
@@ -238,7 +246,6 @@ describe('FormattingToolbar collapse transition', () => {
     } finally { vi.useRealTimers(); }
   });
 });
-
 describe('index.css responsive layout (source scan)', () => {
   const css = readFileSync(resolve(__dirname, '../index.css'), 'utf-8');
   const toolbar = readFileSync(resolve(__dirname, 'FormattingToolbar.tsx'), 'utf-8');
@@ -265,7 +272,6 @@ describe('index.css responsive layout (source scan)', () => {
     expect(menu).not.toMatch(/"[^"]*lg:/);
   });
 });
-
 describe('Responsive header actions (source scan)', () => {
   const read = (name: string) => readFileSync(resolve(__dirname, name), 'utf-8');
 
@@ -274,13 +280,11 @@ describe('Responsive header actions (source scan)', () => {
     expect(read('AppHeader.tsx')).toMatch(/className=\{COMMIT_BUTTON\}/);
     expect(read('HeaderOverflowMenu.tsx')).toMatch(/className="relative md:hidden"/);
   });
-
   it('renders no mode switch anywhere in the header sources', () => {
     expect(read('AppHeader.tsx')).not.toContain('ModeSwitch');
     expect(read('HeaderOverflowMenu.tsx')).not.toContain('onSelectMode');
   });
 });
-
 describe('Crepe selection toolbar stays enabled (source scan)', () => {
   const crepeConfigSource = readFileSync(resolve(__dirname, 'crepe-config.ts'), 'utf8');
 
