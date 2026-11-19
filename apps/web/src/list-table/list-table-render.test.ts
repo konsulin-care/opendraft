@@ -61,6 +61,58 @@ describe('renderListTable — header and body rows', () => {
   });
 });
 
+describe('renderListTable — spans and alignment', () => {
+  it('emits colspan and rowspan attributes on cells whose span exceeds 1', () => {
+    const spanned: ListTableCell = {
+      children: [{ type: 'paragraph', children: [{ type: 'text', value: 'wide' }] }],
+      colspan: 2,
+      rowspan: 3,
+    };
+    const html = renderListTable(table({ rows: [[spanned], [cell('a')]] }));
+    expect(html).toContain('<th colspan="2" rowspan="3"><p>wide</p></th>');
+    expect(html).not.toContain('<td colspan=');
+  });
+
+  it('applies text-align per column with column indexes shifted by colspans and active rowspans', () => {
+    const spanning: ListTableCell = {
+      children: [{ type: 'paragraph', children: [{ type: 'text', value: 'span' }] }],
+      colspan: 2,
+      rowspan: 2,
+    };
+    const html = renderListTable(
+      table({
+        headerRows: 0,
+        aligns: ['left', 'center', 'right'],
+        rows: [
+          [spanning, cell('x')],
+          [cell('y'), cell('z')],
+        ],
+      }),
+    );
+    // First row: the span covers columns 0-1, so `x` lands on column 2.
+    expect(html).toContain('<td colspan="2" rowspan="2" style="text-align:left">');
+    expect(html).toContain('<td style="text-align:right"><p>x</p></td>');
+    // Second row: the active rowspan shifts `y` and `z` to columns 2 and 3.
+    expect(html).toContain('<td style="text-align:right"><p>y</p></td>');
+    expect(html).toContain('<td><p>z</p></td>');
+  });
+});
+
+describe('renderListTable — colgroup', () => {
+  it('emits a colgroup with col widths normalized to percentages of the tbl-colwidths sum', () => {
+    const html = renderListTable(table({ colwidths: [75, 25] }));
+    expect(html).toContain('<colgroup><col style="width:75%"><col style="width:25%"></colgroup>');
+
+    const uneven = renderListTable(table({ colwidths: [1, 3] }));
+    expect(uneven).toContain('<col style="width:25%">');
+    expect(uneven).toContain('<col style="width:75%">');
+  });
+
+  it('omits the colgroup when no widths are declared', () => {
+    expect(renderListTable(table())).not.toContain('<colgroup>');
+  });
+});
+
 describe('renderListTable — caption', () => {
   it('renders a caption element containing the id label and the caption content', () => {
     const caption: MdNode[] = [{ type: 'text', value: 'A & B' }];
