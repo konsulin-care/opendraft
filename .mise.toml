@@ -120,15 +120,14 @@ depends = ["build-cli"]
 run = "bash packages/cli/scripts/smoke.sh"
 
 [tasks.publish]
-description = "Bump the CLI version and publish it (mise run publish [patch|minor|major])"
-dir = "packages/cli"
+description = "Bump the CLI version, publish it, and roll back on failure (mise run publish [patch|minor|major])"
 depends = ["smoke-cli"]
 usage = '''
 arg "[bump]" default="patch" help="Version increment passed to pnpm version" {
   choices "patch" "minor" "major"
 }
 '''
-run = "pnpm version \"${usage_bump?}\" && pnpm publish"
+run = "bash scripts/publish-cli.sh \"${usage_bump?}\""
 
 [tasks.cli]
 description = "Run the OpenDraft CLI from source (mise run cli -- validate)"
