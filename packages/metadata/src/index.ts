@@ -2,7 +2,6 @@
  * YAML metadata parsing, validation, and compilation for OpenDraft manuscripts.
  */
 
-export { compileManuscript } from './compiler.js';
 export { normalizeOrcid, normalizeRor, normalizeDoi } from './rdf/identifiers.js';
 export type { NormalizedIdentifier } from './rdf/identifiers.js';
 export { emitAuthorshipGraph } from './rdf/authorship-graph.js';
@@ -10,7 +9,6 @@ export type { AuthorshipGraphInput } from './rdf/authorship-graph.js';
 export { compilePublicationGraph } from './rdf/publication-graph.js';
 export { compileManuscriptGraph } from './rdf/manuscript-graph.js';
 export type { PublicationGraphInput, PublicationSubject } from './rdf/publication-graph.js';
-export type { PublicationMetadata } from './compiler.js';
 export { compileArticle } from './article-compiler.js';
 export { loadManuscriptSnapshot } from './snapshot.js';
 export type {
@@ -19,8 +17,6 @@ export type {
   SnapshotEntry,
   SnapshotSection,
 } from './snapshot.js';
-export { migrateToBlockLayout } from './migration.js';
-export type { MigrationResult } from './migration.js';
 
 // Re-export generated types from JSON schemas
 export type {
