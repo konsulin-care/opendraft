@@ -9,8 +9,7 @@ import { createCitationPlugin } from '../citation/plugin';
 import type { CitationState } from '../citation/types';
 import { quartoRemarkPlugin, quartoInlineCodePlugin, quartoChunkOptionPlugin, quartoCodeHandler } from '../quarto-syntax';
 import { citationRemarkPlugin } from '../citation/citation-remark-plugin';
-import { fencedDivHandler, fencedDivRemarkPlugin } from '../fenced-div';
-import { fencedDivNode } from '../fenced-div-node';
+import { fencedDivRemarkPlugin } from '../fenced-div';
 import { createTestApi, focusBlockEditor, fulfillPendingFocus, registerBlockEditor, type EditorTestApi } from '../caret-mode-switch';
 import type { DebouncedSaver } from './editor/autosave';
 
@@ -87,22 +86,17 @@ export function createCrepeConfig(options: CrepeConfigOptions): Crepe {
   crepe.addFeature((editor) => {
     editor.use($prose(() => createCitationPlugin(workspace, onStateChangeRef.current, bibPath)));
   });
-  // Verbatim Pandoc fenced-div node; must be queued before create()
-  // so nodesCtx carries it when SchemaReady builds the schema.
-  crepe.addFeature((editor) => {
-    editor.use(fencedDivNode);
-  });
   crepe.editor.config((ctx) => {
     ctx.update(remarkStringifyOptionsCtx, (options) => ({
       ...options,
       bullet: '-' as const,
       // Custom `code` handler emits fence info verbatim (Quarto
       // headers like `{r label, echo=FALSE}` get mangled by the
-      // stock handler's unsafe rules). `fencedDiv` prints captured
-      // Pandoc div source byte-for-byte. Spread so Milkdown's
+      // stock handler's unsafe rules) and prints `quarto-div` fenced
+      // div source byte-for-byte. Spread so Milkdown's
       // text/strong/emphasis customizations survive; its defaults
       // carry no code entry.
-      handlers: { ...options.handlers, code: quartoCodeHandler, fencedDiv: fencedDivHandler },
+      handlers: { ...options.handlers, code: quartoCodeHandler },
     }));
     // Register remark plugins here, at ConfigReady: the editor reduces
     // remarkPluginsCtx into the processor exactly once at SchemaReady,
