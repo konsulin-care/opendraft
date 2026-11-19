@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-# Smoke-test the packaged CLI: build, pack, install into a temp dir, then
-# run `opendraft init` and `opendraft validate` against the installed bin.
+# Smoke-test the packaged CLI: pack, install into a temp dir, then run
+# `opendraft init` and `opendraft validate` against the installed bin.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 CLI_DIR="$ROOT/packages/cli"
 
-# Fresh bundle so the tarball ships the current sources.
-(cd "$CLI_DIR" && pnpm run build)
+# The bundle comes from `mise run build-cli` (smoke-cli depends on it).
+if [ ! -f "$CLI_DIR/dist/index.js" ]; then
+  echo "smoke: $CLI_DIR/dist/index.js is missing; run \`mise run build-cli\` first" >&2
+  exit 1
+fi
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT

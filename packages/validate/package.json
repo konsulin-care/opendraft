@@ -1,0 +1,21 @@
+{
+  "name": "@opendraft/validate",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Project, manuscript and RDF validation shared by the OpenDraft CLI and web app.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
+  "dependencies": {
+    "@opendraft/manuscript": "workspace:*",
+    "@opendraft/metadata": "workspace:*",
+    "@opendraft/rdf": "workspace:*",
+    "@opendraft/references": "workspace:*",
+    "@opendraft/schema": "workspace:*",
+    "@opendraft/workspace": "workspace:*",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": { "typescript": "^6.0.3", "vitest": "^5.0.5" }
+}

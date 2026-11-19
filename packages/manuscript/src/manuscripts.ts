@@ -9,11 +9,9 @@
  * other existing entries.
  */
 import type { WorkspaceAdapter } from '@opendraft/workspace';
+import { MANUSCRIPT_ID_PATTERN } from '@opendraft/schema';
 import { parse, stringify } from 'yaml';
 import { OPENDRAFT_CONFIG_PATH } from './scaffold.js';
-
-/** Manuscript id pattern: lowercase alphanumeric groups joined by hyphens. */
-const MANUSCRIPT_ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /** Build the container article text (metadata frontmatter + refs fence). */
 function containerArticle(): string {

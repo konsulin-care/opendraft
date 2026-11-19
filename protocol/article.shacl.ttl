@@ -3,6 +3,9 @@
 # Validates that an article RDF graph conforms to the OpenDraft protocol.
 # Phase 01: full required field set plus optional-field capability shapes.
 # Provenance scalars live directly on od:Publication (see ADR-018).
+# Release-only constraints (identifier, FRBR work, od:repositoryUrl,
+# od:sourceRevision, and the authorship minimums) live in
+# protocol/article-release.shacl.ttl.
 # ADR-021: authorship follows the OCDM role model — every role node is
 # linked from the publication via pro:isDocumentContextFor, roles are
 # held by agents (pro:isHeldBy), and author order is an oco:hasNext
@@ -10,9 +13,12 @@
 # SHACL Core only (no SHACL-SPARQL); assumes one publication per graph.
 
 @prefix sh: <http://www.w3.org/ns/shacl#> .
-@prefix od: <urn:opendraft:ontology#> .
+@prefix od: <https://w3id.org/opendraft/ontology#> .
 @prefix fabio: <http://purl.org/spar/fabio/> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix doco: <http://purl.org/spar/doco/> .
+@prefix deo: <http://purl.org/spar/deo/> .
 @prefix pro: <http://purl.org/spar/pro/> .
 @prefix scoro: <http://purl.org/spar/scoro/> .
 @prefix oco: <https://w3id.org/oc/ontology/> .
@@ -41,18 +47,6 @@ od:PublicationShape
         sh:message "A publication must have exactly one title." ;
     ] ;
     sh:property [
-        sh:path dcterms:creator ;
-        sh:minCount 1 ;
-        sh:message "A publication must have at least one creator." ;
-    ] ;
-    sh:property [
-        sh:path od:repositoryUrl ;
-        sh:datatype xsd:anyURI ;
-        sh:minCount 1 ;
-        sh:maxCount 1 ;
-        sh:message "A publication must have exactly one repository URL with datatype xsd:anyURI." ;
-    ] ;
-    sh:property [
         sh:path od:manuscriptPath ;
         sh:datatype xsd:string ;
         sh:minCount 1 ;
@@ -60,89 +54,21 @@ od:PublicationShape
         sh:message "A publication must have exactly one manuscript path." ;
     ] ;
     sh:property [
-        sh:path od:sourceRevision ;
-        sh:datatype xsd:string ;
+        sh:path dcterms:conformsTo ;
+        sh:nodeKind sh:IRI ;
         sh:minCount 1 ;
         sh:maxCount 1 ;
-        sh:pattern "^[0-9a-f]{40}$" ;
-        sh:message "A publication must have exactly one source revision: a 40-character hexadecimal Git commit SHA." ;
+        sh:pattern "^https://github\\.com/[^/]+/[^/]+/tree/[0-9a-f]{40}/protocol$" ;
+        sh:message "A publication must have exactly one dcterms:conformsTo IRI: https://github.com/<owner>/<repo>/tree/<40-character SHA>/protocol." ;
     ] ;
     sh:property [
-        sh:path od:protocolRevision ;
-        sh:datatype xsd:string ;
-        sh:minCount 1 ;
-        sh:maxCount 1 ;
-        sh:pattern "^[0-9a-f]{40}$" ;
-        sh:message "A publication must have exactly one protocol revision: a 40-character hexadecimal Git commit SHA." ;
+        sh:path dcterms:hasPart ;
+        sh:class doco:Section ;
+        sh:message "dcterms:hasPart values must be doco:Section nodes." ;
     ] .
-    # Identifier requirement lives in od:PublicationIdentifierShape below:
-    # either dcterms:identifier or an OCDM datacite:hasIdentifier node.
-
-# =============================================================================
-# Work / Version Shape — FRBR Work–Expression model (ADR-021)
-#
-# The manuscript is a fabio:Work (concept DOI); each published version
-# is an od:Publication that realizes exactly one Work and may revise at
-# most one earlier version. A publication IRI can never double as its
-# own Work IRI (concept and version DOIs must differ).
-# =============================================================================
-
-od:PublicationWorkShape
-    a sh:NodeShape ;
-    sh:targetClass od:Publication ;
-
-    sh:property [
-        sh:path frbr:realizationOf ;
-        sh:minCount 1 ;
-        sh:maxCount 1 ;
-        sh:qualifiedValueShape [
-            a sh:NodeShape ;
-            sh:class fabio:Work ;
-        ] ;
-        sh:qualifiedMinCount 1 ;
-        sh:message "A publication must have exactly one frbr:realizationOf pointing to a fabio:Work." ;
-    ] ;
-    sh:property [
-        sh:path frbr:revisionOf ;
-        sh:maxCount 1 ;
-        sh:message "A publication may revise at most one earlier version (frbr:revisionOf)." ;
-    ] ;
-    sh:not [
-        a sh:NodeShape ;
-        sh:class fabio:Work ;
-    ] ;
-    sh:message "A publication IRI must differ from its Work IRI: an od:Publication may not also be a fabio:Work." .
-
-# =============================================================================
-# Identifier Shape — classic dcterms:identifier or OCDM identifier nodes
-# =============================================================================
-
-od:PublicationIdentifierShape
-    a sh:NodeShape ;
-    sh:targetClass od:Publication ;
-
-    sh:property [
-        sh:path datacite:hasIdentifier ;
-        sh:node [
-            a sh:NodeShape ;
-            sh:property [
-                sh:path datacite:usesIdentifierScheme ;
-                sh:minCount 1 ;
-                sh:message "An OCDM identifier node must declare datacite:usesIdentifierScheme." ;
-            ] ;
-            sh:property [
-                sh:path literal:hasLiteralValue ;
-                sh:minCount 1 ;
-                sh:message "An OCDM identifier node must declare literal:hasLiteralValue." ;
-            ] ;
-        ] ;
-        sh:message "A datacite:hasIdentifier node must declare a scheme and a literal value." ;
-    ] ;
-    sh:or (
-        [ sh:property [ sh:path dcterms:identifier ; sh:minCount 1 ] ]
-        [ sh:property [ sh:path datacite:hasIdentifier ; sh:minCount 1 ] ]
-    ) ;
-    sh:message "A publication must declare at least one identifier: dcterms:identifier or an OCDM datacite:hasIdentifier node." .
+    # Release-only constraints (identifier, frbr:realizationOf,
+    # od:repositoryUrl, od:sourceRevision) live in
+    # protocol/article-release.shacl.ttl; drafts validate without them.
 
 # =============================================================================
 # License and Citation Shapes — warnings (do not affect conformance)
@@ -215,40 +141,18 @@ od:PublicationInfoShape
 # Authorship roles are pro:RoleInTime nodes reachable from the
 # publication via pro:isDocumentContextFor. The author order is a single
 # oco:hasNext chain between roles carrying pro:withRole pro:author.
+# The authorship minimums (at least one creator, at least one author
+# role, one chain head, one corresponding author with a mailbox) are
+# release-only and live in protocol/article-release.shacl.ttl: a draft
+# may still be gathering authors (ADR-026). The shapes here only
+# constrain roles that exist.
 # =============================================================================
 
 od:PublicationAuthorshipShape
     a sh:NodeShape ;
     sh:targetClass od:Publication ;
 
-    # At least one author role in the document context.
-    sh:property [
-        sh:path pro:isDocumentContextFor ;
-        sh:qualifiedValueShape [
-            sh:path pro:withRole ;
-            sh:hasValue pro:author ;
-        ] ;
-        sh:qualifiedMinCount 1 ;
-        sh:message "A publication must have at least one author role (pro:withRole pro:author)." ;
-    ] ;
-
-    # Exactly one author role heads the chain (no incoming oco:hasNext).
-    sh:property [
-        sh:path pro:isDocumentContextFor ;
-        sh:qualifiedValueShape [
-            a sh:NodeShape ;
-            sh:property [
-                sh:path pro:withRole ;
-                sh:hasValue pro:author ;
-            ] ;
-            sh:property [
-                sh:path [ sh:inversePath oco:hasNext ] ;
-                sh:maxCount 0 ;
-            ] ;
-        ] ;
-        sh:qualifiedMinCount 1 ;
-        sh:message "Exactly one author role must head the oco:hasNext author chain." ;
-    ] ;
+    # At most one author role heads the chain (no incoming oco:hasNext).
     sh:property [
         sh:path pro:isDocumentContextFor ;
         sh:qualifiedValueShape [
@@ -348,30 +252,12 @@ od:PublicationAuthorshipShape
         ] ;
         sh:qualifiedMaxCount 0 ;
         sh:message "An affiliate role must have exactly one organization with a foaf:name." ;
-    ] ;
-
-    # At least one corresponding-author role whose holder has a mailbox.
-    sh:property [
-        sh:path pro:isDocumentContextFor ;
-        sh:qualifiedValueShape [
-            a sh:NodeShape ;
-            sh:property [
-                sh:path pro:withRole ;
-                sh:hasValue scoro:corresponding-author ;
-            ] ;
-            sh:property [
-                sh:path pro:isHeldBy ;
-                sh:qualifiedValueShape [
-                    sh:path foaf:mbox ;
-                    sh:minCount 1 ;
-                ] ;
-                sh:qualifiedMinCount 1 ;
-            ] ;
-        ] ;
-        sh:qualifiedMinCount 1 ;
-        sh:message "A publication must have at least one corresponding-author role whose holder has a foaf:mbox." ;
     ] .
 
+# On-behalf-of authors are modeled as an extra scoro:agent role in the
+# document context: held by the author (pro:isHeldBy) and related to the
+# group (pro:relatesToEntity). It never joins the oco:hasNext chain —
+# the chain shapes above only match roles carrying pro:withRole pro:author.
 od:AuthorshipRoleShape
     a sh:NodeShape ;
     sh:targetClass pro:RoleInTime ;
@@ -396,6 +282,7 @@ od:AuthorshipRoleShape
         sh:path pro:withRole ;
         sh:in (
             pro:author
+            scoro:agent
             scoro:corresponding-author
             scoro:affiliate
             scoro:consortium-author
@@ -425,4 +312,78 @@ od:GroupShape
         sh:path foaf:name ;
         sh:minCount 1 ;
         sh:message "A foaf:Group author must have a foaf:name." ;
+    ] .
+
+# =============================================================================
+# Section Shape — manuscript sections (doco:Section, deo roles)
+#
+# A section is linked from its publication via dcterms:hasPart,
+# titled exactly once, carrying at most one deo role class, chained
+# to its successor with oco:hasNext, and sourced over https. The
+# release-only dcterms:source requirement lives in
+# protocol/article-release.shacl.ttl.
+# =============================================================================
+
+od:SectionShape
+    a sh:NodeShape ;
+    sh:targetClass doco:Section ;
+
+    sh:property [
+        sh:path dcterms:title ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "A section must have exactly one dcterms:title." ;
+    ] ;
+    sh:property [
+        sh:path rdf:type ;
+        sh:qualifiedValueShape [
+            sh:in (
+                deo:Introduction
+                deo:Methods
+                deo:Results
+                deo:Discussion
+                deo:Conclusion
+                deo:Acknowledgements
+                deo:AuthorContribution
+                deo:Background
+                deo:Biography
+                deo:Contribution
+                deo:Data
+                deo:DatasetDescription
+                deo:Dedication
+                deo:Epilogue
+                deo:Evaluation
+                deo:ExternalResourceDescription
+                deo:FutureWork
+                deo:Materials
+                deo:Model
+                deo:Motivation
+                deo:Postscript
+                deo:ProblemStatement
+                deo:Prologue
+                deo:RelatedWork
+                deo:Scenario
+                deo:SupplementaryInformationDescription
+            ) ;
+        ] ;
+        sh:qualifiedMaxCount 1 ;
+        sh:message "A section may have at most one deo role class." ;
+    ] ;
+    sh:property [
+        sh:path oco:hasNext ;
+        sh:maxCount 1 ;
+        sh:class doco:Section ;
+        sh:message "A section may have at most one successor section (oco:hasNext)." ;
+    ] ;
+    sh:property [
+        sh:path [ sh:inversePath oco:hasNext ] ;
+        sh:maxCount 1 ;
+        sh:message "A section may have at most one predecessor section (oco:hasNext)." ;
+    ] ;
+    sh:property [
+        sh:path dcterms:source ;
+        sh:maxCount 1 ;
+        sh:nodeKind sh:IRI ;
+        sh:pattern "^https://" ;
+        sh:message "A section dcterms:source must be an IRI starting with https://." ;
     ] .

@@ -61,4 +61,15 @@ describe('addManuscript — rejections', () => {
     }
     expect(await ws.listAll()).toEqual(before);
   });
+
+  it('rejects "My-Article" with the invalid id error', async () => {
+    const ws = new MemoryWorkspace();
+    await scaffoldProject(ws, { manuscriptId: 'my-paper', protocol: PROTOCOL });
+    const before = await ws.listAll();
+
+    await expect(addManuscript(ws, 'My-Article')).rejects.toThrow(
+      'Invalid manuscript id "My-Article"',
+    );
+    expect(await ws.listAll()).toEqual(before);
+  });
 });

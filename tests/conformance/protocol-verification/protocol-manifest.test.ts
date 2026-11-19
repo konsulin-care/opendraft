@@ -91,6 +91,28 @@ describe('parseManifest and template parsing', () => {
     expect(() => parseManifest(JSON.stringify({ protocol: { name: PROTOCOL_NAME }, artifacts: [] }))).toThrow(/incomplete/);
     expect(() => parseProtocolBlock('protocol:\n  name: opendraft\n')).toThrow(/template is missing protocol\./);
   });
+  it('accepts a manifest without compatibleSince and round-trips one carrying it', () => {
+    const base = {
+      protocol: { name: PROTOCOL_NAME, version: SHA, repository: CANONICAL_REPOSITORY, commit: SHA },
+      artifacts: [],
+      generatedBy: 'test',
+    };
+    expect(parseManifest(JSON.stringify(base)).protocol.compatibleSince).toBeUndefined();
+    const carrying = { ...base, protocol: { ...base.protocol, compatibleSince: 'c'.repeat(40) } };
+    expect(parseManifest(JSON.stringify(carrying))).toEqual(carrying);
+  });
+  it('rejects a protocol block whose compatibleSince is not a 40-hex SHA', () => {
+    const base = {
+      protocol: { name: PROTOCOL_NAME, version: SHA, repository: CANONICAL_REPOSITORY, commit: SHA },
+      artifacts: [],
+      generatedBy: 'test',
+    };
+    const badValues: unknown[] = ['abc123', 'z'.repeat(40), 'A'.repeat(40), 'a'.repeat(41), 123, null];
+    for (const bad of badValues) {
+      const doc = { ...base, protocol: { ...base.protocol, compatibleSince: bad } };
+      expect(() => parseManifest(JSON.stringify(doc))).toThrow(/compatibleSince .* is not a 40-hex SHA/);
+    }
+  });
 });
 
 describe('readOriginFromConfig', () => {

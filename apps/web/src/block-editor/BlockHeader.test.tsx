@@ -127,10 +127,10 @@ describe('BlockHeader title rename', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
 
     await waitFor(async () => {
-      expect(await ws.readFile(`${DIR}/blocks/intro.qmd`)).toBe(
+      expect(await ws.readFile(`${DIR}/blocks/_intro.qmd`)).toBe(
         '# Background {#sec-intro .deo-intro}\n\nBody.\n',
       );
     });
-    expect(await ws.listFiles(`${DIR}/blocks`)).toEqual(['intro.qmd']);
+    expect(await ws.listFiles(`${DIR}/blocks`)).toEqual(['_intro.qmd']);
   });
 });

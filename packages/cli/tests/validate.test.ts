@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addBlock, scaffoldProject } from '@opendraft/manuscript';
 import type { ProtocolBlock } from '@opendraft/manuscript';
 import { NodeFsWorkspace } from '@opendraft/workspace/node';
-import { runCli } from '../src/index.js';
+import { runCommand } from '../src/index.js';
 
 /** Protocol block accepted by the opendraft.yml schema. */
 const PROTOCOL: ProtocolBlock = {
@@ -34,7 +34,7 @@ let dir: string;
  * @param projectDir - Project root passed to the CLI.
  * @returns Exit code plus the combined printed output.
  */
-function runValidate(projectDir: string): CliRun {
+async function runValidate(projectDir: string): Promise<CliRun> {
   const lines: string[] = [];
   const capture = (...data: unknown[]): void => {
     lines.push(data.map(String).join(' '));
@@ -45,7 +45,8 @@ function runValidate(projectDir: string): CliRun {
     vi.spyOn(console, 'warn').mockImplementation(capture),
   ];
   try {
-    return { code: runCli(['validate', projectDir]), output: lines.join('\n') };
+    const code = await runCommand(['validate', projectDir, '--offline']);
+    return { code, output: lines.join('\n') };
   } finally {
     for (const spy of spies) spy.mockRestore();
   }
@@ -60,6 +61,33 @@ async function scaffoldedProject(): Promise<NodeFsWorkspace> {
   const ws = new NodeFsWorkspace(dir);
   await scaffoldProject(ws, { manuscriptId: 'demo', protocol: PROTOCOL });
   return ws;
+}
+
+/**
+ * Migrate addBlock's legacy block fixtures to the prefixed layout.
+ *
+ * Renames every un-prefixed `blocks/<short>.qmd` to `blocks/_<short>.qmd`
+ * and rewrites the matching include lines in `article.qmd`, so the seeded
+ * project follows the `blocks/_<short>.qmd` convention.
+ *
+ * @param ws - Workspace of the scaffolded project.
+ * @returns Resolves once every block file and include line is prefixed.
+ */
+async function normalizeBlockFixtures(ws: NodeFsWorkspace): Promise<void> {
+  const blocksDir = `${MANUSCRIPT_DIR}/blocks`;
+  const articlePath = `${MANUSCRIPT_DIR}/article.qmd`;
+  for (const file of await ws.listFiles(blocksDir)) {
+    if (file.startsWith('_') || !file.endsWith('.qmd')) continue;
+    const content = await ws.readFile(`${blocksDir}/${file}`);
+    await ws.writeFile(`${blocksDir}/_${file}`, content ?? '');
+    await ws.deleteFile(`${blocksDir}/${file}`);
+    const short = file.replace(/\.qmd$/, '');
+    const article = (await ws.readFile(articlePath)) ?? '';
+    await ws.writeFile(
+      articlePath,
+      article.replaceAll(`blocks/${short}.qmd`, `blocks/_${short}.qmd`),
+    );
+  }
 }
 
 /**
@@ -81,8 +109,9 @@ describe('runCli — validate: config and metadata', () => {
   it('returns 0 for a project built with scaffoldProject plus addBlock', async () => {
     const ws = await scaffoldedProject();
     await addBlock(ws, MANUSCRIPT_DIR, 0, 'Introduction');
+    await normalizeBlockFixtures(ws);
 
-    const run = runValidate(dir);
+    const run = await runValidate(dir);
 
     expect(run.code).toBe(0);
   });
@@ -91,7 +120,7 @@ describe('runCli — validate: config and metadata', () => {
     await scaffoldedProject();
     writeFileSync(join(dir, 'opendraft.yml'), 'protocol:\n  name: opendraft\n');
 
-    const run = runValidate(dir);
+    const run = await runValidate(dir);
 
     expect(run.code).toBe(1);
     expect(run.output).toContain('opendraft.yml');
@@ -101,7 +130,7 @@ describe('runCli — validate: config and metadata', () => {
     await scaffoldedProject();
     writeFileSync(join(dir, MANUSCRIPT_DIR, '_frontmatter.yml'), 'keywords: []\n');
 
-    const run = runValidate(dir);
+    const run = await runValidate(dir);
 
     expect(run.code).toBe(1);
     expect(run.output).toContain('_frontmatter.yml');
@@ -114,40 +143,44 @@ describe('runCli — validate: assembly', () => {
   it('returns 1 when the assembly includes a missing block file', async () => {
     const ws = await scaffoldedProject();
     await addBlock(ws, MANUSCRIPT_DIR, 0, 'Introduction');
+    await normalizeBlockFixtures(ws);
     const articlePath = join(dir, MANUSCRIPT_DIR, 'article.qmd');
     const article = readFileSync(articlePath, 'utf8');
     writeFileSync(
       articlePath,
-      article.replace('::: {#refs}', '{{< include blocks/ghost.qmd >}}\n::: {#refs}'),
+      article.replace('::: {#refs}', '{{< include blocks/_ghost.qmd >}}\n::: {#refs}'),
     );
 
-    const run = runValidate(dir);
+    const run = await runValidate(dir);
 
     expect(run.code).toBe(1);
     expect(run.output).toContain('ghost.qmd');
   });
 
-  it('returns 1 when two included blocks share the same sec anchor', async () => {
+  it('returns 1 and prints the duplicate anchor once when two included blocks share the same sec anchor', async () => {
     const ws = await scaffoldedProject();
     await addBlock(ws, MANUSCRIPT_DIR, 0, 'Introduction');
     await addBlock(ws, MANUSCRIPT_DIR, 1, 'Methods');
+    await normalizeBlockFixtures(ws);
     writeFileSync(
-      join(dir, MANUSCRIPT_DIR, 'blocks', 'methods.qmd'),
+      join(dir, MANUSCRIPT_DIR, 'blocks', '_methods.qmd'),
       '# Methods {#sec-introduction}\n',
     );
 
-    const run = runValidate(dir);
+    const run = await runValidate(dir);
 
     expect(run.code).toBe(1);
     expect(run.output).toContain('sec-introduction');
+    expect(run.output.match(/duplicate anchor/g) ?? []).toHaveLength(1);
   });
 
   it('reports an orphan block file as a warning and returns 0', async () => {
     const ws = await scaffoldedProject();
     await addBlock(ws, MANUSCRIPT_DIR, 0, 'Introduction');
-    await ws.writeFile(`${MANUSCRIPT_DIR}/blocks/scratch.qmd`, '# Scratch {#sec-scratch}\n');
+    await normalizeBlockFixtures(ws);
+    await ws.writeFile(`${MANUSCRIPT_DIR}/blocks/_scratch.qmd`, '# Scratch {#sec-scratch}\n');
 
-    const run = runValidate(dir);
+    const run = await runValidate(dir);
 
     expect(run.code).toBe(0);
     expect(run.output.toLowerCase()).toContain('orphan');

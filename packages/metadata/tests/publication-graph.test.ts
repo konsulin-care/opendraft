@@ -4,13 +4,14 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { loadTurtle, validateShacl } from '@opendraft/rdf';
-import type { ShaclValidationReport, TurtleDataset } from '@opendraft/rdf';
+import type { ShaclValidationReport, ShaclValidationResult, TurtleDataset } from '@opendraft/rdf';
 import { compilePublicationGraph } from '../src/rdf/publication-graph.js';
 import type { PublicationGraphInput } from '../src/rdf/publication-graph.js';
 import type { AuthorObject, RegistryAffiliation } from '../src/types/author.js';
 
 // Repo-root protocol/, resolved from this file: suites run with cwd = packages/metadata.
 const ARTICLE_SHAPES = fileURLToPath(new URL('../../../protocol/article.shacl.ttl', import.meta.url));
+const RELEASE_SHAPES = ARTICLE_SHAPES.replace('article.shacl.ttl', 'article-release.shacl.ttl');
 const SH_VIOLATION = 'http://www.w3.org/ns/shacl#Violation';
 const SH_WARNING = 'http://www.w3.org/ns/shacl#Warning';
 
@@ -23,7 +24,7 @@ const CITO = 'http://purl.org/spar/cito/';
 const FRBR = 'http://purl.org/vocab/frbr/core#';
 const DATACITE = 'http://purl.org/datacite/ontology/';
 const LITERAL = 'https://w3id.org/literal/';
-const OD = 'urn:opendraft:ontology#';
+const OD = 'https://w3id.org/opendraft/ontology#';
 const SKOS = 'http://www.w3.org/2004/02/skos/core#';
 const XSD = 'http://www.w3.org/2001/XMLSchema#';
 
@@ -92,6 +93,7 @@ const FULL: PublicationGraphInput = {
   repositoryUrl: 'https://github.com/konsulin-care/opendraft',
   manuscriptPath: 'manuscripts/distributed-scientific-publication/article.qmd',
   sourceRevision: '1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d',
+  protocolRepository: 'https://github.com/konsulin-care/opendraft',
   protocolRevision: '0000000000000000000000000000000000000000',
   versionDoi: VERSION_DOI,
   conceptDoi: CONCEPT_DOI,
@@ -145,12 +147,16 @@ beforeAll(async () => {
   shapes = await loadTurtle(ARTICLE_SHAPES);
   report = await validateShacl(dataset, shapes);
 });
-
 describe('SHACL conformance and determinism', () => {
-  it('conforms to protocol/article.shacl.ttl', () => {
+  it('conforms to protocol/article.shacl.ttl and the release shape union', async () => {
     expect(violations(report)).toHaveLength(0);
     expect(report.conforms).toBe(true);
     expect(report.results).toHaveLength(0);
+    const union = await loadTurtle(RELEASE_SHAPES);
+    for (const quad of shapes) union.add(quad);
+    const releaseReport = await validateShacl(await parseFragment(turtle), union);
+    expect(violations(releaseReport)).toHaveLength(0);
+    expect(releaseReport.conforms).toBe(true);
   });
 
   it('is byte-identical across two runs', () => {
@@ -166,6 +172,11 @@ describe('SHACL conformance and determinism', () => {
 });
 
 describe('Work and version identity', () => {
+  it('emits od:Publication under the w3id ontology namespace', () => {
+    expect(turtle).toContain('<https://w3id.org/opendraft/ontology#Publication>');
+    expect(turtle).not.toContain('urn:opendraft:ontology#');
+  });
+
   it('realizes a fabio:Work whose IRI differs from the publication IRI', () => {
     expect(subjects(RDF_TYPE, `${OD}Publication`)).toEqual([VERSION_IRI]);
     expect(subjects(RDF_TYPE, `${FABIO}Work`)).toContain(CONCEPT_IRI);
@@ -220,7 +231,6 @@ describe('publication properties', () => {
     expect(values(term, RDF_TYPE)).toContain(`${SKOS}Concept`);
     expect(values(term, `${SKOS}prefLabel`)).toEqual(['Distributed scientific publication']);
   });
-
 });
 
 describe('provenance and citations', () => {
@@ -230,7 +240,10 @@ describe('provenance and citations', () => {
     expect(values(VERSION_IRI, `${OD}manuscriptPath`))
       .toEqual(['manuscripts/distributed-scientific-publication/article.qmd']);
     expect(values(VERSION_IRI, `${OD}sourceRevision`)).toEqual([FULL.sourceRevision]);
-    expect(values(VERSION_IRI, `${OD}protocolRevision`)).toEqual([FULL.protocolRevision]);
+    expect(values(VERSION_IRI, `${DCTERMS}conformsTo`))
+      .toEqual([`https://github.com/konsulin-care/opendraft/tree/${FULL.protocolRevision}/protocol`]);
+    expect(values(VERSION_IRI, `${OD}protocolRevision`)).toEqual([]);
+    expect(turtle).not.toContain(`${OD}protocolRevision`);
     const node = values(VERSION_IRI, `${DATACITE}hasIdentifier`)[0] ?? '';
     expect(values(node, `${DATACITE}usesIdentifierScheme`)).toEqual([`${DATACITE}doi`]);
     expect(values(node, `${LITERAL}hasLiteralValue`)).toEqual([VERSION_DOI]);
@@ -264,5 +277,24 @@ describe('missing license', () => {
     expect(noLicense.results).toHaveLength(1);
     expect(noLicense.results[0]?.severity.value).toBe(SH_WARNING);
     expect(noLicense.results[0]?.path?.value).toBe(`${DCTERMS}license`);
+  });
+});
+
+describe('dcterms:conformsTo protocol link', () => {
+  const PRED = '<http://purl.org/dc/terms/conformsTo>';
+  const CONFORMS = `${DCTERMS}conformsTo`;
+
+  /** SHACL violations naming dcterms:conformsTo for mutated Turtle. */
+  async function conformsViolations(text: string): Promise<ShaclValidationResult[]> {
+    const data = await parseFragment(text);
+    const result = await validateShacl(data, shapes);
+    return result.results.filter((r) => r.severity.value === SH_VIOLATION && r.path?.value === CONFORMS);
+  }
+  it('flags missing, non-matching, or non-IRI dcterms:conformsTo', async () => {
+    const missing = turtle.split('\n').filter((l) => !l.includes('conformsTo')).join('\n');
+    const swap = (term: string) => turtle.replace(new RegExp(`${PRED} \\S+`), `${PRED} ${term}`);
+    expect(await conformsViolations(missing)).not.toHaveLength(0);
+    expect(await conformsViolations(swap('<https://github.com/konsulin-care/opendraft>'))).not.toHaveLength(0);
+    expect(await conformsViolations(swap('"https://github.com/konsulin-care/opendraft"'))).not.toHaveLength(0);
   });
 });

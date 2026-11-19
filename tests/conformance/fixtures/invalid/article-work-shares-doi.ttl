@@ -1,13 +1,15 @@
 # Invalid fixture: Work IRI shares the publication IRI (shared DOI)
 #
-# Violates protocol/article.shacl.ttl — the Work IRI must differ from
-# the Publication IRI (concept DOI vs version DOI, Zenodo pattern).
+# Violates protocol/article-release.shacl.ttl (od:PublicationWorkShape)
+# — the Work IRI must differ from the Publication IRI (concept DOI vs
+# version DOI, Zenodo pattern). This fixture is a release profile (DOI
+# identifier), so it validates against the article + release shapes.
 # Here the publication realizes itself: ex:shared-doi-publication is
 # typed both od:Publication and fabio:Work, so the publication IRI
 # doubles as its own Work IRI. Everything else conforms, so the shared
 # identity is the only defect.
 
-@prefix od: <urn:opendraft:ontology#> .
+@prefix od: <https://w3id.org/opendraft/ontology#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix fabio: <http://purl.org/spar/fabio/> .
 @prefix frbr: <http://purl.org/vocab/frbr/core#> .
@@ -26,7 +28,7 @@ ex:shared-doi-publication
     od:repositoryUrl "https://github.com/opendraft/opendraft"^^xsd:anyURI ;
     od:manuscriptPath "manuscripts/article.qmd" ;
     od:sourceRevision "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d" ;
-    od:protocolRevision "0000000000000000000000000000000000000000" ;
+    dcterms:conformsTo <https://github.com/konsulin-care/opendraft/tree/0000000000000000000000000000000000000000/protocol> ;
     frbr:realizationOf ex:shared-doi-publication ;
     pro:isDocumentContextFor ex:author-role , ex:affiliate-role .
 

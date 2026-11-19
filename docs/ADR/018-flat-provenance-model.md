@@ -36,6 +36,10 @@ No `owl:deprecated` annotations are used. Nothing references these terms prior t
 
 SHACL shapes validate the SHA strings with `sh:pattern ^[0-9a-f]{40}$` and the repository URL with `sh:datatype xsd:anyURI`.
 
+## Amendment (ADR-027)
+
+The namespace is now `https://w3id.org/opendraft/ontology#`. `od:protocolRevision` is replaced by `dcterms:conformsTo <https://github.com/konsulin-care/opendraft/tree/<sha>/protocol>`. Remaining `od:` provenance terms: `od:repositoryUrl`, `od:sourceRevision`. See [ADR-027](027-rdf-sections-and-vocabulary-reuse.md).
+
 ## Consequences
 
 - Publications are simpler to author and validate: one node, three scalar provenance properties.

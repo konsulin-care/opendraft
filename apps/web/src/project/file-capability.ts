@@ -1,11 +1,13 @@
+import { SHORT_NAME_PATTERN } from '@opendraft/schema';
+
 /** Capability of a workspace file as seen by the editor. */
 export type FileCapability = 'rich' | 'text' | 'binary';
 
-/** Valid slug stem: lowercase kebab, no edge hyphens, at most 40 chars. */
-const SLUG_STEM = '[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?';
+/** Short-name pattern without anchors, lifted from @opendraft/schema. */
+const SHORT_INFIX = SHORT_NAME_PATTERN.source.slice(1, -1);
 
-/** Manuscript block file: manuscripts/<id>/blocks/<slug>.qmd. */
-const BLOCK_PATH_RE = new RegExp(`^manuscripts/[^/]+/blocks/${SLUG_STEM}\\.qmd$`);
+/** Manuscript block file: manuscripts/<id>/blocks/_<short>.qmd. */
+const BLOCK_PATH_RE = new RegExp(`^manuscripts/[^/]+/blocks/_${SHORT_INFIX}\\.qmd$`);
 
 /** Manuscript assembly file: manuscripts/<id>/article.qmd. */
 const ARTICLE_PATH_RE = /^manuscripts\/[^/]+\/article\.qmd$/;
@@ -15,8 +17,8 @@ const CONTROL_CHAR_THRESHOLD = 0.1;
 
 /**
  * Report whether a path is a manuscript block file: `manuscripts/<id>/blocks/`
- * followed by a valid slug stem (lowercase kebab, no edge hyphens) and a
- * `.qmd` extension.
+ * followed by `_`, a valid short name (SHORT_NAME_PATTERN: lowercase kebab,
+ * no edge hyphens, max 40 chars) and a `.qmd` extension.
  *
  * @param path - Repo-relative file path.
  * @returns True when the path matches the block-file shape exactly.
@@ -41,7 +43,7 @@ export function isManuscriptArticlePath(path: string): boolean {
  *
  * Content containing a NUL character, or where more than 10% of the characters
  * are control characters other than `\t`, `\n` and `\r`, is `binary`. Manuscript
- * block files (`manuscripts/<id>/blocks/<slug>.qmd`) and manuscript assemblies
+ * block files (`manuscripts/<id>/blocks/_<short>.qmd`) and manuscript assemblies
  * (`manuscripts/<id>/article.qmd`) are `rich`; everything else — root
  * `.md`/`.qmd`, root `article.qmd`, `.yml`, `.bib` — is `text` and opens in the
  * source editor.

@@ -7,9 +7,11 @@
  * operations take a {@link WorkspaceAdapter} and a manuscript directory.
  */
 import type { WorkspaceAdapter } from '@opendraft/workspace';
+import { blockFileName, includeLine } from '@opendraft/schema';
+import { resolveBlockFile, resolveFromFileList } from './block-files.js';
 import { joinHeading, retitleHeading, splitHeading } from './heading.js';
 import type { BlockHeading } from './heading.js';
-import { uniqueShortName } from './slug.js';
+import { normalizeShortName, uniqueShortName } from './slug.js';
 
 /** Draft selecting a new block's own identity instead of deriving it. */
 export interface CreateBlockDraft {
@@ -25,14 +27,16 @@ export interface CreateBlockDraft {
 export interface BlockListItem {
   /** Short name — the block file name without `.qmd`. */
   short: string;
+  /** On-disk file name: `_<short>.qmd` or the legacy `<short>.qmd`. */
+  file: string;
   /** Heading title; falls back to the short name when no heading exists. */
   title: string;
   /** Text after the heading line; `''` when the block file is missing. */
   body: string;
 }
 
-/** Matches one include shortcode on its own line. */
-const INCLUDE_PATTERN = /\{\{< include\s+blocks\/([a-z0-9-]+)\.qmd\s*>\}\}/;
+/** Matches one include shortcode (prefixed or legacy) on its own line. */
+const INCLUDE_PATTERN = /\{\{< include\s+blocks\/_?([a-z0-9-]+)\.qmd\s*>\}\}/;
 
 /** Section type given to blocks that carry no type of their own. */
 const GENERIC_BLOCK_TYPE = 'section';
@@ -55,8 +59,10 @@ export function extractIncludes(article: string): string[] {
 /**
  * Splice an include shortcode into the assembly at `position`.
  *
- * With no existing include the line goes directly before `::: {#refs}`
- * (or at the end when there is no refs fence).
+ * The line is the canonical prefixed form
+ * `{{< include blocks/_<short>.qmd >}}`. With no existing include the
+ * line goes directly before `::: {#refs}` (or at the end when there is
+ * no refs fence).
  *
  * @param article - Full `article.qmd` text.
  * @param short - Short name of the block to include.
@@ -69,7 +75,7 @@ function insertInclude(article: string, short: string, position: number): string
   lines.forEach((line, index) => {
     if (INCLUDE_PATTERN.test(line.trim())) indices.push(index);
   });
-  const include = `{{< include blocks/${short}.qmd >}}`;
+  const include = includeLine(short);
   if (indices.length === 0) {
     const refs = lines.findIndex((line) => line.trim() === '::: {#refs}');
     lines.splice(refs === -1 ? lines.length : refs, 0, include, '');
@@ -89,23 +95,25 @@ function insertInclude(article: string, short: string, position: number): string
  *
  * @param ws - Workspace holding the manuscript.
  * @param dir - Manuscript directory, e.g. `manuscripts/demo`.
- * @returns One entry per include line; missing files yield the short name
- *          as title and an empty body.
+ * @returns One entry per include line with its resolved file name;
+ *          missing files yield the short name as title and an empty body.
  */
 export async function listBlocks(
   ws: WorkspaceAdapter,
   dir: string,
 ): Promise<BlockListItem[]> {
   const article = (await ws.readFile(`${dir}/article.qmd`)) ?? '';
+  const files = await ws.listFiles(`${dir}/blocks`);
   const entries: BlockListItem[] = [];
   for (const short of extractIncludes(article)) {
-    const text = await ws.readFile(`${dir}/blocks/${short}.qmd`);
+    const file = resolveFromFileList(files, short);
+    const text = await ws.readFile(`${dir}/blocks/${file}`);
     if (text === null) {
-      entries.push({ short, title: short, body: '' });
+      entries.push({ short, file, title: short, body: '' });
       continue;
     }
     const parts = splitHeading(text);
-    entries.push({ short, title: parts.title ?? short, body: parts.body });
+    entries.push({ short, file, title: parts.title ?? short, body: parts.body });
   }
   return entries;
 }
@@ -113,11 +121,13 @@ export async function listBlocks(
 /**
  * Write a new block file and splice its include into the assembly.
  *
- * The short name is de-duplicated against existing includes and block
- * files, so a taken name never overwrites an existing block. A string
- * draft derives the identity from its title; a {@link CreateBlockDraft}
- * chooses it, defaulting to the generic `.doco-section` class when no
- * role is given.
+ * The block file is the prefixed `blocks/_<short>.qmd` form and the
+ * include is the canonical `{{< include blocks/_<short>.qmd >}}` line.
+ * The short name is de-duplicated against existing includes and both
+ * block file forms (`_<short>.qmd` and legacy `<short>.qmd`), so a taken
+ * name never overwrites an existing block. A string draft derives the
+ * identity from its title; a {@link CreateBlockDraft} chooses it,
+ * defaulting to the generic `.doco-section` class when no role is given.
  *
  * @param ws - Workspace holding the manuscript.
  * @param dir - Manuscript directory, e.g. `manuscripts/demo`.
@@ -136,12 +146,14 @@ export async function addBlock(
   const taken = new Set(extractIncludes(article));
   const files = await ws.listFiles(`${dir}/blocks`);
   const isTaken = (candidate: string): boolean =>
-    taken.has(candidate) || files.includes(`${candidate}.qmd`);
+    taken.has(candidate) ||
+    files.includes(blockFileName(candidate)) ||
+    files.includes(`${candidate}.qmd`);
   const title = typeof draft === 'string' ? draft : draft.title;
   const short = uniqueShortName(typeof draft === 'string' ? title : draft.short, isTaken);
   const role = typeof draft === 'string' ? GENERIC_BLOCK_TYPE : (draft.role ?? GENERIC_BLOCK_TYPE);
   const heading: BlockHeading = { title, anchor: `sec-${short}`, type: role };
-  await ws.writeFile(`${dir}/blocks/${short}.qmd`, joinHeading(heading, ''));
+  await ws.writeFile(`${dir}/blocks/${blockFileName(short)}`, joinHeading(heading, ''));
   await ws.writeFile(articlePath, insertInclude(article, short, position));
 }
 
@@ -161,13 +173,15 @@ export async function deleteBlock(
   const articlePath = `${dir}/article.qmd`;
   const article = await ws.readFile(articlePath);
   if (article !== null) {
+    // The pattern accepts both include forms, so either is dropped.
     const kept = article.split('\n').filter((line) => {
       const match = INCLUDE_PATTERN.exec(line.trim());
       return match === null || match[1] !== short;
     });
     await ws.writeFile(articlePath, kept.join('\n'));
   }
-  await ws.deleteFile(`${dir}/blocks/${short}.qmd`);
+  const file = await resolveBlockFile(ws, dir, short);
+  await ws.deleteFile(`${dir}/blocks/${file}`);
 }
 
 /**
@@ -203,7 +217,7 @@ async function rewriteOtherRefs(
   newShort: string,
 ): Promise<void> {
   for (const file of await ws.listFiles(blocksDir)) {
-    if (file === `${newShort}.qmd`) continue;
+    if (file === blockFileName(newShort) || file === `${newShort}.qmd`) continue;
     const path = `${blocksDir}/${file}`;
     const text = await ws.readFile(path);
     if (text === null) continue;
@@ -215,11 +229,16 @@ async function rewriteOtherRefs(
 /**
  * Rename a block: file, include line and cross-block references.
  *
+ * `newShort` is normalized with `normalizeShortName`; the rename throws
+ * before any write when the target short is included or its block file
+ * exists; the include and `@sec-<old>` refs are rewritten to the new short.
+ *
  * @param ws - Workspace holding the manuscript.
  * @param dir - Manuscript directory, e.g. `manuscripts/demo`.
  * @param oldShort - Current short name.
- * @param newShort - Replacement short name.
- * @returns Resolves once the file, include and refs are updated.
+ * @param newShort - Replacement short name or human-readable title.
+ * @returns Resolves once the file, include and refs are updated; throws
+ *          before any write when the target short is already in use.
  */
 export async function renameBlock(
   ws: WorkspaceAdapter,
@@ -228,20 +247,24 @@ export async function renameBlock(
   newShort: string,
 ): Promise<void> {
   const blocksDir = `${dir}/blocks`;
-  const oldPath = `${blocksDir}/${oldShort}.qmd`;
-  const text = await ws.readFile(oldPath);
-  if (text === null) return;
-  await ws.writeFile(`${blocksDir}/${newShort}.qmd`, renameIdentity(text, oldShort, newShort));
-  await ws.deleteFile(oldPath);
   const articlePath = `${dir}/article.qmd`;
+  const short = normalizeShortName(newShort);
   const article = await ws.readFile(articlePath);
+  const files = await ws.listFiles(blocksDir);
+  const taken = extractIncludes(article ?? '').includes(short) ||
+    files.includes(blockFileName(short)) || files.includes(`${short}.qmd`);
+  if (taken) throw new Error(`block short name '${short}' is already in use`);
+  const oldFile = resolveFromFileList(files, oldShort);
+  const text = await ws.readFile(`${blocksDir}/${oldFile}`);
+  if (text === null) return;
+  await ws.writeFile(`${blocksDir}/${blockFileName(short)}`, renameIdentity(text, oldShort, short));
+  await ws.deleteFile(`${blocksDir}/${oldFile}`);
   if (article !== null) {
-    await ws.writeFile(
-      articlePath,
-      article.replaceAll(`blocks/${oldShort}.qmd`, `blocks/${newShort}.qmd`),
-    );
+    // Both include forms match; the canonical line replaces either.
+    const includeRe = new RegExp(`\\{\\{< include\\s+blocks\\/_?${oldShort}\\.qmd\\s*>\\}\\}`, 'g');
+    await ws.writeFile(articlePath, article.replace(includeRe, includeLine(short)));
   }
-  await rewriteOtherRefs(ws, blocksDir, oldShort, newShort);
+  await rewriteOtherRefs(ws, blocksDir, oldShort, short);
 }
 
 /**
@@ -262,7 +285,8 @@ export async function setBlockTitle(
   short: string,
   title: string,
 ): Promise<void> {
-  const path = `${dir}/blocks/${short}.qmd`;
+  const file = await resolveBlockFile(ws, dir, short);
+  const path = `${dir}/blocks/${file}`;
   const text = await ws.readFile(path);
   if (text === null) return;
   const parts = splitHeading(text);

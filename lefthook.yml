@@ -38,6 +38,10 @@ pre-commit:
       glob: "*.{yml,yaml}"
       run: mise exec -- yamllint -c .yamllint.yml {staged_files}
 
+    validate-project:
+      glob: "{manuscripts/**,opendraft.yml}"
+      run: mise run validate-project
+
     # Code quality
     large-files:
       run: mise run check-large-files

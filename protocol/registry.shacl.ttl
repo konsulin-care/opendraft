@@ -1,44 +1,35 @@
 # OpenDraft Registry SHACL Shapes
 #
-# Validates registry structure: collection registries and publication registries
-# are mutually exclusive. A collection registry references other registries;
-# a publication registry references publications.
+# A registry is a fabio:ExpressionCollection. Its frbr:part values must
+# be either only publications (a publication registry) or only other
+# registries (a collection registry) — never both (OD-013, OD-014).
+# Registries replace the deleted od:Registry class hierarchy (ADR-018).
 
 @prefix sh: <http://www.w3.org/ns/shacl#> .
-@prefix od: <urn:opendraft:ontology#> .
+@prefix od: <https://w3id.org/opendraft/ontology#> .
+@prefix fabio: <http://purl.org/spar/fabio/> .
+@prefix frbr: <http://purl.org/vocab/frbr/core#> .
 
 # =============================================================================
-# Collection Registry Shape
+# Registry Shape
 # =============================================================================
 
-od:CollectionRegistryShape
+od:RegistryShape
     a sh:NodeShape ;
-    sh:targetClass od:CollectionRegistry ;
-    sh:property [
-        sh:path od:containsRegistry ;
-        sh:minCount 1 ;
-        sh:message "A collection registry must contain at least one registry." ;
-    ] ;
-    sh:property [
-        sh:path od:containsPublication ;
-        sh:maxCount 0 ;
-        sh:message "A collection registry must not contain publications. Use od:containsRegistry instead." ;
-    ] .
-
-# =============================================================================
-# Publication Registry Shape
-# =============================================================================
-
-od:PublicationRegistryShape
-    a sh:NodeShape ;
-    sh:targetClass od:PublicationRegistry ;
-    sh:property [
-        sh:path od:containsPublication ;
-        sh:minCount 1 ;
-        sh:message "A publication registry must contain at least one publication." ;
-    ] ;
-    sh:property [
-        sh:path od:containsRegistry ;
-        sh:maxCount 0 ;
-        sh:message "A publication registry must not contain registries. Use od:containsPublication instead." ;
-    ] .
+    sh:targetClass fabio:ExpressionCollection ;
+    sh:xone (
+        [ a sh:NodeShape ;
+          sh:property [
+              sh:path frbr:part ;
+              sh:minCount 1 ;
+              sh:class od:Publication ;
+              sh:message "A publication registry must only contain publications in frbr:part." ;
+          ] ]
+        [ a sh:NodeShape ;
+          sh:property [
+              sh:path frbr:part ;
+              sh:minCount 1 ;
+              sh:class fabio:ExpressionCollection ;
+              sh:message "A collection registry must only contain registries in frbr:part." ;
+          ] ]
+    ) .

@@ -8,6 +8,22 @@
  */
 import { emitAuthorshipGraph } from './authorship-graph.js';
 import { normalizeDoi } from './identifiers.js';
+import {
+  block,
+  literalString,
+  termRef,
+  CITO,
+  DATACITE,
+  DCTERMS,
+  FABIO,
+  FRAPO,
+  FRBR,
+  LITERAL,
+  OD,
+  PRISM,
+  SKOS,
+  XSD,
+} from './turtle.js';
 import type { NormalizedIdentifier } from './identifiers.js';
 import type { AuthorObject, RegistryAffiliation } from '../types/author.js';
 
@@ -40,17 +56,21 @@ export interface PublicationGraphInput {
   /** Top-level affiliation registry resolving {ref} affiliation items. */
   affiliations?: RegistryAffiliation[];
   /** Repository URL provenance scalar (od:repositoryUrl). */
-  repositoryUrl: string;
+  repositoryUrl?: string;
+  /** Manuscript id; the root IRI is a draft IRI when no version DOI is given. */
+  manuscriptId?: string;
   /** Manuscript path provenance scalar (od:manuscriptPath). */
   manuscriptPath: string;
   /** 40-character Git commit SHA the manuscript was compiled from. */
-  sourceRevision: string;
+  sourceRevision?: string;
+  /** Git repository hosting the protocol (e.g. https://github.com/owner/repo). */
+  protocolRepository: string;
   /** 40-character Git commit SHA of the protocol revision used. */
   protocolRevision: string;
   /** Version DOI of this publication (publication IRI). */
-  versionDoi: string;
+  versionDoi?: string;
   /** Concept DOI of the fabio:Work this publication realizes. */
-  conceptDoi: string;
+  conceptDoi?: string;
   /** Version DOI of the earlier version revised (frbr:revisionOf). */
   previousVersionDoi?: string;
   /** prism:versionIdentifier; defaults to 2 with a previous version, else 1. */
@@ -58,20 +78,6 @@ export interface PublicationGraphInput {
   /** Reference DOIs cited via cito:cites. */
   references?: string[];
 }
-
-// Namespace constants include the opening angle bracket so that
-// `${FABIO}Work>` expands to a wrapped Turtle IRI reference.
-const OD = '<urn:opendraft:ontology#';
-const DCTERMS = '<http://purl.org/dc/terms/';
-const FABIO = '<http://purl.org/spar/fabio/';
-const FRBR = '<http://purl.org/vocab/frbr/core#';
-const PRISM = '<http://prismstandard.org/namespaces/basic/2.0/';
-const FRAPO = '<http://purl.org/spar/frapo/';
-const CITO = '<http://purl.org/spar/cito/';
-const DATACITE = '<http://purl.org/datacite/ontology/';
-const LITERAL = '<https://w3id.org/literal/';
-const SKOS = '<http://www.w3.org/2004/02/skos/core#';
-const XSD = '<http://www.w3.org/2001/XMLSchema#';
 
 /** License presets mapped to their canonical deed URIs. */
 const LICENSE_URIS: Record<string, string> = {
@@ -82,23 +88,9 @@ const LICENSE_URIS: Record<string, string> = {
   'cc0 1.0': 'http://creativecommons.org/publicdomain/zero/1.0/',
 };
 
-/** Escape a value as a Turtle string literal. */
-function literalString(value: string): string {
-  const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-    .replace(/\n/g, '\\n').replace(/\r/g, '\\r');
-  return `"${escaped}"`;
-}
-
-function termRef(iri: string): string {
-  return `<${iri}>`;
-}
-
-function block(subject: string, pairs: string[]): string {
-  return `${subject}\n    ${pairs.join(' ;\n    ')} .`;
-}
-
 /** Normalize a DOI or throw naming the offending input field. */
-function requireDoi(input: string | undefined, label: string): NormalizedIdentifier {
+function requireDoi(input: string | undefined, label: string): NormalizedIdentifier | null {
+  if (input === undefined || input === '') return null;
   const doi = normalizeDoi(input);
   if (!doi) throw new Error(`compilePublicationGraph: invalid ${label} "${String(input)}"`);
   return doi;
@@ -124,6 +116,17 @@ function subjectTermIri(subject: PublicationSubject): string {
     ? subject.authority
     : `${subject.authority}/`;
   return `${base}${subject.term}`;
+}
+
+/**
+ * Build the dcterms:conformsTo IRI for the pinned protocol revision.
+ *
+ * @param input - Publication input with the protocol repository and revision.
+ * @returns Absolute IRI `<repo>/tree/<sha>/protocol`.
+ */
+function conformsToIri(input: PublicationGraphInput): string {
+  const repo = input.protocolRepository.replace(/\/+$/, '');
+  return `${repo}/tree/${input.protocolRevision}/protocol`;
 }
 
 /** The Work block: concept DOI IRI typed as a named fabio:Work. */
@@ -172,20 +175,23 @@ function versionNumber(input: PublicationGraphInput): string {
 /** Every property pair of the od:Publication node in fixed order. */
 function publicationPairs(
   input: PublicationGraphInput,
-  versionDoi: NormalizedIdentifier,
-  conceptDoi: NormalizedIdentifier,
+  versionDoi: NormalizedIdentifier | null,
+  conceptDoi: NormalizedIdentifier | null,
 ): string[] {
-  const pairs = [
-    `a ${OD}Publication>`,
-    `${DCTERMS}title> ${literalString(input.title)}`,
-    `${DCTERMS}identifier> ${termRef(versionDoi.iri)}`,
-    `${DATACITE}hasIdentifier> ${doiIdentifierNode(versionDoi.value)}`,
-    `${OD}repositoryUrl> ${literalString(input.repositoryUrl)}^^${XSD}anyURI>`,
-    `${OD}manuscriptPath> ${literalString(input.manuscriptPath)}`,
-    `${OD}sourceRevision> ${literalString(input.sourceRevision)}`,
-    `${OD}protocolRevision> ${literalString(input.protocolRevision)}`,
-    `${FRBR}realizationOf> ${termRef(conceptDoi.iri)}`,
-  ];
+  const pairs = [`a ${OD}Publication>`, `${DCTERMS}title> ${literalString(input.title)}`];
+  if (versionDoi) {
+    pairs.push(`${DCTERMS}identifier> ${termRef(versionDoi.iri)}`);
+    pairs.push(`${DATACITE}hasIdentifier> ${doiIdentifierNode(versionDoi.value)}`);
+  }
+  if (input.repositoryUrl) {
+    pairs.push(`${OD}repositoryUrl> ${literalString(input.repositoryUrl)}^^${XSD}anyURI>`);
+  }
+  pairs.push(`${OD}manuscriptPath> ${literalString(input.manuscriptPath)}`);
+  if (input.sourceRevision) {
+    pairs.push(`${OD}sourceRevision> ${literalString(input.sourceRevision)}`);
+  }
+  pairs.push(`${DCTERMS}conformsTo> ${termRef(conformsToIri(input))}`);
+  if (conceptDoi) pairs.push(`${FRBR}realizationOf> ${termRef(conceptDoi.iri)}`);
   if (input.previousVersionDoi) {
     const previous = normalizeDoi(input.previousVersionDoi);
     if (previous) pairs.push(`${FRBR}revisionOf> ${termRef(previous.iri)}`);
@@ -211,7 +217,8 @@ function publicationPairs(
  * Compile the publication graph as deterministic Turtle.
  *
  * Emits the fabio:Work (concept DOI), the od:Publication (version DOI)
- * with provenance scalars, license, funding grant, keywords, subject
+ * with provenance scalars and the dcterms:conformsTo protocol link,
+ * license, funding grant, keywords, subject
  * term and cito:cites references, plus the OCDM authorship graph in
  * YAML author order. The output is byte-identical across runs.
  *
@@ -223,10 +230,13 @@ function publicationPairs(
 export function compilePublicationGraph(input: PublicationGraphInput): string {
   const versionDoi = requireDoi(input.versionDoi, 'versionDoi');
   const conceptDoi = requireDoi(input.conceptDoi, 'conceptDoi');
-  const blocks: string[] = [workBlock(conceptDoi.iri, input.title)];
-  blocks.push(block(termRef(versionDoi.iri), publicationPairs(input, versionDoi, conceptDoi)));
+  const root = versionDoi?.iri
+    ?? `https://w3id.org/opendraft/draft/${input.manuscriptId ?? 'manuscript'}`;
+  const blocks: string[] = [];
+  if (conceptDoi) blocks.push(workBlock(conceptDoi.iri, input.title));
+  blocks.push(block(termRef(root), publicationPairs(input, versionDoi, conceptDoi)));
   blocks.push(emitAuthorshipGraph({
-    publication: versionDoi.iri,
+    publication: root,
     authors: input.authors,
     affiliations: input.affiliations,
   }).trimEnd());

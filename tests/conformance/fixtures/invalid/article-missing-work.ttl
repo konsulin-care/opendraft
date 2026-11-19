@@ -6,7 +6,7 @@
 # required field are fully conforming, so the missing Work is the only
 # defect.
 
-@prefix od: <urn:opendraft:ontology#> .
+@prefix od: <https://w3id.org/opendraft/ontology#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix pro: <http://purl.org/spar/pro/> .
 @prefix scoro: <http://purl.org/spar/scoro/> .
@@ -23,7 +23,7 @@ ex:invalid-publication
     od:repositoryUrl "https://github.com/opendraft/opendraft"^^xsd:anyURI ;
     od:manuscriptPath "manuscripts/article.qmd" ;
     od:sourceRevision "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d" ;
-    od:protocolRevision "0000000000000000000000000000000000000000" ;
+    dcterms:conformsTo <https://github.com/konsulin-care/opendraft/tree/0000000000000000000000000000000000000000/protocol> ;
     pro:isDocumentContextFor ex:author-role , ex:affiliate-role .
 
 ex:author-role

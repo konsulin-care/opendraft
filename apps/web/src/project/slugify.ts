@@ -1,8 +1,7 @@
+import { MANUSCRIPT_ID_PATTERN } from '@opendraft/schema';
+
 /** Fallback identifier when a name produces no valid slug. */
 const FALLBACK_ID = 'manuscript';
-
-/** Valid manuscript identifier pattern (mirrors the protocol schema). */
-const MANUSCRIPT_ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /**
  * Convert a human-readable name into a valid manuscript identifier.

@@ -2,11 +2,11 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { runCli } from '../src/index.js';
+import { runCommand } from '../src/index.js';
 
 /** Result of one captured CLI run. */
 interface CliRun {
-  /** Exit code returned by runCli. */
+  /** Exit code resolved by runCommand. */
   code: number;
   /** Everything printed to stdout and stderr. */
   output: string;
@@ -15,12 +15,12 @@ interface CliRun {
 let dir: string;
 
 /**
- * Run the CLI with console output captured.
+ * Run the CLI asynchronously with console output captured.
  *
- * @param args - Arguments passed to runCli.
- * @returns Exit code plus the combined printed output.
+ * @param args - Arguments passed to runCommand.
+ * @returns Promise of the exit code plus the combined printed output.
  */
-function runCapture(args: string[]): CliRun {
+async function runCapture(args: string[]): Promise<CliRun> {
   const lines: string[] = [];
   const capture = (...data: unknown[]): void => {
     lines.push(data.map(String).join(' '));
@@ -31,7 +31,7 @@ function runCapture(args: string[]): CliRun {
     vi.spyOn(console, 'warn').mockImplementation(capture),
   ];
   try {
-    return { code: runCli(args), output: lines.join('\n') };
+    return { code: await runCommand(args), output: lines.join('\n') };
   } finally {
     for (const spy of spies) spy.mockRestore();
   }
@@ -90,7 +90,7 @@ function writeProject(ids: string[], articleId: string, article: string): void {
 function includesOf(article: string): string[] {
   const shorts: string[] = [];
   for (const line of article.split('\n')) {
-    const match = /\{\{< include\s+blocks\/([a-z0-9-]+)\.qmd\s*>\}\}/.exec(line.trim());
+    const match = /\{\{< include\s+blocks\/_?([a-z0-9-]+)\.qmd\s*>\}\}/.exec(line.trim());
     if (match !== null) shorts.push(match[1]);
   }
   return shorts;
@@ -108,23 +108,21 @@ afterEach(() => {
  * Run `block add Methods` in a single-manuscript project and assert the
  * block heading is written and its include appended.
  *
- * @returns Resolves once the asynchronous write and assertions complete.
+ * @returns Resolves once the command and assertions complete.
  */
 async function writesBlockAndAppendsInclude(): Promise<void> {
   writeProject(['first-paper'], 'first-paper', CONTAINER);
 
-  const add = runCapture(['block', 'add', 'Methods', dir]);
+  const add = await runCapture(['block', 'add', 'Methods', dir]);
 
   expect(add.code).toBe(0);
-  await vi.waitFor(() => {
-    const block = readFileSync(
-      join(dir, 'manuscripts', 'first-paper', 'blocks', 'methods.qmd'),
-      'utf8',
-    );
-    expect(block).toBe('# Methods {#sec-methods .doco-section}\n');
-    const article = readFileSync(join(dir, 'manuscripts', 'first-paper', 'article.qmd'), 'utf8');
-    expect(includesOf(article)).toEqual(['methods']);
-  });
+  const block = readFileSync(
+    join(dir, 'manuscripts', 'first-paper', 'blocks', '_methods.qmd'),
+    'utf8',
+  );
+  expect(block).toBe('# Methods {#sec-methods .doco-section}\n');
+  const article = readFileSync(join(dir, 'manuscripts', 'first-paper', 'article.qmd'), 'utf8');
+  expect(includesOf(article)).toEqual(['methods']);
 }
 
 /**
@@ -132,20 +130,20 @@ async function writesBlockAndAppendsInclude(): Promise<void> {
  * that already includes an intro block, and assert include placement and
  * the `.deo-methods` class on the heading.
  *
- * @returns Resolves once the asynchronous write and assertions complete.
+ * @returns Resolves once the command and assertions complete.
  */
 async function insertsAfterAndAppliesType(): Promise<void> {
   const withIntro = CONTAINER.replace(
     '\n::: {#refs}',
-    '\n{{< include blocks/intro.qmd >}}\n\n::: {#refs}',
+    '\n{{< include blocks/_intro.qmd >}}\n\n::: {#refs}',
   );
   writeProject(['first-paper', 'second-paper'], 'first-paper', withIntro);
   writeFileSync(
-    join(dir, 'manuscripts', 'first-paper', 'blocks', 'intro.qmd'),
+    join(dir, 'manuscripts', 'first-paper', 'blocks', '_intro.qmd'),
     '# Introduction {#sec-intro .doco-section}\n',
   );
 
-  const add = runCapture([
+  const add = await runCapture([
     'block',
     'add',
     'Methods',
@@ -159,27 +157,73 @@ async function insertsAfterAndAppliesType(): Promise<void> {
   ]);
 
   expect(add.code).toBe(0);
-  await vi.waitFor(() => {
-    const article = readFileSync(join(dir, 'manuscripts', 'first-paper', 'article.qmd'), 'utf8');
-    expect(includesOf(article)).toEqual(['intro', 'methods']);
-    const block = readFileSync(
-      join(dir, 'manuscripts', 'first-paper', 'blocks', 'methods.qmd'),
-      'utf8',
-    );
-    expect(block).toBe('# Methods {#sec-methods .deo-methods}\n');
-  });
+  const article = readFileSync(join(dir, 'manuscripts', 'first-paper', 'article.qmd'), 'utf8');
+  expect(includesOf(article)).toEqual(['intro', 'methods']);
+  const block = readFileSync(
+    join(dir, 'manuscripts', 'first-paper', 'blocks', '_methods.qmd'),
+    'utf8',
+  );
+  expect(block).toBe('# Methods {#sec-methods .deo-methods}\n');
+}
+
+/**
+ * Run `block add Methods` against a project holding a legacy un-prefixed
+ * `blocks/intro.qmd`, and assert the legacy file is renamed to the
+ * canonical `_intro.qmd` form before the new block is written.
+ *
+ * @returns Resolves once the command and assertions complete.
+ */
+async function renamesLegacyFileBeforeWriting(): Promise<void> {
+  const withIntro = CONTAINER.replace(
+    '\n::: {#refs}',
+    '\n{{< include blocks/intro.qmd >}}\n\n::: {#refs}',
+  );
+  writeProject(['first-paper'], 'first-paper', withIntro);
+  writeFileSync(
+    join(dir, 'manuscripts', 'first-paper', 'blocks', 'intro.qmd'),
+    '# Introduction {#sec-intro .doco-section}\n',
+  );
+
+  const add = await runCapture(['block', 'add', 'Methods', dir]);
+
+  expect(add.code).toBe(0);
+  const blocksDir = join(dir, 'manuscripts', 'first-paper', 'blocks');
+  expect(readdirSync(blocksDir).sort()).toEqual(['_intro.qmd', '_methods.qmd']);
+  expect(readFileSync(join(blocksDir, '_intro.qmd'), 'utf8')).toBe(
+    '# Introduction {#sec-intro .doco-section}\n',
+  );
+  const article = readFileSync(join(dir, 'manuscripts', 'first-paper', 'article.qmd'), 'utf8');
+  expect(includesOf(article)).toEqual(['intro', 'methods']);
+}
+
+/**
+ * Run `block add` with an unknown `--type` value and assert the command
+ * resolves 1 without writing any file.
+ *
+ * @returns Resolves once the command and assertions complete.
+ */
+async function rejectsUnknownTypeWithoutWriting(): Promise<void> {
+  writeProject(['first-paper'], 'first-paper', CONTAINER);
+
+  const add = await runCapture(['block', 'add', 'Methods', dir, '--type', 'bogus']);
+
+  expect(add.code).toBe(1);
+  expect(add.output).toContain('bogus');
+  expect(readdirSync(join(dir, 'manuscripts', 'first-paper', 'blocks'))).toEqual([]);
+  const article = readFileSync(join(dir, 'manuscripts', 'first-paper', 'article.qmd'), 'utf8');
+  expect(includesOf(article)).toEqual([]);
 }
 
 /**
  * Run `block add` without `-m` in a two-manuscript project and assert the
  * failure lists both manuscript ids without writing any file.
  *
- * @returns Nothing; assertions run synchronously.
+ * @returns Resolves once the command and assertions complete.
  */
-function returnsOneListingManuscripts(): void {
+async function returnsOneListingManuscripts(): Promise<void> {
   writeFileSync(join(dir, 'opendraft.yml'), configWith(['first-paper', 'second-paper']));
 
-  const add = runCapture(['block', 'add', 'Methods', dir]);
+  const add = await runCapture(['block', 'add', 'Methods', dir]);
 
   expect(add.code).toBe(1);
   expect(add.output).toContain('first-paper');
@@ -187,15 +231,20 @@ function returnsOneListingManuscripts(): void {
   expect(readdirSync(dir)).toEqual(['opendraft.yml']);
 }
 
-describe('runCli — block add', () => {
+describe('runCommand — block add', () => {
   it(
-    'writes blocks/methods.qmd with its heading and appends its include in a single-manuscript project',
+    'writes blocks/_methods.qmd with its heading and appends its include in a single-manuscript project',
     writesBlockAndAppendsInclude,
   );
   it(
     '--after <short> inserts the include after that block and --type methods writes the .deo-methods class',
     insertsAfterAndAppliesType,
   );
+  it(
+    'renames a legacy blocks/intro.qmd to blocks/_intro.qmd before writing the new block',
+    renamesLegacyFileBeforeWriting,
+  );
+  it('rejects an unknown --type with exit 1 and writes no file', rejectsUnknownTypeWithoutWriting);
   it(
     'returns 1 listing the manuscript ids when run without -m in a two-manuscript project',
     returnsOneListingManuscripts,

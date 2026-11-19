@@ -1,31 +1,34 @@
 /**
- * Protocol pin for the OpenDraft CLI: the protocol commit embedded at
- * build time and the check that compares it against `opendraft.yml`.
+ * Protocol helpers for the OpenDraft CLI: `BUNDLED_PROTOCOL_LATEST` (pin for
+ * new projects) and `cliProtocolOptions` (resolveProtocol options).
  */
 
-import type { Finding } from './output.js';
+import type { ResolveHistory, ResolveProtocolOptions } from '@opendraft/rdf';
+import history from '../../rdf/src/protocol-history.generated.json';
+import { FileProtocolCache } from './protocol-cache.js';
+
+/** Latest protocol revision in the bundled history; the pin for new projects. */
+export const BUNDLED_PROTOCOL_LATEST: string = (history as unknown as { latest: string }).latest;
 
 /**
- * Protocol commit embedded from `protocol/protocol.manifest.json`
- * (`protocol.commit`). Kept in sync by the protocol-pin test.
- */
-export const EMBEDDED_PROTOCOL_COMMIT = 'f192c95d750b6a71b49134819b08aec509790c84';
-
-/**
- * Compare a project's pinned protocol commit against the embedded one.
+ * Build resolveProtocol options for the CLI: bundled history, file cache, global fetch.
  *
- * A mismatch pushes a warning finding onto the collector; warnings never
- * change the validate exit code.
- *
- * @param commit - `protocol.commit` read from opendraft.yml.
- * @param findings - Collector pushed onto when the commits differ.
+ * @param opts - offline flag and optional cache directory.
+ * @returns options for resolveProtocol.
  */
-export function checkProtocolPin(commit: string, findings: Finding[]): void {
-  if (commit === EMBEDDED_PROTOCOL_COMMIT) return;
-  findings.push({
-    level: 'warning',
-    location: 'opendraft.yml',
-    path: 'protocol.commit',
-    message: `protocol commit ${commit} does not match the embedded protocol commit ${EMBEDDED_PROTOCOL_COMMIT}`,
-  });
+export function cliProtocolOptions(opts: {
+  offline?: boolean;
+  cacheDir?: string;
+}): ResolveProtocolOptions {
+  const file = new FileProtocolCache(opts.cacheDir);
+  return {
+    history: history as unknown as ResolveHistory,
+    repository: 'konsulin-care/opendraft',
+    cache: {
+      get: async (key) => (await file.get(key)) ?? undefined,
+      set: (key, value) => file.set(key, value),
+    },
+    fetch: (url) => fetch(url),
+    offline: opts.offline ?? false,
+  };
 }

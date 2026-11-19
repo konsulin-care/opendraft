@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
-import { preCommitAssembly } from '@opendraft/git';
+import { validateProject } from '@opendraft/validate';
+import { IndexedDbProtocolCache } from '../project/protocol-cache';
 
 interface CommitDialogProps {
   isOpen: boolean;
@@ -60,13 +61,17 @@ export function CommitDialog({ isOpen, onClose, onCommit, workspace }: CommitDia
   const handleCommit = async () => {
     setIsCompiling(true);
     setErrors([]);
-    const result = await preCommitAssembly(workspace);
-    if (result.success) {
+    const findings = await validateProject(workspace, {
+      cache: new IndexedDbProtocolCache(),
+      fetch: (url: string) => fetch(url),
+    } as Parameters<typeof validateProject>[1]);
+    const blocking = findings.filter((f) => f.level === 'error');
+    if (blocking.length === 0) {
       onCommit(message);
       setMessage('');
       onClose();
     } else {
-      setErrors(result.errors);
+      setErrors(blocking.map((f) => `${f.path}: ${f.message}`));
     }
     setIsCompiling(false);
   };

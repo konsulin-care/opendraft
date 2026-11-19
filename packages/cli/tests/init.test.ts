@@ -2,11 +2,12 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { runCli } from '../src/index.js';
+import history from '../../rdf/src/protocol-history.generated.json';
+import { runCommand } from '../src/index.js';
 
 /** Result of one captured CLI run. */
 interface CliRun {
-  /** Exit code returned by runCli. */
+  /** Exit code resolved by runCommand. */
   code: number;
   /** Everything printed to stdout and stderr. */
   output: string;
@@ -15,12 +16,12 @@ interface CliRun {
 let dir: string;
 
 /**
- * Run the CLI with console output captured.
+ * Run the CLI asynchronously with console output captured.
  *
- * @param args - Arguments passed to runCli.
- * @returns Exit code plus the combined printed output.
+ * @param args - Arguments passed to runCommand.
+ * @returns Promise of the exit code plus the combined printed output.
  */
-function runCapture(args: string[]): CliRun {
+async function runCapture(args: string[]): Promise<CliRun> {
   const lines: string[] = [];
   const capture = (...data: unknown[]): void => {
     lines.push(data.map(String).join(' '));
@@ -31,23 +32,10 @@ function runCapture(args: string[]): CliRun {
     vi.spyOn(console, 'warn').mockImplementation(capture),
   ];
   try {
-    return { code: runCli(args), output: lines.join('\n') };
+    return { code: await runCommand(args), output: lines.join('\n') };
   } finally {
     for (const spy of spies) spy.mockRestore();
   }
-}
-
-/**
- * Wait until the scaffolded project is fully written.
- *
- * `init` dispatches its workspace writes without blocking runCli, so the
- * test waits for references.bib — the last file the scaffold writes —
- * before validating the project.
- */
-async function waitForScaffold(): Promise<void> {
-  await vi.waitFor(() => {
-    expect(existsSync(join(dir, 'manuscripts', 'references.bib'))).toBe(true);
-  });
 }
 
 beforeEach(() => {
@@ -58,30 +46,51 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-describe('runCli — init', () => {
-  it('init <dir> --manuscript paper creates a project that validate accepts with exit 0', async () => {
-    const init = runCapture(['init', dir, '--manuscript', 'paper']);
+describe('runCommand — init', () => {
+  it('init resolves 0 after opendraft.yml and manuscripts/paper/article.qmd exist', async () => {
+    const init = await runCapture(['init', dir, '--manuscript', 'paper']);
 
     expect(init.code).toBe(0);
-    await waitForScaffold();
+    expect(existsSync(join(dir, 'opendraft.yml'))).toBe(true);
+    expect(existsSync(join(dir, 'manuscripts', 'paper', 'article.qmd'))).toBe(true);
 
-    const validate = runCapture(['validate', dir]);
+    const validate = await runCapture(['validate', dir]);
+    // A scaffold has no authors/abstract, so validate reports warnings but no errors.
     expect(validate.code).toBe(0);
+    expect(validate.output).not.toContain('blocks/');
   });
 
-  it('init returns 1 and writes nothing when the target already contains opendraft.yml', () => {
+  it('a freshly initialized project validates offline with exit code 0', async () => {
+    await runCapture(['init', dir, '--manuscript', 'paper']);
+
+    const validate = await runCapture(['validate', dir, '--offline']);
+
+    expect(validate.code).toBe(0);
+    expect(validate.output).not.toContain('A publication must have at least one creator.');
+  });
+
+  it('init pins protocol version and commit to the bundled history latest', async () => {
+    const latest = (history as unknown as { latest: string }).latest;
+    await runCapture(['init', dir, '--manuscript', 'paper']);
+    const yml = readFileSync(join(dir, 'opendraft.yml'), 'utf8');
+
+    expect(yml).toMatch(new RegExp(`^\\s*version:\\s*"?${latest}"?\\s*$`, 'm'));
+    expect(yml).toMatch(new RegExp(`^\\s*commit:\\s*"?${latest}"?\\s*$`, 'm'));
+  });
+
+  it('init resolves 1 and writes nothing when the target already contains opendraft.yml', async () => {
     const sentinel = 'protocol:\n  name: opendraft\n';
     writeFileSync(join(dir, 'opendraft.yml'), sentinel);
 
-    const init = runCapture(['init', dir, '--manuscript', 'paper']);
+    const init = await runCapture(['init', dir, '--manuscript', 'paper']);
 
     expect(init.code).toBe(1);
     expect(readdirSync(dir)).toEqual(['opendraft.yml']);
     expect(readFileSync(join(dir, 'opendraft.yml'), 'utf8')).toBe(sentinel);
   });
 
-  it('init returns 1 for an invalid manuscript id', () => {
-    const init = runCapture(['init', dir, '--manuscript', 'Not A Slug']);
+  it('init resolves 1 for an invalid manuscript id', async () => {
+    const init = await runCapture(['init', dir, '--manuscript', 'Not A Slug']);
 
     expect(init.code).toBe(1);
   });

@@ -163,7 +163,7 @@ describe('BlockEditor insert points', () => {
     expect(screen.queryByRole('dialog', { name: 'Add section' })).toBeNull();
     expect(titleValues()).toEqual(['Alpha', 'Discussion', 'Beta']);
     expect(await ws.readFile(ARTICLE)).toContain(
-      '{{< include blocks/alpha.qmd >}}\n\n{{< include blocks/discussion.qmd >}}',
+      '{{< include blocks/_alpha.qmd >}}\n\n{{< include blocks/_discussion.qmd >}}',
     );
   });
 });
@@ -274,7 +274,7 @@ describe('BlockEditor add section dialog', () => {
       expect(seen).toHaveLength(1);
       expect(seen[0]).toBeInstanceOf(CustomEvent);
       expect(requestFocusForShort).toHaveBeenCalledWith('methods');
-      expect(await ws.readFile(ARTICLE)).toContain('blocks/methods.qmd');
+      expect(await ws.readFile(ARTICLE)).toContain('blocks/_methods.qmd');
       expect(screen.getByDisplayValue('Methods')).toBeInTheDocument();
     } finally {
       window.removeEventListener('opendraft:files-changed', listener);

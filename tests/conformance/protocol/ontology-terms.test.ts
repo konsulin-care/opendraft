@@ -4,11 +4,16 @@
  * Loads protocol/opendraft.ttl and asserts the SPAR/OCDM alignment:
  * - od:Publication is a subclass of fabio:Expression
  * - deleted terms (od:PublicationVersion, od:hasSubject,
- *   od:isCorrespondingAuthor, od:creditRole) have no triples
+ *   od:isCorrespondingAuthor, od:creditRole, od:Registry,
+ *   od:CollectionRegistry, od:PublicationRegistry, od:containsRegistry,
+ *   od:containsPublication, od:SubjectAssignment, od:hasAssignment,
+ *   od:assignedSubject, od:assignedBy, od:assignedAt) have no triples
  * - exactly 14 NISO CRediT role IRIs are declared as pro:Role
- * - od:isDeceased and od:onBehalfOf are declared
+ * - od:isDeceased is declared and od:onBehalfOf is gone (SCoRO agent role)
+ * - od:protocolRevision is gone (replaced by dcterms:conformsTo)
  * - no owl:imports triple (reference-only prefixes)
  */
+import { readFile } from 'node:fs/promises';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { loadTurtle, type TurtleDataset } from '@opendraft/rdf';
 
@@ -16,7 +21,7 @@ type Quad = TurtleDataset extends Iterable<infer Q> ? Q : never;
 
 const ONTOLOGY = 'protocol/opendraft.ttl';
 
-const OD = 'urn:opendraft:ontology#';
+const OD = 'https://w3id.org/opendraft/ontology#';
 const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
 const RDFS_SUBCLASS_OF = 'http://www.w3.org/2000/01/rdf-schema#subClassOf';
 const RDFS_DOMAIN = 'http://www.w3.org/2000/01/rdf-schema#domain';
@@ -24,20 +29,33 @@ const RDFS_RANGE = 'http://www.w3.org/2000/01/rdf-schema#range';
 const RDFS_LABEL = 'http://www.w3.org/2000/01/rdf-schema#label';
 const OWL_CLASS = 'http://www.w3.org/2002/07/owl#Class';
 const OWL_DATATYPE_PROPERTY = 'http://www.w3.org/2002/07/owl#DatatypeProperty';
-const OWL_OBJECT_PROPERTY = 'http://www.w3.org/2002/07/owl#ObjectProperty';
 const OWL_IMPORTS = 'http://www.w3.org/2002/07/owl#imports';
 const XSD_BOOLEAN = 'http://www.w3.org/2001/XMLSchema#boolean';
 const FOAF_PERSON = 'http://xmlns.com/foaf/0.1/Person';
-const FOAF_AGENT = 'http://xmlns.com/foaf/0.1/Agent';
 const PRO_ROLE = 'http://purl.org/spar/pro/Role';
-const PRO_ROLE_IN_TIME = 'http://purl.org/spar/pro/RoleInTime';
 const FABIO_EXPRESSION = 'http://purl.org/spar/fabio/Expression';
-const FABIO_SUBJECT_TERM = 'http://purl.org/spar/fabio/SubjectTerm';
 
 const CREDIT = 'https://credit.niso.org/contributor-roles/';
 
 /** Deleted od: terms that must not appear as subjects (ADR-018 precedent). */
-const DELETED_TERMS = ['PublicationVersion', 'hasSubject', 'isCorrespondingAuthor', 'creditRole'];
+const DELETED_TERMS = [
+  'PublicationVersion',
+  'hasSubject',
+  'isCorrespondingAuthor',
+  'creditRole',
+  'Registry',
+  'CollectionRegistry',
+  'PublicationRegistry',
+  'containsRegistry',
+  'containsPublication',
+  'SubjectAssignment',
+  'hasAssignment',
+  'assignedSubject',
+  'assignedBy',
+  'assignedAt',
+  'onBehalfOf',
+  'protocolRevision',
+];
 
 /** Namespaces that must only be referenced, never defined, by the ontology. */
 const REFERENCE_ONLY_NAMESPACES = [
@@ -51,9 +69,21 @@ const REFERENCE_ONLY_NAMESPACES = [
   'http://purl.org/spar/cito/',
   'http://purl.org/datacite/ontology/',
   'https://w3id.org/literal/',
+  'http://www.w3.org/ns/oa#',
 ];
 
 let quads: Quad[];
+let raw = '';
+
+/** True when any IRI term in the graph lives under the legacy urn: namespace. */
+function hasLegacyUrnIri(): boolean {
+  return quads.some(
+    (quad) =>
+      quad.subject.value.includes('urn:opendraft:ontology') ||
+      quad.predicate.value.includes('urn:opendraft:ontology') ||
+      quad.object.value.includes('urn:opendraft:ontology'),
+  );
+}
 
 /** Returns every quad with the given subject IRI. */
 function withSubject(iri: string): Quad[] {
@@ -87,17 +117,25 @@ function isReferenceOnlyQuad(quad: Quad): boolean {
 
 beforeAll(async () => {
   quads = [...(await loadTurtle(ONTOLOGY))];
+  raw = await readFile(ONTOLOGY, 'utf8');
+});
+
+describe('protocol/opendraft.ttl namespace', () => {
+  it('declares od: as https://w3id.org/opendraft/ontology#', () => {
+    expect(raw).toContain('@prefix od: <https://w3id.org/opendraft/ontology#>');
+    expect(OD).toBe('https://w3id.org/opendraft/ontology#');
+  });
+
+  it('contains no urn:opendraft:ontology# IRI', () => {
+    expect(raw).not.toContain('urn:opendraft:ontology#');
+    expect(hasLegacyUrnIri()).toBe(false);
+  });
 });
 
 describe('protocol/opendraft.ttl class hierarchy', () => {
   it('declares od:Publication rdfs:subClassOf fabio:Expression', () => {
     expect(hasTriple(`${OD}Publication`, RDFS_SUBCLASS_OF, FABIO_EXPRESSION)).toBe(true);
     expect(hasTriple(`${OD}Publication`, RDF_TYPE, OWL_CLASS)).toBe(true);
-  });
-
-  it('gives od:assignedSubject the range fabio:SubjectTerm', () => {
-    expect(hasTriple(`${OD}assignedSubject`, RDF_TYPE, OWL_OBJECT_PROPERTY)).toBe(true);
-    expect(hasTriple(`${OD}assignedSubject`, RDFS_RANGE, FABIO_SUBJECT_TERM)).toBe(true);
   });
 });
 
@@ -132,11 +170,14 @@ describe('protocol/opendraft.ttl author properties', () => {
     expect(hasTriple(`${OD}isDeceased`, RDFS_DOMAIN, FOAF_PERSON)).toBe(true);
   });
 
-  it('declares od:onBehalfOf from pro:RoleInTime to foaf:Agent', () => {
-    const onBehalfOf = withSubject(`${OD}onBehalfOf`);
-    expect(onBehalfOf.some((quad) => quad.object.value === OWL_OBJECT_PROPERTY)).toBe(true);
-    expect(hasTriple(`${OD}onBehalfOf`, RDFS_DOMAIN, PRO_ROLE_IN_TIME)).toBe(true);
-    expect(hasTriple(`${OD}onBehalfOf`, RDFS_RANGE, FOAF_AGENT)).toBe(true);
+  it('no longer declares od:onBehalfOf (replaced by the SCoRO agent role)', () => {
+    expect(withSubject(`${OD}onBehalfOf`)).toEqual([]);
+    expect(raw).not.toContain('onBehalfOf');
+  });
+
+  it('no longer declares od:protocolRevision (replaced by dcterms:conformsTo)', () => {
+    expect(withSubject(`${OD}protocolRevision`)).toEqual([]);
+    expect(raw).not.toContain('protocolRevision');
   });
 });
 

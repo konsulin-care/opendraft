@@ -6,6 +6,22 @@
  */
 import { isGroupAuthor } from '@opendraft/schema';
 import { normalizeOrcid, normalizeRor } from './identifiers.js';
+import {
+  block,
+  literalString,
+  termRef,
+  CREDIT,
+  DATACITE,
+  DCTERMS,
+  FOAF,
+  LITERAL,
+  OD,
+  OCO,
+  PRO,
+  ROR_PREFIX,
+  SCORO,
+  XSD,
+} from './turtle.js';
 import type {
   AffiliationObject,
   AffiliationRef,
@@ -25,20 +41,6 @@ export interface AuthorshipGraphInput {
   affiliations?: RegistryAffiliation[];
 }
 
-// Namespace constants include the opening angle bracket so that
-// `${PRO}withRole>` expands to a wrapped Turtle IRI reference.
-const PRO = '<http://purl.org/spar/pro/';
-const SCORO = '<http://purl.org/spar/scoro/';
-const OCO = '<https://w3id.org/oc/ontology/';
-const FOAF = '<http://xmlns.com/foaf/0.1/';
-const DCTERMS = '<http://purl.org/dc/terms/';
-const DATACITE = '<http://purl.org/datacite/ontology/';
-const LITERAL = '<https://w3id.org/literal/';
-const OD = '<urn:opendraft:ontology#';
-const CREDIT = '<https://credit.niso.org/contributor-roles/';
-const XSD = '<http://www.w3.org/2001/XMLSchema#';
-const ROR_PREFIX = 'https://ror.org/';
-
 /** A shared organization node keyed by ROR IRI, registry id or name. */
 interface OrgNode {
   term: string;
@@ -54,6 +56,13 @@ interface AffiliateRole {
   org: OrgNode;
 }
 
+/** A scoro:agent role linking an on-behalf-of author to their group. */
+interface BehalfRole {
+  label: string;
+  holder: string;
+  group: string;
+}
+
 /** Shared context threaded through the emission sections. */
 interface AuthorshipContext {
   publication: string;
@@ -63,30 +72,13 @@ interface AuthorshipContext {
   equal: number[];
   roleLabels: string[];
   affiliates: AffiliateRole[];
+  behalfs: BehalfRole[];
   orgs: OrgNode[];
-}
-
-/** Escape a value as a Turtle string literal. */
-function literalString(value: string): string {
-  const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-    .replace(/\n/g, '\\n').replace(/\r/g, '\\r');
-  return `"${escaped}"`;
-}
-
-function termRef(iri: string): string {
-  return `<${iri}>`;
-}
-
-function block(subject: string, pairs: string[]): string {
-  return `${subject}\n    ${pairs.join(' ;\n    ')} .`;
 }
 
 /** Emit an inline OCDM datacite:hasIdentifier node. */
 function identifierNode(scheme: 'orcid' | 'ror', value: string): string {
-  return (
-    `[ ${DATACITE}usesIdentifierScheme> ${DATACITE}${scheme}> ; ` +
-    `${LITERAL}hasLiteralValue> ${literalString(value)} ]`
-  );
+  return `[ ${DATACITE}usesIdentifierScheme> ${DATACITE}${scheme}> ; ${LITERAL}hasLiteralValue> ${literalString(value)} ]`;
 }
 
 function namePairs(name: NameValue): string[] {
@@ -105,15 +97,16 @@ function namePairs(name: NameValue): string[] {
   return pairs;
 }
 
-function agentTerm(author: AuthorObject, index: number): string {
-  if (isGroupAuthor(author)) return `_:group-${index}`;
+function agentTerm(author: AuthorObject, index: number, publication: string): string {
+  if (isGroupAuthor(author)) return termRef(`${publication}#group-${author.id ?? index}`);
   const orcid = normalizeOrcid(author.orcid);
-  return orcid ? termRef(orcid.iri) : `_:author-${index}`;
+  return orcid ? termRef(orcid.iri) : termRef(`${publication}#author-${author.id ?? index}`);
 }
 
-function memberTerm(index: number, slot: number, member: MemberObject): string {
+function memberTerm(index: number, slot: number, member: MemberObject, publication: string): string {
   const orcid = normalizeOrcid(member.orcid);
-  return orcid ? termRef(orcid.iri) : `_:group-${index}-member-${slot}`;
+  const id = typeof member.id === 'string' ? member.id : null;
+  return orcid ? termRef(orcid.iri) : termRef(`${publication}#member-${id ?? slot}`);
 }
 
 /** Resolve one affiliation item (registry ref or inline object). */
@@ -132,6 +125,7 @@ function resolveOrg(
   entry: AffiliationObject,
   orgs: OrgNode[],
   keys: Map<string, OrgNode>,
+  publication: string,
 ): OrgNode {
   const rorIri = normalizeRor(entry.ror);
   const id = typeof entry.id === 'string' && entry.id.length > 0 ? entry.id : null;
@@ -140,7 +134,7 @@ function resolveOrg(
   if (found) return found;
   const node: OrgNode = rorIri
     ? { term: termRef(rorIri), name: entry.name, rorIri, rorValue: rorIri.slice(ROR_PREFIX.length) }
-    : { term: `_:org-${orgs.length}`, name: entry.name, rorIri: null, rorValue: null };
+    : { term: termRef(`${publication}#org-${id ?? orgs.length}`), name: entry.name, rorIri: null, rorValue: null };
   orgs.push(node);
   keys.set(key, node);
   return node;
@@ -149,7 +143,7 @@ function resolveOrg(
 /** Collect agents, groups, equal contributors, roles and organizations. */
 function buildContext(input: AuthorshipGraphInput): AuthorshipContext {
   const registry = input.affiliations ?? [];
-  const agents = input.authors.map((author, index) => agentTerm(author, index));
+  const agents = input.authors.map((author, index) => agentTerm(author, index, input.publication));
   const groups = new Map<string, string>();
   input.authors.forEach((author, index) => {
     if (author.id && isGroupAuthor(author)) groups.set(author.id, agents[index]);
@@ -161,14 +155,22 @@ function buildContext(input: AuthorshipGraphInput): AuthorshipContext {
   const orgKeys = new Map<string, OrgNode>();
   const roleLabels: string[] = [];
   const affiliates: AffiliateRole[] = [];
+  const behalfs: BehalfRole[] = [];
   input.authors.forEach((author, index) => {
     roleLabels.push(`_:role-${index}`);
+    const behalf = author['on-behalf-of'];
+    const group = typeof behalf === 'string' ? groups.get(behalf) : undefined;
+    if (group) {
+      const label = `_:role-${index}-behalf`;
+      roleLabels.push(label);
+      behalfs.push({ label, holder: agents[index], group });
+    }
     (author.affiliations ?? []).forEach((item, slot) => {
       const entry = resolveAffiliation(item, registry);
       if (!entry) return;
       const label = `_:role-${index}-aff-${slot}`;
       roleLabels.push(label);
-      affiliates.push({ label, holder: agents[index], org: resolveOrg(entry, orgs, orgKeys) });
+      affiliates.push({ label, holder: agents[index], org: resolveOrg(entry, orgs, orgKeys, input.publication) });
     });
   });
   return {
@@ -179,6 +181,7 @@ function buildContext(input: AuthorshipGraphInput): AuthorshipContext {
     equal,
     roleLabels,
     affiliates,
+    behalfs,
     orgs,
   };
 }
@@ -212,9 +215,6 @@ function authorRoleBlock(author: AuthorObject, index: number, ctx: AuthorshipCon
     const peers = ctx.equal.filter((peer) => peer !== index).map((peer) => `_:role-${peer}`);
     if (peers.length > 0) pairs.push(`${SCORO}isEqualToRoleInTime> ${peers.join(' , ')}`);
   }
-  const behalf = author['on-behalf-of'];
-  const group = typeof behalf === 'string' ? ctx.groups.get(behalf) : undefined;
-  if (group) pairs.push(`${OD}onBehalfOf> ${group}`);
   return block(`_:role-${index}`, pairs);
 }
 
@@ -224,6 +224,15 @@ function affiliateBlock(role: AffiliateRole): string {
     `${PRO}withRole> ${SCORO}affiliate>`,
     `${PRO}isHeldBy> ${role.holder}`,
     `${PRO}relatesToOrganization> ${role.org.term}`,
+  ]);
+}
+
+function behalfBlock(role: BehalfRole): string {
+  return block(role.label, [
+    `a ${PRO}RoleInTime>`,
+    `${PRO}withRole> ${SCORO}agent>`,
+    `${PRO}isHeldBy> ${role.holder}`,
+    `${PRO}relatesToEntity> ${role.group}`,
   ]);
 }
 
@@ -241,17 +250,17 @@ function agentBlock(author: AuthorObject, index: number, ctx: AuthorshipContext)
 
 function groupBlock(author: AuthorObject, index: number, ctx: AuthorshipContext): string {
   const pairs = [`a ${FOAF}Group>`, ...namePairs(author.name)];
-  const members = (author.members ?? []).map((member, slot) => memberTerm(index, slot, member));
+  const members = (author.members ?? []).map((member, slot) => memberTerm(index, slot, member, ctx.publication));
   if (members.length > 0) pairs.push(`${FOAF}member> ${members.join(' , ')}`);
   return block(ctx.agents[index], pairs);
 }
 
-function memberBlocks(author: AuthorObject, index: number): string[] {
+function memberBlocks(author: AuthorObject, index: number, ctx: AuthorshipContext): string[] {
   return (author.members ?? []).map((member, slot) => {
     const pairs = [`a ${FOAF}Person>`, ...namePairs(member.name)];
     const orcid = normalizeOrcid(member.orcid);
     if (orcid) pairs.push(`${DATACITE}hasIdentifier> ${identifierNode('orcid', orcid.value)}`);
-    return block(memberTerm(index, slot, member), pairs);
+    return block(memberTerm(index, slot, member, ctx.publication), pairs);
   });
 }
 
@@ -280,9 +289,10 @@ export function emitAuthorshipGraph(input: AuthorshipGraphInput): string {
   if (publication.length > 0) blocks.push(publication);
   ctx.authors.forEach((author, index) => blocks.push(authorRoleBlock(author, index, ctx)));
   ctx.affiliates.forEach((role) => blocks.push(affiliateBlock(role)));
+  ctx.behalfs.forEach((role) => blocks.push(behalfBlock(role)));
   ctx.authors.forEach((author, index) => {
     blocks.push(agentBlock(author, index, ctx));
-    blocks.push(...memberBlocks(author, index));
+    blocks.push(...memberBlocks(author, index, ctx));
   });
   ctx.orgs.forEach((org) => blocks.push(orgBlock(org)));
   return `${blocks.join('\n\n')}\n`;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadTurtle, validateShacl } from '../src/index.js';
+import { loadTurtle, parseTurtle, validateShacl } from '../src/index.js';
 import type { ShaclValidationReport } from '../src/types.js';
 import { fileURLToPath } from 'node:url';
 
@@ -15,6 +15,52 @@ const REGISTRY_SHAPES = protocol('registry.shacl.ttl');
 const INVALID_MISSING_TITLE = conformance('fixtures/invalid/article-missing-title.ttl');
 const INVALID_BAD_REVISION = conformance('fixtures/invalid/article-invalid-revision.ttl');
 const INVALID_MIXED_REGISTRY = conformance('fixtures/invalid/registry-mixed-types.ttl');
+
+describe('parseTurtle', () => {
+  it('returns a dataset containing the triples of the Turtle string', () => {
+    const dataset = parseTurtle(`
+      @prefix ex: <https://example.org/> .
+      ex:alpha ex:label "Alpha" .
+      ex:alpha ex:related ex:beta .
+    `);
+
+    expect(dataset.size).toBe(2);
+    const triples = [...dataset].map((quad) => [
+      quad.subject.value,
+      quad.predicate.value,
+      quad.object.value,
+    ]);
+    expect(triples).toContainEqual([
+      'https://example.org/alpha',
+      'https://example.org/label',
+      'Alpha',
+    ]);
+    expect(triples).toContainEqual([
+      'https://example.org/alpha',
+      'https://example.org/related',
+      'https://example.org/beta',
+    ]);
+  });
+
+  it('parses prefixed names, base IRIs and blank nodes', () => {
+    const dataset = parseTurtle(`
+      @base <https://example.org/> .
+      @prefix foaf: <http://xmlns.com/foaf/0.1/> .
+      <#alice> foaf:name "Alice" ;
+               foaf:nick [ foaf:note "hi" ] .
+    `);
+
+    expect(dataset.size).toBe(3);
+    const predicates = new Set([...dataset].map((quad) => quad.predicate.value));
+    expect(predicates).toContain('http://xmlns.com/foaf/0.1/name');
+    expect(predicates).toContain('http://xmlns.com/foaf/0.1/nick');
+    expect(predicates).toContain('http://xmlns.com/foaf/0.1/note');
+  });
+
+  it('throws on invalid Turtle', () => {
+    expect(() => parseTurtle('<http://example.org/a> <http://example.org/b>')).toThrow();
+  });
+});
 
 describe('loadTurtle', () => {
   it('parses a Turtle file into an RDF/JS dataset', async () => {

@@ -79,10 +79,8 @@ jobs:
       - uses: jdx/mise-action@v2
       - run: mise install
       - run: pnpm install --frozen-lockfile
-      - name: Build CLI bundle
-        run: mise run build-cli
       - name: Smoke test packed CLI
-        run: bash packages/cli/scripts/smoke.sh
+        run: mise run smoke-cli
 
   security:
     name: Security

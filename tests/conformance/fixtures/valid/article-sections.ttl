@@ -1,0 +1,79 @@
+# Valid fixture: release publication with sourced sections (T27)
+#
+# Conforms to the union of protocol/article.shacl.ttl and
+# protocol/article-release.shacl.ttl: the od:Publication carries a
+# version DOI, realizes a fabio:Work and declares repository URL and
+# source revision; its dcterms:hasPart sections are doco:Section
+# nodes with exactly one title, at most one deo role class, an
+# oco:hasNext chain, and a dcterms:source IRI to the block file.
+# Edge fixture for tests/conformance only; not a shipped protocol
+# artifact.
+
+@prefix od: <https://w3id.org/opendraft/ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix fabio: <http://purl.org/spar/fabio/> .
+@prefix frbr: <http://purl.org/vocab/frbr/core#> .
+@prefix pro: <http://purl.org/spar/pro/> .
+@prefix scoro: <http://purl.org/spar/scoro/> .
+@prefix oco: <https://w3id.org/oc/ontology/> .
+@prefix doco: <http://purl.org/spar/doco/> .
+@prefix deo: <http://purl.org/spar/deo/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix ex: <https://example.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:sections-work
+    a fabio:Work ;
+    dcterms:title "Sections example" .
+
+ex:sections-publication
+    a od:Publication ;
+    dcterms:title "Sections example" ;
+    dcterms:creator ex:alice ;
+    dcterms:identifier <https://doi.org/10.5555/example-sections> ;
+    dcterms:license <http://creativecommons.org/licenses/by/4.0/> ;
+    od:repositoryUrl "https://github.com/konsulin-care/opendraft"^^xsd:anyURI ;
+    od:manuscriptPath "manuscripts/sections/article.qmd" ;
+    od:sourceRevision "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d" ;
+    dcterms:conformsTo <https://github.com/konsulin-care/opendraft/tree/1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d/protocol> ;
+    frbr:realizationOf ex:sections-work ;
+    dcterms:hasPart ex:sec-intro , ex:sec-methods , ex:sec-results ;
+    pro:isDocumentContextFor ex:author-role , ex:affiliate-role .
+
+ex:author-role
+    a pro:RoleInTime ;
+    pro:withRole pro:author , scoro:corresponding-author ;
+    pro:isHeldBy ex:alice .
+
+ex:affiliate-role
+    a pro:RoleInTime ;
+    pro:withRole scoro:affiliate ;
+    pro:isHeldBy ex:alice ;
+    pro:relatesToOrganization ex:org .
+
+ex:alice
+    a foaf:Person ;
+    foaf:givenName "Alice" ;
+    foaf:familyName "Smith" ;
+    foaf:mbox <mailto:alice@example.edu> .
+
+ex:org
+    a foaf:Organization ;
+    foaf:name "University of Indonesia" .
+
+ex:sec-intro
+    a doco:Section , deo:Introduction ;
+    dcterms:title "Introduction" ;
+    dcterms:source <https://raw.githubusercontent.com/konsulin-care/opendraft/1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d/blocks/_intro.qmd> ;
+    oco:hasNext ex:sec-methods .
+
+ex:sec-methods
+    a doco:Section , deo:Methods ;
+    dcterms:title "Methods" ;
+    dcterms:source <https://raw.githubusercontent.com/konsulin-care/opendraft/1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d/blocks/_methods.qmd> ;
+    oco:hasNext ex:sec-results .
+
+ex:sec-results
+    a doco:Section , deo:Results ;
+    dcterms:title "Results" ;
+    dcterms:source <https://raw.githubusercontent.com/konsulin-care/opendraft/1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d/blocks/_results.qmd> .

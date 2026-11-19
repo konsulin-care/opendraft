@@ -14,6 +14,7 @@ The protocol needs to be distributed, versioned, and independently verifiable.
 Protocol represented as RDF/Turtle:
 - `opendraft.ttl` — core vocabulary
 - `article.shacl.ttl` — article validation
+- `article-release.shacl.ttl` — release-only shapes, applied on top of `article.shacl.ttl` for releases (see [ADR-026](026-runtime-validation-and-protocol-distribution.md))
 - `registry.shacl.ttl` — registry validation
 - `registry.ttl` — registry vocabulary
 
@@ -26,6 +27,8 @@ Protocol represented as RDF/Turtle:
 - Protocol rationale in `manuscripts/distributed-scientific-publication/`.
 - Machine-readable definitions in TTL.
 - Human-readable explanations in manuscript.
+
+Resolution order (bundled -> cache -> raw GitHub -> skip) and the `compatibleSince` rule are defined in [ADR-026](026-runtime-validation-and-protocol-distribution.md).
 
 ## Consequences
 

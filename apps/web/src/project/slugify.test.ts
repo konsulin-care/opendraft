@@ -29,6 +29,7 @@ describe('isValidManuscriptId', () => {
   it('accepts lowercase identifiers with hyphens', () => {
     expect(isValidManuscriptId('my-paper')).toBe(true);
     expect(isValidManuscriptId('untitled-project')).toBe(true);
+    expect(isValidManuscriptId('my-article')).toBe(true);
   });
 
   it('rejects uppercase, underscores and edge hyphens', () => {
@@ -36,5 +37,7 @@ describe('isValidManuscriptId', () => {
     expect(isValidManuscriptId('-lead')).toBe(false);
     expect(isValidManuscriptId('trail-')).toBe(false);
     expect(isValidManuscriptId('')).toBe(false);
+    expect(isValidManuscriptId('-article')).toBe(false);
+    expect(isValidManuscriptId('my_article')).toBe(false);
   });
 });

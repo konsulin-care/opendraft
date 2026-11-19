@@ -33,7 +33,7 @@ const PRESETS = ['Introduction', 'Methods', 'Results', 'Discussion', 'Conclusion
  * @returns article.qmd text with front matter and a refs fence.
  */
 function articleWith(...shorts: string[]): string {
-  const includes = shorts.map((short) => `{{< include blocks/${short}.qmd >}}`).join('\n\n');
+  const includes = shorts.map((short) => `{{< include blocks/_${short}.qmd >}}`).join('\n\n');
   return `---\nmetadata-files:\n- _author.yml\n---\n\n${includes}\n\n::: {#refs}\n:::\n`;
 }
 
@@ -65,8 +65,8 @@ describe('ManuscriptView metadata panel placement', () => {
   it('renders the metadata panel and the block editor list in the same reading column', async () => {
     await renderView({
       [`${DIR}/article.qmd`]: articleWith('intro', 'methods'),
-      [`${DIR}/blocks/intro.qmd`]: blockFile('intro', 'Introduction'),
-      [`${DIR}/blocks/methods.qmd`]: blockFile('methods', 'Methods'),
+      [`${DIR}/blocks/_intro.qmd`]: blockFile('intro', 'Introduction'),
+      [`${DIR}/blocks/_methods.qmd`]: blockFile('methods', 'Methods'),
     });
     const panel = await screen.findByTestId('metadata-panel');
     const headings = await screen.findAllByTestId('block-title');
@@ -90,7 +90,7 @@ describe('ManuscriptView toolbar placement', () => {
   it('renders the formatting toolbar as the first child, outside the scroll container', async () => {
     await renderView({
       [`${DIR}/article.qmd`]: articleWith('intro'),
-      [`${DIR}/blocks/intro.qmd`]: blockFile('intro', 'Introduction'),
+      [`${DIR}/blocks/_intro.qmd`]: blockFile('intro', 'Introduction'),
     });
     const surface = screen.getByTestId('manuscript-view');
     const toolbar = await screen.findByRole('toolbar', { name: 'Formatting' });
@@ -125,7 +125,7 @@ describe('ManuscriptView formatting toolbar', () => {
     try {
       await renderView({
         [`${DIR}/article.qmd`]: articleWith('intro'),
-        [`${DIR}/blocks/intro.qmd`]: blockFile('intro', 'Introduction'),
+        [`${DIR}/blocks/_intro.qmd`]: blockFile('intro', 'Introduction'),
       });
       expect(
         await screen.findByRole('toolbar', { name: 'Formatting' }),
@@ -140,7 +140,7 @@ describe('ManuscriptView add section button', () => {
   it("shows an always-visible '+ Add section' without hover classes", async () => {
     await renderView({
       [`${DIR}/article.qmd`]: articleWith('intro'),
-      [`${DIR}/blocks/intro.qmd`]: blockFile('intro', 'Introduction'),
+      [`${DIR}/blocks/_intro.qmd`]: blockFile('intro', 'Introduction'),
     });
     const add = await screen.findByRole('button', { name: '+ Add section' });
     expect(add.className).not.toContain('opacity-0');

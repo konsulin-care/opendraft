@@ -6,7 +6,7 @@ import { ManuscriptEditor } from "./components/ManuscriptEditor";
 import { ManuscriptView } from "./components/ManuscriptView";
 
 /** Manuscript block path: opens in the source-only editor. */
-const DOC_PATH = "manuscripts/p/blocks/01hxyz000000000000000000000000.qmd";
+const DOC_PATH = "manuscripts/p/blocks/_01hxyz000000000000000000000000.qmd";
 
 /** Resolve on the next animation frame. */
 const nextFrame = (): Promise<void> =>

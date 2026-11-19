@@ -32,7 +32,7 @@ const BLOCKS = `${DIR}/blocks`;
  * @returns article.qmd text.
  */
 function articleWith(...shorts: string[]): string {
-  const includes = shorts.map((short) => `{{< include blocks/${short}.qmd >}}`).join('\n\n');
+  const includes = shorts.map((short) => `{{< include blocks/_${short}.qmd >}}`).join('\n\n');
   return `---\nmetadata-files:\n- _author.yml\n---\n\n${includes}\n\n::: {#refs}\n:::\n`;
 }
 
@@ -85,7 +85,7 @@ function commitTitle(index: number, value: string): void {
  */
 async function expectBlock(ws: WorkspaceAdapter, short: string, text: string): Promise<void> {
   await waitFor(async () => {
-    expect(await ws.readFile(`${BLOCKS}/${short}.qmd`)).toBe(text);
+    expect(await ws.readFile(`${BLOCKS}/_${short}.qmd`)).toBe(text);
   });
 }
 
@@ -97,8 +97,8 @@ describe('BlockEditor title commit keeps section identity', () => {
     });
     commitTitle(0, 'Background');
     await expectBlock(ws, 'alpha', '# Background {#sec-alpha .deo-section}\nBody.\n');
-    expect(await ws.readFile(`${BLOCKS}/background.qmd`)).toBeNull();
-    expect(await ws.listFiles(BLOCKS)).toEqual(['alpha.qmd']);
+    expect(await ws.readFile(`${BLOCKS}/_background.qmd`)).toBeNull();
+    expect(await ws.listFiles(BLOCKS)).toEqual(['_alpha.qmd']);
     expect(await ws.readFile(ARTICLE)).toBe(articleWith('alpha'));
   });
 });
@@ -116,7 +116,7 @@ describe('BlockEditor title round-trip keeps section identity', () => {
     });
     commitTitle(0, 'Introduction');
     await expectBlock(ws, 'introduction', blockFile('introduction', 'Introduction', 'Intro body.\n'));
-    expect(await ws.listFiles(BLOCKS)).toEqual(['introduction.qmd']);
+    expect(await ws.listFiles(BLOCKS)).toEqual(['_introduction.qmd']);
     expect(await ws.readFile(ARTICLE)).toBe(articleWith('introduction'));
   });
 });
@@ -131,6 +131,6 @@ describe('BlockEditor title commit leaves references alone', () => {
     });
     commitTitle(0, 'Background');
     await expectBlock(ws, 'alpha', '# Background {#sec-alpha .deo-section}\nBody.\n');
-    expect(await ws.readFile(`${BLOCKS}/beta.qmd`)).toBe(beta);
+    expect(await ws.readFile(`${BLOCKS}/_beta.qmd`)).toBe(beta);
   });
 });

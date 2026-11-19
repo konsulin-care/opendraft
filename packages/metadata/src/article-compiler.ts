@@ -2,7 +2,22 @@
  * Article compiler: assembles article.qmd from a block manifest.
  */
 
-import { validateManifest, validateAssembly, type ManifestData } from '@opendraft/schema';
+import {
+  validateManifest,
+  validateAssembly,
+  SHORT_NAME_PATTERN,
+  includeLine,
+  type ManifestData,
+} from '@opendraft/schema';
+
+/** Short-name infix lifted from naming's SHORT_NAME_PATTERN (anchors stripped). */
+const SHORT_INFIX = SHORT_NAME_PATTERN.source.slice(1, -1);
+
+/** Matches a prefixed include shortcode with flexible whitespace, capturing the short name. */
+const PREFIXED_INCLUDE_RE = new RegExp(
+  `\\{\\{< include\\s+blocks/_(${SHORT_INFIX})\\.qmd\\s*>\\}\\}`,
+  'g',
+);
 
 /** Front matter block with metadata-files list. */
 function buildFrontMatter(metadataFiles: string[]): string[] {
@@ -98,9 +113,10 @@ export interface AssemblyCompileResult {
  * Validate and normalize an authored assembly into article.qmd.
  *
  * The assembly is the source of truth: front matter, glue prose and the
- * references trailer pass through verbatim; only include shortcodes are
- * rewritten to their canonical `{{< include blocks/<file>.qmd >}}` form.
- * Draft (orphan) files are allowed; they simply are not included.
+ * references trailer pass through verbatim; prefixed include shortcodes
+ * are normalized to their canonical `{{< include blocks/_<short>.qmd >}}`
+ * form (single spaces around the path). Draft (orphan) files are allowed;
+ * they simply are not included.
  *
  * @param assembly - Authored assembly markdown (article.qmd content).
  * @param blocks - Block contents keyed by `blocks/<slug>.qmd`.
@@ -113,8 +129,8 @@ export function compileAssembly(assembly: string, blocks: Record<string, string>
   }
 
   const canonical = assembly.replace(
-    /\{\{< include\s+(blocks\/[a-z0-9][a-z0-9-]*\.qmd)\s*>\}\}/g,
-    (_line: string, path: string) => `{{< include ${path} >}}`,
+    PREFIXED_INCLUDE_RE,
+    (_line: string, short: string) => includeLine(short),
   );
   return { success: true, article: `${canonical.trimEnd()}\n`, errors: [] };
 }

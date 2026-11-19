@@ -1,31 +1,21 @@
-import { readFile } from 'node:fs/promises';
-import { Readable } from 'node:stream';
-import rdf from '@rdfjs/dataset';
-import ParserN3 from '@rdfjs/parser-n3';
 import SHACLValidator from 'rdf-validate-shacl';
-import type { Quad } from '@rdfjs/types';
+import { parseTurtle } from './parse.js';
 import type { ShaclValidationReport, ShaclValidationResult, TurtleDataset } from './types.js';
-
-const parser = new ParserN3();
 
 /**
  * Parses a Turtle (.ttl) file into an RDF/JS DatasetCore.
+ *
+ * The filesystem read is loaded through a dynamic import so this module keeps
+ * no static `node:` imports and stays browser-safe.
  *
  * @param path - Filesystem path to the Turtle file.
  * @returns Resolves to a dataset containing every quad in the file.
  * @throws When the file cannot be read or parsed as Turtle.
  */
 export async function loadTurtle(path: string): Promise<TurtleDataset> {
+  const { readFile } = await import('node:fs/promises');
   const content = await readFile(path, 'utf8');
-  const input = Readable.from([content]);
-  const quads: Quad[] = [];
-
-  const output = parser.import(input) as unknown as AsyncIterable<Quad>;
-  for await (const quad of output) {
-    quads.push(quad);
-  }
-
-  return rdf.dataset(quads);
+  return parseTurtle(content);
 }
 
 /**

@@ -1,9 +1,10 @@
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { loadTurtle } from '@opendraft/rdf';
-import type { TurtleDataset } from '@opendraft/rdf';
+import { loadTurtle, validateShacl } from '@opendraft/rdf';
+import type { ShaclValidationReport, TurtleDataset } from '@opendraft/rdf';
 import { emitAuthorshipGraph } from '../src/rdf/authorship-graph.js';
 import type { AuthorObject, RegistryAffiliation } from '../src/types/author.js';
 
@@ -16,9 +17,11 @@ const FOAF = 'http://xmlns.com/foaf/0.1/';
 const DCTERMS = 'http://purl.org/dc/terms/';
 const DATACITE = 'http://purl.org/datacite/ontology/';
 const LITERAL = 'https://w3id.org/literal/';
-const OD = 'urn:opendraft:ontology#';
+const OD = 'https://w3id.org/opendraft/ontology#';
 const CREDIT = 'https://credit.niso.org/contributor-roles/';
 const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
+// Repo-root protocol/ resolved from this file: suites run with cwd = packages/metadata.
+const ARTICLE_SHAPES = fileURLToPath(new URL('../../../protocol/article.shacl.ttl', import.meta.url));
 
 // Four-author fixture: ORCID corresponding person, non-ORCID person,
 // equal contributor, group with 2 members and on-behalf-of.
@@ -34,7 +37,7 @@ const AUTHORS: AuthorObject[] = [
     affiliations: [{ ref: 'ui' }, { ref: 'rscm' }],
   },
   {
-    id: 'budi',
+    id: 'budi-lee',
     name: { given: 'Budi', family: 'Lee' },
     email: 'budi.lee@example.edu',
     'equal-contributor': true,
@@ -76,6 +79,7 @@ interface Seen {
 let seen: Seen[] = [];
 let chain: string[] = [];
 let holders: string[] = [];
+let report: ShaclValidationReport;
 
 /** Parse an emitted Turtle fragment via a temp file. */
 async function loadFragment(turtle: string): Promise<TurtleDataset> {
@@ -85,11 +89,9 @@ async function loadFragment(turtle: string): Promise<TurtleDataset> {
   return loadTurtle(file);
 }
 
-/** Emit a one-author graph and parse it into Seen rows. */
-async function singleAuthorSeen(author: AuthorObject): Promise<Seen[]> {
-  const turtle = emitAuthorshipGraph({ publication: PUB, authors: [author] });
-  const quads = [...(await loadFragment(turtle))];
-  return quads.map((q) => ({
+/** Convert a parsed Turtle dataset into Seen rows. */
+function toSeen(dataset: TurtleDataset): Seen[] {
+  return [...dataset].map((q) => ({
     s: q.subject.value,
     skind: q.subject.termType,
     p: q.predicate.value,
@@ -97,6 +99,11 @@ async function singleAuthorSeen(author: AuthorObject): Promise<Seen[]> {
     kind: q.object.termType,
     datatype: q.object.termType === 'Literal' ? q.object.datatype.value : undefined,
   }));
+}
+
+/** Emit a graph for the given authors and parse it into Seen rows. */
+async function singleAuthorSeen(...authors: AuthorObject[]): Promise<Seen[]> {
+  return toSeen(await loadFragment(emitAuthorshipGraph({ publication: PUB, authors })));
 }
 
 /** Follow oco:hasNext from the unique head; returns the visited chain. */
@@ -107,8 +114,7 @@ function walkChain(authorRoles: string[]): string[] {
   let current: string | undefined = head;
   while (current && !visited.includes(current)) {
     visited.push(current);
-    const next = values(current, `${OCO}hasNext`);
-    current = next.length > 0 ? next[0] : undefined;
+    current = values(current, `${OCO}hasNext`)[0];
   }
   return visited;
 }
@@ -126,17 +132,11 @@ function subjects(predicate: string, object: string): string[] {
 }
 
 beforeAll(async () => {
-  const turtle = emitAuthorshipGraph({ publication: PUB, authors: AUTHORS, affiliations: REGISTRY });
-  seen = [...(await loadFragment(turtle))].map((q) => ({
-    s: q.subject.value,
-    skind: q.subject.termType,
-    p: q.predicate.value,
-    o: q.object.value,
-    kind: q.object.termType,
-    datatype: q.object.termType === 'Literal' ? q.object.datatype.value : undefined,
-  }));
+  const dataset = await loadFragment(emitAuthorshipGraph({ publication: PUB, authors: AUTHORS, affiliations: REGISTRY }));
+  seen = toSeen(dataset);
   chain = walkChain(subjects(`${PRO}withRole`, `${PRO}author`));
   holders = chain.map((role) => values(role, `${PRO}isHeldBy`)[0] ?? '');
+  report = await validateShacl(dataset, await loadTurtle(ARTICLE_SHAPES));
 });
 
 describe('author roles and order', () => {
@@ -155,13 +155,16 @@ describe('author roles and order', () => {
     }
   });
 
-  it('holds roles by the ORCID person and blank nodes for the rest', () => {
+  it('holds roles by the ORCID person and publication-scoped persons', () => {
     expect(holders[0]).toBe(ALICE_IRI);
     const alice = seen.find((q) => q.s === holders[0] && q.p === RDF_TYPE);
     expect(alice?.o).toBe(`${FOAF}Person`);
-    for (const holder of holders.slice(1)) {
-      expect(seen.find((q) => q.s === holder && q.p === RDF_TYPE)?.skind).toBe('BlankNode');
+    expect(holders[1]).toBe(`${PUB}#author-budi-lee`);
+    expect(holders[2]).toBe(`${PUB}#author-vina`);
+    for (const holder of [holders[1], holders[2]]) {
+      expect(seen.find((q) => q.s === holder && q.p === RDF_TYPE)?.o).toBe(`${FOAF}Person`);
     }
+    expect(holders[3]).toBe(`${PUB}#group-wdwg`);
   });
 });
 
@@ -183,8 +186,11 @@ describe('role flags and agents', () => {
     );
   });
 
-  it('records od:onBehalfOf and models the group with members', () => {
-    const group = values(chain[1], `${OD}onBehalfOf`)[0] ?? '';
+  it('emits a scoro:agent role for an author writing on behalf of a group', () => {
+    const roles = subjects(`${PRO}withRole`, `${SCORO}agent`);
+    expect(roles).toHaveLength(1);
+    expect(values(roles[0], `${PRO}isHeldBy`)).toEqual([holders[1]]);
+    const group = values(roles[0], `${PRO}relatesToEntity`)[0] ?? '';
     expect(seen.find((q) => q.s === group && q.p === RDF_TYPE)?.o).toBe(`${FOAF}Group`);
     expect(values(group, `${FOAF}name`)).toEqual(['WHO Diabetes Work Group']);
     const members = values(group, `${FOAF}member`);
@@ -194,6 +200,12 @@ describe('role flags and agents', () => {
     }
     expect(seen.some((q) => q.s === members[1] && q.p === `${FOAF}name` && q.o === 'Dewi Suharto'))
       .toBe(true);
+  });
+
+  it('emits no od:onBehalfOf triple and conforms to article.shacl.ttl', () => {
+    expect(seen.filter((q) => q.p === `${OD}onBehalfOf`)).toHaveLength(0);
+    expect(report.conforms).toBe(true);
+    expect(report.results).toHaveLength(0);
   });
 
   it('flags deceased authors with od:isDeceased', () => {
@@ -227,10 +239,16 @@ describe('identifiers, organizations and shortcuts', () => {
     expect(orgs.filter((org) => org === 'https://ror.org/05dxgng32')).toHaveLength(2);
   });
 
+  it('mints a no-ROR affiliation with id unair as PUB#org-unair', async () => {
+    const rows = await singleAuthorSeen({ name: 'Dewi', affiliations: [{ id: 'unair', name: 'Airlangga' }] });
+    expect(rows.find((q) => q.p === `${PRO}relatesToOrganization`)?.o).toBe(`${PUB}#org-unair`);
+  });
+
   it('emits exactly four dcterms:creator triples on the publication', () => {
     const creators = objs(PUB, `${DCTERMS}creator`);
     expect(creators).toHaveLength(4);
     expect(creators.map((q) => q.o)).toContain(ALICE_IRI);
+    expect(creators.map((q) => q.o)).toContain(`${PUB}#author-budi-lee`);
   });
 
   it('restricts CRediT role IRIs to the NISO namespace', () => {
@@ -241,20 +259,18 @@ describe('identifiers, organizations and shortcuts', () => {
 
   it('lists every author and affiliate role in the publication context', () => {
     const context = values(PUB, `${PRO}isDocumentContextFor`);
-    expect(context).toHaveLength(8);
+    expect(context).toHaveLength(9);
     expect(chain.every((role) => context.includes(role))).toBe(true);
   });
 });
 
 describe('single-name authors and explicit author type', () => {
   it('emits a literal-only name with author-type person as foaf:Person', async () => {
-    const rows = await singleAuthorSeen({
-      name: { literal: 'Plato' },
-      metadata: { 'author-type': 'person' },
-    });
+    const rows = await singleAuthorSeen({ name: { literal: 'Plato' }, metadata: { 'author-type': 'person' } });
     const person = rows.find((q) => q.p === RDF_TYPE && q.o === `${FOAF}Person`);
     expect(person).toBeDefined();
-    expect(person?.skind).toBe('BlankNode');
+    expect(person?.skind).toBe('NamedNode');
+    expect(person?.s).toBe(`${PUB}#author-0`);
     expect(rows.filter((q) => q.p === RDF_TYPE && q.o === `${FOAF}Group`)).toHaveLength(0);
     expect(rows.filter((q) => q.p === `${FOAF}name`).map((q) => q.o)).toEqual(['Plato']);
   });
@@ -264,14 +280,19 @@ describe('single-name authors and explicit author type', () => {
       name: { literal: 'Plato Collective' },
       metadata: { 'author-type': 'group' },
     });
-    expect(rows.find((q) => q.p === RDF_TYPE && q.o === `${FOAF}Group`)).toBeDefined();
+    expect(rows.find((q) => q.p === RDF_TYPE && q.o === `${FOAF}Group`)?.s).toBe(`${PUB}#group-0`);
     expect(rows.filter((q) => q.p === RDF_TYPE && q.o === `${FOAF}Person`)).toHaveLength(0);
     expect(rows.filter((q) => q.p === `${FOAF}name`).map((q) => q.o)).toEqual(['Plato Collective']);
   });
 
   it('keeps legacy literal-only names without author-type as foaf:Group', async () => {
     const rows = await singleAuthorSeen({ name: { literal: 'Legacy Consortium' } });
-    expect(rows.find((q) => q.p === RDF_TYPE && q.o === `${FOAF}Group`)).toBeDefined();
+    expect(rows.find((q) => q.p === RDF_TYPE && q.o === `${FOAF}Group`)?.s).toBe(`${PUB}#group-0`);
     expect(rows.filter((q) => q.p === RDF_TYPE && q.o === `${FOAF}Person`)).toHaveLength(0);
+  });
+
+  it('mints a no-id group at authors index 2 as PUB#group-2', async () => {
+    const rows = await singleAuthorSeen({ name: 'Ann' }, { name: 'Bob' }, { name: { literal: 'C' } });
+    expect(rows.find((q) => q.p === RDF_TYPE && q.o === `${FOAF}Group`)?.s).toBe(`${PUB}#group-2`);
   });
 });

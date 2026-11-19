@@ -1,14 +1,16 @@
 # OpenDraft Ontology
 #
 # The canonical RDF vocabulary for the OpenDraft protocol.
-# Namespace: urn:opendraft:ontology#
+# Namespace: https://w3id.org/opendraft/ontology#
 # Prefix: od:
 #
 # The protocol reuses established vocabularies instead of defining
 # custom terms where possible (SPAR/OCDM alignment, ADR-021):
-#   - SPAR: FaBiO (fabio: Expression, Work, SubjectTerm), FRBR (frbr:
-#     realizationOf, revisionOf), PRO (pro: Role, RoleInTime, isHeldBy,
-#     withRole), SCoRO (scoro: corresponding-author, affiliate)
+#   - SPAR: FaBiO (fabio: Expression, Work, SubjectTerm,
+#     ExpressionCollection), FRBR (frbr: realizationOf, revisionOf,
+#     part), PRO (pro: Role, RoleInTime, isHeldBy,
+#     withRole), SCoRO (scoro: agent, corresponding-author, affiliate),
+#     DOCO (doco: Section) and DEO (deo: section roles)
 #   - OpenCitations: OCO (oco: hasNext for author order); OCDM patterns
 #     via the DataCite (datacite:) and Literal (literal:) ontologies
 #   - PRISM (prism: versionIdentifier, keyword), FRAPO (frapo: Grant),
@@ -19,12 +21,15 @@
 # this ontology does NOT owl:import them (reference-only prefixes).
 #
 # Custom od: terms cover only what existing vocabularies do not express:
-#   - Git-specific provenance (source revision, protocol revision, repository URL)
-#   - Registry structure (collection vs publication registries)
-#   - Subject assignment reification (who assigned, when)
-#   - Author flags: isDeceased, onBehalfOf
+#   - Git-specific provenance (source revision, repository URL); the
+#     pinned protocol revision is expressed as dcterms:conformsTo
+#   - Author flags: isDeceased
+#
+# Subject assignments follow the W3C Web Annotation Data Model
+# (oa:Annotation motivated by oa:classifying); the oa: prefix below is
+# declared for reference only.
 
-@prefix od: <urn:opendraft:ontology#> .
+@prefix od: <https://w3id.org/opendraft/ontology#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
@@ -44,6 +49,9 @@
 @prefix datacite: <http://purl.org/datacite/ontology/> .
 @prefix literal: <https://w3id.org/literal/> .
 @prefix credit: <https://credit.niso.org/contributor-roles/> .
+@prefix oa: <http://www.w3.org/ns/oa#> .
+@prefix doco: <http://purl.org/spar/doco/> .
+@prefix deo: <http://purl.org/spar/deo/> .
 
 
 # =============================================================================
@@ -54,29 +62,7 @@ od:Publication
     rdf:type owl:Class ;
     rdfs:subClassOf fabio:Expression ;
     rdfs:label "Publication" ;
-    rdfs:comment "A published version of an article: one fabio:Expression that is the sole frbr:realizationOf a fabio:Work. Identified by its version DOI. Carries repository URL, source revision, protocol revision, and subject assignments." .
-
-od:Registry
-    rdf:type owl:Class ;
-    rdfs:label "Registry" ;
-    rdfs:comment "Abstract base class for publication registries. Registries are either collection registries (referencing other registries) or publication registries (referencing publications). Never both." .
-
-od:CollectionRegistry
-    rdf:type owl:Class ;
-    rdfs:subClassOf od:Registry ;
-    rdfs:label "Collection Registry" ;
-    rdfs:comment "A registry that references other registries. Must not directly contain publications." .
-
-od:PublicationRegistry
-    rdf:type owl:Class ;
-    rdfs:subClassOf od:Registry ;
-    rdfs:label "Publication Registry" ;
-    rdfs:comment "A registry that references publications. Must not contain other registries." .
-
-od:SubjectAssignment
-    rdf:type owl:Class ;
-    rdfs:label "Subject Assignment" ;
-    rdfs:comment "A reified assertion linking a publication to a SKOS subject concept, with provenance about who assigned it and when. Distinguishes author-declared from indexer-assigned subjects." .
+    rdfs:comment "A published version of an article: one fabio:Expression that is the sole frbr:realizationOf a fabio:Work. Identified by its version DOI. Carries repository URL, source revision, and a dcterms:conformsTo link to the pinned protocol revision." .
 
 
 # =============================================================================
@@ -97,52 +83,12 @@ od:sourceRevision
     rdfs:label "source revision" ;
     rdfs:comment "Full 40-character Git commit SHA of the source revision." .
 
-od:protocolRevision
-    rdf:type owl:DatatypeProperty ;
-    rdfs:domain od:Publication ;
-    rdfs:range xsd:string ;
-    rdfs:label "protocol revision" ;
-    rdfs:comment "Full 40-character Git commit SHA of the OpenDraft protocol revision." .
-
 od:manuscriptPath
     rdf:type owl:DatatypeProperty ;
     rdfs:domain od:Publication ;
     rdfs:range xsd:string ;
     rdfs:label "manuscript path" ;
     rdfs:comment "Path to the manuscript file within the source repository." .
-
-
-# =============================================================================
-# PROPERTIES — Subject assignment (reified pattern)
-# =============================================================================
-
-od:hasAssignment
-    rdf:type owl:ObjectProperty ;
-    rdfs:domain od:Publication ;
-    rdfs:range od:SubjectAssignment ;
-    rdfs:label "has subject assignment" ;
-    rdfs:comment "Links a publication to a subject assignment. Each assignment binds one SKOS subject term to the publication with provenance." .
-
-od:assignedSubject
-    rdf:type owl:ObjectProperty ;
-    rdfs:domain od:SubjectAssignment ;
-    rdfs:range fabio:SubjectTerm ;
-    rdfs:label "assigned subject" ;
-    rdfs:comment "The SKOS subject term (fabio:SubjectTerm) that was assigned to the publication." .
-
-od:assignedBy
-    rdf:type owl:ObjectProperty ;
-    rdfs:domain od:SubjectAssignment ;
-    rdfs:range foaf:Agent ;
-    rdfs:label "assigned by" ;
-    rdfs:comment "The agent (person or indexer) who performed the subject assignment." .
-
-od:assignedAt
-    rdf:type owl:DatatypeProperty ;
-    rdfs:domain od:SubjectAssignment ;
-    rdfs:range xsd:dateTime ;
-    rdfs:label "assigned at" ;
-    rdfs:comment "Timestamp when the subject was assigned." .
 
 
 # =============================================================================
@@ -155,32 +101,6 @@ od:isDeceased
     rdfs:range xsd:boolean ;
     rdfs:label "deceased" ;
     rdfs:comment "True if this person is deceased. Rendered with the ‡ symbol in bylines." .
-
-od:onBehalfOf
-    rdf:type owl:ObjectProperty ;
-    rdfs:domain pro:RoleInTime ;
-    rdfs:range foaf:Agent ;
-    rdfs:label "on behalf of" ;
-    rdfs:comment "The agent (typically a foaf:Group or consortium) that an author role is held on behalf of." .
-
-
-# =============================================================================
-# PROPERTIES — Registry structure
-# =============================================================================
-
-od:containsRegistry
-    rdf:type owl:ObjectProperty ;
-    rdfs:domain od:CollectionRegistry ;
-    rdfs:range od:Registry ;
-    rdfs:label "contains registry" ;
-    rdfs:comment "A child registry referenced by this collection registry." .
-
-od:containsPublication
-    rdf:type owl:ObjectProperty ;
-    rdfs:domain od:PublicationRegistry ;
-    rdfs:range od:Publication ;
-    rdfs:label "contains publication" ;
-    rdfs:comment "A publication referenced by this publication registry." .
 
 
 # =============================================================================

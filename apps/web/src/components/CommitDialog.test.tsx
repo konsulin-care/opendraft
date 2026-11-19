@@ -1,9 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { CommitDialog } from './CommitDialog';
+import { validateProject } from '@opendraft/validate';
 import { MemoryWorkspace } from '@opendraft/workspace';
 
 // @vitest-environment jsdom
+
+vi.mock('@opendraft/validate', () => ({ validateProject: vi.fn() }));
+vi.mock('../project/protocol-cache', () => ({ IndexedDbProtocolCache: class {} }));
 
 describe('CommitDialog', () => {
   const mockOnClose = vi.fn();
@@ -33,10 +37,25 @@ describe('CommitDialog', () => {
     expect(container.innerHTML).toBe('');
   });
 
+  it('calls onCommit when only warnings are reported', async () => {
+    vi.mocked(validateProject).mockResolvedValue([
+      { level: 'warning', location: 'project', path: 'a', message: 'w' },
+    ]);
+    render(<CommitDialog isOpen={true} onClose={mockOnClose} onCommit={mockOnCommit} workspace={workspace} />);
+    fireEvent.change(screen.getByPlaceholderText('Enter commit message...'), { target: { value: 'Test' } });
+    fireEvent.click(screen.getByText('Commit'));
+    await waitFor(() => expect(mockOnCommit).toHaveBeenCalledWith('Test'));
+  });
+
   it('shows validation errors when the assembly is missing', async () => {
+    vi.mocked(validateProject).mockResolvedValue([
+      { level: 'error', location: 'project', path: 'p', message: 'bad thing' },
+    ]);
     render(<CommitDialog isOpen={true} onClose={mockOnClose} onCommit={mockOnCommit} workspace={workspace} />);
     fireEvent.change(screen.getByPlaceholderText('Enter commit message...'), { target: { value: 'Test' } });
     fireEvent.click(screen.getByText('Commit'));
     await waitFor(() => expect(screen.getByText(/validation errors/i)).toBeDefined());
+    expect(screen.getByText(/bad thing/)).toBeDefined();
+    expect(mockOnCommit).not.toHaveBeenCalled();
   });
 });

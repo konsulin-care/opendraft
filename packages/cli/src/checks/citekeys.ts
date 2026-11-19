@@ -11,16 +11,11 @@
 
 import { readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
-import { extractCitekeys } from '@opendraft/manuscript';
-import { parseBibTeX } from '@opendraft/references';
-import { parse as parseYaml } from 'yaml';
+// Relative import: @opendraft/validate exposes only its index (not editable by this task).
+import { bibliographyRef, checkCitekeysAgainst } from '../../../validate/src/citekeys.js';
+import type { CitekeyFinding } from '../../../validate/src/citekeys.js';
 
-/** One citekey finding: always an error, with its project-relative location. */
-export interface CitekeyFinding {
-  level: 'error';
-  location: string;
-  message: string;
-}
+export type { CitekeyFinding };
 
 /**
  * Read a file as UTF-8 text.
@@ -34,33 +29,6 @@ function readText(path: string): string | null {
   } catch {
     return null;
   }
-}
-
-/**
- * Extract the bibliography path from an article's YAML front matter.
- *
- * @param article - Container article text.
- * @returns First `bibliography` entry (string or array), or null when the
- *          front matter is absent, unparseable, or names no bibliography.
- */
-function bibliographyRef(article: string): string | null {
-  const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(article);
-  if (match === null) return null;
-  let data: unknown;
-  try {
-    data = parseYaml(match[1]);
-  } catch {
-    return null;
-  }
-  if (typeof data !== 'object' || data === null) return null;
-  const bib = (data as { bibliography?: unknown }).bibliography;
-  if (typeof bib === 'string') return bib;
-  if (Array.isArray(bib)) {
-    for (const item of bib) {
-      if (typeof item === 'string') return item;
-    }
-  }
-  return null;
 }
 
 /**
@@ -85,30 +53,11 @@ export function checkCitekeys(
   assembly: string,
   blockFiles: Record<string, string>,
 ): CitekeyFinding[] {
-  const findings: CitekeyFinding[] = [];
   const ref = bibliographyRef(assembly);
-  if (ref === null) return findings;
+  if (ref === null) return [];
   const bibPath = resolve(root, manuscriptPath, ref);
   const text = readText(bibPath);
-  if (text === null) return findings;
+  if (text === null) return [];
   const location = relative(root, bibPath);
-  let known: Set<string>;
-  try {
-    known = new Set(parseBibTeX(text).map((entry) => entry.citeKey));
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    findings.push({ level: 'error', location, message: `Failed to parse bibliography: ${message}` });
-    return findings;
-  }
-  for (const [path, content] of Object.entries(blockFiles)) {
-    for (const key of extractCitekeys(content)) {
-      if (known.has(key)) continue;
-      findings.push({
-        level: 'error',
-        location: `${manuscriptPath}/${path}`,
-        message: `unknown citekey ${key}: not found in ${location}`,
-      });
-    }
-  }
-  return findings;
+  return checkCitekeysAgainst(text, location, manuscriptPath, blockFiles);
 }

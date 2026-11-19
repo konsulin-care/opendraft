@@ -54,6 +54,18 @@ author flags `od:isDeceased` and `od:onBehalfOf`.
 `scoro:corresponding-author`, `scoro:affiliate`,
 `scoro:consortium-author`, and the 14 `credit:*` roles.
 
+### Amendment (ADR-027)
+
+Namespace is `https://w3id.org/opendraft/ontology#`. Term table changes:
+
+| Earlier term | Now |
+|--------------|-----|
+| registries | `fabio:ExpressionCollection` + `frbr:part` |
+| `od:SubjectAssignment` | `oa:Annotation` (`oa:motivatedBy oa:classifying`) |
+| `od:onBehalfOf` | `pro:RoleInTime` with `scoro:agent`, `pro:relatesToEntity` |
+
+Remaining `od:` terms: Publication, repositoryUrl, sourceRevision, manuscriptPath, isDeceased. See [ADR-027](027-rdf-sections-and-vocabulary-reuse.md).
+
 ### One publication per graph
 
 `protocol/article.shacl.ttl` uses SHACL Core only — `rdf-validate-shacl` has

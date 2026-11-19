@@ -128,7 +128,16 @@ it('shows commit issues as a "{m} to commit" segment', async () => {
     [`${ROOT}/_abstract.yml`]: ABSTRACT,
     [`${ROOT}/_author.yml`]: AUTHORS_VALID,
   });
-  expect(screen.getByTestId('validation-badge').textContent).toBe('1 to commit');
+  expect(screen.getByTestId('validation-badge').textContent).toBe('2 to commit'); // readiness issue plus the Ajv unknown-key violation
+});
+
+it('counts an author entry without name as a commit issue', async () => {
+  await renderPanel({
+    [`${ROOT}/_frontmatter.yml`]: LICENSED,
+    [`${ROOT}/_abstract.yml`]: ABSTRACT,
+    [`${ROOT}/_author.yml`]: 'authors:\n  - id: smith\n',
+  });
+  expect(screen.getByTestId('validation-badge').textContent).toMatch(/to commit/);
 });
 
 it('is hidden when there are no issues', async () => {

@@ -2,13 +2,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
 import { addManuscript } from '@opendraft/manuscript';
+import { MANUSCRIPT_ID_PATTERN } from '@opendraft/schema';
 import { NodeFsWorkspace } from '@opendraft/workspace/node';
 
 /** Usage line printed for usage errors. */
 const MANUSCRIPT_USAGE = 'usage: opendraft manuscript add <id> [dir]';
-
-/** Manuscript id pattern: lowercase alphanumeric groups joined by hyphens. */
-const MANUSCRIPT_ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /**
  * Extract the registered manuscript ids from `opendraft.yml` text.
@@ -39,20 +37,20 @@ function listedIds(configText: string): string[] | null {
  *
  * `manuscript add <id> [dir]` creates the starter files for a new
  * manuscript under `manuscripts/<id>/` and registers it in
- * `opendraft.yml`. All rejections are decided synchronously before any
- * write: a missing project root config, an invalid id, an unparseable
- * config, or an id already listed all return 1 without writing. Only
- * after those checks does the async registration start; the returned
- * code reflects the pre-write checks, so the test waits for the config
- * update before asserting the created files.
+ * `opendraft.yml`. All rejections are decided before any write: a
+ * missing project root config, an invalid id, an unparseable config,
+ * or an id already listed all return 1 without writing. The
+ * registration itself is awaited, so when the command resolves every
+ * starter file and the config update are on disk.
  *
  * @param args - Arguments after the command name: `add` followed by the
  *               manuscript id and an optional project directory
  *               (defaults to the current working directory).
- * @returns Exit code: 0 when the registration starts, 1 on rejections,
- *          2 on usage errors.
+ * @returns Promise of the exit code: 0 when the manuscript is created
+ *          and registered, 1 on rejections or write failures, 2 on
+ *          usage errors.
  */
-export function manuscriptCommand(args: string[]): number {
+export async function manuscriptCommand(args: string[]): Promise<number> {
   const [subcommand, ...rest] = args;
   if (subcommand !== 'add') {
     console.error(MANUSCRIPT_USAGE);
@@ -85,9 +83,12 @@ export function manuscriptCommand(args: string[]): number {
     console.error(`Manuscript "${id}" is already listed in opendraft.yml.`);
     return 1;
   }
-  void addManuscript(new NodeFsWorkspace(root), id).catch((err: unknown) => {
+  try {
+    await addManuscript(new NodeFsWorkspace(root), id);
+  } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(message);
-  });
+    return 1;
+  }
   return 0;
 }

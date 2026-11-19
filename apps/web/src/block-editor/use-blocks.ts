@@ -10,6 +10,7 @@ import {
   addBlock as addBlockFile,
   deleteBlock as deleteBlockFile,
   listBlocks,
+  normalizeBlockFiles,
   renameBlock as renameBlockFile,
   setBlockTitle,
 } from '@opendraft/manuscript';
@@ -48,8 +49,19 @@ export interface UseBlocksResult {
   setTitle: (short: string, title: string) => Promise<void>;
 }
 
-/** Load the block list in assembly include order with per-body word counts. */
+/**
+ * Normalize legacy block files, then load the block list in assembly
+ * include order with per-body word counts.
+ *
+ * @param ws - Workspace holding the manuscript.
+ * @param dir - Manuscript directory, e.g. `manuscripts/demo`.
+ * @returns One entry per include line, in include order.
+ */
 async function readBlocks(ws: WorkspaceAdapter, dir: string): Promise<BlockEntry[]> {
+  const { conflicts } = await normalizeBlockFiles(ws, dir);
+  if (conflicts.length > 0) {
+    console.warn('block normalization conflicts skipped:', conflicts.join(', '));
+  }
   const items = await listBlocks(ws, dir);
   return items.map(({ short, title, body }) => ({
     short,

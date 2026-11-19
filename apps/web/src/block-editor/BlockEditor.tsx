@@ -1,11 +1,11 @@
 /**
- * Block editor shell: one collapsible container per included block in
- * `article.qmd` include order, hover-revealed '+' insert points between
- * blocks and at the end that open the add-section dialog at the clicked
- * position, and a single delete confirmation naming the section and
- * listing every `@sec-` reference that would break.
+ * Block editor shell: one collapsible container per included block,
+ * hover-revealed '+' insert points, and a delete confirmation listing
+ * every `@sec-` reference that would break.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { listBlocks } from '@opendraft/manuscript';
+import { blockFileName, legacyBlockShort, parseBlockFileName } from '@opendraft/schema';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import type { SaveStatus } from '../components/AppHeader';
 import { AddSectionDialog } from './AddSectionDialog';
@@ -31,10 +31,11 @@ export interface BlockEditorProps {
 }
 
 /**
- * Collect every `@sec-<short>` reference in other block files that would
- * break when the block is deleted. Mirrors the scope of
- * `rewriteOtherRefs`: every block file but the target, one entry per
- * occurrence, sorted for a stable dialog order.
+ * Collect every `@sec-<short>` reference in other block files that
+ * would break on delete, one entry per occurrence, sorted.
+ *
+ * File names parse through `parseBlockFileName` with `legacyBlockShort`
+ * as fallback: the target is skipped by identity, sources named by short.
  *
  * @param ws - Workspace holding the manuscript.
  * @param dir - Manuscript directory.
@@ -49,11 +50,11 @@ async function findBreakingRefs(
   const token = `@sec-${short}`;
   const refs: string[] = [];
   for (const file of await ws.listFiles(`${dir}/blocks`)) {
-    if (file === `${short}.qmd`) continue;
+    const source = parseBlockFileName(file) ?? legacyBlockShort(file);
+    if (source === null || source === short) continue;
     const text = await ws.readFile(`${dir}/blocks/${file}`);
     if (text === null) continue;
     const pattern = new RegExp(`${token}(?![a-z0-9-])`, 'g');
-    const source = file.replace(/\.qmd$/, '');
     for (let i = 1; i <= (text.match(pattern)?.length ?? 0); i += 1) {
       refs.push(`${token} in ${source}`);
     }
@@ -62,9 +63,8 @@ async function findBreakingRefs(
 }
 
 /**
- * Build the title-commit handler: drain pending autosaves, then rewrite
- * only the heading title. Section identity (file, include, anchor) stays
- * unchanged per ADR-023.
+ * Build the title-commit handler: drain pending autosaves, then
+ * rewrite only the heading title (identity unchanged, ADR-023).
  *
  * @param short - Short name of the block being retitled.
  * @param setTitle - Rewrites the heading title of a block.
@@ -81,8 +81,8 @@ function titleSaver(
 }
 
 /**
- * Build the overflow handler that collects breaking `@sec-` references
- * and opens the delete confirmation for a block.
+ * Build the overflow handler that collects breaking `@sec-`
+ * references and opens the delete confirmation.
  *
  * @param ws - Workspace holding the manuscript.
  * @param dir - Manuscript directory.
@@ -97,6 +97,42 @@ function openDeleteFor(
   return (block) => {
     void findBreakingRefs(ws, dir, block.short).then((refs) => setDeleting({ short: block.short, title: block.title, refs }));
   };
+}
+
+/** Resolved block file names keyed by short name. */
+type BlockFiles = Record<string, string>;
+
+/**
+ * Resolve each included block's on-disk file name through `listBlocks`
+ * (prefixed `_<short>.qmd` or legacy `<short>.qmd`).
+ *
+ * Results merge into the previous map; unresolved shorts use the derived default.
+ *
+ * @param ws - Workspace holding the manuscript.
+ * @param dir - Manuscript directory, e.g. `manuscripts/demo`.
+ * @param shorts - Short names currently in the assembly.
+ * @returns Short name → file name map; empty before the first load.
+ */
+function useBlockFiles(ws: WorkspaceAdapter, dir: string, shorts: string[]): BlockFiles {
+  const [files, setFiles] = useState<BlockFiles>({});
+  const key = shorts.join('\n');
+  useEffect(() => {
+    let stale = false;
+    void listBlocks(ws, dir)
+      .then((items) => {
+        if (stale) return;
+        const resolved: BlockFiles = {};
+        for (const item of items) resolved[item.short] = item.file;
+        setFiles((prev) => ({ ...prev, ...resolved }));
+      })
+      .catch((err: unknown) => {
+        console.error('block file resolution failed:', err);
+      });
+    return () => {
+      stale = true;
+    };
+  }, [ws, dir, key]);
+  return files;
 }
 
 /**
@@ -140,6 +176,8 @@ interface BlockRowProps {
   ws: WorkspaceAdapter;
   /** Manuscript directory, forwarded to the body. */
   dir: string;
+  /** Resolved block file name, forwarded to the body. */
+  file: string;
   /** Flip the collapsed state. */
   onToggle: () => void;
   /** Open the delete confirmation for this block. */
@@ -167,6 +205,7 @@ function BlockRow({
   collapsed,
   ws,
   dir,
+  file,
   onToggle,
   onOverflow,
   onAdd,
@@ -174,8 +213,7 @@ function BlockRow({
   onClose,
   onTitleSave,
 }: BlockRowProps) {
-  // Seed from the list-loaded body count; the mounted editor's live
-  // count overrides it through onWordCount once it reports.
+  // Seed from the list-loaded count; the live count overrides via onWordCount.
   const [wordCount, setWordCount] = useState(block.wordCount);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   return (
@@ -197,6 +235,7 @@ function BlockRow({
           ws={ws}
           dir={dir}
           short={block.short}
+          file={file}
           title={block.title}
           collapsed={collapsed}
           onWordCount={setWordCount}
@@ -220,6 +259,7 @@ function BlockRow({
 export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
   const { loading, blocks, createBlock, deleteBlock, setTitle } = useBlocks(ws, dir);
   const shorts = blocks.map((block) => block.short);
+  const files = useBlockFiles(ws, dir, shorts);
   const { isCollapsed, toggle } = useCollapseState(projectKey, shorts);
   const [addingAt, setAddingAt] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<DeleteTarget | null>(null);
@@ -235,32 +275,22 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
     notifyFilesChanged();
   };
   const closeDelete = (): void => setDeleting(null);
-  if (loading) return null;
-  // Loaded with zero blocks: the preset picker replaces the whole list.
-  if (blocks.length === 0) return <EmptyState onCreate={createAt(0)} />;
+  if (loading || (shorts.length > 0 && Object.keys(files).length === 0)) return null; // Gate until list + file names resolve.
+  if (blocks.length === 0) return <EmptyState onCreate={createAt(0)} />; // Zero blocks: preset picker replaces the list.
   return (
     <div className="space-y-2">
       {blocks.map((block, index) => (
         <BlockRow
-          key={block.short}
-          block={block} formOpen={addingAt === index}
-          collapsed={isCollapsed(block.short)}
-          ws={ws} dir={dir}
-          onToggle={() => toggle(block.short)}
-          onOverflow={() => openDelete(block)}
-          onAdd={() => setAddingAt(index)}
-          onCreate={createAt(index)}
-          onClose={closeForm}
-          onTitleSave={titleSaver(block.short, setTitle)}
+          key={block.short} block={block} formOpen={addingAt === index}
+          collapsed={isCollapsed(block.short)} ws={ws} dir={dir}
+          file={files[block.short] ?? blockFileName(block.short)}
+          onToggle={() => toggle(block.short)} onOverflow={() => openDelete(block)}
+          onAdd={() => setAddingAt(index)} onCreate={createAt(index)}
+          onClose={closeForm} onTitleSave={titleSaver(block.short, setTitle)}
         />
       ))}
       <div>
-        <button
-          type="button" onClick={() => setAddingAt(blocks.length)}
-          className="flex h-9 w-full items-center justify-center rounded-md border border-dashed border-gray-300 text-sm text-gray-500 hover:bg-gray-50"
-        >
-          + Add section
-        </button>
+        <button type="button" onClick={() => setAddingAt(blocks.length)} className="flex h-9 w-full items-center justify-center rounded-md border border-dashed border-gray-300 text-sm text-gray-500 hover:bg-gray-50">+ Add section</button>
         {addingAt === blocks.length && <AddSectionDialog onCreate={createAt(blocks.length)} onClose={closeForm} />}
       </div>
       <DeleteConfirm target={deleting} onConfirm={confirmDelete} onCancel={closeDelete} />

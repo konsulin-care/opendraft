@@ -1,38 +1,44 @@
 import { blockCommand } from './commands/block.js';
 import { initCommand } from './commands/init.js';
 import { manuscriptCommand } from './commands/manuscript.js';
+import { protocolUpgradeCommand } from './commands/protocol-upgrade.js';
+import { rdfCommand } from './commands/rdf.js';
 import { validateCommand } from './commands/validate.js';
 
 const USAGE = [
   'usage: opendraft <command> [arguments]',
   'commands:',
-  '  validate [dir] [--json]  Validate config, metadata and assemblies',
+  '  validate [dir] [--json] [--offline] [--release]  Validate config, metadata and assemblies',
   '  init [dir] --manuscript <id>  Scaffold a new project',
   '  manuscript              Manage manuscripts',
   '  block                   Manage blocks',
+  '  protocol upgrade [dir]  Pin the protocol to the bundled latest revision',
+  '  rdf [dir] [-m <id>]     Print the manuscript RDF graph as Turtle',
 ].join('\n');
 
 /**
- * Run the OpenDraft CLI with the given arguments.
+ * Run the OpenDraft CLI asynchronously with the given arguments.
  *
- * Pure dispatch: never touches `process.argv`, never calls
- * `process.exit`, and never mutates process state — it only prints the
- * command's report to the console and returns the exit code, so it is
- * safe to import and call from tests.
+ * Awaits each handler, so all writes are settled and the exit code
+ * reflects the finished operation. Never touches `process.argv`, never
+ * calls `process.exit`, and never mutates process state.
  *
  * @param args - CLI arguments, excluding the node executable and script.
- * @returns Exit code: 0 on success, 1 on validation failure, 2 on usage errors.
+ * @returns Promise of the exit code: 0 on success, 1 on validation
+ *          failure, 2 on usage errors.
  */
-export function runCli(args: string[]): number {
+export async function runCommand(args: string[]): Promise<number> {
   const [command, ...rest] = args;
   if (command === '--help') {
     console.log(USAGE);
     return 0;
   }
-  if (command === 'validate') return validateCommand(rest);
-  if (command === 'init') return initCommand(rest);
-  if (command === 'manuscript') return manuscriptCommand(rest);
-  if (command === 'block') return blockCommand(rest);
+  if (command === 'validate') return await validateCommand(rest);
+  if (command === 'init') return await initCommand(rest);
+  if (command === 'manuscript') return await manuscriptCommand(rest);
+  if (command === 'block') return await blockCommand(rest);
+  if (command === 'protocol' && rest[0] === 'upgrade') return await protocolUpgradeCommand(rest.slice(1));
+  if (command === 'rdf') return await rdfCommand(rest);
   console.error(USAGE);
   return 2;
 }

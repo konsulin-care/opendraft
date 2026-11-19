@@ -4,7 +4,7 @@
 
 ```turtle
 # Prefixes at top of file
-@prefix od: <urn:opendraft:ontology#> .
+@prefix od: <https://w3id.org/opendraft/ontology#> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
@@ -37,6 +37,7 @@ od:PublicationShape
 - Properties: camelCase in URI (od:hasAssignment)
 - Shapes: PascalCase + Shape suffix (od:PublicationShape)
 - Files: lowercase with dots (article.shacl.ttl)
+- Only these `od:` terms remain: Publication, repositoryUrl, sourceRevision, manuscriptPath, isDeceased (ADR-027); example instance IRIs use `https://example.org/`
 - Reused vocabulary terms keep their own IRIs (SPAR/OCDM, ADR-021); do not create an `od:` alias for a term that already exists
 
 ## Validation
