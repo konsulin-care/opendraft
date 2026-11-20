@@ -177,6 +177,13 @@ describe("CitekeyItem — layout and fallbacks", () => {
     expect(document.querySelectorAll(".citation-author")[1]?.textContent).toBe("Sun2025");
   });
 
+  it("cleans LaTeX braces from the title text and title attribute", () => {
+    renderItem({ fields: { author: "Sun, Yi", title: "{MindKind} Study in {India}", year: "2025" } });
+    const title = document.querySelector(".citation-title");
+    expect(title?.textContent).toBe("MindKind Study in India");
+    expect(title?.getAttribute("title")).toBe("MindKind Study in India");
+  });
+
   it("omits the title line when the title is missing", () => {
     renderItem({ fields: { author: "Sun, Yi", year: "2025" } });
     expect(screen.getAllByRole("listitem")[0].querySelector(".citation-title")).toBeNull();

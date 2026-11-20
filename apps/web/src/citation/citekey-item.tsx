@@ -1,4 +1,6 @@
 import { isCrossrefKey } from "@opendraft/manuscript";
+import { cleanLatex } from "./apa/latex";
+import { displayName, parseName, splitNames } from "./apa/names";
 import type { CitationState } from "./types";
 
 /** Warning shown when a citation key collides with a Quarto cross-reference prefix. */
@@ -9,7 +11,8 @@ export const CROSSREF_RESERVED_WARNING =
  * Extract first author from BibTeX `author` field.
  *
  * BibTeX stores authors as `"Last, First"` or `"Last, First and Last, First"`.
- * Returns `"First Last"` for the first author, or `null` if unavailable.
+ * Returns `"Given particle Family"` for the first author, a literal group name
+ * when braced, or `null` if unavailable.
  *
  * @param author - Raw BibTeX author string.
  * @returns Formatted first author name, or null.
@@ -17,16 +20,10 @@ export const CROSSREF_RESERVED_WARNING =
 export function formatAuthor(author: string | undefined): string | null {
   if (!author || !author.trim()) return null;
 
-  const firstAuthor = author.split(" and ")[0].trim();
-  const parts = firstAuthor.split(",").map((p) => p.trim());
+  const [firstAuthor] = splitNames(author);
+  if (!firstAuthor) return null;
 
-  if (parts.length >= 2) {
-    // "Last, First" -> "First Last"
-    return `${parts[1]} ${parts[0]}`;
-  }
-
-  // Already in "First Last" or single-name format
-  return firstAuthor;
+  return displayName(parseName(firstAuthor)) || null;
 }
 
 /**
@@ -62,7 +59,7 @@ export function CitekeyItem({ item, isActive, onSelect }: CitekeyItemProps) {
   const displayName = author ?? item.citeKey;
   const year = item.fields.year;
   const entryType = item.entryType;
-  const title = item.fields.title;
+  const title = item.fields.title ? cleanLatex(item.fields.title) : undefined;
 
   return (
     <li
