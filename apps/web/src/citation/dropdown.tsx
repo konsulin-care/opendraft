@@ -1,50 +1,25 @@
 import type { CitationState, CitationAction } from "./types";
-import { filterCitekeys } from "./citekey-list";
 import { DoiInput } from "./doi-input";
 import { ComparisonView, extractCitekey } from "./comparison";
 import { resolveDoi, normalizeDoi } from "./doi-resolver";
+import { buildSuggestions } from "./suggestions";
+import type { Suggestion } from "./suggestions";
+import { CitekeyItem } from "./citekey-item";
+import { CrossrefItem } from "./crossref-item";
 
-/**
- * Extract first author from BibTeX `author` field.
- *
- * BibTeX stores authors as `"Last, First"` or `"Last, First and Last, First"`.
- * Returns `"First Last"` for the first author, or `null` if unavailable.
- *
- * @param author - Raw BibTeX author string.
- * @returns Formatted first author name, or null.
- */
-export function formatAuthor(author: string | undefined): string | null {
-  if (!author || !author.trim()) return null;
-
-  const firstAuthor = author.split(' and ')[0].trim();
-  const parts = firstAuthor.split(',').map((p) => p.trim());
-
-  if (parts.length >= 2) {
-    // "Last, First" -> "First Last"
-    return `${parts[1]} ${parts[0]}`;
-  }
-
-  // Already in "First Last" or single-name format
-  return firstAuthor;
-}
-
-/**
- * Capitalize first letter of entry type.
- *
- * @param entryType - BibTeX entry type (e.g. "article").
- * @returns Capitalized entry type (e.g. "Article").
- */
-export function formatEntryType(entryType: string): string {
-  if (!entryType) return '';
-  return entryType.charAt(0).toUpperCase() + entryType.slice(1);
-}
+export {
+  CitekeyItem,
+  formatAuthor,
+  formatEntryType,
+} from "./citekey-item";
+export type { CitekeyItemProps } from "./citekey-item";
 
 interface CitationDropdownProps {
   /** Current citation state. */
   state: CitationState;
   /** Dispatch function for state updates. */
   dispatch: (action: CitationAction) => void;
-  /** Callback when a citekey is selected. */
+  /** Callback when a suggestion is selected. */
   onSelectCitekey?: (citekey: string) => void;
   /** Callback when DOI is resolved. */
   onDoiResolved?: (bibtex: string) => void;
@@ -120,28 +95,160 @@ function renderDoiInput(
   );
 }
 
-function renderCitekeyList(
-  state: CitationState,
-  dispatch: (action: CitationAction) => void,
-  onSelectCitekey?: (citekey: string) => void
+function renderSuggestion(
+  suggestion: Suggestion,
+  index: number,
+  activeIndex: number,
+  onSelect: (key: string) => void,
 ) {
-  return (
-    <CitekeyList
-      items={state.items}
-      query={state.query}
-      loadError={state.loadError ?? null}
-      activeIndex={state.activeIndex}
-      onSelect={(citekey) => onSelectCitekey?.(citekey)}
-      onAddCitation={() => dispatch({ type: "ENTER_DOI_MODE" })}
+  return suggestion.kind === "crossref" ? (
+    <CrossrefItem
+      key={suggestion.key}
+      label={suggestion.label}
+      isActive={index === activeIndex}
+      onSelect={onSelect}
     />
+  ) : (
+    <CitekeyItem
+      key={suggestion.key}
+      item={suggestion.reference}
+      isActive={index === activeIndex}
+      onSelect={onSelect}
+    />
+  );
+}
+
+interface SuggestionListProps {
+  state: CitationState;
+  onSelect: (key: string) => void;
+  onAddCitation: () => void;
+}
+
+interface SuggestionGroupsProps {
+  crossrefs: Suggestion[];
+  citations: Suggestion[];
+  activeIndex: number;
+  emptyMessage: string;
+  onSelect: (key: string) => void;
+}
+
+interface SuggestionGroupProps {
+  heading: string;
+  suggestions: Suggestion[];
+  offset: number;
+  activeIndex: number;
+  onSelect: (key: string) => void;
+}
+
+function SuggestionGroup({
+  heading,
+  suggestions,
+  offset,
+  activeIndex,
+  onSelect,
+}: SuggestionGroupProps) {
+  return (
+    <div className="menu-group">
+      <div className="citation-group-heading">{heading}</div>
+      <ul>
+        {suggestions.map((suggestion, index) =>
+          renderSuggestion(suggestion, offset + index, activeIndex, onSelect),
+        )}
+      </ul>
+    </div>
+  );
+}
+
+function SuggestionGroups({
+  crossrefs,
+  citations,
+  activeIndex,
+  emptyMessage,
+  onSelect,
+}: SuggestionGroupsProps) {
+  if (crossrefs.length === 0 && citations.length === 0) {
+    return (
+      <div className="menu-group">
+        <ul>
+          <li className="citation-empty">{emptyMessage}</li>
+        </ul>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {crossrefs.length > 0 && (
+        <SuggestionGroup
+          heading="Cross-references"
+          suggestions={crossrefs}
+          offset={0}
+          activeIndex={activeIndex}
+          onSelect={onSelect}
+        />
+      )}
+      {citations.length > 0 && (
+        <SuggestionGroup
+          heading="Citations"
+          suggestions={citations}
+          offset={crossrefs.length}
+          activeIndex={activeIndex}
+          onSelect={onSelect}
+        />
+      )}
+    </>
+  );
+}
+
+function getEmptyMessage(state: CitationState): string {
+  const loadError = state.loadError ?? null;
+  if (loadError) {
+    return `references.bib could not be parsed (line ${loadError.line})`;
+  }
+  return state.items.length > 0
+    ? "No matching citations"
+    : "No references yet. Add one by DOI or create references.bib.";
+}
+
+function SuggestionList({ state, onSelect, onAddCitation }: SuggestionListProps) {
+  const suggestions = buildSuggestions(
+    state.items,
+    state.crossrefs ?? [],
+    state.query,
+    state.trigger,
+  );
+  const crossrefs = suggestions.filter((s) => s.kind === "crossref");
+  const citations = suggestions.filter((s) => s.kind === "citation");
+
+  return (
+    <div className="menu-groups">
+      <SuggestionGroups
+        crossrefs={crossrefs}
+        citations={citations}
+        activeIndex={state.activeIndex}
+        emptyMessage={getEmptyMessage(state)}
+        onSelect={onSelect}
+      />
+      <div className="menu-group">
+        <ul>
+          <li
+            className="citation-add-btn"
+            onPointerDown={(e) => e.preventDefault()}
+            onPointerUp={onAddCitation}
+          >
+            + Add Citation (DOI)
+          </li>
+        </ul>
+      </div>
+    </div>
   );
 }
 
 /**
  * Citation dropdown component.
  *
- * Renders citekey list, DOI input, comparison view,
- * or error display based on current state.
+ * Renders the cross-reference and citation suggestion groups, the DOI input,
+ * the comparison view, or an error display based on the current state.
  *
  * Uses the same CSS classes as the slash menu for consistent styling.
  */
@@ -165,105 +272,12 @@ export function CitationDropdown({
       ) : state.doiMode ? (
         renderDoiInput(state, dispatch, onDoiResolved)
       ) : (
-        renderCitekeyList(state, dispatch, onSelectCitekey)
+        <SuggestionList
+          state={state}
+          onSelect={(key) => onSelectCitekey?.(key)}
+          onAddCitation={() => dispatch({ type: "ENTER_DOI_MODE" })}
+        />
       )}
-    </div>
-  );
-}
-
-interface CitekeyListProps {
-  items: CitationState["items"];
-  query: string;
-  loadError?: CitationState["loadError"];
-  activeIndex: number;
-  onSelect: (citekey: string) => void;
-  onAddCitation: () => void;
-}
-
-export interface CitekeyItemProps {
-  item: CitationState["items"][number];
-  isActive: boolean;
-  onSelect: (citekey: string) => void;
-}
-
-export function CitekeyItem({ item, isActive, onSelect }: CitekeyItemProps) {
-  const author = formatAuthor(item.fields.author);
-  const displayName = author ?? item.citeKey;
-  const year = item.fields.year;
-  const entryType = item.entryType;
-  const title = item.fields.title;
-
-  return (
-    <li
-      className={isActive ? "hover" : ""}
-      onPointerDown={(e) => e.preventDefault()}
-      onPointerUp={() => onSelect(item.citeKey)}
-    >
-      <div className="citation-item-body">
-        <div className="citation-line-1">
-          <span className="citation-author">{displayName}</span>
-          {year && <span className="citation-year"> ({year})</span>}
-          {entryType && (
-            <span className="citation-type">{formatEntryType(entryType)}</span>
-          )}
-        </div>
-        <div className="citation-line-2">
-          {title && (
-            <span className="citation-title" title={title}>
-              {title}
-            </span>
-          )}
-        </div>
-      </div>
-    </li>
-  );
-}
-
-function CitekeyList({
-  items,
-  query,
-  loadError,
-  activeIndex,
-  onSelect,
-  onAddCitation,
-}: CitekeyListProps) {
-  const filtered = filterCitekeys(items, query);
-
-  return (
-    <div className="menu-groups">
-      <div className="menu-group">
-        <ul>
-          {filtered.length === 0 ? (
-            <li className="citation-empty">
-              {loadError
-                ? `references.bib could not be parsed (line ${loadError.line})`
-                : items.length > 0
-                ? "No matching citations"
-                : "No references yet. Add one by DOI or create references.bib."}
-            </li>
-          ) : (
-            filtered.map((item, index) => (
-              <CitekeyItem
-                key={item.citeKey}
-                item={item}
-                isActive={index === activeIndex}
-                onSelect={onSelect}
-              />
-            ))
-          )}
-        </ul>
-      </div>
-      <div className="menu-group">
-        <ul>
-          <li
-            className="citation-add-btn"
-            onPointerDown={(e) => e.preventDefault()}
-            onPointerUp={onAddCitation}
-          >
-            + Add Citation (DOI)
-          </li>
-        </ul>
-      </div>
     </div>
   );
 }

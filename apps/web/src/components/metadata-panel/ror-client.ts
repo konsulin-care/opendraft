@@ -2,10 +2,10 @@
  * ROR v2 organization search client.
  *
  * Queries https://api.ror.org/v2/organizations?query=, maps the v2 item
- * shape to flat suggestion records, and caches results per query in
- * IndexedDB with an in-memory hot layer. A missing or broken IndexedDB
- * degrades to memory-only caching. Stale queries are cancelled by
- * passing an AbortSignal through to fetch.
+ * shape (names, locations, links) to flat suggestion records, and caches
+ * results per query in IndexedDB with an in-memory hot layer. A missing
+ * or broken IndexedDB degrades to memory-only caching. Stale queries are
+ * cancelled by passing an AbortSignal through to fetch.
  */
 
 /** One ROR organization mapped to a flat suggestion record. */
@@ -14,10 +14,14 @@ export interface RorOrg {
   id: string;
   /** Display name of the organization. */
   name: string;
-  /** First address city, when present. */
+  /** City of the first location, when present. */
   city?: string;
-  /** ISO country code, e.g. 'ID'. */
+  /** Country subdivision of the first location, when present. */
+  region?: string;
+  /** ISO country code of the first location, e.g. 'ID'. */
   country?: string;
+  /** First website link, when present. */
+  url?: string;
   /** Canonical ROR URL, e.g. 'https://ror.org/0116zj450'. */
   ror: string;
 }
@@ -33,20 +37,26 @@ export interface RorSearchOptions {
 /** Base URL of the ROR v2 organizations endpoint. */
 const ROR_BASE = 'https://api.ror.org/v2/organizations';
 /** Name of the IndexedDB cache database. */
-const DB_NAME = 'opendraft-ror-cache';
+const DB_NAME = 'opendraft-ror-cache-v2';
 /** Object store holding one record per query. */
 const STORE = 'queries';
 /** In-memory hot layer consulted before IndexedDB. */
 const memory = new Map<string, RorOrg[]>();
+
+/** Geolocation details of one v2 location. */
+interface V2GeonamesDetails {
+  name?: string;
+  country_code?: string;
+  country_subdivision_name?: string;
+}
 
 /** Raw v2 item as returned by the ROR API. */
 interface V2Item {
   id?: string;
   name?: string;
   names?: { value?: string; types?: string[] }[];
-  city?: string;
-  addresses?: { city?: string }[];
-  country?: { country_code?: string } | string;
+  locations?: { geonames_details?: V2GeonamesDetails }[];
+  links?: { type?: string; value?: string }[];
 }
 
 /**
@@ -69,6 +79,21 @@ function displayName(item: V2Item): string {
     ?? names[0]?.value ?? item.name ?? '';
 }
 
+// Extract the optional location and website fields of a v2 item.
+function optionalFields(item: V2Item): Partial<RorOrg> {
+  const geo = item.locations?.[0]?.geonames_details;
+  const city = geo?.name;
+  const region = geo?.country_subdivision_name;
+  const country = geo?.country_code;
+  const url = item.links?.find((link) => link.type === 'website')?.value;
+  return {
+    ...(city ? { city } : {}),
+    ...(region ? { region } : {}),
+    ...(country ? { country } : {}),
+    ...(url ? { url } : {}),
+  };
+}
+
 // Map one raw v2 item to a flat suggestion record.
 function toOrg(raw: unknown): RorOrg | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -76,13 +101,10 @@ function toOrg(raw: unknown): RorOrg | null {
   const name = displayName(item);
   const ror = canonicalRor(item.id ?? '');
   if (!ror && !name) return null;
-  const city = item.addresses?.[0]?.city ?? item.city;
-  const country = typeof item.country === 'string' ? item.country : item.country?.country_code;
   return {
     id: ror.replace('https://ror.org/', ''),
     name,
-    ...(city ? { city } : {}),
-    ...(country ? { country } : {}),
+    ...optionalFields(item),
     ror,
   };
 }

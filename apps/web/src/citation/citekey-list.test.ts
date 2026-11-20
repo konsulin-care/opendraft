@@ -60,3 +60,33 @@ describe('filterCitekeys', () => {
     expect(result).toHaveLength(3);
   });
 });
+
+describe('filterCitekeys LaTeX cleanup', () => {
+  it('matches titles after stripping protective braces', () => {
+    const references: Reference[] = [
+      {
+        citeKey: 'study2024',
+        entryType: 'article',
+        fields: { title: '{MindKind} Study findings', author: 'Doe, Jane' },
+      },
+    ];
+
+    const result = filterCitekeys(references, 'mindkind study');
+    expect(result).toHaveLength(1);
+    expect(result[0].citeKey).toBe('study2024');
+  });
+
+  it('matches authors after cleaning LaTeX accent commands', () => {
+    const references: Reference[] = [
+      {
+        citeKey: 'muller2024',
+        entryType: 'article',
+        fields: { title: 'A Study', author: 'M{\\"u}ller, Hans' },
+      },
+    ];
+
+    const result = filterCitekeys(references, 'müller');
+    expect(result).toHaveLength(1);
+    expect(result[0].citeKey).toBe('muller2024');
+  });
+});

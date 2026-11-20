@@ -3,6 +3,7 @@ import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { parseDocument, type Document } from 'yaml';
 import type { SaveStatus } from '../AppHeader';
 import { debouncedSaver, type DebouncedSaver } from '../editor/autosave';
+import { setAbstractLiteral } from './abstract-yaml';
 
 /** Metadata file names under a manuscript root. */
 const FILES = {
@@ -181,9 +182,7 @@ function useMetadataEdits(ctx: EditContext): Pick<
   }, [ctx]);
 
   const setAbstract = useCallback((text: string) => {
-    const next = editRaw(rawRef.current.abstract, (doc) => {
-      doc.set('abstract', text);
-    });
+    const next = editRaw(rawRef.current.abstract, (doc) => setAbstractLiteral(doc, text));
     if (next) commitEdit(ctx, 'abstract', next);
   }, [ctx]);
 

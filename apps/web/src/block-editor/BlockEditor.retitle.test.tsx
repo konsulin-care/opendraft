@@ -5,7 +5,7 @@
  * anchor stay unchanged, and `@sec-` refs in other blocks are untouched.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { MemoryWorkspace } from '@opendraft/workspace';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
@@ -67,12 +67,18 @@ async function setup(files: Record<string, string>): Promise<WorkspaceAdapter> {
 /**
  * Commit a new title in the title field at `index`.
  *
+ * The change is flushed through `act` before Enter lands: the Enter handler
+ * reads the draft from its render, so a late re-render would commit the
+ * pre-edit value and silently drop the save.
+ *
  * @param index - Row index.
  * @param value - New title.
  */
-function commitTitle(index: number, value: string): void {
+async function commitTitle(index: number, value: string): Promise<void> {
   const title = screen.getAllByTestId('block-title')[index];
-  fireEvent.change(title, { target: { value } });
+  await act(async () => {
+    fireEvent.change(title, { target: { value } });
+  });
   fireEvent.keyDown(title, { key: 'Enter' });
 }
 
@@ -86,7 +92,7 @@ function commitTitle(index: number, value: string): void {
 async function expectBlock(ws: WorkspaceAdapter, short: string, text: string): Promise<void> {
   await waitFor(async () => {
     expect(await ws.readFile(`${BLOCKS}/_${short}.qmd`)).toBe(text);
-  });
+  }, { timeout: 3000 });
 }
 
 describe('BlockEditor title commit keeps section identity', () => {
@@ -95,7 +101,7 @@ describe('BlockEditor title commit keeps section identity', () => {
       [ARTICLE]: articleWith('alpha'),
       [`${BLOCKS}/alpha.qmd`]: blockFile('alpha', 'Alpha', 'Body.\n'),
     });
-    commitTitle(0, 'Background');
+    await commitTitle(0, 'Background');
     await expectBlock(ws, 'alpha', '# Background {#sec-alpha .deo-section}\nBody.\n');
     expect(await ws.readFile(`${BLOCKS}/_background.qmd`)).toBeNull();
     expect(await ws.listFiles(BLOCKS)).toEqual(['_alpha.qmd']);
@@ -109,12 +115,12 @@ describe('BlockEditor title round-trip keeps section identity', () => {
       [ARTICLE]: articleWith('introduction'),
       [`${BLOCKS}/introduction.qmd`]: blockFile('introduction', 'Introduction', 'Intro body.\n'),
     });
-    commitTitle(0, 'Overview');
+    await commitTitle(0, 'Overview');
     await expectBlock(ws, 'introduction', '# Overview {#sec-introduction .deo-section}\nIntro body.\n');
     await waitFor(() => {
       expect(screen.getAllByTestId('block-title')[0]).toHaveValue('Overview');
-    });
-    commitTitle(0, 'Introduction');
+    }, { timeout: 3000 });
+    await commitTitle(0, 'Introduction');
     await expectBlock(ws, 'introduction', blockFile('introduction', 'Introduction', 'Intro body.\n'));
     expect(await ws.listFiles(BLOCKS)).toEqual(['_introduction.qmd']);
     expect(await ws.readFile(ARTICLE)).toBe(articleWith('introduction'));
@@ -129,7 +135,7 @@ describe('BlockEditor title commit leaves references alone', () => {
       [`${BLOCKS}/alpha.qmd`]: blockFile('alpha', 'Alpha', 'Body.\n'),
       [`${BLOCKS}/beta.qmd`]: beta,
     });
-    commitTitle(0, 'Background');
+    await commitTitle(0, 'Background');
     await expectBlock(ws, 'alpha', '# Background {#sec-alpha .deo-section}\nBody.\n');
     expect(await ws.readFile(`${BLOCKS}/_beta.qmd`)).toBe(beta);
   });

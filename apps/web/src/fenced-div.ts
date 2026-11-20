@@ -64,16 +64,22 @@ function findDivRanges(lines: string[]): DivRange[] {
 }
 
 /**
- * Build the verbatim `fencedDiv` mdast node for one source range.
+ * Build the verbatim `code` mdast node for one source range.
+ *
+ * A div becomes a `code` node tagged `quarto-div` so Milkdown's
+ * CodeMirror code block renders it as editable text, mirroring how
+ * `$$` LaTeX is handled.
  *
  * @param lines - Source document split on newlines.
  * @param range - Inclusive line range of the div.
- * @returns An mdast node carrying the raw div text.
+ * @returns An mdast code node carrying the raw div text.
  */
 function makeDiv(lines: string[], range: DivRange): DivAstNode {
   const lastLine = lines[range.end] ?? '';
   return {
-    type: 'fencedDiv',
+    type: 'code',
+    lang: 'quarto-div',
+    meta: null,
     value: lines.slice(range.start, range.end + 1).join('\n'),
     position: {
       start: { line: range.start + 1, column: 1 },
@@ -193,22 +199,3 @@ export const fencedDivRemarkPlugin = {
   })(),
   options: {},
 };
-
-/** mdast node subset read by {@link fencedDivHandler}. */
-interface FencedDivNode {
-  value?: unknown;
-}
-
-/**
- * remark-stringify handler for `fencedDiv` nodes: emits the captured
- * source text verbatim, bypassing every escape and join rule that
- * otherwise mangles list-table rows or bracketed attributes.
- *
- * @param node - The `fencedDiv` mdast node.
- * @param _parent - Parent node (unused).
- * @param _state - Serializer state (unused).
- * @returns The div's raw source text.
- */
-export function fencedDivHandler(node: FencedDivNode, _parent: unknown, _state: unknown): string {
-  return typeof node.value === 'string' ? node.value : '';
-}

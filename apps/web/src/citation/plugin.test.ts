@@ -34,6 +34,7 @@ function textBeforeCursor(state: EditorState): string {
 const readSource = (file: string): string =>
   readFileSync(fileURLToPath(new URL(file, import.meta.url)), "utf8");
 const pluginSource = readSource("./plugin.ts");
+const keyboardSource = readSource("./keyboard.ts");
 const insertSource = readSource("./insert.ts");
 
 function createMockWorkspace(): WorkspaceAdapter {
@@ -88,13 +89,15 @@ describe("citation plugin — global keyboard handler (capture phase)", () => {
     expect(pluginSource).not.toMatch(/handleKeyDown\(/);
   });
 
-  it("uses filterCitekeys in Enter handler to resolve filtered index", () => {
-    // Enter handler must read from filtered list, not raw state.items
-    expect(pluginSource).toContain("filterCitekeys");
+  it("uses resolveEnterKey in Enter handler to resolve the active suggestion", () => {
+    // Enter handler reads the shared suggestion list, not raw state.items
+    expect(keyboardSource).toContain("resolveEnterKey");
+    expect(keyboardSource).toContain("buildSuggestions");
+    expect(pluginSource).not.toContain("filterCitekeys");
   });
 
   it("inserts citekey via applyCitekeySelection in Enter handler", () => {
-    expect(pluginSource).toContain("applyCitekeySelection(view, citekey, state.trigger)");
+    expect(keyboardSource).toContain("applyCitekeySelection(view, key, state.trigger)");
     expect(insertSource).toContain("tr.insertText");
     expect(insertSource).toContain("view.dispatch(tr)");
   });
@@ -109,7 +112,6 @@ describe("citation plugin — global keyboard handler (capture phase)", () => {
     expect(insertSource).toContain("insertion.text");
   });
 });
-
 describe("citation plugin — insert range and cursor placement", () => {
   it("replaces only the @query, never consuming the [", () => {
     // T3: the replacement starts at the @ (trigger.from), not at the [.
@@ -237,14 +239,14 @@ describe("citation plugin — SlashProvider behavior (source)", () => {
 
 describe("citation plugin — click-to-select via onSelectCitekey", () => {
   const clickHandler = pluginSource.match(/onSelectCitekey = \(citekey[\s\S]*?\n\s*\}/)?.[0] ?? "";
-  const enterHandler = pluginSource.match(/case "Enter"[\s\S]*?applyCitekeySelection\(view, citekey, state\.trigger\)/)?.[0] ?? "";
+  const enterHandler = keyboardSource.match(/case "Enter"[\s\S]*?applyCitekeySelection\(view, key, state\.trigger\)/)?.[0] ?? "";
   it("createUpdateDropdown passes onSelectCitekey to CitationDropdown", () => {
     expect(pluginSource).toMatch(/createUpdateDropdown\(root, dispatch, view, onDoiResolved\)/);
     expect(pluginSource).toMatch(/React\.createElement\(CitationDropdown, \{[^}]*onSelectCitekey/);
   });
   it("clicking a citekey inserts via applyCitekeySelection like Enter", () => {
     expect(clickHandler).toContain("applyCitekeySelection(view, citekey, state.trigger)");
-    expect(enterHandler).toContain("applyCitekeySelection(view, citekey, state.trigger)");
+    expect(enterHandler).toContain("applyCitekeySelection(view, key, state.trigger)");
   });
   it("clicking a citekey closes the citation dropdown", () => {
     expect(clickHandler).toContain('dispatch({ type: "CLOSE_CITATION" })');

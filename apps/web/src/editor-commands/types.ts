@@ -74,7 +74,7 @@ export interface EditorCommands {
   blockquote(): void;
   /** Turn the current block into a code block. */
   codeBlock(): void;
-  /** Insert a 3x3 table at the cursor. */
+  /** Insert a Quarto list-table template. */
   table(): void;
   /** Insert a horizontal rule. */
   hr(): void;

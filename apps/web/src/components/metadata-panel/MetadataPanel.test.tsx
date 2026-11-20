@@ -31,8 +31,8 @@ class MockResizeObserver {
 }
 /** Stub the global ResizeObserver with the recording mock. */
 function stubResizeObserver(): void { MockResizeObserver.instances = []; vi.stubGlobal('ResizeObserver', MockResizeObserver); }
-/** Fire the latest observer's resize callback inside act(). */
-function fireResize(): void { const instance = MockResizeObserver.instances.at(-1); if (!instance) throw new Error('ResizeObserver was not constructed'); act(() => instance.trigger()); }
+/** Fire the latest observer's resize callback once the effect created it. */
+async function fireResize(): Promise<void> { await waitFor(() => expect(MockResizeObserver.instances.length).toBeGreaterThan(0)); act(() => MockResizeObserver.instances.at(-1)?.trigger()); }
 /** Stub the expanded body height (jsdom reports zero layout metrics). */
 function stubBodyHeight(height: number): void { Object.defineProperty(screen.getByTestId('metadata-panel-body'), 'offsetHeight', { configurable: true, value: height }); }
 /** Stub `window.matchMedia` so the narrow-viewport query matches or not. */
@@ -228,7 +228,7 @@ describe('MetadataPanel overlay', () => {
     flushFrames();
     // Untitled manuscript starts expanded; body is taller than the viewport.
     stubBodyHeight(900);
-    fireResize();
+    await fireResize();
     const overlay = screen.getByTestId('metadata-panel-overlay');
     expect(overlay.className).toContain('overflow-y-auto');
     const panel = screen.getByTestId('metadata-panel');
@@ -242,7 +242,7 @@ describe('MetadataPanel overlay', () => {
     expect(screen.getByTestId('metadata-panel-toggle').getAttribute('aria-expanded')).toBe('true');
     // Content fits the viewport again: inline layout returns.
     stubBodyHeight(300);
-    fireResize();
+    await fireResize();
     expect(screen.queryByTestId('metadata-panel-overlay')).toBeNull();
     expect(screen.getByTestId('metadata-panel').className).toContain('contents');
     scroller.remove();
@@ -253,7 +253,7 @@ describe('MetadataPanel overlay', () => {
     await renderPanel({}, { current: scroller });
     flushFrames();
     stubBodyHeight(900);
-    fireResize();
+    await fireResize();
     expect(screen.queryByTestId('metadata-panel-overlay')).not.toBeNull();
     fireEvent.keyDown(screen.getByTestId('metadata-panel'), { key: 'Escape' });
     expect(screen.queryByTestId('metadata-panel-expanded')).toBeNull();
@@ -262,7 +262,7 @@ describe('MetadataPanel overlay', () => {
   });
   it('wraps the pinned bar and expanded body in a .reading-column', async () => {
     stubResizeObserver(); stubRaf(); const scroller = makeScroller(400);
-    await renderPanel({}, { current: scroller }); flushFrames(); stubBodyHeight(900); fireResize();
+    await renderPanel({}, { current: scroller }); flushFrames(); stubBodyHeight(900); await fireResize();
     const column = screen.getByTestId('metadata-panel').querySelector('.reading-column');
     expect(column?.querySelector('[data-testid="metadata-panel-bar"]')).not.toBeNull();
     expect(column?.querySelector('[data-testid="metadata-panel-body"]')).not.toBeNull();

@@ -1,16 +1,22 @@
 import { useEffect, useRef } from 'react';
 import { EditorView } from '@codemirror/view';
 import { Crepe } from '@milkdown/crepe';
+import { codeBlockConfig } from '@milkdown/kit/component/code-block';
 import { editorViewCtx, remarkPluginsCtx, remarkStringifyOptionsCtx, type Editor } from '@milkdown/kit/core';
 import { listenerCtx } from '@milkdown/kit/plugin/listener';
 import { $prose, getMarkdown } from '@milkdown/kit/utils';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
+import type { CrossrefLabel } from '@opendraft/manuscript';
 import { createCitationPlugin } from '../citation/plugin';
 import type { CitationState } from '../citation/types';
 import { quartoRemarkPlugin, quartoInlineCodePlugin, quartoChunkOptionPlugin, quartoCodeHandler } from '../quarto-syntax';
 import { citationRemarkPlugin } from '../citation/citation-remark-plugin';
-import { fencedDivHandler, fencedDivRemarkPlugin } from '../fenced-div';
-import { fencedDivNode } from '../fenced-div-node';
+import { fencedDivRemarkPlugin } from '../fenced-div';
+import { listTablePlaceholder } from '../list-table/list-table-placeholder';
+import { withListTablePreview } from '../list-table/list-table-preview';
+import { quartoDivDecoration } from '../list-table/quarto-div-decoration';
+import { fencedDivInputRule } from '../list-table/fenced-div-input-rule';
+import { buildListTableMenu } from '../list-table/list-table-slash-item';
 import { createTestApi, focusBlockEditor, fulfillPendingFocus, registerBlockEditor, type EditorTestApi } from '../caret-mode-switch';
 import type { DebouncedSaver } from './editor/autosave';
 
@@ -31,6 +37,8 @@ interface CrepeConfigOptions {
   onStateChangeRef: React.MutableRefObject<(state: CitationState) => void>;
   /** Bib file the citation plugin reads and appends to. */
   bibPath?: string;
+  /** Reads the current cross-reference labels for the `@` completions. */
+  getCrossrefs?: () => CrossrefLabel[];
 }
 
 /**
@@ -56,7 +64,7 @@ function createBaseCrepe(root: HTMLElement, defaultValue: string): Crepe {
       [Crepe.Feature.Cursor]: { virtual: false },
       [Crepe.Feature.CodeMirror]: {
         theme: lightCodeBlockTheme,
-        extensions: [quartoChunkOptionPlugin],
+        extensions: [quartoChunkOptionPlugin, listTablePlaceholder],
       },
       [Crepe.Feature.BlockEdit]: {
         blockHandle: { shouldShow: () => false },
@@ -66,6 +74,10 @@ function createBaseCrepe(root: HTMLElement, defaultValue: string): Crepe {
         // registered in BlockBody is the backstop for every other
         // heading-1 path (input rule, command, paste).
         textGroup: { h1: null },
+        // Replace Crepe's stock pipe-table slash entry with the
+        // Quarto list-table template; the GFM table feature stays on.
+        advancedGroup: { table: null },
+        buildMenu: buildListTableMenu,
       },
     },
   });
@@ -82,15 +94,16 @@ function createBaseCrepe(root: HTMLElement, defaultValue: string): Crepe {
  * @returns The configured Crepe instance, not yet mounted.
  */
 export function createCrepeConfig(options: CrepeConfigOptions): Crepe {
-  const { root, defaultValue, workspace, onStateChangeRef, bibPath } = options;
+  const { root, defaultValue, workspace, onStateChangeRef, bibPath, getCrossrefs } = options;
   const crepe = createBaseCrepe(root, defaultValue);
   crepe.addFeature((editor) => {
-    editor.use($prose(() => createCitationPlugin(workspace, onStateChangeRef.current, bibPath)));
+    editor.use($prose(() => createCitationPlugin(workspace, onStateChangeRef.current, bibPath, getCrossrefs)));
   });
-  // Verbatim Pandoc fenced-div node; must be queued before create()
-  // so nodesCtx carries it when SchemaReady builds the schema.
   crepe.addFeature((editor) => {
-    editor.use(fencedDivNode);
+    editor.use(quartoDivDecoration);
+  });
+  crepe.addFeature((editor) => {
+    editor.use(fencedDivInputRule);
   });
   crepe.editor.config((ctx) => {
     ctx.update(remarkStringifyOptionsCtx, (options) => ({
@@ -98,11 +111,11 @@ export function createCrepeConfig(options: CrepeConfigOptions): Crepe {
       bullet: '-' as const,
       // Custom `code` handler emits fence info verbatim (Quarto
       // headers like `{r label, echo=FALSE}` get mangled by the
-      // stock handler's unsafe rules). `fencedDiv` prints captured
-      // Pandoc div source byte-for-byte. Spread so Milkdown's
+      // stock handler's unsafe rules) and prints `quarto-div` fenced
+      // div source byte-for-byte. Spread so Milkdown's
       // text/strong/emphasis customizations survive; its defaults
       // carry no code entry.
-      handlers: { ...options.handlers, code: quartoCodeHandler, fencedDiv: fencedDivHandler },
+      handlers: { ...options.handlers, code: quartoCodeHandler },
     }));
     // Register remark plugins here, at ConfigReady: the editor reduces
     // remarkPluginsCtx into the processor exactly once at SchemaReady,
@@ -117,6 +130,14 @@ export function createCrepeConfig(options: CrepeConfigOptions): Crepe {
       quartoInlineCodePlugin,
       ...ps,
     ] as unknown as typeof ps);
+    // Render the table a `.list-table` div describes below its editable
+    // source. Chaining order with Crepe's LaTeX preview is irrelevant:
+    // each handler delegates languages it does not own to the previous
+    // one.
+    ctx.update(codeBlockConfig.key, (prev) => ({
+      ...prev,
+      renderPreview: withListTablePreview(prev.renderPreview),
+    }));
   });
   return crepe;
 }

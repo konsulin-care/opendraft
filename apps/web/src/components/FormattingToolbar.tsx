@@ -46,16 +46,17 @@ interface ItemControlProps {
 /**
  * Render one inline toolbar item: the pinned Paragraph style menu trigger, or
  * an icon button wired to its command with the pressed state from the
- * selection. Undo and Redo stay enabled in source mode.
+ * selection. Undo, Redo, and source-enabled items stay enabled in source mode.
  */
 function ItemControl({ item, index, commands, active, disabled, run, setItemRef }: ItemControlProps) {
+  const enabledInSource = item.group === 'history' || item.sourceEnabled === true;
   if (item.group === 'style') {
     return (
       <ToolbarMenu
         label={item.label}
         icon={item.icon}
         items={headingItems(active.heading, (level) => run(() => commands.setHeading(level)))}
-        disabled={disabled}
+        disabled={enabledInSource ? false : disabled}
         measureRef={setItemRef(index)}
       />
     );
@@ -66,7 +67,7 @@ function ItemControl({ item, index, commands, active, disabled, run, setItemRef 
       label={item.label}
       icon={item.icon}
       pressed={item.pressedKey ? active[item.pressedKey] : undefined}
-      disabled={item.group === 'history' ? false : disabled}
+      disabled={enabledInSource ? false : disabled}
       measureRef={setItemRef(index)}
       onClick={() => command && run(() => command(commands))}
     />
@@ -79,6 +80,48 @@ interface ToolbarRowProps {
   commands: EditorCommands;
   /** Disables formatting controls, e.g. in source mode. */
   disabled: boolean;
+}
+
+/** Inline items, hidden tail, and More-trigger entries at a measured count. */
+interface ToolbarLayout {
+  /** Items rendered inline, pinned items always included. */
+  visible: readonly ToolbarItemDef[];
+  /** Items collapsed into the More menu. */
+  hidden: readonly ToolbarItemDef[];
+  /** More-menu entries, restricted to source-enabled items in source mode. */
+  moreEntries: ToolbarMenuItem[];
+  /** Whether the More trigger is enabled. */
+  moreEnabled: boolean;
+}
+
+/**
+ * Split the item list at the measured inline count and build the More-trigger
+ * state, keeping pinned items inline and restricting source mode to items that
+ * explicitly stay enabled.
+ *
+ * @param visibleCount - Measured number of items that fit inline.
+ * @param commands - Command set bound to the active editor surface.
+ * @param run - Runs a command, then refreshes the active state.
+ * @param disabled - True when formatting controls are disabled (source mode).
+ * @returns The inline/hidden split plus More entries and enablement.
+ */
+function toolbarLayout(
+  visibleCount: number,
+  commands: EditorCommands,
+  run: (action: () => void) => void,
+  disabled: boolean,
+): ToolbarLayout {
+  const lastPinned = TOOLBAR_ITEMS.reduce((last, item, index) => (item.pinned ? index : last), -1);
+  const inlineCount = Math.max(visibleCount, lastPinned + 1);
+  const visible = TOOLBAR_ITEMS.slice(0, inlineCount);
+  const hidden = TOOLBAR_ITEMS.slice(inlineCount);
+  const sourceHidden = hidden.filter((item) => item.sourceEnabled === true);
+  return {
+    visible,
+    hidden,
+    moreEntries: hiddenMenuItems(disabled ? sourceHidden : hidden, commands, run),
+    moreEnabled: !disabled || sourceHidden.length > 0,
+  };
 }
 
 /**
@@ -108,11 +151,7 @@ function ToolbarRow({ commands, disabled }: ToolbarRowProps) {
   });
 
   // Pinned items stay inline even when the measured count would exclude them.
-  const lastPinned = TOOLBAR_ITEMS.reduce((last, item, index) => (item.pinned ? index : last), -1);
-  const inlineCount = Math.max(visibleCount, lastPinned + 1);
-  const visible = TOOLBAR_ITEMS.slice(0, inlineCount);
-  const hidden = TOOLBAR_ITEMS.slice(inlineCount);
-  const moreEntries: ToolbarMenuItem[] = hiddenMenuItems(hidden, commands, run);
+  const { visible, hidden, moreEntries, moreEnabled } = toolbarLayout(visibleCount, commands, run, disabled);
   // The More trigger shows an active state while a collapsed item's format is on.
   const moreActive = hiddenFormatActive(hidden, active);
 
@@ -138,7 +177,7 @@ function ToolbarRow({ commands, disabled }: ToolbarRowProps) {
           icon={Ellipsis}
           items={moreEntries}
           pressed={moreActive}
-          disabled={disabled}
+          disabled={!moreEnabled}
           measureRef={(element) => { moreRef.current = element; }}
         />
       )}

@@ -1,4 +1,5 @@
 import type { Reference } from '@opendraft/references';
+import type { CrossrefLabel } from '@opendraft/manuscript';
 
 /** Trigger context for citation dropdown. */
 export interface CitationTrigger {
@@ -6,6 +7,8 @@ export interface CitationTrigger {
   from: number;
   /** Whether this is bracketed mode [@...]. */
   bracketed: boolean;
+  /** Whether the bracket group already contains an earlier @ key. */
+  grouped?: boolean;
 }
 
 /** Comparison state for duplicate DOI detection. */
@@ -58,6 +61,8 @@ export interface CitationState {
   error: CitationError | null;
   /** references.bib load error, if parsing failed. */
   loadError?: CitationLoadError | null;
+  /** Cross-reference labels available for completion. */
+  crossrefs?: CrossrefLabel[];
 }
 
 /** Actions for citation state reducer. */
@@ -77,4 +82,5 @@ export type CitationAction =
   | { type: 'DISCARD_DOI' }
   | { type: 'SET_ERROR'; error: CitationError }
   | { type: 'CLEAR_ERROR' }
+  | { type: 'SET_CROSSREFS'; crossrefs: CrossrefLabel[] }
   | { type: 'SET_DECORATIONS'; decorations: unknown };

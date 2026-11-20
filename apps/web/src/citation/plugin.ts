@@ -5,10 +5,11 @@ import { SlashProvider } from "@milkdown/plugin-slash";
 import type { WorkspaceAdapter } from "@opendraft/workspace";
 import { readReferences } from "./references-source";
 import type { Reference } from "@opendraft/references";
+import type { CrossrefLabel } from "@opendraft/manuscript";
 import { citationReducer, createInitialState } from "./state";
 import { matchCitationTrigger } from "./input-rule";
-import { filterCitekeys } from "./citekey-list";
 import { applyCitekeySelection } from "./insert";
+import { createGlobalKeyHandler } from "./keyboard";
 import type { CitationState, CitationAction } from "./types";
 import { createRoot } from "react-dom/client";
 import React from "react";
@@ -22,6 +23,9 @@ export const citationPluginKey = new PluginKey("citation");
 
 /** Citekey map for tracking position -> citekey mappings. */
 const citekeyMap = new Map<number, string>();
+
+/** Latest cross-reference getter, used when reloads omit it explicitly. */
+let currentCrossrefs: () => CrossrefLabel[] = () => [];
 
 /** Combined plugin state: citation UI state + inline decorations. */
 export interface CitationPluginState {
@@ -42,12 +46,14 @@ export function getCitationState(
  * @param workspace - Workspace adapter for reading references.bib.
  * @param onStateChange - Optional callback fired on every state transition.
  * @param bibPath - Path of the bib file to read and append to.
+ * @param getCrossrefs - Reads the current cross-reference labels.
  * @returns ProseMirror Plugin instance.
  */
 export function createCitationPlugin(
   workspace: WorkspaceAdapter,
   onStateChange?: (state: CitationState) => void,
   bibPath = "references.bib",
+  getCrossrefs: () => CrossrefLabel[] = () => [],
 ): Plugin {
   return new Plugin({
     key: citationPluginKey,
@@ -58,7 +64,7 @@ export function createCitationPlugin(
         return ps?.decorations ?? DecorationSet.empty;
       },
     },
-    view: createView(workspace, bibPath),
+    view: createView(workspace, bibPath, getCrossrefs),
   });
 }
 
@@ -108,10 +114,14 @@ export function shouldShowCitation(content: string | undefined): boolean {
 }
 
 /** Rebuild decorations based on current document and references. */
-function rebuildDecorations(view: EditorView, references: Reference[]) {
+function rebuildDecorations(
+  view: EditorView,
+  references: Reference[],
+  getCrossrefs: () => CrossrefLabel[],
+) {
   if (view.isDestroyed) return;
   citekeyMap.clear();
-  const decoSet = buildCitekeyDecorations(view.state.doc, references, citekeyMap);
+  const decoSet = buildCitekeyDecorations(view.state.doc, references, citekeyMap, getCrossrefs());
   const tr = view.state.tr.setMeta(citationPluginKey, {
     type: "SET_DECORATIONS",
     decorations: decoSet,
@@ -138,22 +148,27 @@ function setupDOMHandlers(view: EditorView) {
 }
 
 /** Create the plugin view spec. */
-function createView(workspace: WorkspaceAdapter, bibPath: string) {
+function createView(
+  workspace: WorkspaceAdapter,
+  bibPath: string,
+  getCrossrefs: () => CrossrefLabel[],
+) {
   return (view: EditorView) => {
-    loadReferences(workspace, bibPath, view);
+    currentCrossrefs = getCrossrefs;
+    loadReferences(workspace, bibPath, view, getCrossrefs);
     const dispatch = createDispatch(view);
     const { provider, root } = createSlashProviderConfig(dispatch, view, () => {
       void loadReferences(workspace, bibPath, view);
-    });
+    }, getCrossrefs);
     const globalKeyHandler = createGlobalKeyHandler(view, dispatch);
     window.addEventListener("keydown", globalKeyHandler, { capture: true });
     const domHandlers = setupDOMHandlers(view);
-    const onDoiResolved = createDoiResolvedHandler(workspace, bibPath, view);
+    const onDoiResolved = createDoiResolvedHandler(workspace, bibPath, view, getCrossrefs);
     const updateDropdown = createUpdateDropdown(root, dispatch, view, onDoiResolved);
 
     setTimeout(() => {
       const ps = citationPluginKey.getState(view.state) as CitationPluginState | null;
-      if (ps?.citation.items) rebuildDecorations(view, ps.citation.items);
+      if (ps?.citation.items) rebuildDecorations(view, ps.citation.items, getCrossrefs);
     }, 0);
 
     return {
@@ -164,7 +179,7 @@ function createView(workspace: WorkspaceAdapter, bibPath: string) {
         if (ps) updateDropdown(ps.citation);
         if (editorView.state.doc !== prevState.doc) {
           const citePs = citationPluginKey.getState(editorView.state) as CitationPluginState | null;
-          if (citePs?.citation.items) setTimeout(() => rebuildDecorations(editorView, citePs.citation.items), 0);
+          if (citePs?.citation.items) setTimeout(() => rebuildDecorations(editorView, citePs.citation.items, getCrossrefs), 0);
         }
       },
       destroy() {
@@ -180,7 +195,12 @@ function createView(workspace: WorkspaceAdapter, bibPath: string) {
 }
 
 /** Create SlashProvider configuration. */
-function createSlashProviderConfig(dispatch: (action: CitationAction) => void, view: EditorView, onOpen?: () => void) {
+function createSlashProviderConfig(
+  dispatch: (action: CitationAction) => void,
+  view: EditorView,
+  onOpen?: () => void,
+  getCrossrefs: () => CrossrefLabel[] = () => [],
+) {
   const container = document.createElement("div");
   const root = createRoot(container);
   const provider = new SlashProvider({
@@ -196,7 +216,15 @@ function createSlashProviderConfig(dispatch: (action: CitationAction) => void, v
     const paragraphText = $from.parent.textBetween(0, $from.parentOffset, undefined, "\uFFFD");
     const trigger = matchCitationTrigger(paragraphText);
     if (!trigger) return;
-    dispatch({ type: "OPEN_CITATION", trigger: { from: $from.start() + trigger.from, bracketed: trigger.bracketed } });
+    dispatch({
+      type: "OPEN_CITATION",
+      trigger: {
+        from: $from.start() + trigger.from,
+        bracketed: trigger.bracketed,
+        grouped: trigger.grouped,
+      },
+    });
+    dispatch({ type: "SET_CROSSREFS", crossrefs: getCrossrefs() });
     onOpen?.();
   };
   provider.onHide = () => dispatch({ type: "CLOSE_CITATION" });
@@ -214,46 +242,6 @@ function createUpdateDropdown(root: ReturnType<typeof createRoot>, dispatch: (ac
   };
 }
 
-/** Create the global keyboard handler for the citation dropdown. */
-function createGlobalKeyHandler(
-  view: EditorView,
-  dispatch: (action: CitationAction) => void
-) {
-  return (event: KeyboardEvent) => {
-    const ps = citationPluginKey.getState(view.state) as CitationPluginState | null;
-    const state = ps?.citation;
-    if (!state?.open) return;
-
-    switch (event.key) {
-      case "Enter": {
-        if (state.doiMode) return;
-        event.preventDefault();
-        const filtered = filterCitekeys(state.items, state.query);
-        if (filtered.length > 0 && state.activeIndex < filtered.length) {
-          const citekey = filtered[state.activeIndex].citeKey;
-          if (state.trigger) {
-            applyCitekeySelection(view, citekey, state.trigger);
-          }
-        }
-        dispatch({ type: "CLOSE_CITATION" });
-        break;
-      }
-      case "ArrowDown":
-        event.preventDefault();
-        dispatch({ type: "INCREMENT_ACTIVE_INDEX" });
-        break;
-      case "ArrowUp":
-        event.preventDefault();
-        dispatch({ type: "DECREMENT_ACTIVE_INDEX" });
-        break;
-      case "Escape":
-        event.preventDefault();
-        dispatch({ type: "CLOSE_CITATION" });
-        break;
-    }
-  };
-}
-
 /** Extract query text from editor content after the @ trigger. */
 function extractQueryFromEditor(view: EditorView, triggerFrom: number): string {
   const { $from } = view.state.selection;
@@ -261,10 +249,15 @@ function extractQueryFromEditor(view: EditorView, triggerFrom: number): string {
 }
 
 /** Create the onDoiResolved handler for DOI resolution flow. */
-function createDoiResolvedHandler(workspace: WorkspaceAdapter, bibPath: string, view: EditorView) {
+function createDoiResolvedHandler(
+  workspace: WorkspaceAdapter,
+  bibPath: string,
+  view: EditorView,
+  getCrossrefs: () => CrossrefLabel[],
+) {
   return async (bibtex: string) => {
     await appendReference(workspace, bibPath, bibtex);
-    await loadReferences(workspace, bibPath, view);
+    await loadReferences(workspace, bibPath, view, getCrossrefs);
   };
 }
 
@@ -278,13 +271,18 @@ function syncQueryFromEditor(editorView: EditorView, dispatch: (action: Citation
 }
 
 /** Load references from workspace and dispatch to state. */
-async function loadReferences(workspace: WorkspaceAdapter, bibPath: string, view: EditorView): Promise<void> {
+async function loadReferences(
+  workspace: WorkspaceAdapter,
+  bibPath: string,
+  view: EditorView,
+  getCrossrefs: () => CrossrefLabel[] = currentCrossrefs,
+): Promise<void> {
   try {
     const { items, error } = await readReferences(workspace, bibPath);
     if (view.isDestroyed) return;
     view.dispatch(view.state.tr.setMeta(citationPluginKey, { type: "SET_ITEMS", items, error }));
     if (error) return;
-    setTimeout(() => rebuildDecorations(view, items), 0);
+    setTimeout(() => rebuildDecorations(view, items, getCrossrefs), 0);
   } catch (err) {
     if (err instanceof DOMException && err.name === "InvalidStateError") return;
     throw err;

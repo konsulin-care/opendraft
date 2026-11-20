@@ -8,6 +8,7 @@ import { getFileCapability } from '../project/file-capability';
 import { useDebouncedSaver } from './editor/autosave';
 import type { SaveStatus } from './AppHeader';
 import { ReadingColumn } from './ReadingColumn';
+import { useAtCompletion } from './use-at-completion';
 
 export type { EditorTestApi } from '../caret-mode-switch';
 
@@ -59,6 +60,7 @@ export function ManuscriptEditor({
   const [sourceMarkdown, setSourceMarkdown] = useState(() => editorContent(path, defaultValue));
   const sourceEditorRef = useRef<SourceEditorHandle | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const completionSources = useAtCompletion(workspace, path, sourceMarkdown);
   const saver = useDebouncedSaver(workspace, path, onSaveStatusChange);
   // Cmd/Ctrl+S flushes the pending debounced save immediately.
   useSaveShortcut(saver);
@@ -90,6 +92,7 @@ export function ManuscriptEditor({
               onChange={handleSourceChange}
               className="source-editor"
               language="plain"
+              completionSources={completionSources}
             />
           </ReadingColumn>
         </div>

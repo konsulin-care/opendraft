@@ -2,56 +2,24 @@ import { describe, expect, it } from 'vitest';
 import { MemoryWorkspace } from '@opendraft/workspace';
 import { addBlock, deleteBlock, listBlocks, renameBlock, setBlockTitle } from '../src/blocks';
 
-/** Manuscript directory used by every fixture. */
 const DIR = 'manuscripts/demo';
-
-/** Path of the assembly under test. */
 const ARTICLE = `${DIR}/article.qmd`;
-
-/** Path of the block directory under test. */
 const BLOCKS = `${DIR}/blocks`;
 
-/**
- * Build an assembly listing the given short names as include lines.
- *
- * @param shorts - Block short names in include order.
- * @returns article.qmd text with front matter and a refs fence.
- */
 function articleWith(...shorts: string[]): string {
   const includes = shorts.map((short) => `{{< include blocks/${short}.qmd >}}`).join('\n\n');
   return `---\nmetadata-files:\n- _author.yml\n---\n\n${includes}\n\n::: {#refs}\n:::\n`;
 }
 
-/**
- * Build canonical block file text.
- *
- * @param title - Heading title.
- * @param anchor - Heading anchor including the `sec-` prefix.
- * @param type - Section type without the `deo-` prefix.
- * @param body - Section body after the heading line.
- * @returns Block file text opening with a canonical heading.
- */
 function blockFile(title: string, anchor: string, type: string, body = ''): string {
   return `# ${title} {#${anchor} .deo-${type}}\n${body}`;
 }
 
-/**
- * Build an assembly listing the given short names as prefixed include lines.
- *
- * @param shorts - Block short names in include order.
- * @returns article.qmd text with front matter and a refs fence.
- */
 function articlePrefixed(...shorts: string[]): string {
   const includes = shorts.map((short) => `{{< include blocks/_${short}.qmd >}}`).join('\n\n');
   return `---\nmetadata-files:\n- _author.yml\n---\n\n${includes}\n\n::: {#refs}\n:::\n`;
 }
 
-/**
- * Write fixture files into a fresh workspace.
- *
- * @param files - Repo-relative paths mapped to file contents.
- * @returns The workspace holding the fixture.
- */
 async function setup(files: Record<string, string>) {
   const ws = new MemoryWorkspace();
   for (const [path, content] of Object.entries(files)) {
@@ -60,12 +28,6 @@ async function setup(files: Record<string, string>) {
   return ws;
 }
 
-/**
- * Read the include order back out of the assembly.
- *
- * @param ws - Workspace holding the fixture.
- * @returns Block short names in assembly include order.
- */
 async function includeOrder(ws: MemoryWorkspace): Promise<string[]> {
   const article = (await ws.readFile(ARTICLE)) ?? '';
   const shorts: string[] = [];
@@ -107,7 +69,6 @@ describe('addBlock', () => {
     );
     expect(await includeOrder(ws)).toEqual(['intro']);
   });
-
 });
 
 describe('addBlock de-duplication', () => {
@@ -152,7 +113,6 @@ describe('addBlock de-duplication', () => {
     expect(await includeOrder(ws)).toEqual(['alpha', createdShort]);
   });
 });
-
 describe('listBlocks', () => {
   it('returns blocks in article.qmd include order with titles read from their headings', async () => {
     const ws = await setup({
@@ -181,7 +141,6 @@ describe('listBlocks', () => {
     ]);
   });
 });
-
 describe('listBlocks file names', () => {
   it('returns file intro.qmd for a legacy include and _intro.qmd for a prefixed include', async () => {
     const ws = await setup({
@@ -196,7 +155,6 @@ describe('listBlocks file names', () => {
     expect(blocks.map((block) => block.file)).toEqual(['intro.qmd', '_methods.qmd']);
   });
 });
-
 describe('renameBlock', () => {
   it('normalizes the new short, writes the prefixed file and rewrites the include and refs', async () => {
     const ws = await setup({
@@ -233,7 +191,46 @@ describe('renameBlock', () => {
     expect(await includeOrder(ws)).toEqual(['background']);
   });
 });
+describe('renameBlock reference boundaries', () => {
+  it('rewrites plain, bracketed and capitalized refs in other blocks and leaves partial keys', async () => {
+    const ws = await setup({
+      [ARTICLE]: articlePrefixed('a', 'b'),
+      [`${BLOCKS}/_a.qmd`]: blockFile('Alpha', 'sec-a', 'a', 'Body.\n'),
+      [`${BLOCKS}/_b.qmd`]: blockFile(
+        'Beta',
+        'sec-b',
+        'b',
+        'See @sec-a, [-@sec-a] and @Sec-a. Not @sec-ab or @sec-a-x.\n',
+      ),
+    });
 
+    await renameBlock(ws, DIR, 'a', 'c');
+
+    const beta = (await ws.readFile(`${BLOCKS}/_b.qmd`)) ?? '';
+    expect(beta).toContain('See @sec-c, [-@sec-c] and @Sec-c.');
+    expect(beta).toContain('Not @sec-ab or @sec-a-x.');
+  });
+
+  it('applies the same boundary rules to the renamed block own body', async () => {
+    const ws = await setup({
+      [ARTICLE]: articlePrefixed('a', 'b'),
+      [`${BLOCKS}/_a.qmd`]: blockFile(
+        'Alpha',
+        'sec-a',
+        'a',
+        'See @sec-a, [-@sec-a] and @Sec-a. Not @sec-ab or @sec-a-x.\n',
+      ),
+      [`${BLOCKS}/_b.qmd`]: blockFile('Beta', 'sec-b', 'b', 'Body.\n'),
+    });
+
+    await renameBlock(ws, DIR, 'a', 'c');
+
+    const alpha = (await ws.readFile(`${BLOCKS}/_c.qmd`)) ?? '';
+    expect(alpha).toBe(
+      '# Alpha {#sec-c .deo-a}\nSee @sec-c, [-@sec-c] and @Sec-c. Not @sec-ab or @sec-a-x.\n',
+    );
+  });
+});
 describe('renameBlock name collisions', () => {
   it('throws when the target short is taken and changes nothing', async () => {
     const article = articlePrefixed('intro', 'methods');
@@ -256,7 +253,6 @@ describe('renameBlock name collisions', () => {
     expect(await ws.listFiles(BLOCKS)).toEqual(['_intro.qmd', '_methods.qmd', 'results.qmd']);
   });
 });
-
 describe('legacy block files', () => {
   it('setBlockTitle rewrites the legacy blocks/intro.qmd included as blocks/intro.qmd', async () => {
     const ws = await setup({

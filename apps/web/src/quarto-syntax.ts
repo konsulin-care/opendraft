@@ -65,6 +65,9 @@ interface StringifyState {
  * @returns The serialized fenced or indented code block.
  */
 export function quartoCodeHandler(node: CodeNode, _parent: unknown, state: StringifyState): string {
+  // Fenced divs are stored as `quarto-div` code blocks whose value is
+  // the whole raw div source; emit it verbatim (no fence, no escaping).
+  if (node.lang === 'quarto-div') return node.value ?? '';
   const marker = state.options.fence === '~' ? '~' : '`';
   const raw = node.value ?? '';
   // Indented fallback mirrors mdast-util-to-markdown's formatCodeAsIndented.

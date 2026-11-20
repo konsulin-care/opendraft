@@ -3,10 +3,9 @@
  * BlockBody tests: typing persists the block file with its canonical
  * heading preserved, mounting without edits performs no write, a
  * loaded level-1 heading neither writes nor hides the warning badge,
- * Quarto constructs survive load and save, and edits autosave to the
- * file named by the `file` prop. Mounting uses a local helper seeded
- * at `_methods.qmd`; the IntersectionObserver harness lives in
- * block-body-harness.ts.
+ * Quarto constructs survive load and save, edits autosave to the file
+ * named by the `file` prop, and the cross-reference index is wired into
+ * the citation plugin and kept in sync on save.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
@@ -17,6 +16,7 @@ import { BlockHeader, reportLoadedBody } from './BlockHeader';
 import { requestFocusForShort } from '../caret-mode-switch';
 import type { EditorTestApi } from '../caret-mode-switch';
 import { createCitationPlugin } from '../citation/plugin';
+import type { CrossrefIndexHandle } from '../crossref/use-crossref-index';
 import {
   DIR,
   SAVE_WINDOW_MS,
@@ -30,16 +30,12 @@ vi.mock('../citation/plugin', async (importOriginal) => {
 });
 
 beforeEach(installBlockBodyHarness);
-
 afterEach(uninstallBlockBodyHarness);
-
 /** Editor APIs handed by locally mounted bodies, in order. */
 let editorApis: EditorTestApi[] = [];
-
 beforeEach(() => {
   editorApis = [];
 });
-
 /**
  * Resolve once a locally mounted body has wired its editor API;
  * returns the most recent API handed to `onEditorReady`.
@@ -50,14 +46,14 @@ async function waitForApi(): Promise<EditorTestApi> {
   }, { timeout: 10000 });
   return editorApis[editorApis.length - 1];
 }
-
 /**
  * Render a block body against a workspace seeded at `_methods.qmd`.
  *
  * @param body - Block file text, canonical heading included.
+ * @param crossrefs - Optional cross-reference index handed to the body.
  * @returns The workspace, a write-count spy, and the seeded path.
  */
-async function mountBody(body: string) {
+async function mountBody(body: string, crossrefs?: CrossrefIndexHandle) {
   const ws = new MemoryWorkspace();
   const path = `${DIR}/blocks/_methods.qmd`;
   await ws.writeFile(path, body);
@@ -75,20 +71,18 @@ async function mountBody(body: string) {
       title="Methods"
       collapsed={false}
       onEditorReady={(api) => editorApis.push(api)}
+      crossrefs={crossrefs}
     />,
   );
   return { ws, writes, path };
 }
-
 describe('BlockBody autosave', () => {
   it('persists typing to the block file with the canonical heading preserved', async () => {
     const { ws, path } = await mountBody('# Methods {#sec-methods .deo-section}\nBody text.\n');
     const api = await waitForApi();
-
     await act(async () => {
       api.insertText(' Extra sentence.');
     });
-
     await waitFor(async () => {
       const saved = await ws.readFile(path);
       // The legacy generic '.deo-section' normalizes to '.doco-section' on save.
@@ -96,47 +90,38 @@ describe('BlockBody autosave', () => {
       expect(saved).toContain('Extra sentence.');
     }, { timeout: SAVE_WINDOW_MS + 5000 });
   }, 20000);
-
   it('performs no file write when mounted without user edits', async () => {
     const { ws, writes, path } = await mountBody(
       '# Methods {#sec-methods .deo-section}\nQuiet body.\n',
     );
     await waitForApi();
     const before = await ws.readFile(path);
-
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, SAVE_WINDOW_MS));
     });
-
     expect(writes).toBe(0);
     expect(await ws.readFile(path)).toBe(before);
   }, 20000);
 });
-
 describe('BlockBody class-less save path', () => {
   it('keeps a heading with no class class-less when the body autosaves', async () => {
     const { ws, path } = await mountBody('# Methods {#sec-methods}\nBody text.\n');
     const api = await waitForApi();
-
     await act(async () => {
       api.insertText(' Extra sentence.');
     });
-
     await waitFor(async () => {
       const saved = await ws.readFile(path);
       expect(saved).toContain('Extra sentence.');
       expect(saved?.split('\n')[0]).toBe('# Methods {#sec-methods}');
     }, { timeout: SAVE_WINDOW_MS + 5000 });
   }, 20000);
-
   it("gives a file with no leading heading the generic '.doco-section' class on its first save", async () => {
     const { ws, path } = await mountBody('Plain body text.\n');
     const api = await waitForApi();
-
     await act(async () => {
       api.insertText(' Extra sentence.');
     });
-
     await waitFor(async () => {
       const saved = await ws.readFile(path);
       expect(saved).toContain('Extra sentence.');
@@ -144,7 +129,6 @@ describe('BlockBody class-less save path', () => {
     }, { timeout: SAVE_WINDOW_MS + 5000 });
   }, 20000);
 });
-
 describe('BlockBody citation bib path', () => {
   it('creates its editor with the shared citation bib path', async () => {
     vi.mocked(createCitationPlugin).mockClear();
@@ -154,8 +138,38 @@ describe('BlockBody citation bib path', () => {
     expect(calls.length).toBeGreaterThan(0);
     expect(calls[calls.length - 1][2]).toBe('manuscripts/references.bib');
   }, 20000);
+  it('passes its crossrefs prop labels as the citation plugin getter', async () => {
+    vi.mocked(createCitationPlugin).mockClear();
+    const labels = [
+      { id: 'sec-methods', kind: 'sec' as const, caption: 'Methods', file: '_methods.qmd' },
+    ];
+    const crossrefs: CrossrefIndexHandle = {
+      getCrossrefs: () => labels,
+      updateFile: () => undefined,
+    };
+    await mountBody('# Methods {#sec-methods .deo-section}\nBody text.\n', crossrefs);
+    await waitForApi();
+    const calls = vi.mocked(createCitationPlugin).mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls[calls.length - 1][3]?.()).toEqual(labels);
+  }, 20000);
+  it('pushes the heading-joined block text into crossrefs under the block file name', async () => {
+    const updateFile = vi.fn();
+    const crossrefs: CrossrefIndexHandle = { getCrossrefs: () => [], updateFile };
+    await mountBody('# Methods {#sec-methods .deo-section}\nBody text.\n', crossrefs);
+    const api = await waitForApi();
+    await act(async () => {
+      api.insertText(' Extra sentence.');
+    });
+    await waitFor(() => {
+      expect(updateFile).toHaveBeenCalled();
+      const [file, text] = updateFile.mock.calls[updateFile.mock.calls.length - 1];
+      expect(file).toBe('_methods.qmd');
+      expect(text).toContain('# Methods');
+      expect(text).toContain('Extra sentence.');
+    }, { timeout: SAVE_WINDOW_MS + 5000 });
+  }, 20000);
 });
-
 describe('BlockBody focus-on-creation', () => {
   it('leaves a request for another short unfulfilled when this body registers', async () => {
     requestFocusForShort('intro');
@@ -169,7 +183,6 @@ describe('BlockBody focus-on-creation', () => {
       expect(surface?.contains(document.activeElement)).toBe(false);
     }, { timeout: 10000 });
   }, 20000);
-
   it('fulfils a pending focus request with DOM focus inside the mounted body', async () => {
     requestFocusForShort('methods');
     await mountBody('# Methods {#sec-methods .deo-section}\nBody text.\n');
@@ -182,7 +195,6 @@ describe('BlockBody focus-on-creation', () => {
     }, { timeout: 10000 });
   }, 20000);
 });
-
 describe('BlockBody level-1 load path', () => {
   it('performs no file write when the loaded file already contains a level-1 heading', async () => {
     const { ws, path } = await mountBody(
@@ -197,11 +209,9 @@ describe('BlockBody level-1 load path', () => {
     };
     await waitForApi();
     const before = await ws.readFile(path);
-
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, SAVE_WINDOW_MS));
     });
-
     expect(writes).toBe(0);
     expect(await ws.readFile(path)).toBe(before);
   }, 20000);
@@ -212,9 +222,8 @@ describe('BlockBody level-1 warning badge', () => {
     // Reset the shared per-short registry so the badge comes from this load.
     reportLoadedBody('methods', '## Level two');
     const ws = new MemoryWorkspace();
-    const path = `${DIR}/blocks/_methods.qmd`;
     await ws.writeFile(
-      path,
+      `${DIR}/blocks/_methods.qmd`,
       '# Methods {#sec-methods .deo-section}\n# Legacy H1\nBody text.',
     );
     render(
@@ -223,13 +232,9 @@ describe('BlockBody level-1 warning badge', () => {
         <BlockBody ws={ws} dir={DIR} short="methods" title="Methods" collapsed={false} />
       </>,
     );
-
-    await waitFor(
-      () => {
-        expect(screen.getByTestId('level-1-warning-badge')).toBeInTheDocument();
-      },
-      { timeout: 10000 },
-    );
+    await waitFor(() => {
+      expect(screen.getByTestId('level-1-warning-badge')).toBeInTheDocument();
+    }, { timeout: 10000 });
   }, 20000);
 });
 
@@ -250,11 +255,9 @@ describe('BlockBody file prop', () => {
       />,
     );
     const api = await waitForApi();
-
     await act(async () => {
       api.insertText(' Extra sentence.');
     });
-
     await waitFor(async () => {
       const saved = await ws.readFile(path);
       expect(saved).toContain('Extra sentence.');
@@ -281,11 +284,9 @@ describe('BlockBody Quarto round-trip', () => {
     ].join('\n');
     const { ws, path } = await mountBody(quartoBody);
     const api = await waitForApi();
-
     await act(async () => {
       api.insertText(' More.');
     });
-
     await waitFor(async () => {
       const saved = await ws.readFile(path);
       expect(saved).toContain('::: {#fig-results}');

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { citationReducer, createInitialState } from './state';
 import type { CitationState } from './types';
 import type { Reference } from '@opendraft/references';
+import type { CrossrefLabel } from '@opendraft/manuscript';
 
 const mockReference: Reference = {
   citeKey: 'doe2024',
@@ -119,6 +120,30 @@ describe('citationReducer - query/items', () => {
     });
 
     expect(result.items).toEqual([mockReference]);
+  });
+});
+
+describe('citationReducer - crossrefs', () => {
+  it('starts with no crossrefs', () => {
+    expect(createInitialState().crossrefs).toEqual([]);
+  });
+
+  it('SET_CROSSREFS stores labels and leaves items, query and activeIndex unchanged', () => {
+    const crossrefs: CrossrefLabel[] = [
+      { id: 'fig-cat', kind: 'fig', caption: 'A cat', file: 'intro.qmd' },
+    ];
+    const state: CitationState = {
+      ...createInitialState(),
+      items: [mockReference],
+      query: 'doe',
+      activeIndex: 2,
+    };
+    const result = citationReducer(state, { type: 'SET_CROSSREFS', crossrefs });
+
+    expect(result.crossrefs).toEqual(crossrefs);
+    expect(result.items).toEqual([mockReference]);
+    expect(result.query).toBe('doe');
+    expect(result.activeIndex).toBe(2);
   });
 });
 

@@ -129,6 +129,20 @@ describe('setTitle', () => {
   });
 });
 
+describe('setAbstract', () => {
+  it('writes _abstract.yml as a literal block', async () => {
+    const { ws, writes } = await trackedWorkspace({
+      [`${ROOT}/_abstract.yml`]: 'abstract: "Old \\"q\\" text."\n',
+    });
+    const rendered = await bootHook(ws);
+    act(() => rendered.result.current.setAbstract('New "quoted" text.'));
+    await act(async () => { vi.advanceTimersByTime(800); });
+    const written = writes.filter((w) => w.path === `${ROOT}/_abstract.yml`);
+    expect(written).toHaveLength(1);
+    expect(written[0].content.startsWith('abstract: |')).toBe(true);
+  });
+});
+
 describe('reload', () => {
   it('picks up an externally written _author.yml', async () => {
     const { ws } = await trackedWorkspace({

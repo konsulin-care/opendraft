@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Editor, rootCtx, defaultValueCtx, commandsCtx, editorViewCtx } from '@milkdown/kit/core';
 import { commonmark, toggleStrongCommand, toggleEmphasisCommand, toggleInlineCodeCommand, setBlockTypeCommand, wrapInBlockTypeCommand, addBlockTypeCommand } from '@milkdown/kit/preset/commonmark';
 import { gfm, toggleStrikethroughCommand } from '@milkdown/kit/preset/gfm';
@@ -6,11 +6,51 @@ import { history, undoCommand, redoCommand } from '@milkdown/kit/plugin/history'
 import { toggleLinkCommand, linkTooltipPlugin } from '@milkdown/kit/component/link-tooltip';
 import { getMarkdown } from '@milkdown/kit/utils';
 import { TextSelection } from '@milkdown/kit/prose/state';
+import { MemoryWorkspace } from '@opendraft/workspace';
+import { createCrepeConfig } from '../components/crepe-config';
+import { LIST_TABLE_BODY_OFFSET, LIST_TABLE_TEMPLATE } from '../list-table/insert-list-table';
 import { createMilkdownCommands } from './milkdown-commands';
 import type { EditorCommands } from './types';
 
-// @vitest-environment jsdom
+/**
+ * Stand-in IntersectionObserver that reports every observed element as
+ * intersecting on the next frame, so lazily mounted editors mount.
+ * (jsdom has no IntersectionObserver; Milkdown's code-block node view
+ * creates a shared one as soon as a fence renders.)
+ */
+class FakeIntersectionObserver implements IntersectionObserver {
+  readonly root: Element | Document | null = null;
+  readonly rootMargin = '0px';
+  readonly scrollMargin = '0px';
+  readonly thresholds: ReadonlyArray<number> = [0];
+  private readonly callback: IntersectionObserverCallback;
+  private readonly targets: Element[] = [];
 
+  constructor(callback: IntersectionObserverCallback) {
+    this.callback = callback;
+  }
+
+  observe(target: Element): void {
+    this.targets.push(target);
+    const entry = { target, isIntersecting: true } as IntersectionObserverEntry;
+    queueMicrotask(() => this.callback([entry], this));
+  }
+
+  unobserve(target: Element): void {
+    const index = this.targets.indexOf(target);
+    if (index >= 0) this.targets.splice(index, 1);
+  }
+
+  disconnect(): void {
+    this.targets.length = 0;
+  }
+
+  takeRecords(): IntersectionObserverEntry[] {
+    return [];
+  }
+}
+
+let crepe: ReturnType<typeof createCrepeConfig> | undefined;
 let editor: Editor | undefined;
 let commands: EditorCommands;
 
@@ -36,6 +76,26 @@ async function mount(markdown: string): Promise<void> {
 }
 
 /**
+ * Mount a Crepe instance with the block-body feature set and bind the
+ * command set, so serialization goes through the Quarto code handler.
+ *
+ * @param markdown - Initial markdown content.
+ */
+async function mountCrepe(markdown: string): Promise<void> {
+  const root = document.createElement('div');
+  document.body.appendChild(root);
+  crepe = createCrepeConfig({
+    root,
+    defaultValue: markdown,
+    workspace: new MemoryWorkspace(),
+    onStateChangeRef: { current: () => undefined },
+  });
+  await crepe.create();
+  editor = crepe.editor;
+  commands = createMilkdownCommands(() => editor);
+}
+
+/**
  * Select a text range inside the first paragraph.
  *
  * @param from - Start position in the document.
@@ -57,14 +117,47 @@ function markdown(): string {
   return editor!.action(getMarkdown());
 }
 
+/** A quarto-div code block observed in the mounted document. */
+interface TableInfo {
+  text: string;
+  language: string;
+  cursor: number;
+}
+
+/**
+ * Find the first quarto-div code block and its cursor offset.
+ *
+ * @returns Block text, language and cursor offset from content start.
+ */
+function tableInfo(): TableInfo | undefined {
+  let info: TableInfo | undefined;
+  editor!.action((ctx) => {
+    const view = ctx.get(editorViewCtx);
+    view.state.doc.descendants((node, pos) => {
+      if (info || node.type.name !== 'code_block') return;
+      const language = String((node.attrs as Record<string, unknown>)['language'] ?? '');
+      if (language !== 'quarto-div') return;
+      info = { text: node.textContent, language, cursor: view.state.selection.from - (pos + 1) };
+    });
+  });
+  return info;
+}
+
 beforeEach(async () => {
+  vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver);
   await mount('text');
 });
 
 afterEach(() => {
-  editor?.destroy();
+  if (crepe) {
+    crepe.destroy();
+    crepe = undefined;
+  } else {
+    editor?.destroy();
+  }
   editor = undefined;
   document.body.innerHTML = '';
+  vi.unstubAllGlobals();
 });
 
 describe('Milkdown inline formatting commands', () => {
@@ -136,6 +229,39 @@ describe('Milkdown block commands', () => {
     select(5, 5);
     commands.insertCitation();
     expect(markdown()).toContain('text@');
+  });
+});
+
+describe('Milkdown table command', () => {
+  beforeEach(async () => {
+    editor?.destroy();
+    editor = undefined;
+    document.body.innerHTML = '';
+    await mountCrepe('text');
+  });
+
+  it('table() inserts a quarto-div code block containing the list-table template', () => {
+    select(1, 1);
+    commands.table();
+    expect(tableInfo()).toEqual({
+      text: LIST_TABLE_TEMPLATE,
+      language: 'quarto-div',
+      cursor: LIST_TABLE_BODY_OFFSET,
+    });
+  });
+
+  it('table() leaves the cursor on the blank body line', () => {
+    select(1, 1);
+    commands.table();
+    expect(tableInfo()?.cursor).toBe(LIST_TABLE_BODY_OFFSET);
+  });
+
+  it('serializes the template without placeholder text right after table()', () => {
+    select(1, 1);
+    commands.table();
+    const output = markdown();
+    expect(output).toContain(LIST_TABLE_TEMPLATE);
+    expect(output).not.toContain('Insert your table caption here');
   });
 });
 

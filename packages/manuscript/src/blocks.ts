@@ -12,6 +12,7 @@ import { resolveBlockFile, resolveFromFileList } from './block-files.js';
 import { joinHeading, retitleHeading, splitHeading } from './heading.js';
 import type { BlockHeading } from './heading.js';
 import { normalizeShortName, uniqueShortName } from './slug.js';
+import { renameIdentity, rewriteOtherRefs } from './block-rename.js';
 
 /** Draft selecting a new block's own identity instead of deriving it. */
 export interface CreateBlockDraft {
@@ -182,48 +183,6 @@ export async function deleteBlock(
   }
   const file = await resolveBlockFile(ws, dir, short);
   await ws.deleteFile(`${dir}/blocks/${file}`);
-}
-
-/**
- * Move a block's heading anchor and `@sec-` body refs to the new short name.
- *
- * @param text - Full block file text.
- * @param oldShort - Current short name.
- * @param newShort - Replacement short name.
- * @returns Block text with anchor and refs updated.
- */
-function renameIdentity(text: string, oldShort: string, newShort: string): string {
-  const parts = splitHeading(text);
-  const body = parts.body.replaceAll(`@sec-${oldShort}`, `@sec-${newShort}`);
-  // Re-emit the heading exactly as parsed: a class-less heading stays class-less.
-  if (parts.title === null || parts.anchor === null) return body;
-  const anchor = parts.anchor === `sec-${oldShort}` ? `sec-${newShort}` : parts.anchor;
-  return joinHeading({ title: parts.title, anchor, type: parts.type }, body);
-}
-
-/**
- * Rewrite `@sec-<old>` refs in every block file but the renamed one.
- *
- * @param ws - Workspace holding the manuscript.
- * @param blocksDir - Directory holding the block files.
- * @param oldShort - Short name being renamed away.
- * @param newShort - Short name being renamed to.
- * @returns Resolves once every ref-bearing file is rewritten.
- */
-async function rewriteOtherRefs(
-  ws: WorkspaceAdapter,
-  blocksDir: string,
-  oldShort: string,
-  newShort: string,
-): Promise<void> {
-  for (const file of await ws.listFiles(blocksDir)) {
-    if (file === blockFileName(newShort) || file === `${newShort}.qmd`) continue;
-    const path = `${blocksDir}/${file}`;
-    const text = await ws.readFile(path);
-    if (text === null) continue;
-    const updated = text.replaceAll(`@sec-${oldShort}`, `@sec-${newShort}`);
-    if (updated !== text) await ws.writeFile(path, updated);
-  }
 }
 
 /**

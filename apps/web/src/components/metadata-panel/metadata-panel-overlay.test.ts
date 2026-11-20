@@ -92,11 +92,15 @@ function stubResizeObserver(): void {
   vi.stubGlobal('ResizeObserver', MockResizeObserver);
 }
 
-/** Fire the latest observer's resize callback inside act(). */
-function fireResize(): void {
+/** Fire the latest observer's resize callback once the effect created it. */
+async function fireResize(): Promise<void> {
+  // The observer is constructed in a passive effect that React flushes after
+  // the commit waitFor observed, so wait for the instance itself.
+  await waitFor(() => {
+    expect(MockResizeObserver.instances.length).toBeGreaterThan(0);
+  });
   const instance = MockResizeObserver.instances.at(-1);
-  if (!instance) throw new Error('ResizeObserver was not constructed');
-  act(() => instance.trigger());
+  act(() => instance?.trigger());
 }
 
 /** Stub the expanded body height (jsdom reports zero layout metrics). */
@@ -130,14 +134,17 @@ async function renderPanel(focusRef: RefObject<HTMLElement | null>) {
 async function mountPanel(): Promise<{ scroller: HTMLDivElement; unmount: () => void }> {
   const scroller = makeScroller(VIEWPORT);
   const rendered = await renderPanel({ current: scroller });
+  // Drain the pending metadata load and the passive effects that commit
+  // schedules, so the panel has settled before a test fires a resize.
+  await act(async () => {});
   flushFrames();
   return { scroller, unmount: rendered.unmount };
 }
 
 /** Drive the panel into its overlay state: body taller than the viewport. */
-function activateOverlay(): HTMLElement {
+async function activateOverlay(): Promise<HTMLElement> {
   stubBodyHeight(BODY_HEIGHT);
-  fireResize();
+  await fireResize();
   const overlay = screen.getByTestId('metadata-panel-overlay');
   flushFrames();
   return overlay;
@@ -170,7 +177,7 @@ describe('MetadataPanel overlay scroll collapse', () => {
     const { scroller } = await mountPanel();
     // Expanded at the top: the bar text is hidden behind progress 0.
     expect(screen.queryByTestId('metadata-panel-bar-title')).toBeNull();
-    const overlay = activateOverlay();
+    const overlay = await activateOverlay();
     const panel = screen.getByTestId('metadata-panel');
     expect(screen.queryByTestId('metadata-panel-overlay')).not.toBeNull();
     // Half the expanded body scrolled: half progress fades the text in.
@@ -191,7 +198,7 @@ describe('MetadataPanel overlay scroll collapse', () => {
 
   it('switches to collapsed and closes the overlay once the body scrolls out', async () => {
     const { scroller } = await mountPanel();
-    const overlay = activateOverlay();
+    const overlay = await activateOverlay();
     setScrollTop(overlay, BODY_HEIGHT);
     expect(screen.queryByTestId('metadata-panel-overlay')).toBeNull();
     const toggle = screen.getByTestId('metadata-panel-toggle');
@@ -202,7 +209,7 @@ describe('MetadataPanel overlay scroll collapse', () => {
 
   it('does not persist the scroll-out collapse, so a remount starts expanded', async () => {
     const { scroller, unmount } = await mountPanel();
-    const overlay = activateOverlay();
+    const overlay = await activateOverlay();
     setScrollTop(overlay, BODY_HEIGHT);
     expect(screen.queryByTestId('metadata-panel-overlay')).toBeNull();
     // Session-only collapse: localStorage keeps its previous (empty) value.

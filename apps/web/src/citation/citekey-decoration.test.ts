@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildCitekeyDecorations, CITEKEY_PATTERN } from './citekey-decoration';
 import type { Reference } from '@opendraft/references';
+import type { CrossrefLabel } from '@opendraft/manuscript';
 import { Schema } from '@milkdown/kit/prose/model';
 
 function createTestSchema(): Schema {
@@ -29,6 +30,11 @@ function paragraph(schema: Schema, ...children: ReturnType<Schema['text']>[]) {
 const refs: Reference[] = [
   { citeKey: 'smith2024', entryType: 'article', fields: { author: 'Smith', year: '2024', title: 'Test' } },
   { citeKey: 'doe2023', entryType: 'book', fields: { author: 'Doe', year: '2023', title: 'Book' } },
+];
+
+const crossrefs: CrossrefLabel[] = [
+  { id: 'fig-x', kind: 'fig', caption: 'Plot of the results.', file: 'body.qmd' },
+  { id: 'sec-a', kind: 'sec', caption: 'Introduction', file: 'intro.qmd' },
 ];
 
 describe('CITEKEY_PATTERN', () => {
@@ -96,5 +102,62 @@ describe('buildCitekeyDecorations', () => {
     const schema = createTestSchema();
     const decoSet = buildCitekeyDecorations(createDocWithParagraphs(schema, ['@smith2024', '@doe2023']), refs);
     expect(decoSet.find(0, 30).length).toBe(2);
+  });
+});
+
+describe('buildCitekeyDecorations known cross-references', () => {
+  it('decorates a known cross-reference label as a link with its metadata', () => {
+    const schema = createTestSchema();
+    const decoSet = buildCitekeyDecorations(createDoc(schema, '@fig-x'), refs, undefined, crossrefs);
+    const found = decoSet.find(0, 10);
+    expect(found.length).toBe(1);
+    expect(found[0].spec).toMatchObject({
+      class: 'crossref-link',
+      'data-crossref': 'fig-x',
+      'data-crossref-kind': 'fig',
+      'data-crossref-caption': 'Plot of the results.',
+    });
+  });
+
+  it('normalizes a capitalized prefix and strips the trailing period', () => {
+    const schema = createTestSchema();
+    const decoSet = buildCitekeyDecorations(createDoc(schema, '@Sec-a.'), refs, undefined, crossrefs);
+    const found = decoSet.find(0, 20);
+    expect(found.length).toBe(1);
+    expect(found[0].spec).toMatchObject({
+      class: 'crossref-link',
+      'data-crossref': 'sec-a',
+    });
+    expect(found[0].to).toBe(1 + '@Sec-a'.length);
+  });
+
+  it('keeps citekey decorations unchanged when crossrefs are supplied', () => {
+    const schema = createTestSchema();
+    const decoSet = buildCitekeyDecorations(createDoc(schema, '@smith2024'), refs, undefined, crossrefs);
+    const found = decoSet.find(0, 20);
+    expect(found.length).toBe(1);
+    expect(found[0].spec).toMatchObject({
+      class: 'citekey-link',
+      'data-citekey': 'smith2024',
+    });
+  });
+});
+
+describe('buildCitekeyDecorations unknown cross-references', () => {
+  it('marks an unknown cross-reference label as broken', () => {
+    const schema = createTestSchema();
+    const decoSet = buildCitekeyDecorations(createDoc(schema, '@fig-nope'), refs, undefined, crossrefs);
+    const found = decoSet.find(0, 20);
+    expect(found.length).toBe(1);
+    expect(found[0].spec).toMatchObject({
+      class: 'crossref-broken',
+      'data-crossref': 'fig-nope',
+    });
+  });
+
+  it('leaves other cross-reference prefixes undecorated', () => {
+    const schema = createTestSchema();
+    const decoSet = buildCitekeyDecorations(createDoc(schema, '@thm-x'), refs, undefined, crossrefs);
+    expect(decoSet.find(0, 10).length).toBe(0);
   });
 });

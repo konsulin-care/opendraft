@@ -7,18 +7,21 @@
  * BlockEditor.retitle.test.tsx.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { MemoryWorkspace } from '@opendraft/workspace';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { BlockEditor } from './BlockEditor';
 import { blockCollapseStorageKey } from './use-collapse-state';
 import { requestFocusForShort } from '../caret-mode-switch';
+import { createCitationPlugin } from '../citation/plugin';
+import { FakeIntersectionObserver } from './block-body-harness';
 
 vi.mock('../caret-mode-switch', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../caret-mode-switch')>()),
   requestFocusForShort: vi.fn(),
 }));
+vi.mock('../citation/plugin', (importOriginal) => importOriginal<typeof import('../citation/plugin')>().then((actual) => ({ ...actual, createCitationPlugin: vi.fn(actual.createCitationPlugin) })));
 
 /** Manuscript directory used by every fixture. */
 const DIR = 'manuscripts/demo';
@@ -280,4 +283,14 @@ describe('BlockEditor add section dialog', () => {
       window.removeEventListener('opendraft:files-changed', listener);
     }
   });
+});
+
+describe('BlockEditor crossref index', () => {
+  it('feeds sibling sec- anchors to the citation plugin', async () => {
+    vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver);
+    await setup({ [ARTICLE]: articleWith('alpha', 'beta'), [`${BLOCKS}/alpha.qmd`]: blockFile('alpha', 'Alpha'), [`${BLOCKS}/beta.qmd`]: blockFile('beta', 'Beta') });
+    const crossrefIds = (): string[] | undefined =>
+      vi.mocked(createCitationPlugin).mock.calls.at(-1)?.[3]?.().map((label) => label.id);
+    await waitFor(() => expect(crossrefIds()).toEqual(['sec-alpha', 'sec-beta']));
+  }, 20000);
 });

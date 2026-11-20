@@ -42,7 +42,7 @@ function fakeCommands(active: ActiveState = INACTIVE_STATE, canFormat = true): E
 const BAR_NAMES = ['Undo', 'Redo', 'Paragraph style', 'Bullet list', 'Citation', 'Insert'];
 
 /** Formatting button names that must be disabled in source mode. */
-const FORMATTING_NAMES = ['Paragraph style', 'Bullet list', 'Citation', 'Insert'];
+const FORMATTING_NAMES = ['Paragraph style', 'Bullet list', 'Citation'];
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -113,6 +113,18 @@ describe('KeyboardBar in source mode (canFormat false)', () => {
     }
     expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Redo' })).toBeEnabled();
+  });
+
+  it('enables Insert with only Table, which calls table()', () => {
+    const commands = fakeCommands(INACTIVE_STATE, false);
+    render(<KeyboardBar commands={commands} open bottomOffset={0} />);
+    const insert = screen.getByRole('button', { name: 'Insert' });
+    expect(insert).toBeEnabled();
+    fireEvent.click(insert);
+    const items = within(screen.getByRole('menu')).getAllByRole('menuitem');
+    expect(items.map((item) => item.getAttribute('aria-label'))).toEqual(['Table']);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Table' }));
+    expect(commands.table).toHaveBeenCalledTimes(1);
   });
 });
 

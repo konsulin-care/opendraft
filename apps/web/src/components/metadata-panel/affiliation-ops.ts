@@ -187,7 +187,8 @@ export function createOps(
     const reused = registry.find((e) => e.ror && e.ror === org.ror);
     if (reused) { addRefTo(String(reused.id)); return; }
     addEntry({ id: uniqueId(slugify(org.name), registry), name: org.name,
-      ...(org.city ? { city: org.city } : {}), ...(org.country ? { country: org.country } : {}),
+      ...(org.city ? { city: org.city } : {}), ...(org.region ? { region: org.region } : {}),
+      ...(org.country ? { country: org.country } : {}), ...(org.url ? { url: org.url } : {}),
       ror: org.ror });
   };
   const toggleRefOp = (id: string): void => {

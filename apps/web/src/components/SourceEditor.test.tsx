@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, cleanup } from '@testing-library/react';
-import type { EditorView } from '@codemirror/view';
+import { render, cleanup, waitFor } from '@testing-library/react';
+import { currentCompletions, startCompletion } from '@codemirror/autocomplete';
+import type { CompletionContext, CompletionSource } from '@codemirror/autocomplete';
+import { EditorView } from '@codemirror/view';
 import { SourceEditor, type SourceEditorHandle } from './SourceEditor';
 
 // @vitest-environment jsdom
@@ -54,6 +56,38 @@ describe('SourceEditor', () => {
     expect(typeof ref!.setCursor).toBe('function');
     expect(typeof ref!.getScrollTop).toBe('function');
     expect(typeof ref!.setScrollTop).toBe('function');
+  });
+});
+
+/**
+ * Collect the labels of the current CodeMirror completions.
+ *
+ * @param view - View whose completion state is inspected.
+ * @returns Visible completion labels.
+ */
+function completionLabels(view: EditorView): string[] {
+  return currentCompletions(view.state).map((option) => option.label);
+}
+
+describe('SourceEditor completion sources', () => {
+  it('lists the source options in currentCompletions after startCompletion', async () => {
+    const source: CompletionSource = (ctx: CompletionContext) => ({
+      from: ctx.pos,
+      options: [{ label: 'fig-cat' }],
+    });
+    const { container } = render(
+      <SourceEditor value="@fi" onChange={vi.fn()} completionSources={[source]} />,
+    );
+    const content = container.querySelector('.cm-content') as HTMLElement | null;
+    expect(content).not.toBeNull();
+    const view = EditorView.findFromDOM(content!);
+    expect(view).not.toBeNull();
+
+    startCompletion(view!);
+
+    await waitFor(() => {
+      expect(completionLabels(view!)).toContain('fig-cat');
+    });
   });
 });
 

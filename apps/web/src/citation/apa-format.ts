@@ -1,144 +1,70 @@
 import type { Reference } from '@opendraft/references';
+import { apaAuthorList } from './apa/names';
+import { sentenceCase } from './apa/sentence-case';
+import { cleanLatex } from './apa/latex';
+import {
+  ENTRY_FORMATTERS,
+  escapeMarkdown,
+} from './apa/entry-types';
+import type { EntryFormatter } from './apa/entry-types';
 
-/**
- * Format a single author name in APA style.
- *
- * @param author - Raw author name string.
- * @returns APA-formatted author name, or empty string.
- */
-function formatSingleAuthor(author: string): string {
-  const trimmed = author.trim();
-  if (!trimmed) return '';
-
-  const parts = trimmed.split(',').map((p) => p.trim());
-  if (parts.length >= 2) {
-    const last = parts[0];
-    const initials = parts.slice(1).join(',')
-      .split(/\s+/)
-      .map((name) => name.charAt(0).toUpperCase() + '.')
-      .join(' ');
-    return `${last}, ${initials}`;
-  }
-
-  const nameParts = trimmed.split(/\s+/);
-  if (nameParts.length === 1) return trimmed;
-
-  const last = nameParts[nameParts.length - 1];
-  const initials = nameParts.slice(0, -1)
-    .map((name) => name.charAt(0).toUpperCase() + '.')
-    .join(' ');
-  return `${last}, ${initials}`;
+/** Strip common DOI prefixes so only the bare DOI remains. */
+function stripDoiPrefix(doi: string): string {
+  return doi
+    .trim()
+    .replace(/^(?:doi:\s*|https?:\/\/doi\.org\/)/i, '')
+    .trim();
 }
 
-/**
- * Format authors in APA style.
- *
- * @param author - Raw BibTeX author string.
- * @returns APA-formatted author string.
- */
-function formatAuthors(author: string | undefined): string {
-  if (!author?.trim()) return '';
-
-  const authors = author.split(' and ').map((a) => a.trim());
-  const formatted = authors.map(formatSingleAuthor).filter((a) => a);
-
-  if (formatted.length === 0) return '';
-  if (formatted.length === 1) return formatted[0];
-  if (formatted.length === 2) return `${formatted[0]}, & ${formatted[1]}`;
-
-  const last = formatted[formatted.length - 1];
-  return `${formatted.slice(0, -1).join(', ')}, & ${last}`;
-}
-
-/** Format page numbers with en-dash. */
-function formatPages(pages: string | undefined): string {
-  return pages?.replace(/-/g, '–') ?? '';
-}
-
-/** Format journal/volume/number fields. */
-function formatJournalFields(fields: Record<string, string>): string[] {
-  const parts: string[] = [];
-  if (fields.journal) parts.push(`*${fields.journal}*`);
-  if (fields.volume) {
-    const vol = `*${fields.volume}*`;
-    parts.push(fields.number ? `${vol}(${fields.number})` : vol);
-  }
-  if (fields.pages) parts.push(formatPages(fields.pages));
-  return parts;
-}
-
-/** Format book-specific fields. */
-function formatBookFields(fields: Record<string, string>): string[] {
-  return fields.publisher ? [`${fields.publisher}.`] : [];
-}
-
-/** Format proceedings-specific fields. */
-function formatProceedingsFields(fields: Record<string, string>): string[] {
-  const parts: string[] = [];
-  if (fields.booktitle) parts.push(`In *${fields.booktitle}*`);
-  if (fields.pages) parts.push(`(pp. ${formatPages(fields.pages)})`);
-  if (fields.publisher) parts.push(`${fields.publisher}.`);
-  return parts;
-}
-
-/** Format thesis-specific fields. */
-function formatThesisFields(fields: Record<string, string>): string[] {
-  return fields.school ? [`${fields.school}.`] : [];
-}
-
-/** Format report-specific fields. */
-function formatReportFields(fields: Record<string, string>): string[] {
-  return fields.institution ? [`${fields.institution}.`] : [];
-}
-
-/** Get URL or DOI string. */
+/** Get the trailing URL or DOI string, preferring the DOI. */
 function getUrlOrDoi(fields: Record<string, string>): string {
-  if (fields.doi) return `https://doi.org/${fields.doi}`;
-  if (fields.url) return fields.url;
-  return '';
+  const doi = fields.doi?.trim();
+  if (doi) return `https://doi.org/${escapeMarkdown(stripDoiPrefix(doi))}`;
+  const url = fields.url?.trim();
+  return url ? escapeMarkdown(url) : '';
 }
 
 /**
- * Format a Reference in APA 7th edition style.
+ * Format a Reference in APA 7th edition style as inline markdown.
+ *
+ * Authors are formatted with the shared name helpers, dates use "(n.d.)" when
+ * the year is missing, and entry-type-specific details come from the formatter
+ * map. All field-derived text is markdown-escaped before emphasis is applied.
  *
  * @param ref - Parsed BibTeX reference.
- * @returns APA-formatted citation string.
+ * @returns APA-formatted markdown citation string.
  */
 export function formatAPA(ref: Reference): string {
   const { entryType, fields } = ref;
-  const author = formatAuthors(fields.author);
-  const year = fields.year;
-  const title = fields.title;
+  const rawAuthor = fields.author?.trim() ? apaAuthorList(fields.author) : '';
+  const author = rawAuthor ? escapeMarkdown(cleanLatex(rawAuthor)) : '';
+  const year = fields.year?.trim();
+  const date = year ? `(${escapeMarkdown(cleanLatex(year))}).` : '(n.d.).';
+  const rawTitle = fields.title?.trim();
+  const title = rawTitle ? escapeMarkdown(sentenceCase(rawTitle)) : '';
+
+  const formatter: EntryFormatter =
+    ENTRY_FORMATTERS[entryType] ?? ENTRY_FORMATTERS.book;
+  const rendered = formatter(fields, title);
 
   const parts: string[] = [];
-
-  if (author) parts.push(author);
-  if (year) parts.push(`(${year})`);
-  if (title) {
-    const isBookType = ['book', 'online', 'misc'].includes(entryType);
-    parts.push(isBookType ? `*${title}*.` : `${title}.`);
+  if (author) {
+    parts.push(author.endsWith('.') ? author : `${author}.`);
+    parts.push(date);
+    parts.push(rendered.title);
+  } else {
+    parts.push(rendered.title);
+    parts.push(date);
   }
-
-  // Entry-type-specific formatting
-  const formatByType: Record<string, () => string[]> = {
-    article: () => formatJournalFields(fields),
-    book: () => formatBookFields(fields),
-    inproceedings: () => formatProceedingsFields(fields),
-    conference: () => formatProceedingsFields(fields),
-    phdthesis: () => formatThesisFields(fields),
-    mastersthesis: () => formatThesisFields(fields),
-    techreport: () => formatReportFields(fields),
-  };
-  const formatter = formatByType[entryType];
-  parts.push(...(formatter ? formatter() : (fields.publisher ? [`${fields.publisher}.`] : [])));
+  parts.push(rendered.rest);
 
   const url = getUrlOrDoi(fields);
-  if (url) parts.push(url);
+  parts.push(url);
 
-  let result = parts.join(' ').replace(/\s+/g, ' ').trim();
-  if (result && !result.endsWith('.') && !result.match(/https?:\/\//)) {
+  let result = parts.filter((part) => part !== '').join(' ');
+  result = result.replace(/\s+/g, ' ').trim();
+  if (result && !result.endsWith('.') && !url) {
     result += '.';
   }
-
   return result;
 }

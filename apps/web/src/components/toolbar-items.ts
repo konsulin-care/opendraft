@@ -44,6 +44,8 @@ export interface ToolbarItemDef {
   pinned?: boolean;
   /** ActiveState field reflected as `aria-pressed` on the button. */
   pressedKey?: PressedKey;
+  /** Keeps the item usable in source mode (`canFormat` false). */
+  sourceEnabled?: boolean;
   /** Command invoked on activation; absent for the paragraph-style menu trigger. */
   command?: (commands: EditorCommands) => void;
 }
@@ -70,7 +72,7 @@ export const TOOLBAR_ITEMS: readonly ToolbarItemDef[] = [
   { key: 'task-list', label: 'Task list', icon: ListTodo, group: 'list', command: (c) => c.taskList() },
   { key: 'quote', label: 'Quote', icon: TextQuote, group: 'list', pressedKey: 'blockquote', command: (c) => c.blockquote() },
   { key: 'image', label: 'Image', icon: ImagePlus, group: 'insert', command: (c) => c.image() },
-  { key: 'table', label: 'Table', icon: Table, group: 'insert', command: (c) => c.table() },
+  { key: 'table', label: 'Table', icon: Table, group: 'insert', sourceEnabled: true, command: (c) => c.table() },
   { key: 'code-block', label: 'Code block', icon: SquareCode, group: 'insert', command: (c) => c.codeBlock() },
   { key: 'rule', label: 'Rule', icon: Minus, group: 'insert', command: (c) => c.hr() },
 ];

@@ -4,6 +4,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { CitationDropdown, CitekeyItem } from "./dropdown";
 import type { CitationState } from "./types";
 import type { Reference } from "@opendraft/references";
+import type { CrossrefLabel } from "@opendraft/manuscript";
 
 const { mockResolveDoi, mockNormalizeDoi } = vi.hoisted(() => ({
   mockResolveDoi: vi.fn(),
@@ -23,6 +24,11 @@ const mockReferences: Reference[] = [
   },
 ];
 
+const mockCrossrefs: CrossrefLabel[] = [
+  { id: "fig-cat", kind: "fig", caption: "A cat diagram", file: "body.qmd" },
+  { id: "sec-intro", kind: "sec", caption: "Introduction", file: "intro.qmd" },
+];
+
 function createOpenState(overrides?: Partial<CitationState>): CitationState {
   return {
     open: true,
@@ -39,145 +45,20 @@ function createOpenState(overrides?: Partial<CitationState>): CitationState {
   };
 }
 
-describe("CitationDropdown — rendering", () => {
-  it("renders when open", () => {
-    const dispatch = vi.fn();
-    const state = createOpenState();
-    render(<CitationDropdown state={state} dispatch={dispatch} />);
-    expect(screen.getByText("Jane Doe")).toBeDefined();
-  });
-
-  it("does not render when closed", () => {
-    const dispatch = vi.fn();
-    const state = { ...createOpenState(), open: false };
-    const { container } = render(<CitationDropdown state={state} dispatch={dispatch} />);
-    expect(container.innerHTML).toBe("");
-  });
-
-  it("renders Add Citation item", () => {
-    const dispatch = vi.fn();
-    const state = createOpenState();
-    render(<CitationDropdown state={state} dispatch={dispatch} />);
-    expect(screen.getByText(/Add Citation/)).toBeDefined();
-  });
-});
-
-describe("CitationDropdown — empty state", () => {
-  it("shows helpful message when no items and empty query", () => {
-    const dispatch = vi.fn();
-    const state = createOpenState({ items: [], query: "" });
-    render(<CitationDropdown state={state} dispatch={dispatch} />);
-    expect(screen.getByText(/No references yet/)).toBeDefined();
-    expect(screen.getByText(/Add one by DOI/)).toBeDefined();
-  });
-
-  it("shows the bib load error instead of the empty-state text", () => {
-    const dispatch = vi.fn();
-    const state = createOpenState({ items: [], loadError: { message: "x", line: 12 } });
-    render(<CitationDropdown state={state} dispatch={dispatch} />);
-    expect(screen.getByText("references.bib could not be parsed (line 12)")).toBeDefined();
-    expect(screen.queryByText(/No references yet/)).toBeNull();
-  });
-
-  it("still shows Add Citation button when no items", () => {
-    const dispatch = vi.fn();
-    const state = createOpenState({ items: [], query: "" });
-    render(<CitationDropdown state={state} dispatch={dispatch} />);
-    expect(screen.getByText(/\+ Add Citation \(DOI\)/)).toBeDefined();
-  });
-
-  it("shows \"No matching citations\" when query matches none", () => {
-    const dispatch = vi.fn();
-    const state = createOpenState({ query: "zzzzz" });
-    render(<CitationDropdown state={state} dispatch={dispatch} />);
-    expect(screen.getByText("No matching citations")).toBeDefined();
-  });
-
-  it("filters by citekey query", () => {
-    const dispatch = vi.fn();
-    const state = createOpenState({ query: "doe" });
-    render(<CitationDropdown state={state} dispatch={dispatch} />);
-    expect(screen.getByText("Jane Doe")).toBeDefined();
-  });
-});
-
-describe("CitationDropdown — DOI resolution", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("calls resolveDoi when Enter is pressed in DOI mode", async () => {
-    mockNormalizeDoi.mockReturnValue("10.1234/test");
-    mockResolveDoi.mockResolvedValue("@article{test, title={Test}}");
-
-    const dispatch = vi.fn();
-    const state = createOpenState({ doiMode: true, doiInput: "10.1234/test" });
-    render(<CitationDropdown state={state} dispatch={dispatch} />);
-
-    fireEvent.keyDown(screen.getByPlaceholderText(/Enter DOI/), { key: "Enter" });
-
-    await vi.waitFor(() => {
-      expect(dispatch).toHaveBeenCalled();
-    });
-    const types = dispatch.mock.calls.map((c) => c[0].type);
-    expect(types).toContain("SET_DOI_LOADING");
-  });
-
-  it("dispatches SET_ERROR for invalid DOI format", async () => {
-    mockNormalizeDoi.mockReturnValue(null);
-
-    const dispatch = vi.fn();
-    const state = createOpenState({ doiMode: true, doiInput: "not a doi" });
-    render(<CitationDropdown state={state} dispatch={dispatch} />);
-
-    fireEvent.keyDown(screen.getByPlaceholderText(/Enter DOI/), { key: "Enter" });
-
-    await vi.waitFor(() => {
-      expect(dispatch).toHaveBeenCalledWith({ type: "SET_ERROR", error: { message: "Invalid DOI format" } });
-    });
-  });
-});
-
-describe("CitationDropdown — no search input (filtering via editor text)", () => {
-  it("does not render a search input", () => {
-    const dispatch = vi.fn();
-    render(<CitationDropdown state={createOpenState()} dispatch={dispatch} />);
-    const inputs = screen.queryAllByRole("textbox");
-    expect(inputs).toHaveLength(0);
-  });
-
-  it("does not render a search input even with items", () => {
-    const dispatch = vi.fn();
-    render(<CitationDropdown state={createOpenState({ items: mockReferences })} dispatch={dispatch} />);
-    const searchInputs = document.querySelectorAll(".citation-search");
-    expect(searchInputs).toHaveLength(0);
-  });
-});
-
-describe("CitationDropdown — prevents focus loss on dropdown click", () => {
-  it("has onPointerDown handler on root element to prevent editor blur", () => {
-    const dispatch = vi.fn();
-    render(<CitationDropdown state={createOpenState()} dispatch={dispatch} />);
-    const dropdown = screen.getByTestId("citation-dropdown");
-    expect(dropdown).toBeDefined();
-    expect(dropdown.className).toContain("milkdown-slash-menu");
-  });
-});
-
-describe("CitationDropdown — keyboard navigation delegated to plugin", () => {
-  it("does not handle keyboard events directly (handled by ProseMirror plugin)", () => {
-    const dispatch = vi.fn();
-    render(<CitationDropdown state={createOpenState()} dispatch={dispatch} />);
-    const dropdown = screen.getByTestId("citation-dropdown");
-    fireEvent.keyDown(dropdown, { key: "ArrowDown" });
-    fireEvent.keyDown(dropdown, { key: "ArrowUp" });
-    fireEvent.keyDown(dropdown, { key: "Enter" });
-    fireEvent.keyDown(dropdown, { key: "Escape" });
-    expect(dispatch).not.toHaveBeenCalled();
-  });
-});
-
-// ── CitekeyItem — new layout ──
+function renderDropdown(
+  overrides?: Partial<CitationState>,
+  onSelectCitekey?: (key: string) => void,
+) {
+  const dispatch = vi.fn();
+  render(
+    <CitationDropdown
+      state={createOpenState(overrides)}
+      dispatch={dispatch}
+      onSelectCitekey={onSelectCitekey}
+    />,
+  );
+  return dispatch;
+}
 
 function createReference(overrides?: Partial<Reference>): Reference {
   return {
@@ -194,104 +75,223 @@ function createReference(overrides?: Partial<Reference>): Reference {
 
 function renderItem(overrides?: Partial<Reference>, isActive = false) {
   const onSelect = vi.fn();
-  render(<CitekeyItem item={createReference(overrides)} isActive={isActive} onSelect={onSelect} />);
+  render(
+    <CitekeyItem item={createReference(overrides)} isActive={isActive} onSelect={onSelect} />,
+  );
   return onSelect;
 }
 
-describe("CitekeyItem — renders new layout", () => {
-  it("renders formatted author and year on line 1", () => {
-    renderItem();
-    expect(screen.getByText(/Yi Sun/)).toBeDefined();
-    expect(screen.getByText(/\(2025\)/)).toBeDefined();
+describe("CitationDropdown — rendering and empty states", () => {
+  it("renders when open with Add Citation and no search input", () => {
+    renderDropdown();
+    expect(screen.getByText("Jane Doe")).toBeDefined();
+    expect(screen.getByText(/Add Citation/)).toBeDefined();
+    expect(screen.queryAllByRole("textbox")).toHaveLength(0);
+    expect(document.querySelectorAll(".citation-search")).toHaveLength(0);
+    expect(screen.getByTestId("citation-dropdown").className).toContain(
+      "milkdown-slash-menu",
+    );
   });
 
-  it("renders entry type in muted text next to year", () => {
-    renderItem();
-    expect(screen.getByText(/article/i)).toBeDefined();
+  it("does not render when closed", () => {
+    const { container } = render(
+      <CitationDropdown state={{ ...createOpenState(), open: false }} dispatch={vi.fn()} />,
+    );
+    expect(container.innerHTML).toBe("");
   });
 
-  it("renders title on line 2", () => {
-    renderItem();
-    expect(screen.getByText(/Integrating Qualitative/)).toBeDefined();
+  it("shows the no-references message and keeps Add Citation", () => {
+    renderDropdown({ items: [], query: "" });
+    expect(screen.getByText(/No references yet/)).toBeDefined();
+    expect(screen.getByText(/Add one by DOI/)).toBeDefined();
+    expect(screen.getByText(/\+ Add Citation \(DOI\)/)).toBeDefined();
   });
 
-  it("applies hover class when isActive is true", () => {
-    renderItem(undefined, true);
-    const items = screen.getAllByRole("listitem");
-    expect(items[0].className).toContain("hover");
+  it("shows the bib load error instead of the empty-state text", () => {
+    renderDropdown({ items: [], loadError: { message: "x", line: 12 } });
+    expect(screen.getByText("references.bib could not be parsed (line 12)")).toBeDefined();
+    expect(screen.queryByText(/No references yet/)).toBeNull();
+  });
+
+  it("shows no-match text and filters by citekey query", () => {
+    renderDropdown({ query: "zzzzz" });
+    expect(screen.getByText("No matching citations")).toBeDefined();
+    renderDropdown({ query: "doe" });
+    expect(screen.getAllByText("Jane Doe").length).toBeGreaterThan(0);
   });
 });
 
-describe("CitekeyItem — fallback and edge cases", () => {
-  it("shows formatted author (not citekey) in .citation-author when author is present", () => {
+describe("CitationDropdown — DOI resolution", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("starts DOI loading when Enter is pressed in DOI mode", async () => {
+    mockNormalizeDoi.mockReturnValue("10.1234/test");
+    mockResolveDoi.mockResolvedValue("@article{test, title={Test}}");
+    const dispatch = renderDropdown({ doiMode: true, doiInput: "10.1234/test" });
+    fireEvent.keyDown(screen.getByPlaceholderText(/Enter DOI/), { key: "Enter" });
+    await vi.waitFor(() => expect(dispatch).toHaveBeenCalled());
+    expect(dispatch.mock.calls.map((c) => c[0].type)).toContain("SET_DOI_LOADING");
+  });
+
+  it("dispatches SET_ERROR for invalid DOI format", async () => {
+    mockNormalizeDoi.mockReturnValue(null);
+    const dispatch = renderDropdown({ doiMode: true, doiInput: "not a doi" });
+    fireEvent.keyDown(screen.getByPlaceholderText(/Enter DOI/), { key: "Enter" });
+    await vi.waitFor(() =>
+      expect(dispatch).toHaveBeenCalledWith({
+        type: "SET_ERROR",
+        error: { message: "Invalid DOI format" },
+      }),
+    );
+  });
+});
+
+describe("CitationDropdown — keyboard navigation delegated to plugin", () => {
+  it("does not handle keyboard events directly", () => {
+    const dispatch = renderDropdown();
+    const dropdown = screen.getByTestId("citation-dropdown");
+    for (const key of ["ArrowDown", "ArrowUp", "Enter", "Escape"]) {
+      fireEvent.keyDown(dropdown, { key });
+    }
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("CitekeyItem — layout and fallbacks", () => {
+  it("renders author, year, type badge and title", () => {
     renderItem();
+    expect(screen.getByText(/Yi Sun/)).toBeDefined();
+    expect(screen.getByText(/\(2025\)/)).toBeDefined();
+    expect(screen.getByText(/article/i)).toBeDefined();
+    expect(screen.getByText(/Integrating Qualitative/)).toBeDefined();
     expect(document.querySelector(".citation-author")?.textContent).toBe("Yi Sun");
     expect(document.querySelector(".citation-key")).toBeNull();
   });
 
-  it("displays citeKey as fallback when author is missing", () => {
+  it("falls back to citeKey when the author is missing or empty", () => {
     renderItem({ fields: { title: "Some Title", year: "2025" } });
     expect(document.querySelector(".citation-author")?.textContent).toBe("Sun2025");
-  });
-
-  it("displays citeKey as fallback when author is empty string", () => {
     renderItem({ fields: { title: "Some Title", author: "", year: "2025" } });
-    expect(document.querySelector(".citation-author")?.textContent).toBe("Sun2025");
+    expect(document.querySelectorAll(".citation-author")[1]?.textContent).toBe("Sun2025");
   });
 
-  it("omits title line when title is missing", () => {
+  it("cleans LaTeX braces from the title text and title attribute", () => {
+    renderItem({ fields: { author: "Sun, Yi", title: "{MindKind} Study in {India}", year: "2025" } });
+    const title = document.querySelector(".citation-title");
+    expect(title?.textContent).toBe("MindKind Study in India");
+    expect(title?.getAttribute("title")).toBe("MindKind Study in India");
+  });
+
+  it("omits the title line when the title is missing", () => {
     renderItem({ fields: { author: "Sun, Yi", year: "2025" } });
-    const items = screen.getAllByRole("listitem");
-    expect(items[0].querySelector(".citation-title")).toBeNull();
+    expect(screen.getAllByRole("listitem")[0].querySelector(".citation-title")).toBeNull();
   });
 });
 
-describe("CitekeyItem — body wrapper and two rows", () => {
-  it("renders exactly one .citation-item-body child inside the li", () => {
+describe("CitekeyItem — cross-reference prefix warning", () => {
+  it("shows the reserved-prefix warning for a cross-reference-shaped key", () => {
+    renderItem({ citeKey: "fig-smith" });
+    expect(
+      screen.getByText("Prefix reserved for Quarto cross-references"),
+    ).toBeDefined();
+    expect(document.querySelector(".citation-crossref-warning")).not.toBeNull();
+  });
+
+  it("shows no warning for a normal citation key", () => {
+    renderItem({ citeKey: "figueroa2020" });
+    expect(
+      screen.queryByText("Prefix reserved for Quarto cross-references"),
+    ).toBeNull();
+    expect(document.querySelector(".citation-crossref-warning")).toBeNull();
+  });
+});
+
+describe("CitekeyItem — body wrapper, two rows and selection", () => {
+  it("renders one body wrapper whose rows carry the expected fields", () => {
     renderItem();
     const li = screen.getByRole("listitem");
     expect(li.children.length).toBe(1);
     expect(li.children[0].className).toContain("citation-item-body");
+    const line1 = li.children[0].children[0];
+    const line2 = li.children[0].children[1];
+    expect(line1.querySelector(".citation-author")?.textContent).toBe("Yi Sun");
+    expect(line1.querySelector(".citation-year")?.textContent?.trim()).toBe("(2025)");
+    expect(line1.querySelector(".citation-type")?.textContent).toBe("Article");
+    expect(line2.querySelector(".citation-title")?.textContent).toContain(
+      "Integrating Qualitative",
+    );
+    expect(line2.querySelector(".citation-title")?.getAttribute("title")).toBe(
+      createReference().fields.title,
+    );
+    expect(line2.querySelector(".citation-key")).toBeNull();
   });
 
-  it("row 1 has author, year and capitalized entry-type badge", () => {
-    renderItem();
-    const body = document.querySelector(".citation-item-body");
-    const line1 = body?.children[0];
-    expect(line1?.querySelector(".citation-author")?.textContent).toBe("Yi Sun");
-    expect(line1?.querySelector(".citation-year")?.textContent?.trim()).toBe("(2025)");
-    expect(line1?.querySelector(".citation-type")?.textContent).toBe("Article");
-  });
-
-  it("row 2 has the title only, with no .citation-key element", () => {
-    renderItem();
-    const body = document.querySelector(".citation-item-body");
-    const line2 = body?.children[1];
-    const titleEl = line2?.querySelector(".citation-title");
-    expect(titleEl?.textContent).toContain("Integrating Qualitative");
-    expect(titleEl?.getAttribute("title")).toBe(createReference().fields.title);
-    expect(line2?.querySelector(".citation-key")).toBeNull();
-    expect(document.querySelector(".citation-key")).toBeNull();
-  });
-
-  it("row 2 omits both .citation-title and .citation-key when the entry has no title", () => {
+  it("omits both title and key when the entry has no title", () => {
     renderItem({ fields: { author: "Sun, Yi", year: "2025" } });
-    const body = document.querySelector(".citation-item-body");
-    const line2 = body?.children[1];
+    const line2 = document.querySelector(".citation-item-body")?.children[1];
     expect(line2?.querySelector(".citation-title")).toBeNull();
     expect(line2?.querySelector(".citation-key")).toBeNull();
   });
-});
 
-describe("CitekeyItem — selection behavior", () => {
-  it("calls onSelect with the citekey on pointerUp", () => {
-    const onSelect = renderItem();
+  it("marks the active item and calls onSelect with the citekey on pointerUp", () => {
+    const onSelect = renderItem(undefined, true);
+    expect(screen.getByRole("listitem").className).toContain("hover");
     fireEvent.pointerUp(screen.getByRole("listitem"));
     expect(onSelect).toHaveBeenCalledWith("Sun2025");
   });
+});
 
-  it("marks the active item with class 'hover'", () => {
-    renderItem(undefined, true);
-    expect(screen.getByRole("listitem").className).toContain("hover");
+describe("CitationDropdown — cross-reference group rendering", () => {
+  it("renders Cross-references with label id and caption above Citations", () => {
+    renderDropdown({ crossrefs: mockCrossrefs });
+    expect(screen.getByText("Cross-references")).toBeDefined();
+    expect(screen.getByText("Citations")).toBeDefined();
+    expect(screen.getByText("fig-cat")).toBeDefined();
+    expect(screen.getByText("A cat diagram")).toBeDefined();
+    expect(screen.getByText("Figure")).toBeDefined();
+    expect(screen.getByText("body.qmd")).toBeDefined();
+    const headings = Array.from(document.querySelectorAll(".citation-group-heading")).map(
+      (el) => el.textContent,
+    );
+    expect(headings).toEqual(["Cross-references", "Citations"]);
+  });
+
+  it("hides the Citations heading when only cross-references match", () => {
+    renderDropdown({ crossrefs: mockCrossrefs, query: "fig-", items: [] });
+    expect(screen.getByText("Cross-references")).toBeDefined();
+    expect(screen.queryByText("Citations")).toBeNull();
+  });
+});
+
+describe("CitationDropdown — cross-reference activeIndex and selection", () => {
+  it("highlights the first cross-reference at index 0 and first citation next", () => {
+    const state = createOpenState({ crossrefs: mockCrossrefs, activeIndex: 0 });
+    const { rerender } = render(<CitationDropdown state={state} dispatch={vi.fn()} />);
+    expect(screen.getByText("fig-cat").closest("li")?.className).toContain("hover");
+    expect(screen.getByText("Jane Doe").closest("li")?.className).not.toContain("hover");
+    rerender(
+      <CitationDropdown
+        state={{ ...state, activeIndex: mockCrossrefs.length }}
+        dispatch={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("fig-cat").closest("li")?.className).not.toContain("hover");
+    expect(screen.getByText("Jane Doe").closest("li")?.className).toContain("hover");
+  });
+
+  it("calls onSelectCitekey with the label id for a cross-reference", () => {
+    const onSelectCitekey = vi.fn();
+    renderDropdown({ crossrefs: mockCrossrefs }, onSelectCitekey);
+    fireEvent.pointerUp(screen.getByText("fig-cat").closest("li")!);
+    expect(onSelectCitekey).toHaveBeenCalledWith("fig-cat");
+  });
+
+  it("calls onSelectCitekey with the citekey for a citation", () => {
+    const onSelectCitekey = vi.fn();
+    renderDropdown({ crossrefs: mockCrossrefs }, onSelectCitekey);
+    fireEvent.pointerUp(screen.getByText("Jane Doe").closest("li")!);
+    expect(onSelectCitekey).toHaveBeenCalledWith("doe2024");
   });
 });

@@ -142,3 +142,56 @@ describe('InlineEditField commits a value once', () => {
     expect(onSave).toHaveBeenLastCalledWith('Second');
   });
 });
+
+describe('InlineEditField external value changes', () => {
+  it('adopts a new value when the field holds no unsaved typing', () => {
+    const { rerender } = renderField();
+    const input = screen.getByRole('textbox', { name: 'Test field' }) as HTMLInputElement;
+    rerender(<InlineEditField value="Renamed Project" label="Test field" />);
+    expect(input.value).toBe('Renamed Project');
+  });
+
+  it('keeps unsaved typing when the value changes, and saves the typed text', () => {
+    const onSave = vi.fn();
+    const { rerender } = renderField({ onSave });
+    const input = screen.getByRole('textbox', { name: 'Test field' }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'My edit' } });
+    rerender(<InlineEditField value="Server Title" label="Test field" onSave={onSave} />);
+    expect(input.value).toBe('My edit');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave).toHaveBeenCalledWith('My edit');
+  });
+
+  it('restores the new external value on Escape without saving', () => {
+    const onSave = vi.fn();
+    const { rerender } = renderField({ onSave });
+    const input = screen.getByRole('textbox', { name: 'Test field' }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'My edit' } });
+    rerender(<InlineEditField value="Server Title" label="Test field" onSave={onSave} />);
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(input.value).toBe('Server Title');
+    expect(onSave).not.toHaveBeenCalled();
+  });
+});
+
+describe('InlineEditField typography', () => {
+  /** Read the rendered input's class list as discrete tokens. */
+  function inputClasses() {
+    const input = screen.getByRole('textbox', { name: 'Test field' }) as HTMLInputElement;
+    return input.className.split(/\s+/);
+  }
+
+  it('keeps text-sm, font-medium and leading-tight when no textClassName is given', () => {
+    renderField();
+    expect(inputClasses()).toEqual(expect.arrayContaining(['text-sm', 'font-medium', 'leading-tight']));
+  });
+
+  it('replaces the default typography with textClassName instead of appending it', () => {
+    renderField({ textClassName: 'text-3xl font-bold' });
+    const classes = inputClasses();
+    expect(classes).toEqual(expect.arrayContaining(['text-3xl', 'font-bold']));
+    expect(classes).not.toContain('text-sm');
+    expect(classes).not.toContain('font-medium');
+  });
+});

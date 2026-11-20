@@ -5,11 +5,12 @@
  */
 import { useEffect, useState } from 'react';
 import { listBlocks } from '@opendraft/manuscript';
-import { blockFileName, legacyBlockShort, parseBlockFileName } from '@opendraft/schema';
+import { blockFileName } from '@opendraft/schema';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import type { SaveStatus } from '../components/AppHeader';
 import { AddSectionDialog } from './AddSectionDialog';
 import { BlockBody, flushBlockBody } from './BlockBody';
+import { findBreakingRefs } from './breaking-refs';
 import { BlockContainer } from './BlockContainer';
 import { DeleteConfirm } from './DeleteConfirm';
 import type { DeleteTarget } from './DeleteConfirm';
@@ -19,6 +20,8 @@ import { useBlocks } from './use-blocks';
 import type { BlockEntry } from './use-blocks';
 import { useCollapseState } from './use-collapse-state';
 import { requestFocusForShort } from '../caret-mode-switch';
+import { useCrossrefIndex } from '../crossref/use-crossref-index';
+import type { CrossrefIndexHandle } from '../crossref/use-crossref-index';
 
 /** Props for {@link BlockEditor}. */
 export interface BlockEditorProps {
@@ -28,38 +31,6 @@ export interface BlockEditorProps {
   dir: string;
   /** Project key scoping the persisted collapse state. */
   projectKey: string;
-}
-
-/**
- * Collect every `@sec-<short>` reference in other block files that
- * would break on delete, one entry per occurrence, sorted.
- *
- * File names parse through `parseBlockFileName` with `legacyBlockShort`
- * as fallback: the target is skipped by identity, sources named by short.
- *
- * @param ws - Workspace holding the manuscript.
- * @param dir - Manuscript directory.
- * @param short - Short name of the block about to be deleted.
- * @returns One `'@sec-<short> in <source>'` string per occurrence.
- */
-async function findBreakingRefs(
-  ws: WorkspaceAdapter,
-  dir: string,
-  short: string,
-): Promise<string[]> {
-  const token = `@sec-${short}`;
-  const refs: string[] = [];
-  for (const file of await ws.listFiles(`${dir}/blocks`)) {
-    const source = parseBlockFileName(file) ?? legacyBlockShort(file);
-    if (source === null || source === short) continue;
-    const text = await ws.readFile(`${dir}/blocks/${file}`);
-    if (text === null) continue;
-    const pattern = new RegExp(`${token}(?![a-z0-9-])`, 'g');
-    for (let i = 1; i <= (text.match(pattern)?.length ?? 0); i += 1) {
-      refs.push(`${token} in ${source}`);
-    }
-  }
-  return refs.sort();
 }
 
 /**
@@ -178,6 +149,8 @@ interface BlockRowProps {
   dir: string;
   /** Resolved block file name, forwarded to the body. */
   file: string;
+  /** Cross-reference index shared with every block body. */
+  crossrefs: CrossrefIndexHandle;
   /** Flip the collapsed state. */
   onToggle: () => void;
   /** Open the delete confirmation for this block. */
@@ -206,6 +179,7 @@ function BlockRow({
   ws,
   dir,
   file,
+  crossrefs,
   onToggle,
   onOverflow,
   onAdd,
@@ -236,6 +210,7 @@ function BlockRow({
           dir={dir}
           short={block.short}
           file={file}
+          crossrefs={crossrefs}
           title={block.title}
           collapsed={collapsed}
           onWordCount={setWordCount}
@@ -260,6 +235,7 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
   const { loading, blocks, createBlock, deleteBlock, setTitle } = useBlocks(ws, dir);
   const shorts = blocks.map((block) => block.short);
   const files = useBlockFiles(ws, dir, shorts);
+  const crossrefs = useCrossrefIndex(ws, dir, shorts);
   const { isCollapsed, toggle } = useCollapseState(projectKey, shorts);
   const [addingAt, setAddingAt] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<DeleteTarget | null>(null);
@@ -284,6 +260,7 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
           key={block.short} block={block} formOpen={addingAt === index}
           collapsed={isCollapsed(block.short)} ws={ws} dir={dir}
           file={files[block.short] ?? blockFileName(block.short)}
+          crossrefs={crossrefs}
           onToggle={() => toggle(block.short)} onOverflow={() => openDelete(block)}
           onAdd={() => setAddingAt(index)} onCreate={createAt(index)}
           onClose={closeForm} onTitleSave={titleSaver(block.short, setTitle)}

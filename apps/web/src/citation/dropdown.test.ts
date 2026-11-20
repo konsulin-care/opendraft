@@ -29,6 +29,20 @@ describe('formatAuthor', () => {
   it('handles author with leading/trailing whitespace', () => {
     expect(formatAuthor('  Sun, Yi  ')).toBe('Yi Sun');
   });
+
+  it('returns a braced group author as a literal name', () => {
+    expect(formatAuthor('{MindKind Consortium}')).toBe('MindKind Consortium');
+  });
+
+  it('returns the first group author before a following person', () => {
+    expect(
+      formatAuthor('{Bill and Melinda Gates Foundation} and Doe, Jane'),
+    ).toBe('Bill and Melinda Gates Foundation');
+  });
+
+  it('keeps the particle before the family name', () => {
+    expect(formatAuthor('van Gogh, Vincent and Doe, Jane')).toBe('Vincent van Gogh');
+  });
 });
 
 describe('formatEntryType', () => {

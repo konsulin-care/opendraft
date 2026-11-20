@@ -160,6 +160,28 @@ describe('BlockEditor delete flow', () => {
   });
 });
 
+describe('BlockEditor delete references follow Pandoc key boundaries', () => {
+  it("matches '@Sec-intro' and '[-@sec-intro]' but not code or longer keys", async () => {
+    await setup({
+      [ARTICLE]: articleWith('intro', 'methods'),
+      [`${BLOCKS}/_intro.qmd`]: blockFile('intro', 'Introduction', 'Body.'),
+      [`${BLOCKS}/_methods.qmd`]: blockFile(
+        'methods',
+        'Methods',
+        'See @Sec-intro and [-@sec-intro] plus @sec-intro-two.\n\n```\n@sec-intro\n```\n',
+      ),
+    });
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Delete section' })[0]);
+    const dialog = await screen.findByRole('dialog', { name: 'Delete Introduction' });
+    const items = within(dialog).getAllByRole('listitem');
+    expect(items.map((item) => item.textContent)).toEqual([
+      '@sec-intro in methods',
+      '@sec-intro in methods',
+    ]);
+  });
+});
+
 describe('BlockEditor delete files-changed event', () => {
   it('dispatches opendraft:files-changed after the block file is removed', async () => {
     const ws = await setup({

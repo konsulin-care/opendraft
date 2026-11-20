@@ -57,7 +57,19 @@ describe('CitekeyTooltip — rendering', () => {
     const tooltip = screen.getByRole('tooltip');
     expect(tooltip.textContent).toContain('Smith, J.');
     expect(tooltip.textContent).toContain('2024');
-    expect(tooltip.textContent).toContain('A Test Article');
+    expect(tooltip.textContent).toContain('A test article');
+    document.body.removeChild(anchor);
+  });
+
+  it('includes the reserved-prefix warning for cross-reference-shaped keys', async () => {
+    const anchor = createMockAnchor();
+    const crossrefRef: Reference = { ...mockRef, citeKey: 'thm-jones' };
+    await act(async () => {
+      render(<CitekeyTooltip reference={crossrefRef} anchorEl={anchor} onClose={() => {}} />);
+    });
+    const tooltip = screen.getByRole('tooltip');
+    expect(tooltip.textContent).toContain('Prefix reserved for Quarto cross-references');
+    expect(tooltip.querySelector('.citation-crossref-warning')).not.toBeNull();
     document.body.removeChild(anchor);
   });
 
@@ -75,6 +87,53 @@ describe('CitekeyTooltip — rendering', () => {
       <CitekeyTooltip reference={mockRef} anchorEl={null} onClose={() => {}} />,
     );
     expect(container.querySelector('.citekey-tooltip')).not.toBeInTheDocument();
+  });
+});
+
+describe('CitekeyTooltip — inline markdown rendering', () => {
+  it('renders a book title inside an em element without asterisks', async () => {
+    const anchor = createMockAnchor();
+    const bookRef: Reference = {
+      citeKey: 'doe2020',
+      entryType: 'book',
+      fields: {
+        author: 'Doe, Jane',
+        year: '2020',
+        title: 'A Book Title',
+        publisher: 'Example Press',
+      },
+    };
+    await act(async () => {
+      render(<CitekeyTooltip reference={bookRef} anchorEl={anchor} onClose={() => {}} />);
+    });
+    const tooltip = screen.getByRole('tooltip');
+    const emphasis = tooltip.querySelector('em');
+    expect(emphasis).not.toBeNull();
+    expect(emphasis!.textContent).toContain('A book title');
+    expect(tooltip.textContent).not.toContain('*');
+    document.body.removeChild(anchor);
+  });
+
+  it('renders a brace-wrapped group author without braces', async () => {
+    const anchor = createMockAnchor();
+    const groupRef: Reference = {
+      citeKey: 'mindkind2022',
+      entryType: 'article',
+      fields: {
+        author: '{MindKind Consortium}',
+        year: '2022',
+        title: 'A Study',
+        journal: 'Test Journal',
+      },
+    };
+    await act(async () => {
+      render(<CitekeyTooltip reference={groupRef} anchorEl={anchor} onClose={() => {}} />);
+    });
+    const tooltip = screen.getByRole('tooltip');
+    expect(tooltip.textContent).toContain('MindKind Consortium. (2022).');
+    expect(tooltip.textContent).not.toContain('{');
+    expect(tooltip.textContent).not.toContain('}');
+    document.body.removeChild(anchor);
   });
 });
 

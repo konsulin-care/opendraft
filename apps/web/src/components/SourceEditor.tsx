@@ -3,9 +3,11 @@ import { Annotation, EditorState } from '@codemirror/state';
 import { EditorView, keymap, drawSelection, dropCursor, highlightActiveLine, highlightActiveLineGutter, highlightSpecialChars, lineNumbers, rectangularSelection, crosshairCursor } from '@codemirror/view';
 import { markdown } from '@codemirror/lang-markdown';
 import { autocompletion, completionKeymap as autocompleteCompletionKeymap, closeBrackets } from '@codemirror/autocomplete';
+import type { CompletionContext, CompletionResult, CompletionSource } from '@codemirror/autocomplete';
 import { searchKeymap as searchSearchKeymap } from '@codemirror/search';
 import { history, defaultKeymap, historyKeymap, undo as cmUndo, redo as cmRedo } from '@codemirror/commands';
 import { foldGutter, foldKeymap, indentOnInput, bracketMatching, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
+import { listTablePlaceholder } from '../list-table/list-table-placeholder';
 
 /** Imperative handle for SourceEditor — cursor, scroll, history, and view access. */
 export interface SourceEditorHandle {
@@ -30,6 +32,8 @@ interface SourceEditorProps {
    * other text files. Changing it recreates the CodeMirror state.
    */
   language?: 'markdown' | 'plain';
+  /** Extra completion sources; when present they replace the default popup sources. */
+  completionSources?: CompletionSource[];
 }
 
 /**
@@ -149,13 +153,49 @@ const lightEditorTheme = EditorView.theme({
   },
 }, { dark: false });
 
-/** Create a CodeMirror EditorState with optional markdown support and change tracking. */
+/**
+ * Run the configured completion sources in order and return the first result.
+ *
+ * @param sources - Completion sources to try.
+ * @param ctx - CodeMirror completion context for the current cursor position.
+ * @returns The first non-null result, or null when every source declines.
+ */
+async function runCompletionSources(
+  sources: readonly CompletionSource[],
+  ctx: CompletionContext,
+): Promise<CompletionResult | null> {
+  for (const source of sources) {
+    const result = await source(ctx);
+    if (result) return result;
+  }
+  return null;
+}
+
+/** Editor callbacks and refs needed to build a CodeMirror state. */
+interface EditorStateOptions {
+  /** Tracks whether the next external value sync is a user edit. */
+  isInternalChangeRef: React.MutableRefObject<boolean>;
+  /** Reports user document changes. */
+  onChange: (value: string) => void;
+  /** Completion sources consulted for the current buffer. */
+  completionSourcesRef: React.MutableRefObject<CompletionSource[]>;
+}
+
+/**
+ * Create a CodeMirror EditorState with optional markdown support and change
+ * tracking.
+ *
+ * @param value - Initial document text.
+ * @param language - Buffer language for syntax support.
+ * @param options - Editor callbacks and completion sources.
+ * @returns A configured CodeMirror state.
+ */
 function createState(
   value: string,
   language: 'markdown' | 'plain',
-  isInternalChangeRef: React.MutableRefObject<boolean>,
-  onChange: (value: string) => void,
+  options: EditorStateOptions,
 ) {
+  const { isInternalChangeRef, onChange, completionSourcesRef } = options;
   return EditorState.create({
     doc: value,
     extensions: [
@@ -170,7 +210,9 @@ function createState(
       indentOnInput(),
       bracketMatching(),
       closeBrackets(),
-      autocompletion(),
+      ...(completionSourcesRef.current.length > 0
+        ? [autocompletion({ override: [(ctx) => runCompletionSources(completionSourcesRef.current, ctx)] })]
+        : [autocompletion()]),
       rectangularSelection(),
       crosshairCursor(),
       highlightActiveLine(),
@@ -181,7 +223,7 @@ function createState(
         ...autocompleteCompletionKeymap,
         ...searchSearchKeymap,
       ]),
-      ...(language === 'markdown' ? [markdown()] : []),
+      ...(language === 'markdown' ? [markdown(), listTablePlaceholder] : []),
       // Wrap long lines within the viewport instead of scrolling horizontally.
       EditorView.lineWrapping,
       lightEditorTheme,
@@ -205,16 +247,25 @@ function createState(
  * toggle in ManuscriptEditor.
  */
 export const SourceEditor = forwardRef<SourceEditorHandle, SourceEditorProps>(
-  function SourceEditor({ value, onChange, className, language = 'markdown' }, ref) {
+  function SourceEditor(
+    { value, onChange, className, language = 'markdown', completionSources = [] },
+    ref,
+  ) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const viewRef = useRef<EditorView | null>(null);
     const isInternalChangeRef = useRef(false);
+    const completionSourcesRef = useRef<CompletionSource[]>(completionSources);
+    completionSourcesRef.current = completionSources;
 
     // Mount CodeMirror on first render; recreate when the language changes.
     useEffect(() => {
       if (!containerRef.current) return;
       const view = new EditorView({
-        state: createState(value, language, isInternalChangeRef, onChange),
+        state: createState(value, language, {
+          isInternalChangeRef,
+          onChange,
+          completionSourcesRef,
+        }),
         parent: containerRef.current,
       });
       viewRef.current = view;
