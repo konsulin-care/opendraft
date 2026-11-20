@@ -8,12 +8,13 @@
  * when roles exist) and the publication details section collapsed by
  * default.
  */
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { MetadataAuthor } from './use-manuscript-metadata';
 import { buildByline, type BylineModel, type AffiliationEntry } from './byline-model';
 import { Byline } from './Byline';
 import { KeywordInput } from './KeywordInput';
 import { SectionLabel } from './SectionLabel';
+import { AbstractField, type AbstractFieldHandle } from './AbstractField';
 import { PublicationDetails } from './PublicationDetails';
 import { AuthorsDialog } from './AuthorsDialog';
 
@@ -92,55 +93,6 @@ function autoGrow(el: HTMLTextAreaElement | null): void {
   el.style.height = `${el.scrollHeight}px`;
 }
 
-/** Count whitespace-separated words in a text. */
-function countWords(text: string): number {
-  return text.trim().split(/\s+/).filter(Boolean).length;
-}
-
-/** Small-caps label row with the abstract word count, above the textarea. */
-function AbstractLabelRow({ abstract }: { abstract: string }): ReactNode {
-  return (
-    <div data-testid="abstract-label-row" className="flex items-baseline justify-between text-sm">
-      <SectionLabel>Abstract</SectionLabel>
-      <span data-testid="abstract-word-count" className="text-muted">
-        {countWords(abstract)} words
-      </span>
-    </div>
-  );
-}
-
-/** Borderless auto-grown abstract textarea without a placeholder. */
-function AbstractField(
-  { abstract, setAbstract, textareaRef }: {
-    abstract: string;
-    setAbstract: (text: string) => void;
-    textareaRef: RefObject<HTMLTextAreaElement | null>;
-  },
-): ReactNode {
-  // Stable ref object plus a value-change effect: re-measure only on mount
-  // and when the abstract changes, not on every unrelated re-render.
-  useEffect(() => {
-    autoGrow(textareaRef.current);
-  }, [abstract, textareaRef]);
-  return (
-    <section className="mt-3">
-      <AbstractLabelRow abstract={abstract} />
-      <textarea
-        ref={textareaRef}
-        data-testid="metadata-abstract"
-        aria-label="Abstract"
-        value={abstract}
-        rows={2}
-        onChange={(event) => {
-          setAbstract(event.target.value);
-          autoGrow(event.currentTarget);
-        }}
-        className="min-h-11 w-full resize-none text-sm outline-none"
-      />
-    </section>
-  );
-}
-
 /** Collapsible collaborators list of one group author. */
 function CollaboratorItem({ group }: { group: BylineModel['collaborators'][number] }): ReactNode {
   const [open, setOpen] = useState(false);
@@ -185,17 +137,17 @@ export function ArticleView({
   setFrontmatterField = () => {},
 }: ArticleViewProps): ReactNode {
   const model = buildByline(authors, affiliations);
-  const abstractRef = useRef<HTMLTextAreaElement>(null);
+  const abstractRef = useRef<AbstractFieldHandle>(null);
   // Dialog target: author index, or -1 for a new draft author.
   const [dialogIndex, setDialogIndex] = useState<number | null>(null);
   return (
     <div data-testid="metadata-article-view" className="py-3">
-      <TitleField title={title} setTitle={setTitle} onEnter={() => abstractRef.current?.focus()} />
+      <TitleField title={title} setTitle={setTitle} onEnter={() => abstractRef.current?.startEditing()} />
       <Byline model={model} authors={authors} setAuthors={setAuthors} onOpenName={setDialogIndex} />
       {model.collaborators.map((group) => (
         <CollaboratorItem key={group.key} group={group} />
       ))}
-      <AbstractField abstract={abstract} setAbstract={setAbstract} textareaRef={abstractRef} />
+      <AbstractField ref={abstractRef} abstract={abstract} setAbstract={setAbstract} />
       <section className="mt-3">
         <SectionLabel>Keywords</SectionLabel>
         <KeywordInput keywords={keywords} onChange={setKeywords} />

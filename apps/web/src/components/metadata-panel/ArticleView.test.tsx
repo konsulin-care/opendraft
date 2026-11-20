@@ -4,13 +4,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within, type RenderResult } from '@testing-library/react';
 import { ArticleView, type ArticleViewProps } from './ArticleView';
 import type { MetadataAuthor } from './use-manuscript-metadata';
-
 /** Affiliation registry used by the default fixture. */
 const AFFILIATIONS = [
   { id: 'ui', name: 'University of Indonesia' },
   { id: 'rscm', name: 'RS Pondok Indah Cempaka Putih' },
 ];
-
 /** Two person authors with shared affiliation, symbol flags, contact. */
 const AUTHORS: MetadataAuthor[] = [
   {
@@ -28,7 +26,6 @@ const AUTHORS: MetadataAuthor[] = [
     affiliations: [{ ref: 'rscm' }],
   },
 ];
-
 /** Render the article view with defaults overridden per test. */
 function renderView(props: Partial<ArticleViewProps> = {}): RenderResult {
   return render(
@@ -41,7 +38,6 @@ function renderView(props: Partial<ArticleViewProps> = {}): RenderResult {
     />,
   );
 }
-
 describe('ArticleView byline', () => {
   it('renders names with superscripts and symbol markers', () => {
     renderView();
@@ -50,7 +46,6 @@ describe('ArticleView byline', () => {
     expect(screen.getByTestId('byline-superscript-1').textContent).toBe('2†');
     expect(screen.getByTestId('byline-orcid-0')).toBeDefined();
   });
-
   it('shows a tooltip with email and ORCID when a byline name is focused', () => {
     renderView();
     fireEvent.focus(screen.getByTestId('byline-author-0'));
@@ -60,7 +55,6 @@ describe('ArticleView byline', () => {
     fireEvent.blur(screen.getByTestId('byline-author-0'));
     expect(screen.queryByTestId('byline-tooltip')).toBeNull();
   });
-
   it('phrases a person signing on behalf of a group', () => {
     renderView({
       authors: [
@@ -76,7 +70,6 @@ describe('ArticleView byline', () => {
     expect(screen.getByTestId('byline-author-1').textContent).toContain('Dewi Sari on behalf of OpenDraft Team');
   });
 });
-
 describe('ArticleView footnotes and collaborators', () => {
   it('lists numbered affiliations once under the byline, footnotes with symbols only', () => {
     renderView();
@@ -89,14 +82,12 @@ describe('ArticleView footnotes and collaborators', () => {
     expect(notes).not.toContain('‡');
     expect(notes).not.toContain('University of Indonesia');
   });
-
   it('renders each affiliation name exactly once for two authors', () => {
     renderView();
     const text = screen.getByTestId('metadata-article-view').textContent ?? '';
     expect(text.split('University of Indonesia')).toHaveLength(2);
     expect(text.split('RS Pondok Indah Cempaka Putih')).toHaveLength(2);
   });
-
   it('collapses the collaborator list behind a toggle', () => {
     renderView({
       authors: [
@@ -120,43 +111,29 @@ describe('ArticleView footnotes and collaborators', () => {
     expect(list.textContent).toContain('Suharto');
   });
 });
-
 describe('ArticleView contributions', () => {
   it('renders no Author contributions when no author has roles', () => {
     renderView();
     expect(screen.queryByTestId('author-contributions')).toBeNull();
     expect(screen.queryByText(/Author contributions/)).toBeNull();
   });
-
   it('renders per-author contribution lines by full name when roles exist', () => {
     renderView({
       authors: [
         { id: 'john', name: { given: 'John' }, roles: ['conceptualization'] },
-        {
-          id: 'jane',
-          name: { given: 'Jane', family: 'Doe' },
-          roles: ['data-curation', 'formal-analysis'],
-        },
+        { id: 'jane', name: { given: 'Jane', family: 'Doe' }, roles: ['data-curation', 'formal-analysis'] },
       ],
       affiliations: [],
     });
     const lines = within(screen.getByTestId('author-contributions'))
       .getAllByRole('listitem')
       .map((item) => item.textContent);
-    expect(lines).toEqual([
-      'John: Conceptualization',
-      'Jane Doe: Data curation, Formal analysis',
-    ]);
+    expect(lines).toEqual(['John: Conceptualization', 'Jane Doe: Data curation, Formal analysis']);
   });
-
   it('renders the contributions section read-only directly after Keywords', () => {
     renderView({
       authors: [
-        {
-          id: 'smith',
-          name: { given: 'Alice Marie', family: 'Smith' },
-          roles: ['conceptualization'],
-        },
+        { id: 'smith', name: { given: 'Alice Marie', family: 'Smith' }, roles: ['conceptualization'] },
       ],
       affiliations: [],
     });
@@ -166,7 +143,6 @@ describe('ArticleView contributions', () => {
     expect(contributions.querySelector('button, input, textarea, select')).toBeNull();
   });
 });
-
 describe('ArticleView publication details', () => {
   it('keeps the publication details content hidden until clicked', () => {
     renderView({ frontmatter: { license: 'CC BY 4.0', date: '2024-01-01' } });
@@ -177,7 +153,6 @@ describe('ArticleView publication details', () => {
     expect((screen.getByTestId('date-input') as HTMLInputElement).value).toBe('2024-01-01');
   });
 });
-
 describe('ArticleView section labels', () => {
   it('renders Abstract, Keywords, Contributions and Publication details via one small-caps label', () => {
     renderView({
@@ -195,12 +170,12 @@ describe('ArticleView section labels', () => {
       expect(label.className).toContain('font-variant-caps:all-small-caps');
     }
   });
-
   it('places the word count in the abstract label row and renders no placeholder', () => {
     renderView({ abstract: 'one two three' });
     const row = screen.getByTestId('abstract-label-row');
     expect(row.querySelector('[data-testid="section-label"]')?.textContent).toBe('Abstract');
     expect(row.textContent).toContain('3 words');
+    fireEvent.click(screen.getByTestId('metadata-abstract-view'));
     const textarea = screen.getByTestId('metadata-abstract') as HTMLTextAreaElement;
     expect(textarea.hasAttribute('placeholder')).toBe(false);
     expect(screen.getByTestId('metadata-panel-title-input').hasAttribute('placeholder')).toBe(false);
@@ -210,7 +185,6 @@ describe('ArticleView section labels', () => {
     expect(children.indexOf(row)).toBeLessThan(children.indexOf(textarea));
   });
 });
-
 describe('ArticleView inline editing', () => {
   it('Enter in the title inserts no newline and focuses the abstract', () => {
     renderView();
@@ -221,12 +195,10 @@ describe('ArticleView inline editing', () => {
     expect(title.value).toBe('Deep Dive');
     expect(document.activeElement).toBe(screen.getByTestId('metadata-abstract'));
   });
-
   it("abstract '  one two  three ' shows '3 words'", () => {
     renderView({ abstract: '  one two  three ' });
     expect(screen.getByTestId('abstract-word-count').textContent).toBe('3 words');
   });
-
   it('reports abstract edits and updates the word count', () => {
     const setAbstract = vi.fn();
     const { rerender } = renderView({ abstract: '', setAbstract });
@@ -246,35 +218,59 @@ describe('ArticleView inline editing', () => {
     );
     expect(screen.getByTestId('abstract-word-count').textContent).toBe('3 words');
   });
-
   it('renders the keyword chip input with a count', () => {
     renderView({ keywords: ['fasting', 'keto'] });
     expect(screen.getByTestId('keyword-count').textContent).toBe('2 keywords');
     expect(screen.getAllByTestId('keyword-chip')).toHaveLength(2);
   });
 });
-
+describe('ArticleView abstract view mode', () => {
+  it('renders a non-empty abstract as markdown without a textarea', () => {
+    renderView({ abstract: '**Aim.** text' });
+    const view = screen.getByTestId('metadata-abstract-view');
+    expect(view.querySelector('strong')?.textContent).toBe('Aim.');
+    expect(screen.queryByTestId('metadata-abstract')).toBeNull();
+  });
+  it('switches to a focused textarea on click and back to the view on blur', () => {
+    renderView({ abstract: '**Aim.** text' });
+    fireEvent.click(screen.getByTestId('metadata-abstract-view'));
+    const textarea = screen.getByTestId('metadata-abstract') as HTMLTextAreaElement;
+    expect(document.activeElement).toBe(textarea);
+    fireEvent.blur(textarea);
+    expect(screen.queryByTestId('metadata-abstract')).toBeNull();
+    expect(screen.getByTestId('metadata-abstract-view')).toBeDefined();
+  });
+  it('keeps the local draft when the saved abstract gains a trailing newline', () => {
+    const { rerender } = renderView({ abstract: '**Aim.** text' });
+    fireEvent.click(screen.getByTestId('metadata-abstract-view'));
+    const textarea = screen.getByTestId('metadata-abstract') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'Typed' } });
+    rerender(
+      <ArticleView
+        title="Deep Dive"
+        authors={AUTHORS}
+        affiliations={AFFILIATIONS}
+        setTitle={() => {}}
+        abstract={'Typed\n'}
+      />,
+    );
+    expect((screen.getByTestId('metadata-abstract') as HTMLTextAreaElement).value).toBe('Typed');
+  });
+});
 describe('ArticleView title field', () => {
-  it('renders the title as a one-row auto-growing textarea that wraps', () => {
-    renderView();
+  it('renders a one-row auto-growing textarea and replaces newlines with spaces', () => {
+    const setTitle = vi.fn();
+    renderView({ setTitle });
     const title = screen.getByTestId('metadata-panel-title-input') as HTMLTextAreaElement;
     expect(title.tagName).toBe('TEXTAREA');
     expect(title.rows).toBe(1);
     expect(title.className).toContain('resize-none');
-  });
-
-  it('replaces typed or pasted newlines in the title with spaces', () => {
-    const setTitle = vi.fn();
-    renderView({ setTitle });
-    fireEvent.change(screen.getByTestId('metadata-panel-title-input'), {
-      target: { value: 'a\nb' },
-    });
+    fireEvent.change(title, { target: { value: 'a\nb' } });
     expect(setTitle).toHaveBeenCalledWith('a b');
   });
 });
-
 describe('ArticleView textarea auto-grow', () => {
-  it('keeps textarea heights on a re-render with unchanged props', () => {
+  it('keeps heights on an unchanged re-render and re-measures on change', () => {
     const { rerender } = renderView();
     const title = screen.getByTestId('metadata-panel-title-input') as HTMLTextAreaElement;
     const abstract = screen.getByTestId('metadata-abstract') as HTMLTextAreaElement;
@@ -284,11 +280,6 @@ describe('ArticleView textarea auto-grow', () => {
       setTitle={() => {}} />);
     expect(title.style.height).toBe('42px');
     expect(abstract.style.height).toBe('42px');
-  });
-
-  it('re-measures the textarea when its value changes via onChange', () => {
-    renderView();
-    const title = screen.getByTestId('metadata-panel-title-input') as HTMLTextAreaElement;
     title.style.height = '42px';
     fireEvent.change(title, { target: { value: 'Changed title' } });
     expect(title.style.height).not.toBe('42px');
