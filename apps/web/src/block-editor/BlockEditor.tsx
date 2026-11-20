@@ -5,11 +5,12 @@
  */
 import { useEffect, useState } from 'react';
 import { listBlocks } from '@opendraft/manuscript';
-import { blockFileName, legacyBlockShort, parseBlockFileName } from '@opendraft/schema';
+import { blockFileName } from '@opendraft/schema';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import type { SaveStatus } from '../components/AppHeader';
 import { AddSectionDialog } from './AddSectionDialog';
 import { BlockBody, flushBlockBody } from './BlockBody';
+import { findBreakingRefs } from './breaking-refs';
 import { BlockContainer } from './BlockContainer';
 import { DeleteConfirm } from './DeleteConfirm';
 import type { DeleteTarget } from './DeleteConfirm';
@@ -28,38 +29,6 @@ export interface BlockEditorProps {
   dir: string;
   /** Project key scoping the persisted collapse state. */
   projectKey: string;
-}
-
-/**
- * Collect every `@sec-<short>` reference in other block files that
- * would break on delete, one entry per occurrence, sorted.
- *
- * File names parse through `parseBlockFileName` with `legacyBlockShort`
- * as fallback: the target is skipped by identity, sources named by short.
- *
- * @param ws - Workspace holding the manuscript.
- * @param dir - Manuscript directory.
- * @param short - Short name of the block about to be deleted.
- * @returns One `'@sec-<short> in <source>'` string per occurrence.
- */
-async function findBreakingRefs(
-  ws: WorkspaceAdapter,
-  dir: string,
-  short: string,
-): Promise<string[]> {
-  const token = `@sec-${short}`;
-  const refs: string[] = [];
-  for (const file of await ws.listFiles(`${dir}/blocks`)) {
-    const source = parseBlockFileName(file) ?? legacyBlockShort(file);
-    if (source === null || source === short) continue;
-    const text = await ws.readFile(`${dir}/blocks/${file}`);
-    if (text === null) continue;
-    const pattern = new RegExp(`${token}(?![a-z0-9-])`, 'g');
-    for (let i = 1; i <= (text.match(pattern)?.length ?? 0); i += 1) {
-      refs.push(`${token} in ${source}`);
-    }
-  }
-  return refs.sort();
 }
 
 /**
