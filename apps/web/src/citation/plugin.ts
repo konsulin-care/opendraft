@@ -24,6 +24,9 @@ export const citationPluginKey = new PluginKey("citation");
 /** Citekey map for tracking position -> citekey mappings. */
 const citekeyMap = new Map<number, string>();
 
+/** Latest cross-reference getter, used when reloads omit it explicitly. */
+let currentCrossrefs: () => CrossrefLabel[] = () => [];
+
 /** Combined plugin state: citation UI state + inline decorations. */
 export interface CitationPluginState {
   citation: CitationState;
@@ -151,10 +154,11 @@ function createView(
   getCrossrefs: () => CrossrefLabel[],
 ) {
   return (view: EditorView) => {
+    currentCrossrefs = getCrossrefs;
     loadReferences(workspace, bibPath, view, getCrossrefs);
     const dispatch = createDispatch(view);
     const { provider, root } = createSlashProviderConfig(dispatch, view, () => {
-      void loadReferences(workspace, bibPath, view, getCrossrefs);
+      void loadReferences(workspace, bibPath, view);
     }, getCrossrefs);
     const globalKeyHandler = createGlobalKeyHandler(view, dispatch);
     window.addEventListener("keydown", globalKeyHandler, { capture: true });
@@ -271,7 +275,7 @@ async function loadReferences(
   workspace: WorkspaceAdapter,
   bibPath: string,
   view: EditorView,
-  getCrossrefs: () => CrossrefLabel[],
+  getCrossrefs: () => CrossrefLabel[] = currentCrossrefs,
 ): Promise<void> {
   try {
     const { items, error } = await readReferences(workspace, bibPath);
