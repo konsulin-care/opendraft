@@ -134,3 +134,39 @@ describe('BlockHeader title rename', () => {
     expect(await ws.listFiles(`${DIR}/blocks`)).toEqual(['_intro.qmd']);
   });
 });
+
+describe('BlockHeader title typography', () => {
+  /** Split a class attribute into discrete tokens. */
+  const tokens = (element: Element) => element.getAttribute('class')?.split(/\s+/) ?? [];
+
+  it('renders the read-only title larger than a body H2 in the serif title font', () => {
+    const { container } = renderHeader('methods');
+    const heading = container.querySelector('h1');
+    expect(heading).not.toBeNull();
+    const classes = tokens(heading as Element);
+    expect(classes).toEqual(
+      expect.arrayContaining([
+        'text-[1.625rem]',
+        'sm:text-3xl',
+        'font-bold',
+        'font-(family-name:--crepe-font-title)',
+      ]),
+    );
+    expect(classes).not.toContain('text-base');
+  });
+
+  it('renders the editable title larger than a body H2 in the serif title font', () => {
+    renderHeader('methods', { onTitleSave: vi.fn() });
+    const classes = tokens(screen.getByTestId('block-title'));
+    expect(classes).toEqual(
+      expect.arrayContaining([
+        'text-[1.625rem]',
+        'sm:text-3xl',
+        'font-bold',
+        'font-(family-name:--crepe-font-title)',
+      ]),
+    );
+    expect(classes).not.toContain('text-sm');
+    expect(classes).not.toContain('text-base');
+  });
+});

@@ -120,6 +120,14 @@ function Level1Badge() {
 }
 
 /**
+ * Title typography shared by the static heading and the inline editor.
+ * The block title outranks every body heading: 26px on small screens and
+ * 30px from 640px up, against body H2 at 24px, in the serif title font.
+ */
+const BLOCK_TITLE_TEXT_CLASS =
+  'text-[1.625rem] sm:text-3xl font-bold leading-tight font-(family-name:--crepe-font-title)';
+
+/**
  * Header title: the inline-edit field when a save handler is wired,
  * otherwise the static H1 so consumers without rename support keep
  * their level-1 heading.
@@ -135,7 +143,9 @@ function HeaderTitle({
   onTitleSave?: (title: string) => void | Promise<void>;
 }) {
   if (onTitleSave === undefined) {
-    return <h1 className="flex-1 truncate text-base font-semibold text-gray-900">{title}</h1>;
+    return (
+      <h1 className={`flex-1 truncate text-gray-900 ${BLOCK_TITLE_TEXT_CLASS}`}>{title}</h1>
+    );
   }
   return (
     <span className="min-w-0 flex-1">
@@ -144,7 +154,7 @@ function HeaderTitle({
         label="Section title"
         testId="block-title"
         onSave={onTitleSave}
-        inputClassName="text-base font-semibold"
+        textClassName={BLOCK_TITLE_TEXT_CLASS}
       />
     </span>
   );
