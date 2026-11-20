@@ -20,8 +20,10 @@ import { reportLoadedBody } from './BlockHeader';
 import { joinHeading } from './heading';
 import type { BlockHeading } from './heading';
 import { captureLoadedHeading } from './heading-capture';
+import { useBlockFileText } from './use-block-file-text';
 import { useLazyMount } from './use-lazy-mount';
 import { sharedBibPath } from '../citation/references-source';
+import type { CrossrefIndexHandle } from '../crossref/use-crossref-index';
 
 /** Section type given to blocks that carry no type of their own. */
 const GENERIC_TYPE = 'section';
@@ -79,36 +81,8 @@ export interface BlockBodyProps {
   onSaveStatus?: (status: SaveStatus) => void;
   /** Receives the editor test API once the editor is wired (tests/tools). */
   onEditorReady?: (api: EditorTestApi) => void;
-}
-
-/**
- * Load the block file text once the block has earned mounting.
- *
- * Reads at most once per path; a path change triggers a fresh read and
- * the cleanup marks an in-flight read stale.
- *
- * @param ws - Workspace holding the manuscript.
- * @param path - Path of the block file, e.g. `.../blocks/short.qmd`.
- * @param mounted - Whether the editor has earned mounting.
- * @returns The file text, or `null` while the load is pending.
- */
-function useBlockFileText(
-  ws: WorkspaceAdapter,
-  path: string,
-  mounted: boolean,
-): string | null {
-  const [loaded, setLoaded] = useState<{ path: string; text: string } | null>(null);
-  useEffect(() => {
-    if (!mounted || loaded?.path === path) return undefined;
-    let stale = false;
-    void ws.readFile(path).then((text) => {
-      if (!stale) setLoaded({ path, text: text ?? '' });
-    });
-    return () => {
-      stale = true;
-    };
-  }, [mounted, loaded, ws, path]);
-  return loaded !== null && loaded.path === path ? loaded.text : null;
+  /** In-memory cross-reference index shared with the citation plugin. */
+  crossrefs?: CrossrefIndexHandle;
 }
 
 /** Options for {@link useCrepeEditor}. */
@@ -135,6 +109,8 @@ interface CrepeEditorOptions {
   citationStateRef: RefObject<(state: CitationState) => void>;
   /** Receives the loaded body's word count. */
   onWordCountRef: RefObject<WordCountSink>;
+  /** Cross-reference index read by the citation plugin. */
+  crossrefsRef: RefObject<CrossrefIndexHandle | undefined>;
 }
 
 /**
@@ -151,7 +127,7 @@ interface CrepeEditorOptions {
  */
 function useCrepeEditor(options: CrepeEditorOptions): boolean {
   const { mounted, fileText, ws, short, title, bibPath } = options;
-  const { rootRef, editorRef, headingRef, citationStateRef, onWordCountRef } = options;
+  const { rootRef, editorRef, headingRef, citationStateRef, onWordCountRef, crossrefsRef } = options;
   const [ready, setReady] = useState(false);
   // Title is only a fallback for heading-less files; a retitle must not recreate the editor from stale text.
   const titleRef = useRef(title);
@@ -170,6 +146,7 @@ function useCrepeEditor(options: CrepeEditorOptions): boolean {
       workspace: ws,
       onStateChangeRef: citationStateRef,
       bibPath,
+      getCrossrefs: () => crossrefsRef.current?.getCrossrefs() ?? [],
     });
     // Every block editor demotes H1s: register the heading guard on
     // the block-body Crepe instance before it mounts. The slash menu
@@ -197,6 +174,16 @@ function useCrepeEditor(options: CrepeEditorOptions): boolean {
   return ready;
 }
 
+/** Extra wiring for {@link useJoinedSaver}. */
+interface JoinedSaverOptions {
+  /** Receives the edited body's word count. */
+  onWordCountRef: RefObject<WordCountSink>;
+  /** Cross-reference index kept in sync with the saved text. */
+  crossrefsRef: RefObject<CrossrefIndexHandle | undefined>;
+  /** Block file name the joined text belongs to. */
+  file: string;
+}
+
 /**
  * Wrap the shared debounced saver so scheduled markdown is rejoined
  * onto the block's canonical heading and its words are reported
@@ -204,24 +191,27 @@ function useCrepeEditor(options: CrepeEditorOptions): boolean {
  *
  * @param saver - Debounced autosave target for the block file.
  * @param headingRef - Heading captured at load; reattached verbatim.
- * @param onWordCountRef - Receives the edited body's word count.
+ * @param options - Word-count sink, cross-reference index and file name.
  * @returns A saver handle whose identity is stable across renders.
  */
 function useJoinedSaver(
   saver: DebouncedSaver,
   headingRef: RefObject<BlockHeading>,
-  onWordCountRef: RefObject<WordCountSink>,
+  options: JoinedSaverOptions,
 ): DebouncedSaver {
+  const { onWordCountRef, crossrefsRef, file } = options;
   return useMemo(
     () => ({
       setPath: (path: string) => saver.setPath(path),
       schedule: (markdown: string) => {
         onWordCountRef.current?.(countWords(markdown));
-        saver.schedule(joinHeading(headingRef.current, markdown));
+        const joined = joinHeading(headingRef.current, markdown);
+        crossrefsRef.current?.updateFile(file, joined);
+        saver.schedule(joined);
       },
       flush: () => saver.flush(),
     }),
-    [saver],
+    [saver, file],
   );
 }
 
@@ -247,18 +237,21 @@ function useBodyFlush(short: string, joinedSaver: DebouncedSaver): void {
  * @param props - See {@link BlockBodyProps}.
  * @returns The mount host; the editor root appears once mounted.
  */
-export function BlockBody({ ws, dir, short, file, title, collapsed, onWordCount, onSaveStatus, onEditorReady }: BlockBodyProps) {
+export function BlockBody({ ws, dir, short, file, title, collapsed, onWordCount, onSaveStatus, onEditorReady, crossrefs }: BlockBodyProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<Editor | null>(null);
   const mounted = useLazyMount(hostRef, !collapsed);
-  const path = `${dir}/blocks/${file ?? blockFileName(short)}`;
+  const fileName = file ?? blockFileName(short);
+  const path = `${dir}/blocks/${fileName}`;
 
   // Callbacks live in refs so their identity never retriggers effects.
   const onWordCountRef = useRef(onWordCount);
   onWordCountRef.current = onWordCount;
   const onEditorReadyRef = useRef(onEditorReady);
   onEditorReadyRef.current = onEditorReady;
+  const crossrefsRef = useRef(crossrefs);
+  crossrefsRef.current = crossrefs;
 
   // Heading captured at load; every save reattaches it verbatim.
   const headingRef = useRef<BlockHeading>({ title, anchor: `sec-${short}`, type: GENERIC_TYPE });
@@ -268,9 +261,9 @@ export function BlockBody({ ws, dir, short, file, title, collapsed, onWordCount,
   const fileText = useBlockFileText(ws, path, mounted);
   const ready = useCrepeEditor({
     mounted, fileText, ws, short, title, rootRef, bibPath: sharedBibPath(dir),
-    editorRef, headingRef, citationStateRef, onWordCountRef,
+    editorRef, headingRef, citationStateRef, onWordCountRef, crossrefsRef,
   });
-  const joinedSaver = useJoinedSaver(saver, headingRef, onWordCountRef);
+  const joinedSaver = useJoinedSaver(saver, headingRef, { onWordCountRef, crossrefsRef, file: fileName });
   useBodyFlush(short, joinedSaver);
 
   // Register autosave + the block-editor registry so toolbar commands

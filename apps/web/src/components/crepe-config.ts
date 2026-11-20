@@ -6,6 +6,7 @@ import { editorViewCtx, remarkPluginsCtx, remarkStringifyOptionsCtx, type Editor
 import { listenerCtx } from '@milkdown/kit/plugin/listener';
 import { $prose, getMarkdown } from '@milkdown/kit/utils';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
+import type { CrossrefLabel } from '@opendraft/manuscript';
 import { createCitationPlugin } from '../citation/plugin';
 import type { CitationState } from '../citation/types';
 import { quartoRemarkPlugin, quartoInlineCodePlugin, quartoChunkOptionPlugin, quartoCodeHandler } from '../quarto-syntax';
@@ -36,6 +37,8 @@ interface CrepeConfigOptions {
   onStateChangeRef: React.MutableRefObject<(state: CitationState) => void>;
   /** Bib file the citation plugin reads and appends to. */
   bibPath?: string;
+  /** Reads the current cross-reference labels for the `@` completions. */
+  getCrossrefs?: () => CrossrefLabel[];
 }
 
 /**
@@ -91,10 +94,10 @@ function createBaseCrepe(root: HTMLElement, defaultValue: string): Crepe {
  * @returns The configured Crepe instance, not yet mounted.
  */
 export function createCrepeConfig(options: CrepeConfigOptions): Crepe {
-  const { root, defaultValue, workspace, onStateChangeRef, bibPath } = options;
+  const { root, defaultValue, workspace, onStateChangeRef, bibPath, getCrossrefs } = options;
   const crepe = createBaseCrepe(root, defaultValue);
   crepe.addFeature((editor) => {
-    editor.use($prose(() => createCitationPlugin(workspace, onStateChangeRef.current, bibPath)));
+    editor.use($prose(() => createCitationPlugin(workspace, onStateChangeRef.current, bibPath, getCrossrefs)));
   });
   crepe.addFeature((editor) => {
     editor.use(quartoDivDecoration);
