@@ -11,6 +11,7 @@ export type { BlockListItem, CreateBlockDraft } from './blocks.js';
 export { normalizeBlockFiles } from './normalize.js';
 export type { NormalizeBlockFilesResult } from './normalize.js';
 export { extractCitekeys } from './citekeys.js';
+export { isCrossrefKey, QUARTO_CROSSREF_PREFIXES } from './crossref-prefixes.js';
 export { joinHeading, retitleHeading, splitHeading } from './heading.js';
 export type { BlockHeading, SplitHeading } from './heading.js';
 export {

@@ -20,6 +20,11 @@ describe('extractCitekeys', () => {
     expect(extractCitekeys('Shown in [-@fig-overview] and [@sec-intro].')).toEqual([]);
   });
 
+  it('excludes the other Quarto cross-reference prefixes too', () => {
+    expect(extractCitekeys('See @thm-x, @lst-y and @smith2020.')).toEqual(['smith2020']);
+    expect(extractCitekeys('See @Thm-x and @Lst-y.')).toEqual([]);
+  });
+
   it('ignores email addresses and @ inside inline code and fenced code blocks', () => {
     const markdown = [
       'Contact jane@example.org or @realcite.',
