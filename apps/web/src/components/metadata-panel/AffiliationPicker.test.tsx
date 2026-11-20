@@ -16,11 +16,12 @@ import type { MetadataAuthor } from './use-manuscript-metadata';
 /** One raw v2 organization item. */
 const ROR = 'https://ror.org/0116zj450';
 const ITEM = { id: ROR, names: [{ value: 'University of Indonesia', types: ['ror_display'] }],
-  addresses: [{ city: 'Depok' }], country: { country_code: 'ID' } };
+  locations: [{ geonames_details: { name: 'Depok', country_code: 'ID', country_subdivision_name: 'West Java' } }],
+  links: [{ type: 'website', value: 'https://www.ui.ac.id/' }] };
 const PAYLOAD = { items: [ITEM] };
 const UI: AffiliationEntry = { id: 'ui', name: 'University of Indonesia' };
 const ROR_ENTRY = { id: 'university-of-indonesia', name: 'University of Indonesia',
-  city: 'Depok', country: 'ID', ror: ROR };
+  city: 'Depok', region: 'West Java', country: 'ID', url: 'https://www.ui.ac.id/', ror: ROR };
 const INDEPENDENT: AffiliationEntry = { id: 'independent', name: 'Independent researcher' };
 
 // One seed author without affiliations.
