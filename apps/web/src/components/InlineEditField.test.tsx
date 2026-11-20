@@ -142,3 +142,24 @@ describe('InlineEditField commits a value once', () => {
     expect(onSave).toHaveBeenLastCalledWith('Second');
   });
 });
+
+describe('InlineEditField typography', () => {
+  /** Read the rendered input's class list as discrete tokens. */
+  function inputClasses() {
+    const input = screen.getByRole('textbox', { name: 'Test field' }) as HTMLInputElement;
+    return input.className.split(/\s+/);
+  }
+
+  it('keeps text-sm, font-medium and leading-tight when no textClassName is given', () => {
+    renderField();
+    expect(inputClasses()).toEqual(expect.arrayContaining(['text-sm', 'font-medium', 'leading-tight']));
+  });
+
+  it('replaces the default typography with textClassName instead of appending it', () => {
+    renderField({ textClassName: 'text-3xl font-bold' });
+    const classes = inputClasses();
+    expect(classes).toEqual(expect.arrayContaining(['text-3xl', 'font-bold']));
+    expect(classes).not.toContain('text-sm');
+    expect(classes).not.toContain('font-medium');
+  });
+});
