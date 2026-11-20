@@ -637,6 +637,28 @@ textarea {
   background: var(--color-blue-600-18);
 }
 
+/* ── Cross-reference inline decorations ── */
+/* Known labels look like a link; unknown sec/fig/tbl/eq labels get a wavy
+   warning underline. Both use only theme tokens. */
+.crossref-link {
+  color: var(--color-blue-600);
+  background: var(--color-blue-600-10);
+  border-radius: 4px;
+  padding: 0 4px;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.crossref-link:hover {
+  background: var(--color-blue-600-18);
+}
+
+.crossref-broken {
+  color: var(--color-error);
+  text-decoration: underline wavy var(--color-error);
+  text-underline-offset: 2px;
+}
+
 /* ── Reserved cross-reference prefix warning ── */
 .citation-crossref-warning {
   display: block;

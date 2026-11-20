@@ -111,10 +111,14 @@ export function shouldShowCitation(content: string | undefined): boolean {
 }
 
 /** Rebuild decorations based on current document and references. */
-function rebuildDecorations(view: EditorView, references: Reference[]) {
+function rebuildDecorations(
+  view: EditorView,
+  references: Reference[],
+  getCrossrefs: () => CrossrefLabel[],
+) {
   if (view.isDestroyed) return;
   citekeyMap.clear();
-  const decoSet = buildCitekeyDecorations(view.state.doc, references, citekeyMap);
+  const decoSet = buildCitekeyDecorations(view.state.doc, references, citekeyMap, getCrossrefs());
   const tr = view.state.tr.setMeta(citationPluginKey, {
     type: "SET_DECORATIONS",
     decorations: decoSet,
@@ -147,20 +151,20 @@ function createView(
   getCrossrefs: () => CrossrefLabel[],
 ) {
   return (view: EditorView) => {
-    loadReferences(workspace, bibPath, view);
+    loadReferences(workspace, bibPath, view, getCrossrefs);
     const dispatch = createDispatch(view);
     const { provider, root } = createSlashProviderConfig(dispatch, view, () => {
-      void loadReferences(workspace, bibPath, view);
+      void loadReferences(workspace, bibPath, view, getCrossrefs);
     }, getCrossrefs);
     const globalKeyHandler = createGlobalKeyHandler(view, dispatch);
     window.addEventListener("keydown", globalKeyHandler, { capture: true });
     const domHandlers = setupDOMHandlers(view);
-    const onDoiResolved = createDoiResolvedHandler(workspace, bibPath, view);
+    const onDoiResolved = createDoiResolvedHandler(workspace, bibPath, view, getCrossrefs);
     const updateDropdown = createUpdateDropdown(root, dispatch, view, onDoiResolved);
 
     setTimeout(() => {
       const ps = citationPluginKey.getState(view.state) as CitationPluginState | null;
-      if (ps?.citation.items) rebuildDecorations(view, ps.citation.items);
+      if (ps?.citation.items) rebuildDecorations(view, ps.citation.items, getCrossrefs);
     }, 0);
 
     return {
@@ -171,7 +175,7 @@ function createView(
         if (ps) updateDropdown(ps.citation);
         if (editorView.state.doc !== prevState.doc) {
           const citePs = citationPluginKey.getState(editorView.state) as CitationPluginState | null;
-          if (citePs?.citation.items) setTimeout(() => rebuildDecorations(editorView, citePs.citation.items), 0);
+          if (citePs?.citation.items) setTimeout(() => rebuildDecorations(editorView, citePs.citation.items, getCrossrefs), 0);
         }
       },
       destroy() {
@@ -241,10 +245,15 @@ function extractQueryFromEditor(view: EditorView, triggerFrom: number): string {
 }
 
 /** Create the onDoiResolved handler for DOI resolution flow. */
-function createDoiResolvedHandler(workspace: WorkspaceAdapter, bibPath: string, view: EditorView) {
+function createDoiResolvedHandler(
+  workspace: WorkspaceAdapter,
+  bibPath: string,
+  view: EditorView,
+  getCrossrefs: () => CrossrefLabel[],
+) {
   return async (bibtex: string) => {
     await appendReference(workspace, bibPath, bibtex);
-    await loadReferences(workspace, bibPath, view);
+    await loadReferences(workspace, bibPath, view, getCrossrefs);
   };
 }
 
@@ -258,13 +267,18 @@ function syncQueryFromEditor(editorView: EditorView, dispatch: (action: Citation
 }
 
 /** Load references from workspace and dispatch to state. */
-async function loadReferences(workspace: WorkspaceAdapter, bibPath: string, view: EditorView): Promise<void> {
+async function loadReferences(
+  workspace: WorkspaceAdapter,
+  bibPath: string,
+  view: EditorView,
+  getCrossrefs: () => CrossrefLabel[],
+): Promise<void> {
   try {
     const { items, error } = await readReferences(workspace, bibPath);
     if (view.isDestroyed) return;
     view.dispatch(view.state.tr.setMeta(citationPluginKey, { type: "SET_ITEMS", items, error }));
     if (error) return;
-    setTimeout(() => rebuildDecorations(view, items), 0);
+    setTimeout(() => rebuildDecorations(view, items, getCrossrefs), 0);
   } catch (err) {
     if (err instanceof DOMException && err.name === "InvalidStateError") return;
     throw err;
