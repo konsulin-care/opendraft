@@ -183,6 +183,24 @@ describe("CitekeyItem — layout and fallbacks", () => {
   });
 });
 
+describe("CitekeyItem — cross-reference prefix warning", () => {
+  it("shows the reserved-prefix warning for a cross-reference-shaped key", () => {
+    renderItem({ citeKey: "fig-smith" });
+    expect(
+      screen.getByText("Prefix reserved for Quarto cross-references"),
+    ).toBeDefined();
+    expect(document.querySelector(".citation-crossref-warning")).not.toBeNull();
+  });
+
+  it("shows no warning for a normal citation key", () => {
+    renderItem({ citeKey: "figueroa2020" });
+    expect(
+      screen.queryByText("Prefix reserved for Quarto cross-references"),
+    ).toBeNull();
+    expect(document.querySelector(".citation-crossref-warning")).toBeNull();
+  });
+});
+
 describe("CitekeyItem — body wrapper, two rows and selection", () => {
   it("renders one body wrapper whose rows carry the expected fields", () => {
     renderItem();

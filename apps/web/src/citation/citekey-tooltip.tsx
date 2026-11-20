@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { computePosition, flip, shift, offset } from '@floating-ui/dom';
+import { isCrossrefKey } from '@opendraft/manuscript';
 import type { Reference } from '@opendraft/references';
 import { formatAPA } from './apa-format';
+
+/** Warning shown when a citation key collides with a Quarto cross-reference prefix. */
+const CROSSREF_RESERVED_WARNING = 'Prefix reserved for Quarto cross-references';
 
 interface CitekeyTooltipProps {
   reference: Reference | null;
@@ -58,6 +62,11 @@ export function CitekeyTooltip({ reference, anchorEl }: CitekeyTooltipProps) {
       style={{ position: 'fixed' }}
     >
       {apaText}
+      {isCrossrefKey(reference.citeKey) && (
+        <div className="citation-crossref-warning">
+          {CROSSREF_RESERVED_WARNING}
+        </div>
+      )}
     </div>
   );
 }

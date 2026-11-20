@@ -61,6 +61,18 @@ describe('CitekeyTooltip — rendering', () => {
     document.body.removeChild(anchor);
   });
 
+  it('includes the reserved-prefix warning for cross-reference-shaped keys', async () => {
+    const anchor = createMockAnchor();
+    const crossrefRef: Reference = { ...mockRef, citeKey: 'thm-jones' };
+    await act(async () => {
+      render(<CitekeyTooltip reference={crossrefRef} anchorEl={anchor} onClose={() => {}} />);
+    });
+    const tooltip = screen.getByRole('tooltip');
+    expect(tooltip.textContent).toContain('Prefix reserved for Quarto cross-references');
+    expect(tooltip.querySelector('.citation-crossref-warning')).not.toBeNull();
+    document.body.removeChild(anchor);
+  });
+
   it('does not render when reference is null', () => {
     const anchor = createMockAnchor();
     const { container } = render(

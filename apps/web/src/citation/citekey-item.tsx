@@ -1,4 +1,9 @@
+import { isCrossrefKey } from "@opendraft/manuscript";
 import type { CitationState } from "./types";
+
+/** Warning shown when a citation key collides with a Quarto cross-reference prefix. */
+export const CROSSREF_RESERVED_WARNING =
+  "Prefix reserved for Quarto cross-references";
 
 /**
  * Extract first author from BibTeX `author` field.
@@ -80,6 +85,11 @@ export function CitekeyItem({ item, isActive, onSelect }: CitekeyItemProps) {
             </span>
           )}
         </div>
+        {isCrossrefKey(item.citeKey) && (
+          <span className="citation-crossref-warning">
+            {CROSSREF_RESERVED_WARNING}
+          </span>
+        )}
       </div>
     </li>
   );

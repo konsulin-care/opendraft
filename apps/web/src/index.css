@@ -637,6 +637,15 @@ textarea {
   background: var(--color-blue-600-18);
 }
 
+/* ── Reserved cross-reference prefix warning ── */
+.citation-crossref-warning {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-amber-800);
+  font-size: 0.7rem;
+  line-height: 1.3;
+}
+
 /* ── Citekey hover tooltip ── */
 .citekey-tooltip {
   position: fixed;
