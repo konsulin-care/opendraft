@@ -57,7 +57,7 @@ describe('CitekeyTooltip — rendering', () => {
     const tooltip = screen.getByRole('tooltip');
     expect(tooltip.textContent).toContain('Smith, J.');
     expect(tooltip.textContent).toContain('2024');
-    expect(tooltip.textContent).toContain('A Test Article');
+    expect(tooltip.textContent).toContain('A test article');
     document.body.removeChild(anchor);
   });
 
