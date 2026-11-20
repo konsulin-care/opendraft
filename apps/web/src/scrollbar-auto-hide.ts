@@ -21,6 +21,9 @@ export const SCROLL_IDLE_MS = 800;
 /** Attribute (and value) that reveals the scrollbar of a scroll container. */
 const SCROLLING_ATTRIBUTE = 'data-scrolling';
 
+/** Live installations, so repeated installs share one listener per document. */
+const INSTALLATIONS = new WeakMap<Document, () => void>();
+
 /**
  * Resolve the element whose scrollbar should be revealed for a scroll event.
  *
@@ -43,13 +46,14 @@ function resolveScrolledElement(doc: Document, target: EventTarget | null): Elem
 }
 
 /**
- * Reveal scrollbars while the document is being scrolled, auto-hiding each
- * container's scrollbar {@link SCROLL_IDLE_MS} after its last scroll event.
+ * Track `data-scrolling` marks and their idle timers for every scrolled element.
  *
- * @param doc - Document to observe, defaults to the global document.
- * @returns Disposer that removes the listener and clears pending timers.
+ * @returns Handlers to reveal a container's scrollbar and to clear all marks.
  */
-export function installScrollbarAutoHide(doc: Document = document): () => void {
+function createScrollingMarks(): {
+  mark: (element: Element) => void;
+  clearAll: () => void;
+} {
   const timers = new WeakMap<Element, ReturnType<typeof setTimeout>>();
   const pending = new Set<Element>();
 
@@ -78,20 +82,46 @@ export function installScrollbarAutoHide(doc: Document = document): () => void {
     );
   };
 
-  const handleScroll = (event: Event): void => {
-    const element = resolveScrolledElement(doc, event.target);
-    if (element) {
-      mark(element);
-    }
-  };
-
-  doc.addEventListener('scroll', handleScroll, { capture: true, passive: true });
-
-  return () => {
-    doc.removeEventListener('scroll', handleScroll, { capture: true });
+  const clearAll = (): void => {
     for (const element of pending) {
       hide(element);
     }
     pending.clear();
   };
+
+  return { mark, clearAll };
+}
+
+/**
+ * Reveal scrollbars while the document is being scrolled, auto-hiding each
+ * container's scrollbar {@link SCROLL_IDLE_MS} after its last scroll event.
+ *
+ * @param doc - Document to observe, defaults to the global document.
+ * @returns Disposer that removes the listener and clears pending timers. Calling
+ * the disposer twice is safe, and installing again afterwards re-registers.
+ */
+export function installScrollbarAutoHide(doc: Document = document): () => void {
+  const existing = INSTALLATIONS.get(doc);
+  if (existing) {
+    return existing;
+  }
+
+  const marks = createScrollingMarks();
+
+  const handleScroll = (event: Event): void => {
+    const element = resolveScrolledElement(doc, event.target);
+    if (element) {
+      marks.mark(element);
+    }
+  };
+
+  const disposer = (): void => {
+    doc.removeEventListener('scroll', handleScroll, { capture: true });
+    marks.clearAll();
+    INSTALLATIONS.delete(doc);
+  };
+
+  doc.addEventListener('scroll', handleScroll, { capture: true, passive: true });
+  INSTALLATIONS.set(doc, disposer);
+  return disposer;
 }

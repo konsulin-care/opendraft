@@ -53,6 +53,32 @@ describe('scrollbar auto-hide — idle timeout', () => {
   });
 });
 
+describe('scrollbar auto-hide — install lifecycle', () => {
+  it('registers a single scroll listener when installed twice', () => {
+    const addListener = vi.spyOn(document, 'addEventListener');
+    const first = installScrollbarAutoHide(document);
+    const second = installScrollbarAutoHide(document);
+    dispose = first;
+
+    const scrollListeners = addListener.mock.calls.filter(([type]) => type === 'scroll');
+    expect(scrollListeners).toHaveLength(1);
+    expect(second).toBe(first);
+
+    addListener.mockRestore();
+  });
+
+  it('stops marking elements once the disposer ran', () => {
+    const disposer = installScrollbarAutoHide(document);
+    const scroller = document.createElement('div');
+    document.body.appendChild(scroller);
+
+    disposer();
+    scroll(scroller);
+
+    expect(scroller.hasAttribute('data-scrolling')).toBe(false);
+  });
+});
+
 describe('scrollbar auto-hide — per-element timers', () => {
   it('clears each scroll container independently', () => {
     dispose = installScrollbarAutoHide(document);
