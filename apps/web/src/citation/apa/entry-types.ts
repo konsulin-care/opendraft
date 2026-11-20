@@ -1,5 +1,6 @@
 import { cleanLatex } from './latex';
 import { parseName, splitNames } from './names';
+import { detectPreprint } from './preprint';
 
 /** Characters that carry meaning in markdown and must be escaped in text. */
 const MARKDOWN_SPECIAL = /[\\*_[\]`~^<>]/g;
@@ -192,6 +193,35 @@ function formatBook(
 }
 
 /**
+ * Render a preprint, or a generic online source when no preprint is detected.
+ *
+ * Preprints use the bracketed [Preprint] marker and the detected server. Other
+ * entries use the title followed by the first available source field.
+ */
+function formatPreprint(
+  fields: Readonly<Record<string, string>>,
+  title: string,
+): EntryParts {
+  const preprint = detectPreprint(fields);
+  if (preprint) {
+    return {
+      title: title ? `*${title}* [Preprint].` : '',
+      rest: preprint.server ? `${escapeMarkdown(preprint.server)}.` : '',
+    };
+  }
+
+  const source =
+    fields.howpublished?.trim() ||
+    fields.publisher?.trim() ||
+    fields.organization?.trim() ||
+    '';
+  return {
+    title: title ? `*${title}*.` : '',
+    rest: source ? `${escapeMarkdown(cleanLatex(source))}.` : '',
+  };
+}
+
+/**
  * Formatter map keyed by BibTeX entry type.
  *
  * Unknown entry types fall back to the book formatter.
@@ -206,4 +236,9 @@ export const ENTRY_FORMATTERS: Record<string, EntryFormatter> = {
   phdthesis: thesisFormatter('Doctoral dissertation'),
   mastersthesis: thesisFormatter("Master's thesis"),
   techreport: formatTechReport,
+  misc: formatPreprint,
+  online: formatPreprint,
+  electronic: formatPreprint,
+  unpublished: formatPreprint,
+  preprint: formatPreprint,
 };
