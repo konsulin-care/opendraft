@@ -55,3 +55,25 @@ describe('scrollbar.css — revealed while scrolling', () => {
     expect(css).not.toMatch(/\brgba?\(/);
   });
 });
+
+describe('scrollbar.css — fallbacks', () => {
+  const REDUCED_MOTION = '@media (prefers-reduced-motion: reduce)';
+  const webkit = css.slice(
+    css.indexOf('@supports not (scrollbar-color: auto)'),
+    css.indexOf(REDUCED_MOTION),
+  );
+
+  it('styles the WebKit pseudo-elements when scrollbar-color is unsupported', () => {
+    expect(webkit).not.toBe('');
+    expect(webkit).toMatch(/::-webkit-scrollbar\s*\{[^}]*background:\s*transparent/);
+    expect(webkit).toMatch(
+      /::-webkit-scrollbar-thumb\s*\{[^}]*background-color:\s*var\(--scrollbar-thumb\)/,
+    );
+  });
+
+  it('disables the fade under prefers-reduced-motion: reduce', () => {
+    expect(css).toContain(REDUCED_MOTION);
+    const reduced = css.slice(css.indexOf(REDUCED_MOTION));
+    expect(reduced).toMatch(/transition:\s*none/);
+  });
+});

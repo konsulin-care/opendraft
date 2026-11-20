@@ -14,6 +14,11 @@
  * here. The `@property` registration must stay outside the layer: it makes
  * `--scrollbar-thumb` animatable in browsers that support registered
  * properties.
+ *
+ * Browsers without `scrollbar-color` support (Safari) style the scrollbar
+ * through the `::-webkit-scrollbar` pseudo-elements instead. They must be
+ * gated: Chrome ignores those pseudo-elements as soon as `scrollbar-color` is
+ * set, so the fallback only applies where `scrollbar-color` is unsupported.
  */
 
 @property --scrollbar-thumb {
@@ -33,5 +38,28 @@
   [data-scrolling] {
     --scrollbar-thumb: var(--color-outline);
     transition-duration: 0ms;
+  }
+
+  @supports not (scrollbar-color: auto) {
+    *::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+      background: transparent;
+    }
+
+    *::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    *::-webkit-scrollbar-thumb {
+      background-color: var(--scrollbar-thumb);
+      border-radius: 4px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      transition: none;
+    }
   }
 }
