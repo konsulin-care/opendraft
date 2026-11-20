@@ -1,4 +1,5 @@
 import type { Reference } from '@opendraft/references';
+import { cleanLatex } from './apa/latex';
 
 /**
  * Filter citekeys by query string.
@@ -19,12 +20,12 @@ export function filterCitekeys(items: Reference[], query: string): Reference[] {
     // Match against citekey
     if (item.citeKey.toLowerCase().includes(lowerQuery)) return true;
 
-    // Match against author field
-    const author = item.fields.author ?? '';
+    // Match against cleaned author field
+    const author = cleanLatex(item.fields.author ?? '');
     if (author.toLowerCase().includes(lowerQuery)) return true;
 
-    // Match against title field
-    const title = item.fields.title ?? '';
+    // Match against cleaned title field
+    const title = cleanLatex(item.fields.title ?? '');
     if (title.toLowerCase().includes(lowerQuery)) return true;
 
     return false;
