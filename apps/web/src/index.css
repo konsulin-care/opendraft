@@ -431,6 +431,71 @@ textarea {
   cursor: pointer;
 }
 
+/* Group heading above each suggestion group (Cross-references / Citations). */
+.milkdown .citation-group-heading {
+  padding: 4px 16px;
+  color: var(--color-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ── Cross-reference item ── */
+/* Single column body; min-width 0 lets the rows ellipsize inside the menu. */
+.milkdown .crossref-item-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+/* Row 1: kind badge, label id, and the file name pushed right. */
+.milkdown .crossref-line-1 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.milkdown .crossref-kind {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border: 1px solid var(--color-outline);
+  border-radius: 4px;
+  color: var(--color-muted);
+  font-size: 0.7rem;
+}
+
+.milkdown .crossref-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--crepe-font-code);
+  font-size: 0.8rem;
+}
+
+.milkdown .crossref-file {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--color-muted);
+  font-size: 0.7rem;
+}
+
+/* Row 2: caption (wraps instead of widening the menu). */
+.milkdown .crossref-line-2 {
+  min-width: 0;
+  margin-top: 2px;
+}
+
+.milkdown .crossref-caption {
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 /* ── DOI input ── */
 /* Pin the citation dropdown (citekey list and DOI mode) to exactly
    380px so the DOI field matches the menu width. */
