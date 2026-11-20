@@ -90,6 +90,53 @@ describe('CitekeyTooltip — rendering', () => {
   });
 });
 
+describe('CitekeyTooltip — inline markdown rendering', () => {
+  it('renders a book title inside an em element without asterisks', async () => {
+    const anchor = createMockAnchor();
+    const bookRef: Reference = {
+      citeKey: 'doe2020',
+      entryType: 'book',
+      fields: {
+        author: 'Doe, Jane',
+        year: '2020',
+        title: 'A Book Title',
+        publisher: 'Example Press',
+      },
+    };
+    await act(async () => {
+      render(<CitekeyTooltip reference={bookRef} anchorEl={anchor} onClose={() => {}} />);
+    });
+    const tooltip = screen.getByRole('tooltip');
+    const emphasis = tooltip.querySelector('em');
+    expect(emphasis).not.toBeNull();
+    expect(emphasis!.textContent).toContain('A book title');
+    expect(tooltip.textContent).not.toContain('*');
+    document.body.removeChild(anchor);
+  });
+
+  it('renders a brace-wrapped group author without braces', async () => {
+    const anchor = createMockAnchor();
+    const groupRef: Reference = {
+      citeKey: 'mindkind2022',
+      entryType: 'article',
+      fields: {
+        author: '{MindKind Consortium}',
+        year: '2022',
+        title: 'A Study',
+        journal: 'Test Journal',
+      },
+    };
+    await act(async () => {
+      render(<CitekeyTooltip reference={groupRef} anchorEl={anchor} onClose={() => {}} />);
+    });
+    const tooltip = screen.getByRole('tooltip');
+    expect(tooltip.textContent).toContain('MindKind Consortium. (2022).');
+    expect(tooltip.textContent).not.toContain('{');
+    expect(tooltip.textContent).not.toContain('}');
+    document.body.removeChild(anchor);
+  });
+});
+
 describe('CitekeyTooltip — Floating UI positioning', () => {
   it('calls computePosition with correct middleware', async () => {
     const anchor = createMockAnchor();
