@@ -13,6 +13,8 @@ export type { NormalizeBlockFilesResult } from './normalize.js';
 export { extractCitekeys } from './citekeys.js';
 export { countSectionRefs, rewriteSectionRefs } from './section-refs.js';
 export { isCrossrefKey, QUARTO_CROSSREF_PREFIXES } from './crossref-prefixes.js';
+export { extractCrossrefLabels } from './crossref-labels.js';
+export type { CrossrefKind, CrossrefLabel } from './crossref-labels.js';
 export { joinHeading, retitleHeading, splitHeading } from './heading.js';
 export type { BlockHeading, SplitHeading } from './heading.js';
 export {
