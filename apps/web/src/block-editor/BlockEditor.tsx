@@ -20,6 +20,8 @@ import { useBlocks } from './use-blocks';
 import type { BlockEntry } from './use-blocks';
 import { useCollapseState } from './use-collapse-state';
 import { requestFocusForShort } from '../caret-mode-switch';
+import { useCrossrefIndex } from '../crossref/use-crossref-index';
+import type { CrossrefIndexHandle } from '../crossref/use-crossref-index';
 
 /** Props for {@link BlockEditor}. */
 export interface BlockEditorProps {
@@ -147,6 +149,8 @@ interface BlockRowProps {
   dir: string;
   /** Resolved block file name, forwarded to the body. */
   file: string;
+  /** Cross-reference index shared with every block body. */
+  crossrefs: CrossrefIndexHandle;
   /** Flip the collapsed state. */
   onToggle: () => void;
   /** Open the delete confirmation for this block. */
@@ -175,6 +179,7 @@ function BlockRow({
   ws,
   dir,
   file,
+  crossrefs,
   onToggle,
   onOverflow,
   onAdd,
@@ -205,6 +210,7 @@ function BlockRow({
           dir={dir}
           short={block.short}
           file={file}
+          crossrefs={crossrefs}
           title={block.title}
           collapsed={collapsed}
           onWordCount={setWordCount}
@@ -229,6 +235,7 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
   const { loading, blocks, createBlock, deleteBlock, setTitle } = useBlocks(ws, dir);
   const shorts = blocks.map((block) => block.short);
   const files = useBlockFiles(ws, dir, shorts);
+  const crossrefs = useCrossrefIndex(ws, dir, shorts);
   const { isCollapsed, toggle } = useCollapseState(projectKey, shorts);
   const [addingAt, setAddingAt] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<DeleteTarget | null>(null);
@@ -253,6 +260,7 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
           key={block.short} block={block} formOpen={addingAt === index}
           collapsed={isCollapsed(block.short)} ws={ws} dir={dir}
           file={files[block.short] ?? blockFileName(block.short)}
+          crossrefs={crossrefs}
           onToggle={() => toggle(block.short)} onOverflow={() => openDelete(block)}
           onAdd={() => setAddingAt(index)} onCreate={createAt(index)}
           onClose={closeForm} onTitleSave={titleSaver(block.short, setTitle)}
