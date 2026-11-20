@@ -11,12 +11,29 @@ import type { CitationTrigger } from './types';
  * @returns True when inside an unclosed bracket group.
  */
 function insideBracketGroup(textBefore: string): boolean {
+  return openBracketIndex(textBefore) !== -1;
+}
+
+/**
+ * Index of the last unclosed `[` in the text, or -1 when none is open.
+ *
+ * @param textBefore - Text preceding the @ character.
+ * @returns Index of the unclosed bracket, or -1.
+ */
+function openBracketIndex(textBefore: string): number {
   let depth = 0;
-  for (const char of textBefore) {
-    if (char === '[') depth += 1;
-    else if (char === ']' && depth > 0) depth -= 1;
+  let openIndex = -1;
+  for (let i = 0; i < textBefore.length; i += 1) {
+    const char = textBefore[i];
+    if (char === '[') {
+      depth += 1;
+      openIndex = i;
+    } else if (char === ']' && depth > 0) {
+      depth -= 1;
+      if (depth === 0) openIndex = -1;
+    }
   }
-  return depth > 0;
+  return depth > 0 ? openIndex : -1;
 }
 
 /**
@@ -47,11 +64,16 @@ export function matchCitationTrigger(text: string): CitationTrigger | null {
   }
 
   // Bracketed mode: directly after [, or a later @ inside an unclosed group.
-  const bracketed =
-    (atPos > 0 && text[atPos - 1] === '[') || insideBracketGroup(text.slice(0, atPos));
+  const textBefore = text.slice(0, atPos);
+  const bracketed = (atPos > 0 && text[atPos - 1] === '[') || insideBracketGroup(textBefore);
+
+  // Grouped: the unclosed bracket already holds an earlier @ key.
+  const openIndex = bracketed ? openBracketIndex(textBefore) : -1;
+  const grouped = openIndex !== -1 && textBefore.slice(openIndex + 1).includes('@');
 
   return {
     from: atPos,
     bracketed,
+    grouped,
   };
 }

@@ -10,54 +10,54 @@ function countChar(text: string, char: string): number {
 describe('matchCitationTrigger - positive cases', () => {
   it('matches @ at start of line', () => {
     const result = matchCitationTrigger('@');
-    expect(result).toEqual({ from: 0, bracketed: false });
+    expect(result).toEqual({ from: 0, bracketed: false, grouped: false });
   });
 
   it('matches @ after whitespace', () => {
     const result = matchCitationTrigger('text @');
-    expect(result).toEqual({ from: 5, bracketed: false });
+    expect(result).toEqual({ from: 5, bracketed: false, grouped: false });
   });
 
   it('matches @ after tab', () => {
     const result = matchCitationTrigger('text\t@');
-    expect(result).toEqual({ from: 5, bracketed: false });
+    expect(result).toEqual({ from: 5, bracketed: false, grouped: false });
   });
 
   it('matches [@ for bracketed mode', () => {
     const result = matchCitationTrigger('[@');
-    expect(result).toEqual({ from: 1, bracketed: true });
+    expect(result).toEqual({ from: 1, bracketed: true, grouped: false });
   });
 
   it('matches [@ after whitespace', () => {
     const result = matchCitationTrigger('text [@');
-    expect(result).toEqual({ from: 6, bracketed: true });
+    expect(result).toEqual({ from: 6, bracketed: true, grouped: false });
   });
 
   it('matches @ after closing bracket', () => {
     const result = matchCitationTrigger(']@');
-    expect(result).toEqual({ from: 1, bracketed: false });
+    expect(result).toEqual({ from: 1, bracketed: false, grouped: false });
   });
 
   it('matches @ after punctuation', () => {
     const result = matchCitationTrigger('.@');
-    expect(result).toEqual({ from: 1, bracketed: false });
+    expect(result).toEqual({ from: 1, bracketed: false, grouped: false });
   });
 });
 
 describe('matchCitationTrigger - multiple citations in one bracket group', () => {
   it('treats the second @ in "[@a; @" as bracketed', () => {
     const result = matchCitationTrigger('[@a; @');
-    expect(result).toEqual({ from: 5, bracketed: true });
+    expect(result).toEqual({ from: 5, bracketed: true, grouped: true });
   });
 
   it('treats @ in "[@a;  @" (extra space) as bracketed', () => {
     const result = matchCitationTrigger('[@a;  @');
-    expect(result).toEqual({ from: 6, bracketed: true });
+    expect(result).toEqual({ from: 6, bracketed: true, grouped: true });
   });
 
   it('does NOT treat @ as bracketed after the group is closed', () => {
     const result = matchCitationTrigger('[@a] @');
-    expect(result).toEqual({ from: 5, bracketed: false });
+    expect(result).toEqual({ from: 5, bracketed: false, grouped: false });
   });
 
   it('picking b in "[@a; @b]" (] after cursor) yields exactly one ]', () => {

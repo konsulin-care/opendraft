@@ -14,6 +14,7 @@ export function createInitialState(): CitationState {
     comparison: null,
     error: null,
     loadError: null,
+    crossrefs: [],
   };
 }
 
@@ -59,6 +60,9 @@ function handleQueryItems(state: CitationState, action: CitationAction): Citatio
   }
   if (action.type === 'SET_ITEMS') {
     return { ...state, items: action.items, loadError: action.error ?? null };
+  }
+  if (action.type === 'SET_CROSSREFS') {
+    return { ...state, crossrefs: action.crossrefs };
   }
   return null;
 }
