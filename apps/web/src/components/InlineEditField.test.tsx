@@ -143,6 +143,38 @@ describe('InlineEditField commits a value once', () => {
   });
 });
 
+describe('InlineEditField external value changes', () => {
+  it('adopts a new value when the field holds no unsaved typing', () => {
+    const { rerender } = renderField();
+    const input = screen.getByRole('textbox', { name: 'Test field' }) as HTMLInputElement;
+    rerender(<InlineEditField value="Renamed Project" label="Test field" />);
+    expect(input.value).toBe('Renamed Project');
+  });
+
+  it('keeps unsaved typing when the value changes, and saves the typed text', () => {
+    const onSave = vi.fn();
+    const { rerender } = renderField({ onSave });
+    const input = screen.getByRole('textbox', { name: 'Test field' }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'My edit' } });
+    rerender(<InlineEditField value="Server Title" label="Test field" onSave={onSave} />);
+    expect(input.value).toBe('My edit');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave).toHaveBeenCalledWith('My edit');
+  });
+
+  it('restores the new external value on Escape without saving', () => {
+    const onSave = vi.fn();
+    const { rerender } = renderField({ onSave });
+    const input = screen.getByRole('textbox', { name: 'Test field' }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'My edit' } });
+    rerender(<InlineEditField value="Server Title" label="Test field" onSave={onSave} />);
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(input.value).toBe('Server Title');
+    expect(onSave).not.toHaveBeenCalled();
+  });
+});
+
 describe('InlineEditField typography', () => {
   /** Read the rendered input's class list as discrete tokens. */
   function inputClasses() {
