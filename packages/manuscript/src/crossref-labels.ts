@@ -8,6 +8,7 @@
  */
 
 import { blankCode } from './code-segments.js';
+import { extractExtraCrossrefLabels } from './crossref-label-extras.js';
 
 /** The cross-reference kinds the `@` autocomplete understands. */
 export type CrossrefKind = 'sec' | 'fig' | 'tbl' | 'eq';
@@ -165,6 +166,8 @@ export function extractCrossrefLabels(markdown: string, file: string): CrossrefL
     }
     offset += line.length + 1;
   }
+
+  found.push(...extractExtraCrossrefLabels(markdown, file));
 
   return found
     .sort((left, right) => left.index - right.index)

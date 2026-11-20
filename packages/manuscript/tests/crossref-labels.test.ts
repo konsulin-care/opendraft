@@ -64,3 +64,63 @@ describe('extractCrossrefLabels', () => {
     ]);
   });
 });
+
+describe('extractCrossrefLabels table and math extras', () => {
+  it('extracts a tbl label with its caption from a pipe-table caption line', () => {
+    const markdown = [
+      '| a | b |',
+      '|---|---|',
+      '| 1 | 2 |',
+      '',
+      ': Results {#tbl-res}',
+    ].join('\n');
+
+    expect(extractCrossrefLabels(markdown, 'tables.qmd')).toEqual([
+      { id: 'tbl-res', kind: 'tbl', caption: 'Results', file: 'tables.qmd' },
+    ]);
+  });
+
+  it('extracts eq labels from single-line and multi-line display math', () => {
+    const markdown = [
+      '$$ E=mc^2 $$ {#eq-single}',
+      '',
+      '$$',
+      'a = b',
+      '$$',
+      '{#eq-multi}',
+    ].join('\n');
+
+    expect(extractCrossrefLabels(markdown, 'math.qmd')).toEqual([
+      { id: 'eq-single', kind: 'eq', caption: 'E=mc^2', file: 'math.qmd' },
+      { id: 'eq-multi', kind: 'eq', caption: 'a = b', file: 'math.qmd' },
+    ]);
+  });
+});
+
+describe('extractCrossrefLabels chunk extras', () => {
+  it('extracts fig and tbl labels from executable chunk options', () => {
+    const markdown = [
+      '```{r}',
+      '#| label: fig-plot',
+      '#| fig-cap: "A plot"',
+      'plot(1)',
+      '```',
+      '',
+      '```{r}',
+      '#| label: tbl-data',
+      "#| tbl-cap: 'A table'",
+      'table(1)',
+      '```',
+      '',
+      '```',
+      '#| label: fig-ignored',
+      '#| fig-cap: "Nope"',
+      '```',
+    ].join('\n');
+
+    expect(extractCrossrefLabels(markdown, 'chunks.qmd')).toEqual([
+      { id: 'fig-plot', kind: 'fig', caption: 'A plot', file: 'chunks.qmd' },
+      { id: 'tbl-data', kind: 'tbl', caption: 'A table', file: 'chunks.qmd' },
+    ]);
+  });
+});
