@@ -1,5 +1,6 @@
 @import "@milkdown/crepe/theme/common/style.css";
 @import "@milkdown/crepe/theme/classic.css";
+@import "./scrollbar.css";
 
 /* ── Palette: monochrome + error red ── */
 .milkdown {
