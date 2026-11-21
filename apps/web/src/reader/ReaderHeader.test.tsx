@@ -46,4 +46,18 @@ describe('ReaderHeader', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(onLogout).toHaveBeenCalledTimes(1);
   });
+
+  it('renders no sign-in or install links when login is disabled', () => {
+    render(
+      <ReaderHeader
+        session={null}
+        returnTo={RETURN_TO}
+        onLogout={vi.fn()}
+        loginEnabled={false}
+      />,
+    );
+
+    expect(screen.queryByRole('link', { name: 'Sign in with GitHub' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Install OpenDraft' })).toBeNull();
+  });
 });

@@ -20,6 +20,8 @@ export interface ConvertPanelProps {
   returnTo: string;
   /** Start the conversion and resolve with its PR or compare result. */
   convert: () => Promise<ConvertResult>;
+  /** Whether GitHub login is configured; defaults to true. */
+  loginEnabled?: boolean;
 }
 
 /** Read a human-readable message from an unknown thrown value. */
@@ -82,7 +84,12 @@ function ConvertOutcome({ result, error }: { result: ConvertResult | null; error
  * @param props - See {@link ConvertPanelProps}.
  * @returns The panel with a sign-in link or the conversion controls.
  */
-export function ConvertPanel({ session, returnTo, convert }: ConvertPanelProps) {
+export function ConvertPanel({
+  session,
+  returnTo,
+  convert,
+  loginEnabled = true,
+}: ConvertPanelProps) {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<ConvertResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -104,7 +111,11 @@ export function ConvertPanel({ session, returnTo, convert }: ConvertPanelProps) 
   return (
     <section className="flex flex-col gap-3 rounded-md border border-outline p-4">
       <p className="text-sm text-black">This repository is not an OpenDraft project yet.</p>
-      {session === null ? (
+      {!loginEnabled ? (
+        <p className="text-sm text-muted">
+          Conversion needs the GitHub app configured on this server.
+        </p>
+      ) : session === null ? (
         <SignInLink returnTo={returnTo} />
       ) : (
         <div className="flex flex-col gap-2">

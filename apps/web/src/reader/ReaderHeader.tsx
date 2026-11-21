@@ -17,6 +17,8 @@ export interface ReaderHeaderProps {
   returnTo: string;
   /** Sign-out handler invoked when the session owner clicks `Sign out`. */
   onLogout: () => void;
+  /** Whether GitHub login is configured; defaults to true. */
+  loginEnabled?: boolean;
 }
 
 /**
@@ -25,11 +27,16 @@ export interface ReaderHeaderProps {
  * @param props - See {@link ReaderHeaderProps}.
  * @returns A header with either anonymous links or the signed-in identity.
  */
-export function ReaderHeader({ session, returnTo, onLogout }: ReaderHeaderProps) {
+export function ReaderHeader({
+  session,
+  returnTo,
+  onLogout,
+  loginEnabled = true,
+}: ReaderHeaderProps) {
   return (
     <header className="flex items-center justify-between gap-4 border-b border-outline px-4 py-3">
       <span className="text-sm font-semibold text-black">OpenDraft</span>
-      {session === null ? (
+      {!loginEnabled ? null : session === null ? (
         <nav className="flex items-center gap-3">
           <a
             href={loginUrl(returnTo)}

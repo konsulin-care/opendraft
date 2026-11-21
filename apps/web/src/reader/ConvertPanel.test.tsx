@@ -36,6 +36,25 @@ describe('ConvertPanel anonymous', () => {
     );
     expect(screen.queryByRole('button', { name: 'Convert to OpenDraft' })).toBeNull();
   });
+
+  it('shows the disabled note and no sign-in link when login is disabled', () => {
+    render(
+      <ConvertPanel
+        session={null}
+        returnTo={RETURN_TO}
+        convert={vi.fn()}
+        loginEnabled={false}
+      />,
+    );
+
+    expect(
+      screen.getByText('Conversion needs the GitHub app configured on this server.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Sign in with GitHub to convert' }),
+    ).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Convert to OpenDraft' })).toBeNull();
+  });
 });
 
 describe('ConvertPanel signed in', () => {
