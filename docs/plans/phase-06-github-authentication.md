@@ -12,10 +12,12 @@ Create the OpenDraft GitHub App.
 
 ### Definition of Done
 
-- [ ] App has documented permissions.
-- [ ] App has configured callback URL.
-- [ ] App has secure private key storage.
-- [ ] App has development and production configuration separation.
+- [x] App has documented permissions (see `docs/github-app.md`).
+- [x] App has configured callback URL (production and development).
+- [x] No private key is generated or stored at runtime; user access tokens are
+      used instead. The future private-key procedure is documented for when a
+      feature needs installation tokens.
+- [x] App has development and production configuration separation (two apps).
 
 ---
 
@@ -27,8 +29,10 @@ Request only permissions required for normal repository operation.
 
 ### Definition of Done
 
-- [ ] Permissions are documented and reviewed.
-- [ ] No unnecessary administrative permission is requested for normal operation.
+- [x] Permissions are documented and reviewed (`docs/github-app.md`).
+- [x] No unnecessary administrative permission is requested for normal operation
+      (no account permissions; repository creation replaces Administration
+      read/write where available).
 
 ---
 
@@ -40,9 +44,9 @@ Allow users to install OpenDraft on selected repositories.
 
 ### Definition of Done
 
-- [ ] User can start authorization.
-- [ ] User can select account/repositories.
-- [ ] User can return to OpenDraft.
+- [x] User can start authorization (`/@api/auth/install`).
+- [x] User can select account/repositories (GitHub installation page).
+- [x] User can return to OpenDraft (sealed `returnTo` path).
 - [ ] User can identify the installation.
 - [ ] User can access authorized repository operations.
 
@@ -56,6 +60,7 @@ Implement user authorization for operations that require acting as the user.
 
 ### Definition of Done
 
-- [ ] User can authorize OpenDraft through GitHub.
-- [ ] Authorization code exchange occurs through the BFF.
-- [ ] Client secrets/private keys never reach the browser.
+- [x] User can authorize OpenDraft through GitHub (`/@api/auth/login`).
+- [x] Authorization code exchange occurs through the BFF (state + PKCE + client
+      secret).
+- [x] Client secrets/private keys never reach the browser.
