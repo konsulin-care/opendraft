@@ -34,24 +34,93 @@ func requiredEnv() map[string]string {
 	return env
 }
 
-// TestLoadReportsEveryMissingRequiredVariable asserts that one error names all
-// required variables when none are configured.
-func TestLoadReportsEveryMissingRequiredVariable(t *testing.T) {
-	_, err := Load(fakeEnv(nil), nil)
-	if err == nil {
-		t.Fatal("Load returned nil error for empty environment")
+// TestLoadAllowsAnonymousMode asserts that only BFF_PUBLIC_ORIGIN is always
+// required and that an anonymous configuration has no session key.
+func TestLoadAllowsAnonymousMode(t *testing.T) {
+	cfg, err := Load(fakeEnv(map[string]string{
+		"BFF_PUBLIC_ORIGIN": "https://publish.example.test",
+	}), nil)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
 	}
-	message := err.Error()
-	for _, name := range []string{
-		"BFF_PUBLIC_ORIGIN",
-		"BFF_GITHUB_CLIENT_ID",
-		"BFF_GITHUB_CLIENT_SECRET",
-		"BFF_GITHUB_APP_SLUG",
-		"BFF_SESSION_KEY",
-	} {
-		if !strings.Contains(message, name) {
-			t.Errorf("error %q does not name missing variable %s", message, name)
+	if cfg.LoginEnabled {
+		t.Error("LoginEnabled = true, want false")
+	}
+	if len(cfg.SessionKey) != 0 {
+		t.Errorf("SessionKey = %v, want empty", cfg.SessionKey)
+	}
+}
+
+// TestLoadReportsPartialCredentials asserts that a partial credential set
+// fails and names only the variables that are left unset.
+func TestLoadReportsPartialCredentials(t *testing.T) {
+	t.Run("only client id", func(t *testing.T) {
+		env := map[string]string{
+			"BFF_PUBLIC_ORIGIN": "https://publish.example.test",
 		}
+		env["BFF_GITHUB_CLIENT_ID"] = "client-id"
+		env["BFF_SESSION_KEY_PREVIOUS"] = validSessionKey(3)
+		_, err := Load(fakeEnv(env), nil)
+		if err == nil {
+			t.Fatal("Load returned nil error for partial credentials")
+		}
+		message := err.Error()
+		for _, name := range []string{"BFF_GITHUB_CLIENT_SECRET", "BFF_GITHUB_APP_SLUG"} {
+			if !strings.Contains(message, name) {
+				t.Errorf("error %q does not name missing variable %s", message, name)
+			}
+		}
+		for _, name := range []string{"BFF_GITHUB_CLIENT_ID", "BFF_PUBLIC_ORIGIN", "BFF_SESSION_KEY"} {
+			if strings.Contains(message, name) {
+				t.Errorf("error %q unexpectedly names configured variable %s", message, name)
+			}
+		}
+	})
+
+	t.Run("secret and slug", func(t *testing.T) {
+		env := map[string]string{
+			"BFF_PUBLIC_ORIGIN": "https://publish.example.test",
+		}
+		env["BFF_GITHUB_CLIENT_SECRET"] = "client-secret"
+		env["BFF_GITHUB_APP_SLUG"] = "opendraft"
+		_, err := Load(fakeEnv(env), nil)
+		if err == nil {
+			t.Fatal("Load returned nil error for partial credentials")
+		}
+		message := err.Error()
+		if !strings.Contains(message, "BFF_GITHUB_CLIENT_ID") {
+			t.Errorf("error %q does not name missing variable BFF_GITHUB_CLIENT_ID", message)
+		}
+		for _, name := range []string{"BFF_GITHUB_CLIENT_SECRET", "BFF_GITHUB_APP_SLUG", "BFF_SESSION_KEY"} {
+			if strings.Contains(message, name) {
+				t.Errorf("error %q unexpectedly names variable %s", message, name)
+			}
+		}
+	})
+}
+
+// TestLoadRequiresSessionKeyWhenLoginEnabled asserts that complete credentials
+// enable login and require a valid session key.
+func TestLoadRequiresSessionKeyWhenLoginEnabled(t *testing.T) {
+	env := requiredEnv()
+	delete(env, "BFF_SESSION_KEY")
+	_, err := Load(fakeEnv(env), nil)
+	if err == nil {
+		t.Fatal("Load returned nil error without a session key")
+	}
+	if !strings.Contains(err.Error(), "BFF_SESSION_KEY") {
+		t.Errorf("error %q does not name BFF_SESSION_KEY", err)
+	}
+
+	cfg, err := Load(fakeEnv(requiredEnv()), nil)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if !cfg.LoginEnabled {
+		t.Error("LoginEnabled = false, want true")
+	}
+	if len(cfg.SessionKey) != 32 {
+		t.Errorf("SessionKey length = %d, want 32", len(cfg.SessionKey))
 	}
 }
 

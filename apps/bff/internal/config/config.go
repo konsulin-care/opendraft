@@ -42,6 +42,10 @@ type Config struct {
 	GitHubClientSecret string
 	// GitHubAppSlug is the URL slug of the GitHub App.
 	GitHubAppSlug string
+	// LoginEnabled reports whether the GitHub App credentials are complete and
+	// sign-in is therefore available. When false the BFF runs in anonymous,
+	// read-only mode.
+	LoginEnabled bool
 	// SessionKey is the current 32-byte session encryption key.
 	SessionKey []byte
 	// SessionKeyPrevious is the optional previous 32-byte session key used
@@ -82,28 +86,49 @@ func Load(getenv func(string) string, readFile func(string) ([]byte, error)) (Co
 	cfg.GitHubWebURL = defaultWhenEmpty(getenv(envGitHubWebURL), defaultGitHubWebURL)
 	cfg.GitHubAPIURL = defaultWhenEmpty(getenv(envGitHubAPIURL), defaultGitHubAPIURL)
 
-	required := []string{envPublicOrigin, envGitHubClientID, envGitHubAppSlug}
-	for _, name := range required {
-		if strings.TrimSpace(getenv(name)) == "" {
-			problems = append(problems, fmt.Sprintf("%s is required", name))
-		}
+	if cfg.PublicOrigin == "" {
+		problems = append(problems, fmt.Sprintf("%s is required", envPublicOrigin))
 	}
 
 	secret, secretProblem := loadSecret(getenv, readFile, envGitHubClientSecret, envGitHubClientSecretFile)
 	if secretProblem != "" {
 		problems = append(problems, secretProblem)
-	} else if secret == "" {
-		problems = append(problems, fmt.Sprintf("%s is required", envGitHubClientSecret))
 	}
 	cfg.GitHubClientSecret = secret
+
+	present := []struct {
+		name string
+		set  bool
+	}{
+		{envGitHubClientID, cfg.GitHubClientID != ""},
+		{envGitHubClientSecret, cfg.GitHubClientSecret != ""},
+		{envGitHubAppSlug, cfg.GitHubAppSlug != ""},
+	}
+	configured := 0
+	var missing []string
+	for _, item := range present {
+		if item.set {
+			configured++
+		} else {
+			missing = append(missing, item.name)
+		}
+	}
+	cfg.LoginEnabled = configured == len(present)
+	if configured > 0 && !cfg.LoginEnabled {
+		for _, name := range missing {
+			problems = append(problems, fmt.Sprintf("%s is required", name))
+		}
+	}
 
 	sessionKey, keyProblem := loadSecret(getenv, readFile, envSessionKey, envSessionKeyFile)
 	if keyProblem != "" {
 		problems = append(problems, keyProblem)
 	} else if sessionKey == "" {
-		problems = append(problems, fmt.Sprintf("%s is required", envSessionKey))
+		if cfg.LoginEnabled {
+			problems = append(problems, fmt.Sprintf("%s is required", envSessionKey))
+		}
 	} else {
-		decoded, err := decodeSessionKey(envSessionKey, sessionKey, true)
+		decoded, err := decodeSessionKey(envSessionKey, sessionKey, false)
 		if err != nil {
 			problems = append(problems, err.Error())
 		} else {
