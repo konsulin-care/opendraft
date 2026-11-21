@@ -9,8 +9,14 @@ WORKDIR /src
 ARG PNPM_VERSION=12.21.0
 RUN npm install -g "pnpm@${PNPM_VERSION}" && pnpm --version
 
+# Copy workspace manifests only, so edits to application sources do not
+# invalidate the dependency install layer below. --parents keeps the
+# workspace directory layout (available from dockerfile frontend 1.7).
+COPY --parents package.json pnpm-lock.yaml pnpm-workspace.yaml apps/*/package.json packages/*/package.json ./
+RUN pnpm install --frozen-lockfile
+
 COPY . .
-RUN pnpm install --frozen-lockfile && pnpm --filter @opendraft/web build
+RUN pnpm --filter @opendraft/web build
 
 FROM golang:1.27 AS bff
 WORKDIR /src/apps/bff
