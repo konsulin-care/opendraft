@@ -19,6 +19,7 @@ import type { SectionDraft } from './SectionPicker';
 import { useBlocks } from './use-blocks';
 import type { BlockEntry } from './use-blocks';
 import { useCollapseState } from './use-collapse-state';
+import { useReadOnly } from './read-only-context';
 import { requestFocusForShort } from '../caret-mode-switch';
 import { useCrossrefIndex } from '../crossref/use-crossref-index';
 import type { CrossrefIndexHandle } from '../crossref/use-crossref-index';
@@ -141,6 +142,8 @@ interface BlockRowProps {
   block: BlockEntry;
   /** Whether the add-section dialog is open at this row's insert point. */
   formOpen: boolean;
+  /** Whether the row is rendered read-only (no insert points or dialogs). */
+  readOnly: boolean;
   /** Whether the block body is collapsed. */
   collapsed: boolean;
   /** Workspace holding the manuscript files, forwarded to the body. */
@@ -175,6 +178,7 @@ interface BlockRowProps {
 function BlockRow({
   block,
   formOpen,
+  readOnly,
   collapsed,
   ws,
   dir,
@@ -192,8 +196,8 @@ function BlockRow({
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   return (
     <div className="group">
-      <InsertPoint onAdd={onAdd} />
-      {formOpen && <AddSectionDialog onCreate={onCreate} onClose={onClose} />}
+      {!readOnly && <InsertPoint onAdd={onAdd} />}
+      {!readOnly && formOpen && <AddSectionDialog onCreate={onCreate} onClose={onClose} />}
       <BlockContainer
         short={block.short}
         title={block.title}
@@ -232,6 +236,7 @@ function BlockRow({
  * @returns The shell markup, or nothing while the list loads.
  */
 export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
+  const readOnly = useReadOnly();
   const { loading, blocks, createBlock, deleteBlock, setTitle } = useBlocks(ws, dir);
   const shorts = blocks.map((block) => block.short);
   const files = useBlockFiles(ws, dir, shorts);
@@ -252,25 +257,29 @@ export function BlockEditor({ ws, dir, projectKey }: BlockEditorProps) {
   };
   const closeDelete = (): void => setDeleting(null);
   if (loading || (shorts.length > 0 && Object.keys(files).length === 0)) return null; // Gate until list + file names resolve.
+  if (blocks.length === 0 && readOnly) return null; // Read-only: nothing to read, no create action.
   if (blocks.length === 0) return <EmptyState onCreate={createAt(0)} />; // Zero blocks: preset picker replaces the list.
   return (
     <div className="space-y-2">
       {blocks.map((block, index) => (
         <BlockRow
-          key={block.short} block={block} formOpen={addingAt === index}
+          key={block.short} block={block} formOpen={addingAt === index} readOnly={readOnly}
           collapsed={isCollapsed(block.short)} ws={ws} dir={dir}
           file={files[block.short] ?? blockFileName(block.short)}
           crossrefs={crossrefs}
           onToggle={() => toggle(block.short)} onOverflow={() => openDelete(block)}
           onAdd={() => setAddingAt(index)} onCreate={createAt(index)}
-          onClose={closeForm} onTitleSave={titleSaver(block.short, setTitle)}
+          onClose={closeForm}
+          onTitleSave={readOnly ? undefined : titleSaver(block.short, setTitle)}
         />
       ))}
-      <div>
-        <button type="button" onClick={() => setAddingAt(blocks.length)} className="flex h-9 w-full items-center justify-center rounded-md border border-dashed border-gray-300 text-sm text-gray-500 hover:bg-gray-50">+ Add section</button>
-        {addingAt === blocks.length && <AddSectionDialog onCreate={createAt(blocks.length)} onClose={closeForm} />}
-      </div>
-      <DeleteConfirm target={deleting} onConfirm={confirmDelete} onCancel={closeDelete} />
+      {!readOnly && (
+        <div>
+          <button type="button" onClick={() => setAddingAt(blocks.length)} className="flex h-9 w-full items-center justify-center rounded-md border border-dashed border-gray-300 text-sm text-gray-500 hover:bg-gray-50">+ Add section</button>
+          {addingAt === blocks.length && <AddSectionDialog onCreate={createAt(blocks.length)} onClose={closeForm} />}
+        </div>
+      )}
+      {!readOnly && <DeleteConfirm target={deleting} onConfirm={confirmDelete} onCancel={closeDelete} />}
     </div>
   );
 }

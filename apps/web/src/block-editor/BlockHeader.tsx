@@ -10,6 +10,7 @@ import { useSyncExternalStore } from 'react';
 import { ChevronDown, Trash2 } from 'lucide-react';
 import type { SaveStatus } from '../components/AppHeader';
 import { InlineEditField } from '../components/InlineEditField';
+import { useReadOnly } from './read-only-context';
 
 /** Per-block level-1 warnings reported by mounted bodies, keyed by short name. */
 const level1Warnings = new Map<string, boolean>();
@@ -196,6 +197,7 @@ export function BlockHeader({
   onOverflow,
   onTitleSave,
 }: BlockHeaderProps) {
+  const readOnly = useReadOnly();
   const hasLevel1Warning = useSyncExternalStore(
     subscribeLevel1Warning,
     () => level1Warnings.get(short) ?? false,
@@ -215,17 +217,19 @@ export function BlockHeader({
           className={`h-4 w-4 transition-transform ${collapsed ? '-rotate-90' : ''}`}
         />
       </button>
-      <HeaderTitle title={title} onTitleSave={onTitleSave} />
+      <HeaderTitle title={title} onTitleSave={readOnly ? undefined : onTitleSave} />
       {hasLevel1Warning && <Level1Badge />}
       <HeaderStatus wordCount={wordCount} saveStatus={saveStatus} />
-      <button
-        type="button"
-        aria-label="Delete section"
-        onClick={onOverflow}
-        className="inline-flex items-center justify-center rounded-md p-1 text-gray-500 hover:bg-gray-100"
-      >
-        <Trash2 aria-hidden="true" className="h-4 w-4" />
-      </button>
+      {!readOnly && (
+        <button
+          type="button"
+          aria-label="Delete section"
+          onClick={onOverflow}
+          className="inline-flex items-center justify-center rounded-md p-1 text-gray-500 hover:bg-gray-100"
+        >
+          <Trash2 aria-hidden="true" className="h-4 w-4" />
+        </button>
+      )}
     </header>
   );
 }
