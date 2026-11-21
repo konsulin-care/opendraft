@@ -56,8 +56,24 @@ run = "pnpm exec vite --host 127.0.0.1 --port 5173"
 dir = "apps/web"
 
 [tasks.build]
-description = "Build (placeholder)"
-run = "echo 'Placeholder for build script'"
+description = "Build the web app and the BFF binary"
+run = "pnpm --filter @opendraft/web build && mise run build-bff"
+
+[tasks.build-bff]
+description = "Build the BFF as a static binary"
+run = "CGO_ENABLED=0 go build -trimpath -ldflags \"-s -w -X main.Version=${VERSION:-0.0.0-dev}\" -o bff ."
+
+dir = "apps/bff"
+
+[tasks.serve-bff]
+description = "Run the BFF locally with env loaded from .env"
+run = "bash -c 'set -a; [ -f ../../.env ] && source ../../.env; set +a; exec go run .'"
+
+dir = "apps/bff"
+
+[tasks.docker-build]
+description = "Build the OpenDraft Docker image"
+run = "docker build -t opendraft ."
 
 [tasks.lint-go]
 description = "Run golangci-lint on Go code"
