@@ -9,12 +9,13 @@
  */
 
 import { useEffect, useState } from 'react';
-import type { BffSession } from '../github/bff-client';
+import type { BffSession, SessionState } from '../github/bff-client';
 import {
   createPullRequest,
   forkRepo,
   getRepoPermissions,
   getSession as fetchSession,
+  getSessionState,
   loginUrl,
   logout as signOut,
 } from '../github/bff-client';
@@ -38,8 +39,8 @@ import type { ConvertDeps, ConvertInput, ConvertResult } from './convert';
 export interface ReaderPageDeps {
   /** Load the repository at a route into a read-only workspace. */
   loadRepo: (route: ReaderRoute) => Promise<LoadedRepo>;
-  /** Read the current BFF session, or null when anonymous. */
-  getSession: () => Promise<BffSession | null>;
+  /** Read the current BFF session and whether login is configured. */
+  getSessionState: () => Promise<SessionState>;
   /** Clear the BFF session. */
   logout: () => Promise<void>;
   /** Convert a plain repository into an OpenDraft project. */
@@ -109,7 +110,7 @@ const defaultDeps: ReaderPageDeps = {
       getSession: () => fetchSession(),
       cloneViaRelay,
     }),
-  getSession: () => fetchSession(),
+  getSessionState: () => getSessionState(),
   logout: () => signOut(),
   convert: convertWithGit,
 };
@@ -171,6 +172,7 @@ function ManuscriptSwitcher({
 /** Reader state loaded from the route and injected dependencies. */
 interface ReaderState {
   session: BffSession | null;
+  loginEnabled: boolean;
   repo: LoadedRepo | null;
   error: unknown;
   loading: boolean;
@@ -182,6 +184,7 @@ interface ReaderState {
 /** Load the session and repository snapshot for a route. */
 function useReaderState(route: ReaderRoute, deps: ReaderPageDeps): ReaderState {
   const [session, setSession] = useState<BffSession | null>(null);
+  const [loginEnabled, setLoginEnabled] = useState(true);
   const [repo, setRepo] = useState<LoadedRepo | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
@@ -196,12 +199,10 @@ function useReaderState(route: ReaderRoute, deps: ReaderPageDeps): ReaderState {
 
     void (async () => {
       try {
-        const [nextSession, loaded] = await Promise.all([
-          deps.getSession(),
-          deps.loadRepo(route),
-        ]);
+        const [nextState, loaded] = await Promise.all([deps.getSessionState(), deps.loadRepo(route)]);
         if (cancelled) return;
-        setSession(nextSession);
+        setSession(nextState.session);
+        setLoginEnabled(nextState.loginEnabled);
         setRepo(loaded);
       } catch (thrown) {
         if (!cancelled) setError(thrown);
@@ -225,7 +226,7 @@ function useReaderState(route: ReaderRoute, deps: ReaderPageDeps): ReaderState {
     })();
   };
 
-  return { session, repo, error, loading, selected, select: setSelected, logout };
+  return { session, loginEnabled, repo, error, loading, selected, select: setSelected, logout };
 }
 
 /** Props for {@link ReaderContent}. */
@@ -237,14 +238,14 @@ interface ReaderContentProps {
 
 /** Render the loading indicator, load error, conversion panel or reader view. */
 function ReaderContent({ route, state, convert }: ReaderContentProps) {
-  const { session, repo, error, loading, selected, select } = state;
+  const { session, loginEnabled, repo, error, loading, selected, select } = state;
   const returnTo = readerPath(route);
 
   if (loading) return <p className="text-sm text-black">Loading…</p>;
   if (error !== null) return <LoadError error={error} returnTo={returnTo} />;
   if (repo === null) return null;
   if (!repo.isOpenDraft) {
-    return <ConvertPanel session={session} returnTo={returnTo} convert={convert} />;
+    return <ConvertPanel session={session} returnTo={returnTo} convert={convert} loginEnabled={loginEnabled} />;
   }
 
   const manuscript = repo.manuscripts[selected] ?? repo.manuscripts[0];
@@ -276,9 +277,7 @@ export function ReaderPage({ route, deps = defaultDeps }: ReaderPageProps) {
   const state = useReaderState(route, deps);
   /** Run the conversion for the signed-in viewer. */
   const handleConvert = async (): Promise<ConvertResult> => {
-    if (state.session === null) {
-      throw new Error('Sign in to convert this repository.');
-    }
+    if (state.session === null) throw new Error('Sign in to convert this repository.');
     return deps.convert({ owner: route.owner, repo: route.repo, session: state.session });
   };
 
@@ -288,6 +287,7 @@ export function ReaderPage({ route, deps = defaultDeps }: ReaderPageProps) {
         session={state.session}
         returnTo={readerPath(route)}
         onLogout={state.logout}
+        loginEnabled={state.loginEnabled}
       />
       <main className="flex flex-1 flex-col gap-4 p-4">
         <ReaderContent route={route} state={state} convert={handleConvert} />

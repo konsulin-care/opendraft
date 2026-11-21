@@ -91,7 +91,7 @@ async function makeRepo(
 function makeDeps(overrides: Partial<ReaderPageDeps> = {}): ReaderPageDeps {
   return {
     loadRepo: vi.fn(async () => makeRepo([{ id: 'demo', path: 'manuscripts/demo' }])),
-    getSession: vi.fn(async () => null),
+    getSessionState: vi.fn(async () => ({ session: null, loginEnabled: true })),
     logout: vi.fn(async () => undefined),
     convert: vi.fn(async () => ({ kind: 'pr' as const, url: 'https://example.test/pr/1' })),
     ...overrides,
@@ -158,12 +158,38 @@ describe('ReaderPage plain repository', () => {
   it('offers conversion to a signed-in viewer', async () => {
     const deps = makeDeps({
       loadRepo: vi.fn(async () => makeRepo([])),
-      getSession: vi.fn(async () => SESSION),
+      getSessionState: vi.fn(async () => ({ session: SESSION, loginEnabled: true })),
     });
 
     render(<ReaderPage route={ROUTE} deps={deps} />);
 
     expect(await screen.findByRole('button', { name: 'Convert to OpenDraft' })).toBeInTheDocument();
+  });
+});
+
+describe('ReaderPage login availability', () => {
+  it('shows no sign-in link when login is disabled', async () => {
+    const deps = makeDeps({
+      getSessionState: vi.fn(async () => ({ session: null, loginEnabled: false })),
+    });
+
+    render(<ReaderPage route={ROUTE} deps={deps} />);
+
+    await screen.findByTestId('manuscript-view');
+    expect(screen.queryByRole('link', { name: 'Sign in with GitHub' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Install OpenDraft' })).toBeNull();
+  });
+
+  it('offers sign-in when login is enabled without a session', async () => {
+    const deps = makeDeps({
+      getSessionState: vi.fn(async () => ({ session: null, loginEnabled: true })),
+    });
+
+    render(<ReaderPage route={ROUTE} deps={deps} />);
+
+    expect(
+      await screen.findByRole('link', { name: 'Sign in with GitHub' }),
+    ).toBeInTheDocument();
   });
 });
 
