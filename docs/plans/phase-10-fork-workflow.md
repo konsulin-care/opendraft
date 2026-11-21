@@ -2,6 +2,8 @@
 
 **Summary:** Enables forking an existing repository, loading the fork locally, and preserving protocol provenance through the fork operation.
 
+The fork endpoint and the compare-URL fallback used when a fork cannot open a PR directly are delivered in Phase 7 ([phase-07-go-bff.md](phase-07-go-bff.md), OD-075 and OD-078). This phase references that work instead of duplicating it.
+
 ---
 
 ## OD-100 — Implement repository URL input
@@ -22,10 +24,12 @@ Allow user to enter a source repository URL.
 
 Fork the repository to a user-selected destination.
 
+Delivered by the Phase 7 fork endpoint in [phase-07-go-bff.md](phase-07-go-bff.md), OD-075, and used by the conversion fallback in OD-078.
+
 ### Definition of Done
 
 - [ ] User can select personal account or permitted organization.
-- [ ] Fork is created successfully.
+- [x] Fork is created successfully. See `POST /@api/repos/{owner}/{repo}/forks` in `apps/bff/internal/httpapi/repo_actions.go`; the conversion fallback returns the GitHub compare URL built in `apps/web/src/reader/convert.ts`.
 
 ---
 
