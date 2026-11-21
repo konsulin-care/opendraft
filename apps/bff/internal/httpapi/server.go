@@ -51,6 +51,7 @@ func New(cfg config.Config, deps Deps) http.Handler {
 	mux.HandleFunc("GET "+loginPath, auth.handleLogin)
 	mux.HandleFunc("GET "+installPath, auth.handleInstall)
 	mux.HandleFunc("GET "+callbackPath, auth.handleCallback)
+	mux.HandleFunc("GET "+sessionPath, auth.handleSession)
 	mux.HandleFunc("GET "+healthPath, func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{
 			"status":  "ok",
@@ -73,7 +74,7 @@ func New(cfg config.Config, deps Deps) http.Handler {
 }
 
 // writeJSON writes payload as a JSON response with the given status code.
-func writeJSON(w http.ResponseWriter, status int, payload map[string]string) {
+func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", contentType)
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
