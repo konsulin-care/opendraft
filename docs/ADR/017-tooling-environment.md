@@ -28,7 +28,6 @@ Use **mise** as the single source of truth for tool versions and quality tasks.
 - lefthook: 2.1.15
 - golangci-lint: 2.15.0
 - govulncheck: 1.10.0
-- markdownlint-cli2: 0.23.2
 - yamllint: 1.38.0
 
 **Package manager inside container builds:**
@@ -53,8 +52,13 @@ with the same change; without it `pnpm install --frozen-lockfile` fails.
 | `fmt-go` | Check Go formatting |
 | `typecheck` | TypeScript type checking |
 | `test` | All test suites (RDF, SHACL, Go, TypeScript) |
-| `build` | Build (placeholder) |
+| `build` | Build the web app and the static BFF binary |
+| `build-bff` | Build the BFF as a static Go binary |
 | `build-go` | Build Go code |
+| `serve` | Build, then serve the web app and BFF locally on :5173 |
+| `dev` | Run Vite on :5173, proxying `/@api` to the BFF |
+| `dev-bff` | Run the BFF for Vite dev mode on :8080 |
+| `docker-build` | Build the OpenDraft Docker image |
 | `validate-ttl` | Validate RDF/Turtle files |
 | `audit` | npm security audit |
 | `complexity-ts` | TypeScript complexity check |
@@ -86,7 +90,7 @@ Checks are distributed across three layers based on cost and blocking behavior. 
 
 | Layer | Purpose | Checks | Blocking |
 |-------|---------|--------|----------|
-| **pre-commit** | Fast feedback on common issues | TypeScript type-check, ESLint (with --fix), Go fmt, Go vet, Go mod tidy, TTL validation, Markdown lint, YAML lint, Large file check | Yes |
+| **pre-commit** | Fast feedback on common issues | TypeScript type-check, ESLint (with --fix), Go fmt, Go vet, Go mod tidy, TTL validation, YAML lint, Large file check | Yes |
 | **pre-push** | Validate readiness for review | Full test suite, Build validation, govulncheck, Complexity analysis (TS + Go) | Yes |
 | **CI** | Comprehensive analysis + broader checks | All pre-commit/pre-push checks + npm audit, coverage | Yes (PR merge) |
 
@@ -116,7 +120,7 @@ CI provides the final gate with 7 parallel jobs:
 
 | Job | What it checks |
 |-----|----------------|
-| lint | ESLint, golangci-lint, TTL validation, markdown/yaml lint, large files |
+| lint | ESLint, golangci-lint, TTL validation, YAML lint, large files |
 | test | All test suites (RDF, SHACL, Go, TypeScript) |
 | build | TypeScript build, Go build |
 | security | npm audit, govulncheck |

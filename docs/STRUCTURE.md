@@ -10,7 +10,7 @@ OpenDraft uses a monorepo structure containing the application, shared packages,
 opendraft/
 ├── apps/                    # Applications
 │   ├── web/                 # PWA client (TypeScript)
-│   └── bff/                 # Go BFF (auth proxy)
+│   └── bff/                 # Go BFF (same-origin server)
 │
 ├── packages/                # Shared libraries
 │   ├── editor/              # Manuscript editing
@@ -52,7 +52,7 @@ opendraft/
 
 ### apps/
 
-Contains runnable applications. The web app is a TypeScript PWA. The BFF is a lightweight Go server for GitHub authentication.
+Contains runnable applications. The web app is a TypeScript PWA. The BFF is a lightweight, same-origin Go server that handles GitHub authentication, the sealed-cookie session, repository creation, pull requests, forks, the sign-in-only git transport relay and static hosting of the built web app. Without GitHub App credentials it runs anonymously as a local, read-only reader server.
 
 ### packages/
 
