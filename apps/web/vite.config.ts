@@ -12,6 +12,15 @@ export default defineConfig({
   server: {
     host: '127.0.0.1',
     allowedHosts: ['.ts.net'],
+    proxy: {
+      '/@api': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: false,
+      },
+    },
+  },
+  build: {
+    assetsDir: '@assets',
   },
   plugins: [react(), tailwindcss()],
   resolve: {

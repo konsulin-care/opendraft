@@ -28,4 +28,27 @@ describe('vite.config', () => {
       .map((p) => (p as { name?: string }).name);
     expect(pluginNames.some((name) => name?.includes('tailwind'))).toBe(true);
   });
+
+  it('should build assets under the reserved @assets path', async () => {
+    const result = await loadConfigFromFile(
+      { command: 'build', mode: 'production' },
+      resolve(__dirname, 'vite.config.ts'),
+    );
+
+    expect(result?.config.build?.assetsDir).toBe('@assets');
+  });
+
+  it('should proxy /@api to the local BFF while binding 127.0.0.1', async () => {
+    const result = await loadConfigFromFile(
+      { command: 'serve', mode: 'development' },
+      resolve(__dirname, 'vite.config.ts'),
+    );
+
+    expect(result?.config.server?.host).toBe('127.0.0.1');
+    const proxy = result?.config.server?.proxy?.['/@api'];
+    expect(proxy).toMatchObject({
+      target: 'http://127.0.0.1:8080',
+      changeOrigin: false,
+    });
+  });
 });
