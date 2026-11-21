@@ -98,6 +98,9 @@ importers:
       '@opendraft/workspace':
         specifier: workspace:*
         version: link:../../packages/workspace
+      buffer:
+        specifier: ^6.0.3
+        version: 6.0.3
       katex:
         specifier: ^0.19.1
         version: 0.19.1
