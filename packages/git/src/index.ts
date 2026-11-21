@@ -92,6 +92,8 @@ export class GitOperations {
 }
 
 export { MemoryFS } from './memory-fs.js';
+export { commitFilesOnBranch, readWorkingFiles } from './branch-commit.js';
+export type { CommitFilesOnBranchOptions } from './branch-commit.js';
 export { preCommitAssembly } from './commit.js';
 export { RemoteGit, relayUrl } from './remote.js';
 export type { CloneResult, RemoteGitOptions } from './remote.js';
