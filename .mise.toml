@@ -50,9 +50,13 @@ run = "pnpm run typecheck"
 dir = "apps/web"
 
 [tasks.serve]
-description = "Run the apps/web Vite dev server on 127.0.0.1:5173"
-run = "pnpm exec vite --host 127.0.0.1 --port 5173"
+description = "Build the web app and serve it with the local BFF at http://127.0.0.1:5173"
+depends = ["build"]
+run = "bash -c 'set -a; source .env; set +a; export BFF_ADDR=:5173 BFF_STATIC_DIR=\"$PWD/apps/web/dist\"; exec apps/bff/bff'"
 
+[tasks.dev]
+description = "Hot-reload dev: Vite on 5173 proxying /@api to the BFF on 8080"
+run = "pnpm exec vite --host 127.0.0.1 --port 5173"
 dir = "apps/web"
 
 [tasks.build]
@@ -65,10 +69,9 @@ run = "CGO_ENABLED=0 go build -trimpath -ldflags \"-s -w -X main.Version=${VERSI
 
 dir = "apps/bff"
 
-[tasks.serve-bff]
-description = "Run the BFF locally with env loaded from .env"
-run = "bash -c 'set -a; [ -f ../../.env ] && source ../../.env; set +a; exec go run .'"
-
+[tasks.dev-bff]
+description = "Run the BFF for Vite dev mode (no static serving, :8080)"
+run = "bash -c 'set -a; source ../../.env; set +a; export BFF_ADDR=:8080 BFF_STATIC_DIR=; exec go run .'"
 dir = "apps/bff"
 
 [tasks.docker-build]
