@@ -48,6 +48,7 @@ func New(cfg config.Config, deps Deps) http.Handler {
 	auth := newAuthHandler(cfg, deps)
 	logout := newLogoutHandler(deps)
 	repos := newReposHandler(auth, deps)
+	actions := newRepoActionsHandler(auth, deps)
 
 	api := http.NewServeMux()
 	api.HandleFunc("GET "+loginPath, auth.handleLogin)
@@ -56,6 +57,9 @@ func New(cfg config.Config, deps Deps) http.Handler {
 	api.HandleFunc("GET "+sessionPath, auth.handleSession)
 	api.HandleFunc("POST "+logoutPath, logout.handleLogout)
 	api.HandleFunc("POST "+reposPath, repos.handleCreate)
+	api.HandleFunc("GET "+permissionsPath, actions.handlePermissions)
+	api.HandleFunc("POST "+pullsPath, actions.handlePulls)
+	api.HandleFunc("POST "+forksPath, actions.handleForks)
 	api.HandleFunc("GET "+healthPath, func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{
 			"status":  "ok",
