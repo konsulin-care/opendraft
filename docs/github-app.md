@@ -15,6 +15,33 @@ Register two separate apps:
 Register at `https://github.com/settings/apps/new` while signed in as the owning
 account or organization.
 
+## Run locally without a GitHub App
+
+A GitHub App is optional. With none of `BFF_GITHUB_CLIENT_ID`,
+`BFF_GITHUB_CLIENT_SECRET` (or `_FILE`), or `BFF_GITHUB_APP_SLUG` set, the BFF
+starts in **anonymous read-only mode**: no secrets are needed, no session key is
+required, and the reader still works because the browser reads public
+repositories directly from `api.github.com` and `raw.githubusercontent.com`.
+
+Setting only some of the three variables is a startup error that names the
+missing ones. Once all three are set, `BFF_SESSION_KEY` becomes required.
+
+Anonymous mode makes the following features unavailable:
+
+- Sign-in
+- Repository creation
+- Conversion (pull requests)
+- Git transport relay
+
+The gated endpoints answer `403 {"error":"login_disabled"}`:
+`/@api/auth/login`, `/@api/auth/install`, `/@api/auth/callback`,
+`POST /@api/auth/logout`, `POST /@api/repos`, `/@api/repos/{owner}/{repo}/...`,
+and `/@api/git/...`.
+
+Unaffected are `/@api/health`, static files and the SPA fallback, and
+`/@api/auth/session`, which answers `200 {"loginEnabled":false}` so the web app
+knows login is off.
+
 ## 1. Basic information
 
 Set the following for each app.

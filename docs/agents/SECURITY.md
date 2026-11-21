@@ -10,6 +10,13 @@
 - Anonymous reads stay anonymous: public repositories are read directly from
   the browser against GitHub, without OpenDraft credentials.
 
+## Anonymous Mode (No Credentials)
+
+With no GitHub App credentials configured, the BFF exposes no authenticated
+surface. It keeps only `/@api/health`, `/@api/auth/session` (reporting
+`loginEnabled: false`), and static content; every gated endpoint answers
+`403 {"error":"login_disabled"}` and no session key or client secret is needed.
+
 ## GitHub Authorization
 
 The BFF is the confidential client of the GitHub App and uses **GitHub App
