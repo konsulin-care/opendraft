@@ -2,7 +2,7 @@
 
 **Status:** Accepted  
 **Date:** 2024-12-01  
-**Updated:** 2026-08-31
+**Updated:** 2026-11-21
 
 ## Context
 
@@ -21,14 +21,28 @@ Use **mise** as the single source of truth for tool versions and quality tasks.
 
 **Pinned tools:**
 
-- node: lts
-- pnpm: 11.13.0
+- node: lts, currently Node 26; container images pin the major tag
+  (`node:26-slim`) so a new Node major cannot change the build silently
+- pnpm: 12.21.0
 - go: 1.27
-- lefthook: 2.1.12
-- golangci-lint: 2.13.2
-- govulncheck: 1.7.0
+- lefthook: 2.1.15
+- golangci-lint: 2.15.0
+- govulncheck: 1.10.0
 - markdownlint-cli2: 0.23.2
 - yamllint: 1.38.0
+
+**Package manager inside container builds:**
+
+Node.js ships no Corepack from version 25 onward, so container images can no
+longer run `corepack enable`. The build installs pnpm explicitly at the pinned
+version through the `PNPM_VERSION` build argument of the container `Dockerfile`
+(default `12.21.0`), and the root `package.json` declares the same version in
+its `packageManager` field, so mise, local runs, the container build and any
+Corepack-based consumer all agree on one pnpm version. Bumping pnpm therefore
+means updating `.mise.toml`, the `packageManager` field and the `Dockerfile`
+default together. Because pnpm 12 records the managed version in
+`pnpm-lock.yaml` under `packageManagerDependencies`, that lockfile update ships
+with the same change; without it `pnpm install --frozen-lockfile` fails.
 
 **Quality tasks defined in `.mise.toml`:**
 
