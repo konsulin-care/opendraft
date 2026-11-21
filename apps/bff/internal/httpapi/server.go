@@ -47,25 +47,30 @@ func New(cfg config.Config, deps Deps) http.Handler {
 
 	auth := newAuthHandler(cfg, deps)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET "+loginPath, auth.handleLogin)
-	mux.HandleFunc("GET "+installPath, auth.handleInstall)
-	mux.HandleFunc("GET "+callbackPath, auth.handleCallback)
-	mux.HandleFunc("GET "+sessionPath, auth.handleSession)
-	mux.HandleFunc("GET "+healthPath, func(w http.ResponseWriter, r *http.Request) {
+	api := http.NewServeMux()
+	api.HandleFunc("GET "+loginPath, auth.handleLogin)
+	api.HandleFunc("GET "+installPath, auth.handleInstall)
+	api.HandleFunc("GET "+callbackPath, auth.handleCallback)
+	api.HandleFunc("GET "+sessionPath, auth.handleSession)
+	api.HandleFunc("GET "+healthPath, func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{
 			"status":  "ok",
 			"version": deps.Version,
 		})
 	})
-	mux.HandleFunc(apiPrefix, func(w http.ResponseWriter, r *http.Request) {
+	api.HandleFunc(apiPrefix, func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": errorCode})
 	})
 	// ServeMux redirects /@api to /@api/; register the bare prefix so unknown
 	// API paths always answer JSON instead of a redirect.
-	mux.HandleFunc(strings.TrimSuffix(apiPrefix, "/"), func(w http.ResponseWriter, r *http.Request) {
+	api.HandleFunc(strings.TrimSuffix(apiPrefix, "/"), func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": errorCode})
 	})
+
+	mux := http.NewServeMux()
+	protectedAPI := requireSameOrigin(cfg.PublicOrigin, api)
+	mux.Handle(apiPrefix, protectedAPI)
+	mux.Handle(strings.TrimSuffix(apiPrefix, "/"), protectedAPI)
 	if cfg.StaticDir != "" {
 		mux.Handle(rootPath, NewStaticHandler(cfg.StaticDir))
 	}
