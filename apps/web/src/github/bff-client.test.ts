@@ -10,6 +10,7 @@ import {
   forkRepo,
   getRepoPermissions,
   getSession,
+  getSessionState,
   installUrl,
   loginUrl,
   logout,
@@ -42,6 +43,36 @@ const SESSION: BffSession = {
   name: 'Mona Lisa',
   expiresAt: '2026-01-01T00:00:00Z',
 };
+
+describe('getSessionState', () => {
+  it('reports loginEnabled true and a null session on 401', async () => {
+    const fetchFn = vi.fn(async () => response({ error: 'unauthenticated' }, 401));
+
+    await expect(getSessionState(fetchFn as unknown as typeof fetch)).resolves.toEqual({
+      session: null,
+      loginEnabled: true,
+    });
+    expect(fetchFn).toHaveBeenCalledWith('/@api/auth/session', { credentials: 'same-origin' });
+  });
+
+  it('reports loginEnabled false and a null session when login is disabled', async () => {
+    const fetchFn = vi.fn(async () => response({ loginEnabled: false }));
+
+    await expect(getSessionState(fetchFn as unknown as typeof fetch)).resolves.toEqual({
+      session: null,
+      loginEnabled: false,
+    });
+  });
+
+  it('returns the session with loginEnabled true on 200', async () => {
+    const fetchFn = vi.fn(async () => response(SESSION));
+
+    await expect(getSessionState(fetchFn as unknown as typeof fetch)).resolves.toEqual({
+      session: SESSION,
+      loginEnabled: true,
+    });
+  });
+});
 
 describe('getSession', () => {
   it('returns the parsed session on 200', async () => {

@@ -18,6 +18,12 @@ export interface BffSession {
   expiresAt: string;
 }
 
+/** Session availability returned by {@link getSessionState}. */
+export interface SessionState {
+  session: BffSession | null;
+  loginEnabled: boolean;
+}
+
 /** Error raised for any non-2xx BFF answer. */
 export class BffError extends Error {
   /** Stable error code from the JSON body, e.g. `unauthenticated`. */
@@ -62,43 +68,30 @@ export interface PullRequestInput {
 
 /** Result of {@link createPullRequest}. */
 export interface PullRequestResult {
-  /** Pull request number. */
   number: number;
-  /** HTML URL of the pull request. */
   url: string;
 }
 
 /** Result of {@link forkRepo}. */
 export interface ForkResult {
-  /** Owner login of the fork. */
   owner: string;
-  /** Repository name of the fork. */
   repo: string;
-  /** Default branch of the fork. */
   defaultBranch: string;
 }
 
 /** Input of {@link createRepo}. */
 export interface CreateRepoInput {
-  /** Owner login that receives the repository. */
   owner: string;
-  /** Repository name. */
   name: string;
-  /** Visibility accepted by the BFF, `public` or `private`. */
   visibility: string;
-  /** Optional repository description. */
   description?: string;
 }
 
 /** Result of {@link createRepo}. */
 export interface CreateRepoResult {
-  /** Owner login of the created repository. */
   owner: string;
-  /** Repository name. */
   name: string;
-  /** HTML URL of the created repository. */
   htmlUrl: string;
-  /** Default branch of the created repository. */
   defaultBranch: string;
 }
 
@@ -107,7 +100,6 @@ const REPOS_PATH = '/@api/repos';
 
 /**
  * Read the stable error code from a failed response.
- *
  * @param response - Failed fetch response.
  * @returns The server error code, or `http_<status>` when the body is missing
  *          or malformed.
@@ -127,7 +119,6 @@ async function readErrorCode(response: Response): Promise<string> {
 
 /**
  * Build the {@link BffError} for a failed response without relaying its body.
- *
  * @param response - Failed fetch response.
  * @returns The matching BFF error.
  */
@@ -137,7 +128,6 @@ async function toBffError(response: Response): Promise<BffError> {
 
 /**
  * Issue a same-origin GET request.
- *
  * @param path - BFF-relative path.
  * @param fetchFn - Fetch implementation; injectable for tests.
  * @returns The successful response.
@@ -150,7 +140,6 @@ async function get(path: string, fetchFn: typeof fetch): Promise<Response> {
 
 /**
  * Issue a same-origin JSON POST request.
- *
  * @param path - BFF-relative path.
  * @param body - JSON body, or undefined for a bodyless POST.
  * @param fetchFn - Fetch implementation; injectable for tests.
@@ -169,7 +158,6 @@ async function post(path: string, body: unknown, fetchFn: typeof fetch): Promise
 
 /**
  * Read the optional JSON body of a successful response.
- *
  * @param response - Successful fetch response.
  * @returns The parsed body, or undefined for an empty/204 answer.
  */
@@ -179,21 +167,34 @@ async function readJson<T>(response: Response): Promise<T | undefined> {
 }
 
 /**
+ * Fetch the current session and whether login is enabled.
+ *
+ * @param fetchFn - Fetch implementation; injectable for tests.
+ * @returns The session state; a 401 or `loginEnabled: false` means no session.
+ */
+export async function getSessionState(fetchFn: typeof fetch = fetch): Promise<SessionState> {
+  const response = await fetchFn(`${AUTH_PREFIX}/session`, { credentials: 'same-origin' });
+  if (response.status === 401) return { session: null, loginEnabled: true };
+  if (!response.ok) throw await toBffError(response);
+  const body = (await response.json()) as BffSession | { loginEnabled?: boolean };
+  if (typeof body === 'object' && body !== null && 'loginEnabled' in body && body.loginEnabled === false) {
+    return { session: null, loginEnabled: false };
+  }
+  return { session: body as BffSession, loginEnabled: true };
+}
+
+/**
  * Fetch the current session.
  *
  * @param fetchFn - Fetch implementation; injectable for tests.
  * @returns The session identity, or null when unauthenticated (401).
  */
 export async function getSession(fetchFn: typeof fetch = fetch): Promise<BffSession | null> {
-  const response = await fetchFn(`${AUTH_PREFIX}/session`, { credentials: 'same-origin' });
-  if (response.status === 401) return null;
-  if (!response.ok) throw await toBffError(response);
-  return (await response.json()) as BffSession;
+  return (await getSessionState(fetchFn)).session;
 }
 
 /**
  * Clear the BFF session cookie and revoke the upstream token when possible.
- *
  * @param fetchFn - Fetch implementation; injectable for tests.
  */
 export async function logout(fetchFn: typeof fetch = fetch): Promise<void> {
