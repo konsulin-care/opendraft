@@ -49,6 +49,7 @@ func New(cfg config.Config, deps Deps) http.Handler {
 	logout := newLogoutHandler(deps)
 	repos := newReposHandler(auth, deps)
 	actions := newRepoActionsHandler(auth, deps)
+	git := newGitRelayHandler(cfg, auth)
 
 	api := http.NewServeMux()
 	api.HandleFunc("GET "+loginPath, auth.handleLogin)
@@ -60,6 +61,8 @@ func New(cfg config.Config, deps Deps) http.Handler {
 	api.HandleFunc("GET "+permissionsPath, actions.handlePermissions)
 	api.HandleFunc("POST "+pullsPath, actions.handlePulls)
 	api.HandleFunc("POST "+forksPath, actions.handleForks)
+	api.HandleFunc("GET "+gitRelayPath, git.handleRelay)
+	api.HandleFunc("POST "+gitRelayPath, git.handleRelay)
 	api.HandleFunc("GET "+healthPath, func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{
 			"status":  "ok",
