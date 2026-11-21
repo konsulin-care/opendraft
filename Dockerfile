@@ -1,8 +1,14 @@
 # syntax=docker/dockerfile:1
 
-FROM node:lts-slim AS web
+FROM node:26-slim AS web
 WORKDIR /src
-RUN corepack enable
+
+# Node.js 25 and later ship no Corepack, so pnpm is installed explicitly.
+# PNPM_VERSION must stay equal to the pnpm pin in .mise.toml and to the
+# packageManager field in the root package.json.
+ARG PNPM_VERSION=12.21.0
+RUN npm install -g "pnpm@${PNPM_VERSION}" && pnpm --version
+
 COPY . .
 RUN pnpm install --frozen-lockfile && pnpm --filter @opendraft/web build
 
