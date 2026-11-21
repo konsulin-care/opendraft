@@ -1,0 +1,136 @@
+import { describe, expect, it, vi } from 'vitest';
+import type { ReaderRoute } from './route';
+import { NotFoundError } from './github-public';
+import { cloneViaRelay, loadRepo } from './load-repo';
+import type { LoadRepoDeps } from './load-repo';
+
+const ROUTE: ReaderRoute = { owner: 'konsulin-care', repo: 'citizen-science' };
+
+/** Build a file map with an opendraft.yml listing the given manuscripts. */
+function filesWithManuscripts(entries: { id: string; path: string }[]): Map<string, string> {
+  const yml = ['protocol:', '  name: opendraft', 'manuscripts:', ...entries.flatMap((e) => [
+    `  - id: ${e.id}`,
+    `    path: ${e.path}`,
+  ]), ''].join('\n');
+  return new Map([
+    ['opendraft.yml', yml],
+    ['manuscripts/demo/article.qmd', '---\ntitle: Demo\n---\n'],
+  ]);
+}
+
+/** Build loadRepo dependencies with inert defaults and spy hooks. */
+function makeDeps(overrides: Partial<LoadRepoDeps> = {}): LoadRepoDeps {
+  return {
+    resolveCommit: vi.fn(async () => ({ sha: 'sha1', treeSha: 'tree1' })),
+    loadPublicSnapshot: vi.fn(async () => ({ sha: 'sha1', files: new Map<string, string>() })),
+    cache: {
+      loadSnapshot: vi.fn(async () => null),
+      saveSnapshot: vi.fn(async () => undefined),
+    },
+    getSession: vi.fn(async () => null),
+    cloneViaRelay: vi.fn(async () => ({ sha: 'sha1', files: new Map<string, string>() })),
+    ...overrides,
+  };
+}
+
+describe('loadRepo cache', () => {
+  it('returns cached files for the resolved SHA without loading a public snapshot', async () => {
+    const cached = filesWithManuscripts([{ id: 'demo', path: 'manuscripts/demo' }]);
+    const cache = {
+      loadSnapshot: vi.fn(async () => cached),
+      saveSnapshot: vi.fn(async () => undefined),
+    };
+    const deps = makeDeps({ cache });
+
+    const result = await loadRepo(ROUTE, deps);
+
+    expect(cache.loadSnapshot).toHaveBeenCalledWith('konsulin-care', 'citizen-science', 'sha1');
+    expect(deps.loadPublicSnapshot).not.toHaveBeenCalled();
+    expect(deps.cache.saveSnapshot).not.toHaveBeenCalled();
+    expect(result.sha).toBe('sha1');
+    expect(await result.workspace.readFile('manuscripts/demo/article.qmd')).toContain('title: Demo');
+    expect(result.isOpenDraft).toBe(true);
+  });
+
+  it('loads a public snapshot and saves it on a cache miss', async () => {
+    const files = filesWithManuscripts([{ id: 'demo', path: 'manuscripts/demo' }]);
+    const deps = makeDeps({
+      loadPublicSnapshot: vi.fn(async () => ({ sha: 'sha1', files })),
+    });
+
+    const result = await loadRepo(ROUTE, deps);
+
+    expect(deps.loadPublicSnapshot).toHaveBeenCalled();
+    expect(deps.cache.saveSnapshot).toHaveBeenCalledWith(
+      'konsulin-care',
+      'citizen-science',
+      'sha1',
+      files,
+    );
+    expect(result.isOpenDraft).toBe(true);
+  });
+});
+
+describe('loadRepo fallback', () => {
+  it('rethrows NotFoundError for an anonymous viewer', async () => {
+    const deps = makeDeps({
+      resolveCommit: vi.fn(async () => {
+        throw new NotFoundError();
+      }),
+      getSession: vi.fn(async () => null),
+    });
+
+    await expect(loadRepo(ROUTE, deps)).rejects.toBeInstanceOf(NotFoundError);
+    expect(deps.cloneViaRelay).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the relay clone for a signed-in viewer', async () => {
+    const files = filesWithManuscripts([{ id: 'demo', path: 'manuscripts/demo' }]);
+    const deps = makeDeps({
+      loadPublicSnapshot: vi.fn(async () => {
+        throw new NotFoundError();
+      }),
+      getSession: vi.fn(async () => ({ login: 'octocat' })),
+      cloneViaRelay: vi.fn(async () => ({ sha: 'private-sha', files })),
+    });
+
+    const result = await loadRepo(ROUTE, deps);
+
+    expect(deps.cloneViaRelay).toHaveBeenCalledWith('konsulin-care', 'citizen-science', undefined);
+    expect(result.sha).toBe('private-sha');
+    expect(result.isOpenDraft).toBe(true);
+    expect(result.manuscripts).toEqual([{ id: 'demo', path: 'manuscripts/demo' }]);
+  });
+});
+
+describe('loadRepo metadata', () => {
+  it('reports no OpenDraft config and no manuscripts without opendraft.yml', async () => {
+    const files = new Map([['manuscripts/demo/article.qmd', 'text']]);
+    const deps = makeDeps({ loadPublicSnapshot: vi.fn(async () => ({ sha: 'sha1', files })) });
+
+    const result = await loadRepo(ROUTE, deps);
+
+    expect(result.isOpenDraft).toBe(false);
+    expect(result.manuscripts).toEqual([]);
+  });
+
+  it('exposes a workspace that rejects writes', async () => {
+    const deps = makeDeps({
+      loadPublicSnapshot: vi.fn(async () => ({
+        sha: 'sha1',
+        files: new Map([['opendraft.yml', 'manuscripts: []\n']]),
+      })),
+    });
+
+    const result = await loadRepo(ROUTE, deps);
+
+    await expect(result.workspace.writeFile('x.md', 'x')).rejects.toThrow();
+    await expect(result.workspace.deleteFile('opendraft.yml')).rejects.toThrow();
+  });
+});
+
+describe('cloneViaRelay', () => {
+  it('is exported as a lazy default clone', () => {
+    expect(typeof cloneViaRelay).toBe('function');
+  });
+});
