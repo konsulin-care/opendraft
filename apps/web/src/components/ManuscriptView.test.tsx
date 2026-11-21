@@ -52,12 +52,16 @@ function blockFile(short: string, title: string): string {
  * Render the view over a freshly seeded workspace.
  *
  * @param files - Repo-relative paths mapped to file contents.
+ * @param readOnly - Whether to render the reader (read-only) surface.
  * @returns The workspace the rendered view reads.
  */
-async function renderView(files: Record<string, string>): Promise<WorkspaceAdapter> {
+async function renderView(
+  files: Record<string, string>,
+  readOnly = false,
+): Promise<WorkspaceAdapter> {
   const ws = new MemoryWorkspace();
   for (const [path, content] of Object.entries(files)) await ws.writeFile(path, content);
-  render(<ManuscriptView workspace={ws} dir={DIR} projectKey={PROJECT} />);
+  render(<ManuscriptView workspace={ws} dir={DIR} projectKey={PROJECT} readOnly={readOnly} />);
   return ws;
 }
 
@@ -146,6 +150,44 @@ describe('ManuscriptView add section button', () => {
     expect(add.className).not.toContain('opacity-0');
     expect(add.className).not.toContain('hidden');
     // Hover insert points remain before each block, none trailing the list.
+    expect(screen.getAllByRole('button', { name: 'Insert block here' })).toHaveLength(1);
+  });
+});
+
+describe('ManuscriptView read-only mode', () => {
+  it('renders no editor toolbars and shows ReaderMetadata instead of the metadata panel', async () => {
+    await renderView(
+      {
+        [`${DIR}/article.qmd`]: articleWith('intro'),
+        [`${DIR}/blocks/_intro.qmd`]: blockFile('intro', 'Introduction'),
+        [`${DIR}/_frontmatter.yml`]: 'title: "Reader Title"\nkeywords: [ocean]\n',
+      },
+      true,
+    );
+
+    expect(screen.queryByRole('toolbar', { name: 'Formatting' })).toBeNull();
+    expect(screen.queryByTestId('metadata-panel')).toBeNull();
+    expect(await screen.findByRole('heading', { name: 'Reader Title' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Introduction' })).toBeInTheDocument();
+  });
+
+  it('renders blocks without add-block controls, while the default view is unchanged', async () => {
+    const files = {
+      [`${DIR}/article.qmd`]: articleWith('intro'),
+      [`${DIR}/blocks/_intro.qmd`]: blockFile('intro', 'Introduction'),
+    };
+    const ws = new MemoryWorkspace();
+    for (const [path, content] of Object.entries(files)) await ws.writeFile(path, content);
+    const readOnlyView = render(
+      <ManuscriptView workspace={ws} dir={DIR} projectKey={PROJECT} readOnly />,
+    );
+    expect(await screen.findByRole('heading', { name: 'Introduction' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '+ Add section' })).toBeNull();
+    expect(screen.queryAllByRole('button', { name: 'Insert block here' })).toHaveLength(0);
+    readOnlyView.unmount();
+
+    await renderView(files);
+    expect(await screen.findByRole('button', { name: '+ Add section' })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Insert block here' })).toHaveLength(1);
   });
 });
