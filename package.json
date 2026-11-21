@@ -4,6 +4,7 @@
   "type": "module",
   "description": "Client-first, Git-native, decentralized scientific publication.",
   "license": "AGPL-3.0-only",
+  "packageManager": "pnpm@12.21.0",
   "engines": {
     "node": ">=20"
   },
