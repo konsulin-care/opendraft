@@ -27,14 +27,14 @@ type Deps struct {
 	// Logger receives request log lines. A nil logger falls back to the
 	// default slog logger.
 	Logger *slog.Logger
-	// Version is the build version reported by the health endpoint.
-	Version string
 	// Now supplies the current time. A nil value falls back to time.Now.
 	Now func() time.Time
 	// GitHub is the GitHub App client used by the auth endpoints.
 	GitHub *github.Client
 	// Sealer seals and opens the session and OAuth transaction cookies.
 	Sealer *session.Sealer
+	// Version is the build version reported by the health endpoint.
+	Version string
 }
 
 // New builds the BFF handler: the health endpoint, the JSON 404 catch-all for
@@ -50,6 +50,7 @@ func New(cfg config.Config, deps Deps) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET "+loginPath, auth.handleLogin)
 	mux.HandleFunc("GET "+installPath, auth.handleInstall)
+	mux.HandleFunc("GET "+callbackPath, auth.handleCallback)
 	mux.HandleFunc("GET "+healthPath, func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{
 			"status":  "ok",
