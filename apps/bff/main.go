@@ -11,8 +11,10 @@ import (
 	"time"
 
 	"github.com/konsulin-care/opendraft/apps/bff/internal/config"
+	"github.com/konsulin-care/opendraft/apps/bff/internal/github"
 	"github.com/konsulin-care/opendraft/apps/bff/internal/httpapi"
 	"github.com/konsulin-care/opendraft/apps/bff/internal/logging"
+	"github.com/konsulin-care/opendraft/apps/bff/internal/session"
 )
 
 const healthcheckArg = "healthcheck"
@@ -20,6 +22,8 @@ const healthcheckArg = "healthcheck"
 const readHeaderTimeout = 10 * time.Second
 
 const shutdownTimeout = 10 * time.Second
+
+const githubHTTPTimeout = 30 * time.Second
 
 // main dispatches the healthcheck subcommand or starts the BFF server.
 func main() {
@@ -46,11 +50,7 @@ func serve(getenv func(string) string, readFile func(string) ([]byte, error)) in
 		return 1
 	}
 
-	handler := httpapi.New(cfg, httpapi.Deps{
-		Logger:  logger,
-		Version: Version,
-		Now:     time.Now,
-	})
+	handler := newHandler(cfg, logger)
 
 	server := &http.Server{
 		Addr:              cfg.Addr,
@@ -85,6 +85,44 @@ func serve(getenv func(string) string, readFile func(string) ([]byte, error)) in
 
 	logger.Info("server stopped")
 	return 0
+}
+
+// newHandler builds the BFF handler from a validated configuration. The GitHub
+// client and the session sealer are wired only when login is enabled; otherwise
+// the gated routes answer login_disabled and one warning names the anonymous
+// read-only mode.
+func newHandler(cfg config.Config, logger *slog.Logger) http.Handler {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	deps := httpapi.Deps{
+		Logger:  logger,
+		Version: Version,
+		Now:     time.Now,
+	}
+
+	if cfg.LoginEnabled {
+		sealer, err := session.NewSealer(cfg.SessionKey, cfg.SessionKeyPrevious)
+		if err != nil {
+			logger.Error("session sealer unavailable", slog.String("error", err.Error()))
+		} else {
+			deps.Sealer = sealer
+			deps.GitHub = &github.Client{
+				WebURL:       cfg.GitHubWebURL,
+				APIURL:       cfg.GitHubAPIURL,
+				ClientID:     cfg.GitHubClientID,
+				ClientSecret: cfg.GitHubClientSecret,
+				HTTP:         &http.Client{Timeout: githubHTTPTimeout},
+				Now:          time.Now,
+			}
+		}
+	}
+
+	if deps.GitHub == nil || deps.Sealer == nil {
+		logger.Warn("login disabled: running in anonymous read-only mode")
+	}
+
+	return httpapi.New(cfg, deps)
 }
 
 // newLogger returns a JSON slog logger wrapped in the redacting handler.
