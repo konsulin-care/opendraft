@@ -45,24 +45,28 @@ func New(cfg config.Config, deps Deps) http.Handler {
 		deps.Now = time.Now
 	}
 
-	auth := newAuthHandler(cfg, deps)
-	logout := newLogoutHandler(deps)
-	repos := newReposHandler(auth, deps)
-	actions := newRepoActionsHandler(auth, deps)
-	git := newGitRelayHandler(cfg, auth)
-
 	api := http.NewServeMux()
-	api.HandleFunc("GET "+loginPath, auth.handleLogin)
-	api.HandleFunc("GET "+installPath, auth.handleInstall)
-	api.HandleFunc("GET "+callbackPath, auth.handleCallback)
-	api.HandleFunc("GET "+sessionPath, auth.handleSession)
-	api.HandleFunc("POST "+logoutPath, logout.handleLogout)
-	api.HandleFunc("POST "+reposPath, repos.handleCreate)
-	api.HandleFunc("GET "+permissionsPath, actions.handlePermissions)
-	api.HandleFunc("POST "+pullsPath, actions.handlePulls)
-	api.HandleFunc("POST "+forksPath, actions.handleForks)
-	api.HandleFunc("GET "+gitRelayPath, git.handleRelay)
-	api.HandleFunc("POST "+gitRelayPath, git.handleRelay)
+	if deps.GitHub == nil || deps.Sealer == nil {
+		registerDisabledRoutes(api)
+	} else {
+		auth := newAuthHandler(cfg, deps)
+		logout := newLogoutHandler(deps)
+		repos := newReposHandler(auth, deps)
+		actions := newRepoActionsHandler(auth, deps)
+		git := newGitRelayHandler(cfg, auth)
+
+		api.HandleFunc("GET "+loginPath, auth.handleLogin)
+		api.HandleFunc("GET "+installPath, auth.handleInstall)
+		api.HandleFunc("GET "+callbackPath, auth.handleCallback)
+		api.HandleFunc("GET "+sessionPath, auth.handleSession)
+		api.HandleFunc("POST "+logoutPath, logout.handleLogout)
+		api.HandleFunc("POST "+reposPath, repos.handleCreate)
+		api.HandleFunc("GET "+permissionsPath, actions.handlePermissions)
+		api.HandleFunc("POST "+pullsPath, actions.handlePulls)
+		api.HandleFunc("POST "+forksPath, actions.handleForks)
+		api.HandleFunc("GET "+gitRelayPath, git.handleRelay)
+		api.HandleFunc("POST "+gitRelayPath, git.handleRelay)
+	}
 	api.HandleFunc("GET "+healthPath, func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{
 			"status":  "ok",
