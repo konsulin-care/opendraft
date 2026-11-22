@@ -25,5 +25,6 @@ export {
 } from './deo-types.js';
 export type { SectionTypePreset } from './deo-types.js';
 export { addManuscript } from './manuscripts.js';
+export { isValidManuscriptId, normalizeManuscriptId } from './manuscript-id.js';
 export { OPENDRAFT_CONFIG_PATH, SHARED_BIB_PATH, scaffoldProject } from './scaffold.js';
 export type { ProtocolBlock, ScaffoldOptions } from './scaffold.js';
