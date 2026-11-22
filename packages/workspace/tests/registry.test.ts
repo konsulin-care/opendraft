@@ -166,6 +166,52 @@ describe('ProjectRegistry.remove', () => {
   });
 });
 
+describe('ProjectRegistry project sources', () => {
+  let registry: ProjectRegistry;
+
+  const githubSource = {
+    kind: 'github' as const,
+    owner: 'viewer',
+    repo: 'paper-fork',
+    branch: 'opendraft/viewer/20250101-120000',
+    upstream: { owner: 'author', repo: 'paper', defaultBranch: 'main' },
+    private: false,
+    pushed: true,
+    syncedSha: 'abc123',
+    digest: { 'opendraft.yml': 'sha1', 'manuscripts/a/article.qmd': 'sha2' },
+    pullNumber: 42,
+  };
+
+  beforeEach(async () => {
+    registry = await freshRegistry();
+  });
+
+  afterEach(async () => {
+    await registry.close();
+  });
+
+  it('create persists a given GitHub source', async () => {
+    const record = await registry.create('Paper', githubSource);
+    expect(record.source).toEqual(githubSource);
+    expect((await registry.get(record.id))?.source).toEqual(githubSource);
+  });
+
+  it('create defaults to a local source when none is given', async () => {
+    const record = await registry.create('Paper');
+    expect(record.source).toEqual({ kind: 'local' });
+  });
+
+  it('setSource replaces the stored source', async () => {
+    const record = await registry.create('Paper');
+    await registry.setSource(record.id, githubSource);
+    expect((await registry.get(record.id))?.source).toEqual(githubSource);
+  });
+
+  it('setSource throws for an unknown id', async () => {
+    await expect(registry.setSource('missing', githubSource)).rejects.toThrow('Project not found');
+  });
+});
+
 describe('ProjectRegistry persistence', () => {
   let registry: ProjectRegistry;
 

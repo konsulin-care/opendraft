@@ -1,26 +1,18 @@
 import { openDB, type IDBPDatabase } from 'idb';
 import { REGISTRY_DB } from './db-names.js';
 import { workspaceManager, type WorkspaceManager } from './manager.js';
+import type { ProjectSource } from './project-source.js';
+
+export type {
+  ProjectSource,
+  ProjectSourceGitHub,
+  ProjectSourceLocal,
+  ProjectUpstream,
+} from './project-source.js';
 
 const PROJECTS_STORE = 'projects';
 const META_STORE = 'meta';
 const DB_VERSION = 1;
-
-/** A local, on-disk project source. */
-export interface ProjectSourceLocal {
-  kind: 'local';
-}
-
-/** A GitHub-hosted project source (reserved for future clone support). */
-export interface ProjectSourceGitHub {
-  kind: 'github';
-  owner: string;
-  repo: string;
-  branch: string;
-}
-
-/** Where a project's files come from. Union so GitHub sources can be added later. */
-export type ProjectSource = ProjectSourceLocal | ProjectSourceGitHub;
 
 /** Persistent record describing a writing project. */
 export interface ProjectRecord {
@@ -124,22 +116,40 @@ export class ProjectRegistry {
   }
 
   /**
-   * Create a new project with a fresh UUID and local source.
+   * Create a new project with a fresh UUID.
    * @param name - Human-readable project name.
+   * @param source - Project source; defaults to a local source.
    * @returns The created record.
    */
-  async create(name: string): Promise<ProjectRecord> {
+  async create(name: string, source: ProjectSource = { kind: 'local' }): Promise<ProjectRecord> {
     const now = nextTimestamp();
     const record: ProjectRecord = {
       id: crypto.randomUUID(),
       name,
-      source: { kind: 'local' },
+      source,
       createdAt: now,
       lastOpenedAt: now,
     };
     const db = await this.getDB();
     await db.put(PROJECTS_STORE, record, record.id);
     return record;
+  }
+
+  /**
+   * Replace a project's source.
+   * @param id - Project id.
+   * @param source - New project source.
+   * @returns The updated record.
+   */
+  async setSource(id: string, source: ProjectSource): Promise<ProjectRecord> {
+    const db = await this.getDB();
+    const record = (await db.get(PROJECTS_STORE, id)) as ProjectRecord | undefined;
+    if (!record) {
+      throw new Error(`Project not found: ${id}`);
+    }
+    const updated: ProjectRecord = { ...record, source };
+    await db.put(PROJECTS_STORE, updated, id);
+    return updated;
   }
 
   /**
