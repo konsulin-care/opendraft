@@ -147,7 +147,7 @@ describe('CitekeyTooltip — Floating UI positioning', () => {
     expect(computePositionMock).toHaveBeenCalledTimes(1);
     const [ref, , options] = computePositionMock.mock.calls[0];
     expect(ref).toBe(anchor);
-    expect(options).toMatchObject({ placement: 'bottom' });
+    expect(options).toMatchObject({ strategy: 'fixed', placement: 'bottom' });
     expect(options.middleware).toEqual([
       'offset-middleware',
       'flip-middleware',

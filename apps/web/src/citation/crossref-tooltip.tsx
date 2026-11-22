@@ -68,6 +68,7 @@ export function CrossrefTooltip(props: CrossrefTooltipProps) {
     /** Compute and apply the tooltip position. */
     async function update() {
       const { x, y } = await computePosition(anchorEl!, el!, {
+        strategy: 'fixed',
         placement: 'bottom',
         middleware: [offset(8), flip(), shift({ padding: 8 })],
       });

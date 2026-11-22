@@ -46,6 +46,27 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
+describe('CrossrefTooltip — Floating UI positioning', () => {
+  it('calls computePosition with the fixed strategy', async () => {
+    const anchor = createMockAnchor();
+    await act(async () => {
+      render(
+        <CrossrefTooltip
+          id="fig-cat"
+          kind="fig"
+          caption="A cat"
+          anchorEl={anchor}
+        />,
+      );
+    });
+
+    expect(computePositionMock).toHaveBeenCalledTimes(1);
+    const [ref, , options] = computePositionMock.mock.calls[0];
+    expect(ref).toBe(anchor);
+    expect(options).toMatchObject({ strategy: 'fixed', placement: 'bottom' });
+  });
+});
+
 describe('CrossrefTooltip — rendering', () => {
   it('renders the kind name, id and caption for a known label', async () => {
     const anchor = createMockAnchor();
@@ -81,6 +102,32 @@ describe('CrossrefTooltip — rendering', () => {
 
     const tooltip = screen.getByRole('tooltip');
     expect(tooltip.textContent).toBe('Unknown cross-reference: fig-nope');
+  });
+});
+
+describe('CrossrefTooltip — Floating UI positioning', () => {
+  it('calls computePosition with the fixed strategy', async () => {
+    const anchor = createMockAnchor();
+    await act(async () => {
+      render(
+        <CrossrefTooltip
+          id="fig-cat"
+          kind="fig"
+          caption="A cat"
+          anchorEl={anchor}
+        />,
+      );
+    });
+
+    expect(computePositionMock).toHaveBeenCalledTimes(1);
+    const [ref, , options] = computePositionMock.mock.calls[0];
+    expect(ref).toBe(anchor);
+    expect(options).toMatchObject({ strategy: 'fixed', placement: 'bottom' });
+    expect(options.middleware).toEqual([
+      'offset-middleware',
+      'flip-middleware',
+      'shift-middleware',
+    ]);
   });
 });
 
