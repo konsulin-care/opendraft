@@ -80,6 +80,50 @@ describe('commitFilesOnBranch', () => {
   });
 });
 
+describe('commitFilesOnBranch removals', () => {
+  it('removes the listed files from the working tree and the new commit tree', async () => {
+    const fs = await initRepo();
+
+    const first = await commitFilesOnBranch(fs, DIR, {
+      branch: 'opendraft/init',
+      files: new Map([['obsolete.txt', 'old content']]),
+      message: 'Add a file to remove later',
+      author: AUTHOR,
+    });
+    expect(await readBlob(fs, first, 'obsolete.txt')).toBe('old content');
+
+    const sha = await commitFilesOnBranch(fs, DIR, {
+      branch: 'opendraft/second',
+      files: new Map([['kept.txt', 'kept content']]),
+      remove: ['obsolete.txt'],
+      message: 'Remove obsolete file',
+      author: AUTHOR,
+    });
+
+    const { commit } = await git.readCommit({ fs, dir: DIR, oid: sha });
+    expect(commit.tree).toBeTruthy();
+    await expect(readBlob(fs, sha, 'obsolete.txt')).rejects.toThrow();
+    expect(await readBlob(fs, sha, 'kept.txt')).toBe('kept content');
+    expect(await readBlob(fs, sha, 'existing.txt')).toBe('keep me');
+    await expect(fs.promises.readFile(`${DIR}/obsolete.txt`)).rejects.toThrow();
+  });
+
+  it('ignores remove entries for missing files and keeps untouched files', async () => {
+    const fs = await initRepo();
+
+    const sha = await commitFilesOnBranch(fs, DIR, {
+      branch: 'opendraft/init',
+      files: new Map(),
+      remove: ['missing.txt'],
+      message: 'Ignore missing removal',
+      author: AUTHOR,
+    });
+
+    expect(await readBlob(fs, sha, 'existing.txt')).toBe('keep me');
+    await expect(readBlob(fs, sha, 'missing.txt')).rejects.toThrow();
+  });
+});
+
 describe('readWorkingFiles', () => {
   it('returns every working-tree file path and content excluding .git', async () => {
     const fs = await initRepo();

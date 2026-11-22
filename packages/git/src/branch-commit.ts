@@ -5,6 +5,8 @@ import type { FsClient } from 'isomorphic-git';
 export interface CommitFilesOnBranchOptions {
   branch: string;
   files: Map<string, string>;
+  /** Repository-relative paths to delete from the working tree and stage as removals. */
+  remove?: string[];
   message: string;
   author: { name: string; email: string };
 }
@@ -14,6 +16,7 @@ interface PromiseFs {
   readFile: (filepath: string) => Promise<unknown>;
   writeFile: (filepath: string, data: Uint8Array | string) => Promise<unknown>;
   mkdir: (filepath: string, opts?: { recursive?: boolean }) => Promise<unknown>;
+  unlink: (filepath: string) => Promise<unknown>;
 }
 
 /**
@@ -80,11 +83,11 @@ export async function readWorkingFiles(
 }
 
 /**
- * Create or check out a branch, write files, stage and commit them.
- * Existing files not present in the map are left untouched.
+ * Create or check out a branch, write and remove files, stage and commit them.
+ * Existing files not present in the map and not listed for removal are left untouched.
  * @param fs - Isomorphic-git filesystem client.
  * @param dir - Repository directory.
- * @param opts - Branch, files, commit message and author.
+ * @param opts - Branch, files, removals, commit message and author.
  * @returns The new commit sha.
  */
 export async function commitFilesOnBranch(
@@ -109,6 +112,19 @@ export async function commitFilesOnBranch(
 
   for (const filepath of opts.files.keys()) {
     await git.add({ fs, dir, filepath });
+  }
+
+  for (const filepath of opts.remove ?? []) {
+    try {
+      await promises.unlink(joinPath(dir, filepath));
+    } catch {
+      // Missing working-tree file: nothing to delete.
+    }
+    try {
+      await git.remove({ fs, dir, filepath });
+    } catch {
+      // Missing or untracked file: nothing to stage as removed.
+    }
   }
 
   return git.commit({
