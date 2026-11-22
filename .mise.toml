@@ -44,8 +44,8 @@ description = "Run TypeScript type checker"
 run = "pnpm exec tsc --noEmit"
 
 [tasks.typecheck-web]
-description = "Run TypeScript type checker for apps/web"
-run = "pnpm run typecheck"
+description = "Run TypeScript type checker for apps/web (src and the vite config project)"
+run = "pnpm exec tsc -b"
 
 dir = "apps/web"
 
