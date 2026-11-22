@@ -17,6 +17,7 @@ import type { ConvertResult } from './convert';
 import type { LoadedRepo } from './load-repo';
 import { NotFoundError, RateLimitedError } from './github-public';
 import type { ReaderRoute } from './route';
+import { UnlistedBanner } from './UnlistedBanner';
 
 /** Reader state loaded from the route and injected dependencies. */
 export interface ReaderState {
@@ -46,6 +47,8 @@ export interface ReaderContentProps {
   state: ReaderState;
   /** Start a conversion with the chosen registration decisions. */
   convert: (decisions: InitDecisions) => Promise<ConvertResult>;
+  /** Register unlisted manuscript ids in the project configuration. */
+  register: (ids: string[]) => Promise<ConvertResult>;
 }
 
 /** Return the reader path (`/{owner}/{repo}[/tree/{ref}]`) for a route. */
@@ -108,7 +111,7 @@ function ManuscriptSwitcher({
   );
 }
 
-/** Discover a plain repository's existing manuscripts, read-only. */
+/** Discover a repository's existing manuscripts, read-only. */
 function useDiscovery(repo: LoadedRepo | null): {
   discovery: ProjectDiscovery | null;
   error: unknown;
@@ -119,7 +122,7 @@ function useDiscovery(repo: LoadedRepo | null): {
   useEffect(() => {
     setDiscovery(null);
     setError(null);
-    if (repo === null || repo.isOpenDraft) return;
+    if (repo === null) return;
 
     let cancelled = false;
     void (async () => {
@@ -145,7 +148,7 @@ function useDiscovery(repo: LoadedRepo | null): {
  * @param props - See {@link ReaderContentProps}.
  * @returns The content for the current reader state.
  */
-export function ReaderContent({ route, state, convert }: ReaderContentProps) {
+export function ReaderContent({ route, state, convert, register }: ReaderContentProps) {
   const { session, loginEnabled, repo, error, loading, selected, select } = state;
   const { discovery, error: discoveryError } = useDiscovery(repo);
   const returnTo = readerPath(route);
@@ -174,6 +177,9 @@ export function ReaderContent({ route, state, convert }: ReaderContentProps) {
   const manuscript = repo.manuscripts[selected] ?? repo.manuscripts[0];
   return (
     <>
+      {discovery !== null && discovery.unlisted.length > 0 && session !== null ? (
+        <UnlistedBanner discovery={discovery} session={session} register={register} />
+      ) : null}
       <ManuscriptSwitcher manuscripts={repo.manuscripts} selected={selected} onSelect={select} />
       {manuscript === undefined ? (
         <p className="text-sm text-black">No manuscripts found.</p>

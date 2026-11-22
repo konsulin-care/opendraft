@@ -29,6 +29,8 @@ import { ReaderContent } from './ReaderContent';
 import type { ReaderState } from './ReaderContent';
 import { convertRepository } from './convert';
 import type { ConvertDeps, ConvertInput, ConvertResult } from './convert';
+import { registerManuscripts } from './register';
+import type { RegisterManuscriptsInput } from './register';
 
 /** Reader page dependencies, injectable for tests. */
 export interface ReaderPageDeps {
@@ -40,7 +42,12 @@ export interface ReaderPageDeps {
   logout: () => Promise<void>;
   /** Convert a plain repository into an OpenDraft project. */
   convert: (input: ConvertInput) => Promise<ConvertResult>;
+  /** Register unlisted manuscript ids in an existing project. */
+  register: (ids: string[]) => Promise<ConvertResult>;
 }
+
+/** Reader page dependencies without the route-dependent register hook. */
+type ReaderPageBaseDeps = Omit<ReaderPageDeps, 'register'>;
 
 /** Props for {@link ReaderPage}. */
 export interface ReaderPageProps {
@@ -60,8 +67,8 @@ function readerPath(route: ReaderRoute): string {
   return route.ref === undefined ? base : `${base}/tree/${route.ref}`;
 }
 
-/** Convert lazily with the browser git client, Buffer polyfill and protocol. */
-async function convertWithGit(input: ConvertInput): Promise<ConvertResult> {
+/** Build dependencies on the browser git client, Buffer polyfill and protocol. */
+async function browserConvertDeps(): Promise<ConvertDeps> {
   await import('../github/buffer-polyfill');
   const git = await import('@opendraft/git');
   const http = (
@@ -69,7 +76,7 @@ async function convertWithGit(input: ConvertInput): Promise<ConvertResult> {
   ).default;
   const { PROTOCOL } = await import('../project/scaffold');
 
-  const deps: ConvertDeps = {
+  return {
     getRepoPermissions: (owner, repo) => getRepoPermissions(owner, repo),
     forkRepo: (owner, repo) => forkRepo(owner, repo),
     createPullRequest: (owner, repo, pullRequest) =>
@@ -90,12 +97,20 @@ async function convertWithGit(input: ConvertInput): Promise<ConvertResult> {
     readWorkingFiles: (fs, dir) => git.readWorkingFiles(fs as GitFs, dir),
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   };
+}
 
-  return convertRepository(input, deps);
+/** Convert lazily with the browser git client, Buffer polyfill and protocol. */
+async function convertWithGit(input: ConvertInput): Promise<ConvertResult> {
+  return convertRepository(input, await browserConvertDeps());
+}
+
+/** Register manuscripts lazily with the browser git client and protocol. */
+async function registerWithGit(input: RegisterManuscriptsInput): Promise<ConvertResult> {
+  return registerManuscripts(input, await browserConvertDeps());
 }
 
 /** Live reader dependencies backed by the anonymous API, relay and BFF. */
-const defaultDeps: ReaderPageDeps = {
+const defaultDeps: ReaderPageBaseDeps = {
   loadRepo: (route) =>
     loadReaderRepo(route, {
       resolveCommit,
@@ -110,7 +125,7 @@ const defaultDeps: ReaderPageDeps = {
 };
 
 /** Load the session and repository snapshot for a route. */
-function useReaderState(route: ReaderRoute, deps: ReaderPageDeps): ReaderState {
+function useReaderState(route: ReaderRoute, deps: ReaderPageBaseDeps): ReaderState {
   const [session, setSession] = useState<BffSession | null>(null);
   const [loginEnabled, setLoginEnabled] = useState(true);
   const [repo, setRepo] = useState<LoadedRepo | null>(null);
@@ -164,17 +179,30 @@ function useReaderState(route: ReaderRoute, deps: ReaderPageDeps): ReaderState {
  * @returns The header plus the loading indicator, error message, conversion
  *          panel or read-only manuscript view.
  */
-export function ReaderPage({ route, deps = defaultDeps }: ReaderPageProps) {
-  const state = useReaderState(route, deps);
+export function ReaderPage({ route, deps }: ReaderPageProps) {
+  const baseDeps = deps ?? defaultDeps;
+  const state = useReaderState(route, baseDeps);
 
   /** Run the conversion for the signed-in viewer with its decisions. */
   const handleConvert = async (decisions: InitDecisions): Promise<ConvertResult> => {
     if (state.session === null) throw new Error('Sign in to convert this repository.');
-    return deps.convert({
+    return baseDeps.convert({
       owner: route.owner,
       repo: route.repo,
       session: state.session,
       decisions,
+    });
+  };
+
+  /** Register unlisted manuscripts for the signed-in viewer. */
+  const handleRegister = async (ids: string[]): Promise<ConvertResult> => {
+    if (state.session === null) throw new Error('Sign in to register manuscripts.');
+    if (deps !== undefined) return deps.register(ids);
+    return registerWithGit({
+      owner: route.owner,
+      repo: route.repo,
+      session: state.session,
+      ids,
     });
   };
 
@@ -187,7 +215,12 @@ export function ReaderPage({ route, deps = defaultDeps }: ReaderPageProps) {
         loginEnabled={state.loginEnabled}
       />
       <main className="flex flex-1 flex-col gap-4 p-4">
-        <ReaderContent route={route} state={state} convert={handleConvert} />
+        <ReaderContent
+          route={route}
+          state={state}
+          convert={handleConvert}
+          register={handleRegister}
+        />
       </main>
     </div>
   );
