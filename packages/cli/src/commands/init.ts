@@ -12,7 +12,7 @@ import { DEFAULT_INIT_IO } from './init-io.js';
 import type { InitIo } from './init-io.js';
 
 /** Usage line printed for flag errors. */
-const INIT_USAGE = 'usage: opendraft init [dir] [--manuscript <id>]';
+const INIT_USAGE = 'usage: opendraft init [dir] [--manuscript <id>] [--yes] [--dry-run]';
 
 /** Canonical protocol repository recorded in scaffolded configs. */
 const PROTOCOL_REPOSITORY = 'https://github.com/konsulin-care/opendraft';
@@ -31,30 +31,44 @@ interface InitArgs {
   dir: string | null;
   /** Optional manuscript id from `--manuscript`. */
   manuscriptId: string | null;
+  /** True when unlisted manuscripts are registered without a prompt. */
+  yes: boolean;
+  /** True when the plan is printed but nothing is written. */
+  dryRun: boolean;
   /** True when an unknown flag was seen or `--manuscript` lacks a value. */
   invalid: boolean;
 }
 
 /**
- * Parse `init` arguments: one optional positional directory and
- * `--manuscript <id>`.
+ * Parse `init` arguments: one optional positional directory,
+ * `--manuscript <id>`, `--yes`, and `--dry-run`.
  *
  * @param args - Arguments after the command name.
- * @returns Parsed directory, optional manuscript id, and invalid-flag marker.
+ * @returns Parsed directory, optional manuscript id, flags, and invalid-flag marker.
  */
 function parseArgs(args: string[]): InitArgs {
   let dir: string | null = null;
   let manuscriptId: string | null = null;
+  let yes = false;
+  let dryRun = false;
   let invalid = false;
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
     if (arg === '--manuscript') {
       const value = args[i + 1];
       if (value === undefined || value.startsWith('--')) {
-        return { dir, manuscriptId: null, invalid: true };
+        return { dir, manuscriptId: null, yes, dryRun, invalid: true };
       }
       manuscriptId = value;
       i += 1;
+      continue;
+    }
+    if (arg === '--yes') {
+      yes = true;
+      continue;
+    }
+    if (arg === '--dry-run') {
+      dryRun = true;
       continue;
     }
     if (arg.startsWith('--')) {
@@ -63,7 +77,7 @@ function parseArgs(args: string[]): InitArgs {
     }
     if (dir === null) dir = arg;
   }
-  return { dir, manuscriptId, invalid };
+  return { dir, manuscriptId, yes, dryRun, invalid };
 }
 
 /**
@@ -79,16 +93,34 @@ function reportConfigErrors(discovery: ProjectDiscovery): void {
 /**
  * Ask for confirmation before registering unlisted manuscripts.
  *
+ * `--yes` registers every unlisted id. Otherwise an interactive run asks
+ * for confirmation and a non-interactive run prints the ids and asks for
+ * `--yes` instead of writing anything. A dry run previews the same ids
+ * without writing, so it does not require confirmation.
+ *
  * @param io - Interaction surface for prompts.
  * @param unlisted - Registrable candidate ids absent from the configuration.
- * @returns The ids to register; empty when the user declines.
+ * @param yes - True when `--yes` was supplied.
+ * @param dryRun - True when only a preview will be printed.
+ * @returns The ids to register, or null when non-interactive input needs `--yes`.
  */
-async function confirmUnlisted(io: InitIo, unlisted: string[]): Promise<string[]> {
-  if (!io.interactive) return unlisted;
-  const answer = await io.ask(
-    `Register unlisted manuscripts (${unlisted.join(', ')})? [y/N] `,
-  );
-  return /^y(es)?$/i.test(answer.trim()) ? unlisted : [];
+async function confirmUnlisted(
+  io: InitIo,
+  unlisted: string[],
+  yes: boolean,
+  dryRun: boolean,
+): Promise<string[] | null> {
+  if (yes) return unlisted;
+  if (io.interactive) {
+    const answer = await io.ask(
+      `Register unlisted manuscripts (${unlisted.join(', ')})? [y/N] `,
+    );
+    return /^y(es)?$/i.test(answer.trim()) ? unlisted : [];
+  }
+  if (dryRun) return unlisted;
+  for (const id of unlisted) console.log(id);
+  console.error('Unlisted manuscripts found. Re-run with --yes to register them.');
+  return null;
 }
 
 /**
@@ -114,19 +146,27 @@ async function chooseNewManuscriptId(
  * @param io - Interaction surface for prompts.
  * @param discovery - Read-only discovery result for the project.
  * @param manuscriptId - Id supplied through `--manuscript`, if any.
+ * @param flags - Parsed `--yes` and `--dry-run` flags.
  * @returns Decisions to plan, or an immediate exit code.
  */
 async function resolveDecisions(
   io: InitIo,
   discovery: ProjectDiscovery,
   manuscriptId: string | null,
+  flags: { yes: boolean; dryRun: boolean },
 ): Promise<{ decisions: InitDecisions } | { exit: number }> {
   if (discovery.config === 'valid') {
     if (discovery.unlisted.length === 0) {
       console.log('nothing to do');
       return { exit: 0 };
     }
-    const confirmed = await confirmUnlisted(io, discovery.unlisted);
+    const confirmed = await confirmUnlisted(
+      io,
+      discovery.unlisted,
+      flags.yes,
+      flags.dryRun,
+    );
+    if (confirmed === null) return { exit: 2 };
     if (confirmed.length === 0) {
       console.log('nothing to do');
       return { exit: 0 };
@@ -158,10 +198,14 @@ async function resolveDecisions(
  * registers all registrable candidates, scaffolding a new manuscript only
  * when none exists. `--manuscript` is therefore optional and used only when
  * there is no registrable candidate. Non-interactive runs without a
- * candidate or an id exit 2.
+ * candidate or an id exit 2. `--yes` registers unlisted manuscripts without
+ * prompting; without it a non-interactive configured project with unlisted
+ * folders exits 2. `--dry-run` prints the planned operations and writes
+ * nothing.
  *
  * @param args - Arguments after the command name: optional project
- *               directory and optional `--manuscript <id>`.
+ *               directory, optional `--manuscript <id>`, `--yes`, and
+ *               `--dry-run`.
  * @param io - Injectable interaction surface; non-interactive by default.
  * @returns Promise of the exit code: 0 on success or nothing to do, 1 for
  *          invalid config, invalid id, or write failure, 2 on usage errors.
@@ -170,7 +214,7 @@ export async function initCommand(
   args: string[],
   io: InitIo = DEFAULT_INIT_IO,
 ): Promise<number> {
-  const { dir, manuscriptId, invalid } = parseArgs(args);
+  const { dir, manuscriptId, yes, dryRun, invalid } = parseArgs(args);
   if (invalid) {
     console.error(INIT_USAGE);
     return 2;
@@ -192,11 +236,17 @@ export async function initCommand(
     return 1;
   }
 
-  const decisions = await resolveDecisions(io, discovery, manuscriptId);
+  const decisions = await resolveDecisions(io, discovery, manuscriptId, { yes, dryRun });
   if ('exit' in decisions) return decisions.exit;
 
   try {
     const plan = await planInit(ws, discovery, decisions.decisions, { protocol: PROTOCOL });
+    if (dryRun) {
+      for (const file of plan.files) {
+        console.log(`${file.op} ${file.path} (${file.reason})`);
+      }
+      return 0;
+    }
     await applyPlan(ws, plan);
   } catch (err: unknown) {
     console.error(err instanceof Error ? err.message : String(err));
