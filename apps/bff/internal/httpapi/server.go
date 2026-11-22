@@ -53,6 +53,7 @@ func New(cfg config.Config, deps Deps) http.Handler {
 		logout := newLogoutHandler(deps)
 		repos := newReposHandler(auth, deps)
 		actions := newRepoActionsHandler(auth, deps)
+		suggestions := newSuggestionsHandler(auth, deps)
 		git := newGitRelayHandler(cfg, auth)
 
 		api.HandleFunc("GET "+loginPath, auth.handleLogin)
@@ -64,6 +65,9 @@ func New(cfg config.Config, deps Deps) http.Handler {
 		api.HandleFunc("GET "+permissionsPath, actions.handlePermissions)
 		api.HandleFunc("POST "+pullsPath, actions.handlePulls)
 		api.HandleFunc("POST "+forksPath, actions.handleForks)
+		api.HandleFunc("GET "+branchesPath, suggestions.handleBranches)
+		api.HandleFunc("GET "+pullsPath, suggestions.handlePullLookup)
+		api.HandleFunc("POST "+mergeUpstreamPath, suggestions.handleMergeUpstream)
 		api.HandleFunc("GET "+gitRelayPath, git.handleRelay)
 		api.HandleFunc("POST "+gitRelayPath, git.handleRelay)
 	}
