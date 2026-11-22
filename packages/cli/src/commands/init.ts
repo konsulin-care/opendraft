@@ -113,7 +113,7 @@ async function confirmUnlisted(
   if (yes) return unlisted;
   if (io.interactive) {
     const answer = await io.ask(
-      `Register unlisted manuscripts (${unlisted.join(', ')})? [y/N] `,
+      `Add ${unlisted.length} unlisted manuscript(s) (${unlisted.join(', ')}) to opendraft.yml? [y/N] `,
     );
     return /^y(es)?$/i.test(answer.trim()) ? unlisted : [];
   }
@@ -136,7 +136,7 @@ async function chooseNewManuscriptId(
 ): Promise<string | null> {
   if (manuscriptId !== null) return manuscriptId;
   if (!io.interactive) return null;
-  const answer = await io.ask('Project name: ');
+  const answer = await io.ask('No manuscripts found. Project name: ');
   return normalizeManuscriptId(answer);
 }
 
