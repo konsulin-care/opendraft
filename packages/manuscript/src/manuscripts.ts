@@ -12,48 +12,7 @@ import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { MANUSCRIPT_ID_PATTERN } from '@opendraft/schema';
 import { parse, stringify } from 'yaml';
 import { OPENDRAFT_CONFIG_PATH } from './scaffold.js';
-
-/** Build the container article text (metadata frontmatter + refs fence). */
-function containerArticle(): string {
-  return `---
-metadata-files:
-- _author.yml
-- _abstract.yml
-- _frontmatter.yml
-bibliography: ../references.bib
----
-
-::: {#refs}
-:::
-`;
-}
-
-/** Starter author metadata, mirroring templates/manuscript/_author.yml. */
-const AUTHOR_YML = `authors: []
-affiliations: []
-`;
-
-/** Starter abstract, mirroring templates/manuscript/_abstract.yml. */
-const ABSTRACT_YML = `abstract: ""\n`;
-
-/**
- * Build the starter frontmatter for a new manuscript.
- *
- * @returns Frontmatter YAML text stamped with today's local date.
- */
-function frontmatterYml(): string {
-  const now = new Date();
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
-  const date = `${now.getFullYear()}-${mm}-${dd}`;
-  return `title: "Article Title"
-date: ${date}
-keywords:
-  - keyword1
-  - keyword2
-license: "CC BY 4.0"
-`;
-}
+import { starterManuscriptFiles, todayIsoDate } from './templates.js';
 
 /**
  * Narrow an arbitrary parsed value to a plain record.
@@ -102,10 +61,9 @@ export async function addManuscript(ws: WorkspaceAdapter, id: string): Promise<v
   }
 
   const dir = `manuscripts/${id}`;
-  await ws.writeFile(`${dir}/article.qmd`, containerArticle());
-  await ws.writeFile(`${dir}/_author.yml`, AUTHOR_YML);
-  await ws.writeFile(`${dir}/_abstract.yml`, ABSTRACT_YML);
-  await ws.writeFile(`${dir}/_frontmatter.yml`, frontmatterYml());
+  for (const [file, content] of Object.entries(starterManuscriptFiles(todayIsoDate()))) {
+    await ws.writeFile(`${dir}/${file}`, content);
+  }
 
   await ws.writeFile(
     OPENDRAFT_CONFIG_PATH,
