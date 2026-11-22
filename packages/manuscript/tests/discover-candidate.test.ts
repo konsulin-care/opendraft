@@ -67,6 +67,48 @@ describe('classifyCandidate — valid block layout', () => {
     expect(candidate.status).toBe('valid');
     expect(candidate.layout).toBe('legacy');
   });
+
+  it('reports legacy layout when the blocks directory is absent', async () => {
+    const ws = new MemoryWorkspace();
+    await ws.writeFile('manuscripts/plain-paper/article.qmd', ARTICLE_HEAD);
+    await ws.writeFile('manuscripts/plain-paper/_author.yml', 'authors: []\n');
+    await ws.writeFile('manuscripts/plain-paper/_abstract.yml', 'abstract: ""\n');
+    await ws.writeFile('manuscripts/plain-paper/_frontmatter.yml', 'title: "Article"\n');
+
+    const candidate = await classifyCandidate(ws, 'manuscripts/plain-paper');
+
+    expect(candidate.status).toBe('valid');
+    expect(candidate.layout).toBe('legacy');
+    expect(candidate.warnings).toEqual([]);
+  });
+});
+
+describe('classifyCandidate — front-matter warnings', () => {
+  it('warns about a bibliography path that is not ../references.bib', async () => {
+    const ws = await blockFixture('manuscripts/other-bib');
+    await ws.writeFile(
+      'manuscripts/other-bib/article.qmd',
+      `${ARTICLE_HEAD.replace('bibliography: ../references.bib', 'bibliography: refs.bib')}\n`,
+    );
+
+    const candidate = await classifyCandidate(ws, 'manuscripts/other-bib');
+
+    expect(candidate.status).toBe('valid');
+    expect(candidate.warnings).toEqual(['bibliography-mismatch']);
+  });
+
+  it('warns when metadata-files omits a metadata starter file and keeps the status valid', async () => {
+    const ws = await blockFixture('manuscripts/incomplete-metadata');
+    await ws.writeFile(
+      'manuscripts/incomplete-metadata/article.qmd',
+      `${ARTICLE_HEAD.replace('- _abstract.yml\n', '')}\n`,
+    );
+
+    const candidate = await classifyCandidate(ws, 'manuscripts/incomplete-metadata');
+
+    expect(candidate.status).toBe('valid');
+    expect(candidate.warnings).toEqual(['metadata-files-mismatch']);
+  });
 });
 
 describe('classifyCandidate — repairable', () => {
