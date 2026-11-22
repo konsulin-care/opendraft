@@ -1,15 +1,10 @@
 /**
  * Repository conversion for the reader.
  *
- * Converts a plain GitHub repository into an OpenDraft project by cloning it
- * through the authenticated git relay, discovering any existing manuscripts,
- * planning the project initialization and pushing the result onto
- * `opendraft/init`. Depending on push permission and GitHub App installation,
- * the flow either opens a pull request through the BFF or returns a GitHub
- * compare URL against the user's fork.
- *
- * The module is pure: every GitHub, git and workspace operation is injected so
- * it never statically imports `@opendraft/git` or the BFF client.
+ * Clones a GitHub repository, discovers existing manuscripts, plans the
+ * project initialization and pushes the result onto `opendraft/init`. Every
+ * GitHub, git and workspace operation is injected so the module never
+ * statically imports `@opendraft/git` or the BFF client.
  */
 
 import { MemoryWorkspace } from '@opendraft/workspace';
@@ -120,10 +115,7 @@ export type ConvertResult =
   | { kind: 'compare'; url: string };
 
 /**
- * Choose registration decisions when the caller did not provide any.
- *
- * Registers every registrable candidate. When none exists, asks for a new
- * manuscript derived from the repository name.
+ * Register every candidate, or ask for a new manuscript named after the repo.
  *
  * @param discovery - Read-only project discovery result.
  * @param repo - Repository name used for the new manuscript id.
@@ -137,13 +129,7 @@ function defaultDecisions(discovery: ProjectDiscovery, repo: string): InitDecisi
   return { newManuscriptId: normalizeManuscriptId(repo) };
 }
 
-/**
- * Clone a fork, retrying while GitHub finishes creating it.
- *
- * @param deps - Injected dependencies.
- * @param url - Fork relay URL.
- * @returns The cloned filesystem and directory.
- */
+/** Clone a fork, retrying while GitHub finishes creating it. */
 async function cloneFork(deps: ConvertDeps, url: string): Promise<ClonedRepo> {
   let lastError: unknown;
 
@@ -162,16 +148,35 @@ async function cloneFork(deps: ConvertDeps, url: string): Promise<ClonedRepo> {
 }
 
 /**
- * Build the GitHub compare URL that proposes the branch from a fork.
+ * Build the GitHub compare URL that proposes a branch from a fork.
  *
  * @param owner - Upstream repository owner.
  * @param repo - Upstream repository name.
  * @param base - Upstream base branch.
- * @param login - Fork owner used as the head repository owner.
+ * @param head - Fork login and optional head branch.
  * @returns The prefilled GitHub compare URL.
  */
-function compareUrl(owner: string, repo: string, base: string, login: string): string {
-  return `https://github.com/${owner}/${repo}/compare/${base}...${login}:${CONVERT_BRANCH}?expand=1`;
+export function compareUrl(
+  owner: string,
+  repo: string,
+  base: string,
+  head: { login: string; branch?: string },
+): string {
+  const branch = head.branch ?? CONVERT_BRANCH;
+  return `https://github.com/${owner}/${repo}/compare/${base}...${head.login}:${branch}?expand=1`;
+}
+
+/**
+ * Build the commit author identity from the signed-in session.
+ *
+ * @param session - Signed-in BFF session identity.
+ * @returns Name and noreply email used for commits.
+ */
+export function author(session: BffSession): { name: string; email: string } {
+  return {
+    name: session.name ?? session.login,
+    email: `${session.id}+${session.login}@users.noreply.github.com`,
+  };
 }
 
 /**
@@ -186,8 +191,8 @@ function compareUrl(owner: string, repo: string, base: string, login: string): s
  * @param direct - Whether the upstream repository is the target.
  * @returns The clone target, relay URL and cloned repository.
  */
-async function cloneTarget(
-  input: ConvertInput,
+export async function cloneTarget(
+  input: { owner: string; repo: string },
   deps: ConvertDeps,
   direct: boolean,
 ): Promise<{ target: { owner: string; repo: string }; url: string; cloned: ClonedRepo }> {
@@ -265,10 +270,7 @@ export async function convertRepository(
     branch: CONVERT_BRANCH,
     files,
     message: CONVERT_COMMIT_MESSAGE,
-    author: {
-      name: session.name ?? session.login,
-      email: `${session.id}+${session.login}@users.noreply.github.com`,
-    },
+    author: author(session),
   });
 
   await deps.push(fs, dir, url, CONVERT_BRANCH);
@@ -285,7 +287,7 @@ export async function convertRepository(
 
   return {
     kind: 'compare',
-    url: compareUrl(owner, repo, perms.defaultBranch, session.login),
+    url: compareUrl(owner, repo, perms.defaultBranch, { login: session.login }),
   };
 }
 
