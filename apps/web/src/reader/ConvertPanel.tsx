@@ -2,14 +2,16 @@
  * Repository conversion panel for the reader.
  *
  * Shown when a repository has no `opendraft.yml`. Anonymous visitors get a
- * sign-in link; signed-in users can start the conversion and follow the
- * resulting pull request or compare URL. Conversion errors are shown inline
- * and re-enable the trigger.
+ * sign-in link; signed-in users get a checklist of existing manuscripts and
+ * can start the conversion, then follow the resulting pull request or compare
+ * URL. Conversion errors are shown inline and re-enable the trigger.
  */
 
 import { useState } from 'react';
+import type { InitDecisions, ProjectDiscovery } from '@opendraft/manuscript';
 import type { BffSession } from '../github/bff-client';
 import { loginUrl } from '../github/bff-client';
+import { ConvertChecklist } from './ConvertChecklist';
 import type { ConvertResult } from './convert';
 
 /** Props for {@link ConvertPanel}. */
@@ -18,8 +20,12 @@ export interface ConvertPanelProps {
   session: BffSession | null;
   /** Reader path returned to after sign-in. */
   returnTo: string;
-  /** Start the conversion and resolve with its PR or compare result. */
-  convert: () => Promise<ConvertResult>;
+  /** Read-only discovery result of the repository. */
+  discovery: ProjectDiscovery;
+  /** Default name for a new manuscript when nothing can be registered. */
+  defaultId: string;
+  /** Start the conversion with the chosen decisions and resolve with its result. */
+  convert: (decisions: InitDecisions) => Promise<ConvertResult>;
   /** Whether GitHub login is configured; defaults to true. */
   loginEnabled?: boolean;
 }
@@ -38,20 +44,6 @@ function SignInLink({ returnTo }: { returnTo: string }) {
     >
       Sign in with GitHub to convert
     </a>
-  );
-}
-
-/** Render the conversion trigger. */
-function ConvertButton({ running, onClick }: { running: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      disabled={running}
-      onClick={onClick}
-      className="self-start rounded-md bg-black px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-    >
-      Convert to OpenDraft
-    </button>
   );
 }
 
@@ -79,14 +71,16 @@ function ConvertOutcome({ result, error }: { result: ConvertResult | null; error
 }
 
 /**
- * Render the conversion prompt, action and outcome.
+ * Render the conversion prompt, checklist, action and outcome.
  *
  * @param props - See {@link ConvertPanelProps}.
- * @returns The panel with a sign-in link or the conversion controls.
+ * @returns The panel with a sign-in link or the conversion checklist.
  */
 export function ConvertPanel({
   session,
   returnTo,
+  discovery,
+  defaultId,
   convert,
   loginEnabled = true,
 }: ConvertPanelProps) {
@@ -94,13 +88,13 @@ export function ConvertPanel({
   const [result, setResult] = useState<ConvertResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  /** Run the conversion, tracking its running, error and result state. */
-  const handleConvert = async (): Promise<void> => {
+  /** Run the conversion with the chosen decisions, tracking its state. */
+  const handleConvert = async (decisions: InitDecisions): Promise<void> => {
     setRunning(true);
     setResult(null);
     setError(null);
     try {
-      setResult(await convert());
+      setResult(await convert(decisions));
     } catch (thrown) {
       setError(errorMessage(thrown));
     } finally {
@@ -118,10 +112,15 @@ export function ConvertPanel({
       ) : session === null ? (
         <SignInLink returnTo={returnTo} />
       ) : (
-        <div className="flex flex-col gap-2">
-          <ConvertButton running={running} onClick={() => void handleConvert()} />
+        <>
+          <ConvertChecklist
+            discovery={discovery}
+            defaultId={defaultId}
+            running={running}
+            onSubmit={(decisions) => void handleConvert(decisions)}
+          />
           <ConvertOutcome result={result} error={error} />
-        </div>
+        </>
       )}
     </section>
   );

@@ -5,7 +5,7 @@
  * and not-found messages.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { MemoryWorkspace, readOnlyWorkspace } from '@opendraft/workspace';
 import type { BffSession } from '../github/bff-client';
@@ -74,6 +74,26 @@ async function makeRepo(
   }
 
   await workspace.writeFile('README.md', '# Plain repository\n');
+  return {
+    sha: 'sha1',
+    workspace: readOnlyWorkspace(workspace),
+    isOpenDraft: false,
+    manuscripts: [],
+  };
+}
+
+/**
+ * Build a plain (non-OpenDraft) repository fixture with extra files.
+ *
+ * @param files - Additional repository-relative files to write.
+ * @returns The loaded repository with a read-only workspace.
+ */
+async function makePlainRepo(files: Record<string, string> = {}): Promise<LoadedRepo> {
+  const workspace = new MemoryWorkspace();
+  await workspace.writeFile('README.md', '# Plain repository\n');
+  for (const [path, content] of Object.entries(files)) {
+    await workspace.writeFile(path, content);
+  }
   return {
     sha: 'sha1',
     workspace: readOnlyWorkspace(workspace),
@@ -154,16 +174,54 @@ describe('ReaderPage plain repository', () => {
     ).toBeInTheDocument();
     expect(screen.queryByTestId('manuscript-view')).toBeNull();
   });
+});
 
+describe('ReaderPage plain repository conversion', () => {
   it('offers conversion to a signed-in viewer', async () => {
     const deps = makeDeps({
-      loadRepo: vi.fn(async () => makeRepo([])),
+      loadRepo: vi.fn(async () =>
+        makePlainRepo({
+          'manuscripts/case-series-review/article.qmd': '# Case series\n',
+        }),
+      ),
       getSessionState: vi.fn(async () => ({ session: SESSION, loginEnabled: true })),
     });
 
     render(<ReaderPage route={ROUTE} deps={deps} />);
 
     expect(await screen.findByRole('button', { name: 'Convert to OpenDraft' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('checkbox', { name: /case-series-review/ }),
+    ).toBeChecked();
+  });
+
+  it('converts with the checked registration decisions', async () => {
+    const convert = vi.fn(async () => ({
+      kind: 'pr' as const,
+      url: 'https://example.test/pr/1',
+    }));
+    const deps = makeDeps({
+      loadRepo: vi.fn(async () =>
+        makePlainRepo({
+          'manuscripts/case-series-review/article.qmd': '# Case series\n',
+        }),
+      ),
+      getSessionState: vi.fn(async () => ({ session: SESSION, loginEnabled: true })),
+      convert,
+    });
+
+    render(<ReaderPage route={ROUTE} deps={deps} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Convert to OpenDraft' }));
+
+    await waitFor(() => {
+      expect(convert).toHaveBeenCalledWith({
+        owner: ROUTE.owner,
+        repo: ROUTE.repo,
+        session: SESSION,
+        decisions: { register: ['case-series-review'] },
+      });
+    });
   });
 });
 

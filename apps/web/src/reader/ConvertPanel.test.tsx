@@ -6,6 +6,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
+import type {
+  InitDecisions,
+  ManuscriptCandidate,
+  ProjectDiscovery,
+} from '@opendraft/manuscript';
 import type { BffSession } from '../github/bff-client';
 import type { ConvertResult } from './convert';
 import { ConvertPanel } from './ConvertPanel';
@@ -21,9 +26,52 @@ const SESSION: BffSession = {
   expiresAt: '2030-01-01T00:00:00Z',
 };
 
+/** Valid manuscript candidate fixture. */
+const CANDIDATE: ManuscriptCandidate = {
+  id: 'case-series-review',
+  path: 'manuscripts/case-series-review',
+  status: 'valid',
+  layout: 'legacy',
+  missingFiles: [],
+  warnings: [],
+};
+
+/** Discovery fixture with one registrable candidate. */
+const DISCOVERY: ProjectDiscovery = {
+  config: 'missing',
+  configErrors: [],
+  listed: [],
+  candidates: [CANDIDATE],
+  unlisted: [],
+};
+
+/** Render the panel with a convert spy and optional session. */
+function renderPanel(
+  convert: (decisions: InitDecisions) => Promise<ConvertResult>,
+  session: BffSession | null = SESSION,
+) {
+  return render(
+    <ConvertPanel
+      session={session}
+      returnTo={RETURN_TO}
+      discovery={DISCOVERY}
+      defaultId="opendraft"
+      convert={convert}
+    />,
+  );
+}
+
 describe('ConvertPanel anonymous', () => {
   it('links the anonymous action to sign in with return_to and hides conversion', () => {
-    render(<ConvertPanel session={null} returnTo={RETURN_TO} convert={vi.fn()} />);
+    render(
+      <ConvertPanel
+        session={null}
+        returnTo={RETURN_TO}
+        discovery={DISCOVERY}
+        defaultId="opendraft"
+        convert={vi.fn()}
+      />,
+    );
 
     expect(
       screen.getByText('This repository is not an OpenDraft project yet.'),
@@ -42,6 +90,8 @@ describe('ConvertPanel anonymous', () => {
       <ConvertPanel
         session={null}
         returnTo={RETURN_TO}
+        discovery={DISCOVERY}
+        defaultId="opendraft"
         convert={vi.fn()}
         loginEnabled={false}
       />,
@@ -59,25 +109,30 @@ describe('ConvertPanel anonymous', () => {
 
 describe('ConvertPanel signed in', () => {
   it('calls convert and links to the pull request for a PR result', async () => {
-    const convert = vi.fn<() => Promise<ConvertResult>>(async () => ({
-      kind: 'pr',
-      url: 'https://github.com/octocat/draft/pull/7',
-    }));
-    render(<ConvertPanel session={SESSION} returnTo={RETURN_TO} convert={convert} />);
+    const convert = vi.fn<(decisions: InitDecisions) => Promise<ConvertResult>>(
+      async () => ({
+        kind: 'pr',
+        url: 'https://github.com/octocat/draft/pull/7',
+      }),
+    );
+    renderPanel(convert);
 
     fireEvent.click(screen.getByRole('button', { name: 'Convert to OpenDraft' }));
 
     const link = await screen.findByRole('link', { name: 'View pull request' });
     expect(convert).toHaveBeenCalledTimes(1);
+    expect(convert).toHaveBeenCalledWith({ register: ['case-series-review'] });
     expect(link).toHaveAttribute('href', 'https://github.com/octocat/draft/pull/7');
   });
 
   it('links to GitHub compare for a compare result', async () => {
-    const convert = vi.fn<() => Promise<ConvertResult>>(async () => ({
-      kind: 'compare',
-      url: 'https://github.com/octocat/draft/compare/main...octocat:opendraft/init?expand=1',
-    }));
-    render(<ConvertPanel session={SESSION} returnTo={RETURN_TO} convert={convert} />);
+    const convert = vi.fn<(decisions: InitDecisions) => Promise<ConvertResult>>(
+      async () => ({
+        kind: 'compare',
+        url: 'https://github.com/octocat/draft/compare/main...octocat:opendraft/init?expand=1',
+      }),
+    );
+    renderPanel(convert);
 
     fireEvent.click(screen.getByRole('button', { name: 'Convert to OpenDraft' }));
 
@@ -92,13 +147,13 @@ describe('ConvertPanel signed in', () => {
 describe('ConvertPanel conversion state', () => {
   it('disables the button while running', async () => {
     let resolve: (value: ConvertResult) => void = () => undefined;
-    const convert = vi.fn<() => Promise<ConvertResult>>(
+    const convert = vi.fn<(decisions: InitDecisions) => Promise<ConvertResult>>(
       () =>
         new Promise<ConvertResult>((done) => {
           resolve = done;
         }),
     );
-    render(<ConvertPanel session={SESSION} returnTo={RETURN_TO} convert={convert} />);
+    renderPanel(convert);
 
     fireEvent.click(screen.getByRole('button', { name: 'Convert to OpenDraft' }));
 
@@ -108,10 +163,12 @@ describe('ConvertPanel conversion state', () => {
   });
 
   it('shows the error message and re-enables the button when conversion fails', async () => {
-    const convert = vi.fn<() => Promise<ConvertResult>>(async () => {
-      throw new Error('branch exists');
-    });
-    render(<ConvertPanel session={SESSION} returnTo={RETURN_TO} convert={convert} />);
+    const convert = vi.fn<(decisions: InitDecisions) => Promise<ConvertResult>>(
+      async () => {
+        throw new Error('branch exists');
+      },
+    );
+    renderPanel(convert);
 
     fireEvent.click(screen.getByRole('button', { name: 'Convert to OpenDraft' }));
 
