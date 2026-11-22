@@ -8,7 +8,7 @@ import {
 import type { InitDecisions, ProjectDiscovery, ProtocolBlock } from '@opendraft/manuscript';
 import { NodeFsWorkspace } from '@opendraft/workspace/node';
 import { BUNDLED_PROTOCOL_LATEST } from '../protocol.js';
-import { DEFAULT_INIT_IO } from './init-io.js';
+import { DEFAULT_INIT_IO, reportPlan, reportRejections } from './init-io.js';
 import type { InitIo } from './init-io.js';
 
 /** Usage line printed for flag errors. */
@@ -236,11 +236,14 @@ export async function initCommand(
     return 1;
   }
 
+  reportRejections(discovery);
+
   const decisions = await resolveDecisions(io, discovery, manuscriptId, { yes, dryRun });
   if ('exit' in decisions) return decisions.exit;
 
   try {
     const plan = await planInit(ws, discovery, decisions.decisions, { protocol: PROTOCOL });
+    reportPlan(plan, !dryRun);
     if (dryRun) {
       for (const file of plan.files) {
         console.log(`${file.op} ${file.path} (${file.reason})`);
