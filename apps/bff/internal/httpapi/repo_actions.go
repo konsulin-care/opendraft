@@ -44,9 +44,12 @@ func newRepoActionsHandler(auth *authHandler, deps Deps) *repoActionsHandler {
 
 // permissionsResponse is the JSON answer of the permissions endpoint.
 type permissionsResponse struct {
-	Push          bool   `json:"push"`
-	Installed     bool   `json:"installed"`
-	DefaultBranch string `json:"defaultBranch"`
+	DefaultBranch      string `json:"defaultBranch"`
+	Push               bool   `json:"push"`
+	Installed          bool   `json:"installed"`
+	Private            bool   `json:"private"`
+	AllowForking       bool   `json:"allowForking"`
+	ViewerInstalledAll bool   `json:"viewerInstalledAll"`
 }
 
 // pullsRequest is the JSON body of a pull request creation.
@@ -59,8 +62,8 @@ type pullsRequest struct {
 
 // pullsResponse is the JSON answer of a successful pull request creation.
 type pullsResponse struct {
-	Number int    `json:"number"`
 	URL    string `json:"url"`
+	Number int    `json:"number"`
 }
 
 // forkResponse is the JSON answer of a successful fork creation.
@@ -77,15 +80,18 @@ func (h *repoActionsHandler) handlePermissions(w http.ResponseWriter, r *http.Re
 		return
 	}
 	h.auth.requireSession(func(w http.ResponseWriter, r *http.Request, sess session.Session) {
-		push, installed, branch, err := h.github.RepoPermissions(r.Context(), sess.AccessToken, owner, repo)
+		perms, err := h.github.RepoPermissions(r.Context(), sess.AccessToken, sess.Login, owner, repo)
 		if err != nil {
 			writeRepoError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, permissionsResponse{
-			Push:          push,
-			Installed:     installed,
-			DefaultBranch: branch,
+			Push:               perms.Push,
+			Installed:          perms.Installed,
+			DefaultBranch:      perms.DefaultBranch,
+			Private:            perms.Private,
+			AllowForking:       perms.AllowForking,
+			ViewerInstalledAll: perms.ViewerInstalledAll,
 		})
 	}).ServeHTTP(w, r)
 }

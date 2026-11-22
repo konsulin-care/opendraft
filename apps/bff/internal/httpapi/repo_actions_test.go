@@ -16,11 +16,11 @@ import (
 
 // fakeRepoActions is a fake GitHub endpoint for the repository action routes.
 type fakeRepoActions struct {
-	mu     sync.Mutex
-	calls  int
+	router func(w http.ResponseWriter, r *http.Request)
 	paths  []string
 	bodies []map[string]any
-	router func(w http.ResponseWriter, r *http.Request)
+	mu     sync.Mutex
+	calls  int
 }
 
 func (f *fakeRepoActions) handler() http.Handler {
@@ -107,7 +107,7 @@ func TestRepoPermissionsEndpoint(t *testing.T) {
 	fake := &fakeRepoActions{router: func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/repos/octocat/draft":
-			_, _ = w.Write([]byte(`{"default_branch":"main","permissions":{"push":true}}`))
+			_, _ = w.Write([]byte(`{"default_branch":"main","private":false,"permissions":{"push":true}}`))
 		case "/user/installations":
 			_, _ = w.Write([]byte(`{"installations":[{"id":7,"repository_selection":"all","account":{"login":"octocat"}}]}`))
 		default:
@@ -122,7 +122,8 @@ func TestRepoPermissionsEndpoint(t *testing.T) {
 		t.Fatalf("status = %d, want 200: %s", rec.Code, rec.Body.String())
 	}
 	body := decodeAnyJSON(t, rec)
-	if body["push"] != true || body["installed"] != true || body["defaultBranch"] != "main" {
+	if body["push"] != true || body["installed"] != true || body["defaultBranch"] != "main" ||
+		body["private"] != false || body["allowForking"] != true || body["viewerInstalledAll"] != true {
 		t.Fatalf("body = %v", body)
 	}
 }
@@ -132,9 +133,9 @@ func TestRepoPermissionsSelectedRepository(t *testing.T) {
 	fake := &fakeRepoActions{router: func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/repos/acme/paper":
-			_, _ = w.Write([]byte(`{"default_branch":"trunk","permissions":{"push":false}}`))
+			_, _ = w.Write([]byte(`{"default_branch":"trunk","private":true,"allow_forking":true,"permissions":{"push":false}}`))
 		case "/user/installations":
-			_, _ = w.Write([]byte(`{"installations":[{"id":9,"repository_selection":"selected","account":{"login":"acme"}}]}`))
+			_, _ = w.Write([]byte(`{"installations":[{"id":9,"repository_selection":"selected","account":{"login":"acme"}},{"id":7,"repository_selection":"all","account":{"login":"OctoCat"}}]}`))
 		case "/user/installations/9/repositories":
 			_, _ = w.Write([]byte(`{"repositories":[{"full_name":"acme/paper"}]}`))
 		default:
@@ -149,7 +150,8 @@ func TestRepoPermissionsSelectedRepository(t *testing.T) {
 		t.Fatalf("status = %d, want 200: %s", rec.Code, rec.Body.String())
 	}
 	body := decodeAnyJSON(t, rec)
-	if body["push"] != false || body["installed"] != true || body["defaultBranch"] != "trunk" {
+	if body["push"] != false || body["installed"] != true || body["defaultBranch"] != "trunk" ||
+		body["private"] != true || body["allowForking"] != true || body["viewerInstalledAll"] != true {
 		t.Fatalf("body = %v", body)
 	}
 }
@@ -285,11 +287,9 @@ func TestRepoActionsRequireSession(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}}
 	handler, _ := newRepoActionsServer(t, fake, now)
-
 	req := httptest.NewRequest(http.MethodGet, "/@api/repos/octocat/draft/permissions", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
-
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401", rec.Code)
 	}

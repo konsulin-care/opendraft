@@ -15,18 +15,32 @@ import (
 // permissions endpoint.
 type repoSettings struct {
 	DefaultBranch string `json:"default_branch"`
+	Private       bool   `json:"private"`
+	AllowForking  bool   `json:"allow_forking"`
 	Permissions   struct {
 		Push bool `json:"push"`
 	} `json:"permissions"`
 }
 
+// RepoPermissions is the answer of the permissions endpoint: the viewer's push
+// access, whether the app is installed on the repository, its default branch
+// and the fork/installation facts the edit plan needs.
+type RepoPermissions struct {
+	DefaultBranch      string
+	Push               bool
+	Installed          bool
+	Private            bool
+	AllowForking       bool
+	ViewerInstalledAll bool
+}
+
 // installation is one GitHub App installation visible to a user token.
 type installation struct {
-	ID                  int64  `json:"id"`
-	RepositorySelection string `json:"repository_selection"`
-	Account             struct {
+	Account struct {
 		Login string `json:"login"`
 	} `json:"account"`
+	RepositorySelection string `json:"repository_selection"`
+	ID                  int64  `json:"id"`
 }
 
 // installationList mirrors GET /user/installations.
@@ -52,8 +66,8 @@ type pullRequest struct {
 
 // pullResponse is the subset of GitHub's pull request JSON the BFF reads.
 type pullResponse struct {
-	Number  int    `json:"number"`
 	HTMLURL string `json:"html_url"`
+	Number  int    `json:"number"`
 }
 
 // forkRequest is the JSON body of a fork creation.
@@ -62,39 +76,51 @@ type forkRequest struct {
 }
 
 // RepoPermissions reports whether the token can push to the repository, whether
-// the GitHub App is installed on it, and its default branch. Installation is
-// true when a user installation belongs to the same owner and either covers all
-// repositories or lists the repository on one of the first ten pages.
-func (c *Client) RepoPermissions(ctx context.Context, token, owner, repo string) (bool, bool, string, error) {
+// the GitHub App is installed on it, its default branch and its fork/private
+// settings. Installation is true when a user installation belongs to the same
+// owner and either covers all repositories or lists the repository on one of
+// the first ten pages. ViewerInstalledAll is true when an installation belongs
+// to viewer with repository_selection "all".
+func (c *Client) RepoPermissions(ctx context.Context, token, viewer, owner, repo string) (RepoPermissions, error) {
 	settingsURL := c.APIURL + "/repos/" + url.PathEscape(owner) + "/" + url.PathEscape(repo)
 	var settings repoSettings
 	if err := c.getActionJSON(ctx, token, settingsURL, &settings); err != nil {
-		return false, false, "", err
+		return RepoPermissions{}, err
 	}
 
 	installationsURL := c.APIURL + "/user/installations"
 	var list installationList
 	if err := c.getActionJSON(ctx, token, installationsURL, &list); err != nil {
-		return false, false, "", err
+		return RepoPermissions{}, err
 	}
 
+	result := RepoPermissions{
+		Push:          settings.Permissions.Push,
+		DefaultBranch: settings.DefaultBranch,
+		Private:       settings.Private,
+		AllowForking:  !settings.Private || settings.AllowForking,
+	}
 	fullName := owner + "/" + repo
 	for _, inst := range list.Installations {
-		if !strings.EqualFold(inst.Account.Login, owner) {
+		if strings.EqualFold(inst.Account.Login, viewer) && inst.RepositorySelection == "all" {
+			result.ViewerInstalledAll = true
+		}
+		if !strings.EqualFold(inst.Account.Login, owner) || result.Installed {
 			continue
 		}
 		if inst.RepositorySelection == "all" {
-			return settings.Permissions.Push, true, settings.DefaultBranch, nil
+			result.Installed = true
+			continue
 		}
 		found, err := c.installationCoversRepo(ctx, token, inst.ID, fullName)
 		if err != nil {
-			return false, false, "", err
+			return RepoPermissions{}, err
 		}
 		if found {
-			return settings.Permissions.Push, true, settings.DefaultBranch, nil
+			result.Installed = true
 		}
 	}
-	return settings.Permissions.Push, false, settings.DefaultBranch, nil
+	return result, nil
 }
 
 // installationCoversRepo reports whether the installation lists fullName on one
