@@ -277,3 +277,5 @@ export async function planInit(
 
   return { files: state.files, registered: state.registered, warnings: state.warnings };
 }
+
+export { applyPlan } from './init-apply.js';

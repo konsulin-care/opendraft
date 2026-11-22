@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parse } from 'yaml';
+import { parse, stringify } from 'yaml';
 import { MemoryWorkspace } from '@opendraft/workspace';
 import {
   InitError,
@@ -143,5 +143,57 @@ describe('planInit — invalid decisions', () => {
     await expect(
       planInit(ws, discovery, { register: ['nope'] }, { protocol: PROTOCOL }),
     ).rejects.toMatchObject({ code: 'unknown-candidate' });
+  });
+});
+
+describe('planInit — valid config with unlisted manuscripts', () => {
+  it('updates opendraft.yml in a single op, keeping the protocol block and existing entries', async () => {
+    const ws = new MemoryWorkspace();
+    await writeValidManuscript(ws, CASE_ID);
+    await ws.writeFile(SHARED_BIB_PATH, '@misc{keep,}\n');
+    await ws.writeFile(
+      OPENDRAFT_CONFIG_PATH,
+      stringify({
+        protocol: PROTOCOL,
+        manuscripts: [{ id: 'other-paper', path: 'manuscripts/other-paper' }],
+        extra: 'keep-me',
+      }),
+    );
+
+    const discovery = await discoverProject(ws);
+    expect(discovery.config).toBe('valid');
+    expect(discovery.unlisted).toEqual([CASE_ID]);
+
+    const plan = await planInit(ws, discovery, { addUnlisted: [CASE_ID] }, { protocol: PROTOCOL });
+
+    expect(plan.files).toHaveLength(1);
+    const update = plan.files[0];
+    expect(update.path).toBe(OPENDRAFT_CONFIG_PATH);
+    expect(update.op).toBe('update');
+
+    const parsed = parse(update.content);
+    expect(parsed.protocol).toEqual(PROTOCOL);
+    expect(parsed.manuscripts).toEqual([
+      { id: 'other-paper', path: 'manuscripts/other-paper' },
+      { id: CASE_ID, path: CASE_DIR },
+    ]);
+    expect(parsed.extra).toBe('keep-me');
+  });
+});
+
+describe('planInit — invalid config', () => {
+  it('throws InitError invalid-config and never rewrites the configuration', async () => {
+    const ws = new MemoryWorkspace();
+    await writeValidManuscript(ws, CASE_ID);
+    const invalid = 'protocol: [\n';
+    await ws.writeFile(OPENDRAFT_CONFIG_PATH, invalid);
+
+    const discovery = await discoverProject(ws);
+    expect(discovery.config).toBe('invalid');
+
+    await expect(
+      planInit(ws, discovery, { addUnlisted: [CASE_ID] }, { protocol: PROTOCOL }),
+    ).rejects.toMatchObject({ code: 'invalid-config' });
+    expect(await ws.readFile(OPENDRAFT_CONFIG_PATH)).toBe(invalid);
   });
 });
