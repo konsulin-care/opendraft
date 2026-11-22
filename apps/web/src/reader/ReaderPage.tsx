@@ -71,7 +71,7 @@ async function convertWithGit(input: ConvertInput): Promise<ConvertResult> {
   const http = (
     await import('../../../../packages/git/node_modules/isomorphic-git/http/web/index.js')
   ).default;
-  const { scaffoldProject } = await import('../project/scaffold');
+  const { PROTOCOL } = await import('../project/scaffold');
 
   const deps: ConvertDeps = {
     getRepoPermissions: (owner, repo) => getRepoPermissions(owner, repo),
@@ -88,9 +88,7 @@ async function convertWithGit(input: ConvertInput): Promise<ConvertResult> {
       const remote = new git.RemoteGit({ http, fs: fs as GitRemoteOptions['fs'], dir });
       await remote.push(url, branch);
     },
-    scaffold: async (ws, manuscriptId) => {
-      await scaffoldProject(ws, { manuscriptId });
-    },
+    protocol: PROTOCOL,
     commitFilesOnBranch: (fs, dir, opts) =>
       git.commitFilesOnBranch(fs as GitFs, dir, opts),
     readWorkingFiles: (fs, dir) => git.readWorkingFiles(fs as GitFs, dir),

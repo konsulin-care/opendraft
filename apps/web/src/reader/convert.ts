@@ -2,10 +2,11 @@
  * Repository conversion for the reader.
  *
  * Converts a plain GitHub repository into an OpenDraft project by cloning it
- * through the authenticated git relay, scaffolding the manuscript layout and
- * pushing the result onto `opendraft/init`. Depending on push permission and
- * GitHub App installation, the flow either opens a pull request through the
- * BFF or returns a GitHub compare URL against the user's fork.
+ * through the authenticated git relay, discovering any existing manuscripts,
+ * planning the project initialization and pushing the result onto
+ * `opendraft/init`. Depending on push permission and GitHub App installation,
+ * the flow either opens a pull request through the BFF or returns a GitHub
+ * compare URL against the user's fork.
  *
  * The module is pure: every GitHub, git and workspace operation is injected so
  * it never statically imports `@opendraft/git` or the BFF client.
@@ -13,6 +14,18 @@
 
 import { MemoryWorkspace } from '@opendraft/workspace';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
+import {
+  applyPlan,
+  discoverProject,
+  normalizeManuscriptId,
+  planInit,
+} from '@opendraft/manuscript';
+import type {
+  InitDecisions,
+  InitPlan,
+  ProjectDiscovery,
+  ProtocolBlock,
+} from '@opendraft/manuscript';
 import type {
   BffSession,
   ForkResult,
@@ -20,6 +33,7 @@ import type {
   PullRequestResult,
   RepoPermissions,
 } from '../github/bff-client';
+import { buildPrBody } from './convert-plan';
 
 /** Branch that receives the initial OpenDraft project structure. */
 export const CONVERT_BRANCH = 'opendraft/init';
@@ -29,10 +43,6 @@ export const CONVERT_COMMIT_MESSAGE = 'chore: initialize OpenDraft project struc
 
 /** Title of the pull request that initializes the project. */
 export const CONVERT_PR_TITLE = 'Initialize OpenDraft project';
-
-/** Body of the pull request that initializes the project. */
-export const CONVERT_PR_BODY =
-  'This pull request initializes the OpenDraft project structure for this repository.';
 
 /** Number of clone attempts while a freshly created fork becomes ready. */
 const FORK_CLONE_ATTEMPTS = 5;
@@ -48,6 +58,8 @@ export interface ConvertInput {
   repo: string;
   /** Signed-in BFF session identity. */
   session: BffSession;
+  /** Optional registration decisions; defaults to registering every manuscript. */
+  decisions?: InitDecisions;
 }
 
 /** A cloned repository filesystem and working directory. */
@@ -88,8 +100,8 @@ export interface ConvertDeps {
   relayUrl: (owner: string, repo: string) => string;
   /** Push a local branch to a relay URL. */
   push: (fs: unknown, dir: string, url: string, branch: string) => Promise<void>;
-  /** Scaffold the OpenDraft project structure into a workspace. */
-  scaffold: (ws: WorkspaceAdapter, manuscriptId: string) => Promise<void>;
+  /** Protocol block written into a new or updated project configuration. */
+  protocol: ProtocolBlock;
   /** Commit a file map onto a branch. */
   commitFilesOnBranch: (
     fs: unknown,
@@ -108,20 +120,21 @@ export type ConvertResult =
   | { kind: 'compare'; url: string };
 
 /**
- * Derive a manuscript id from a repository name.
+ * Choose registration decisions when the caller did not provide any.
  *
- * Lowercases the name, maps every character outside `[a-z0-9]` to `-`, trims
- * leading and trailing dashes and falls back to `manuscript`.
+ * Registers every registrable candidate. When none exists, asks for a new
+ * manuscript derived from the repository name.
  *
- * @param repo - Repository name.
- * @returns Manuscript id safe for the scaffold layout.
+ * @param discovery - Read-only project discovery result.
+ * @param repo - Repository name used for the new manuscript id.
+ * @returns Decisions handed to `planInit`.
  */
-export function slug(repo: string): string {
-  const slugged = repo
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '-')
-    .replace(/^-+|-+$/g, '');
-  return slugged === '' ? 'manuscript' : slugged;
+function defaultDecisions(discovery: ProjectDiscovery, repo: string): InitDecisions {
+  const registrable = discovery.candidates
+    .filter((candidate) => candidate.status === 'valid' || candidate.status === 'repairable')
+    .map((candidate) => candidate.id);
+  if (registrable.length > 0) return { register: registrable };
+  return { newManuscriptId: normalizeManuscriptId(repo) };
 }
 
 /**
@@ -187,47 +200,50 @@ async function cloneTarget(
 }
 
 /**
- * Seed a workspace with the working files and scaffold the project into it.
+ * Load the cloned working files, plan the project initialization and apply it.
+ *
+ * The plan is applied to an in-memory copy of the working tree so the cloned
+ * checkout is left untouched; only the planned files are handed to the commit.
  *
  * @param deps - Injected dependencies.
- * @param fs - Cloned repository filesystem.
- * @param dir - Cloned repository directory.
- * @param manuscriptId - Manuscript id handed to the scaffold.
- * @returns Only the paths created by the scaffold, with their contents.
+ * @param cloned - Cloned repository filesystem and directory.
+ * @param repo - Repository name used for the default new manuscript id.
+ * @param decisions - Optional caller decisions; defaults are derived on a miss.
+ * @returns The applied plan.
  */
-async function scaffoldFiles(
+async function applyInit(
   deps: ConvertDeps,
-  fs: unknown,
-  dir: string,
-  manuscriptId: string,
-): Promise<Map<string, string>> {
-  const workingFiles = await deps.readWorkingFiles(fs, dir);
-  const existing = new Set(workingFiles.keys());
-
-  const ws = new MemoryWorkspace();
+  cloned: ClonedRepo,
+  repo: string,
+  decisions: InitDecisions | undefined,
+): Promise<InitPlan> {
+  const workingFiles = await deps.readWorkingFiles(cloned.fs, cloned.dir);
+  const ws: WorkspaceAdapter = new MemoryWorkspace();
   for (const [path, content] of workingFiles) {
     await ws.writeFile(path, content);
   }
 
-  await deps.scaffold(ws, manuscriptId);
-
-  const files = new Map<string, string>();
-  for (const path of await ws.listAll()) {
-    if (existing.has(path)) continue;
-    files.set(path, (await ws.readFile(path)) ?? '');
-  }
-  return files;
+  const discovery = await discoverProject(ws);
+  const plan = await planInit(
+    ws,
+    discovery,
+    decisions ?? defaultDecisions(discovery, repo),
+    { protocol: deps.protocol },
+  );
+  await applyPlan(ws, plan);
+  return plan;
 }
 
 /**
  * Convert a repository into an OpenDraft project.
  *
- * Resolves permissions, then either pushes the scaffold branch to the upstream
+ * Resolves permissions, then discovers existing manuscripts in the clone,
+ * plans and applies the initialization, pushes the branch to the upstream
  * repository and opens a PR through the BFF, or pushes it to the user's fork
- * and returns the GitHub compare URL. Only paths created by the scaffold are
- * committed, so existing files are never overwritten.
+ * and returns the GitHub compare URL. Exactly the planned files are committed,
+ * so existing manuscript files are never overwritten.
  *
- * @param input - Repository owner, name and the signed-in session.
+ * @param input - Repository owner, name, session and optional decisions.
  * @param deps - Injected GitHub, git and workspace dependencies.
  * @returns A pull request URL or a compare URL, depending on the flow.
  */
@@ -241,7 +257,9 @@ export async function convertRepository(
 
   const { url, cloned } = await cloneTarget(input, deps, direct);
   const { fs, dir } = cloned;
-  const files = await scaffoldFiles(deps, fs, dir, slug(repo));
+  const plan = await applyInit(deps, cloned, repo, input.decisions);
+
+  const files = new Map(plan.files.map((file) => [file.path, file.content]));
 
   await deps.commitFilesOnBranch(fs, dir, {
     branch: CONVERT_BRANCH,
@@ -260,7 +278,7 @@ export async function convertRepository(
       title: CONVERT_PR_TITLE,
       head: CONVERT_BRANCH,
       base: perms.defaultBranch,
-      body: CONVERT_PR_BODY,
+      body: buildPrBody(plan),
     });
     return { kind: 'pr', url: pullRequest.url };
   }

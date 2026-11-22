@@ -1,18 +1,19 @@
 /**
- * Conversion tests: direct PR flow, fork compare flow and the guarantee that
- * only newly scaffolded paths are committed.
+ * Conversion tests: direct PR flow, fork compare flow, the discovery-driven
+ * file selection and the pull request body formatting.
  */
 import { describe, expect, it, vi } from 'vitest';
-import type { WorkspaceAdapter } from '@opendraft/workspace';
-import { scaffoldProject } from '../project/scaffold';
+import { parse } from 'yaml';
+import type { InitPlan } from '@opendraft/manuscript';
+import { PROTOCOL } from '../project/scaffold';
 import type { BffSession } from '../github/bff-client';
 import {
   CONVERT_BRANCH,
   CONVERT_COMMIT_MESSAGE,
   convertRepository,
-  slug,
 } from './convert';
 import type { ClonedRepo, ConvertDeps } from './convert';
+import { buildPrBody } from './convert-plan';
 
 const SESSION: BffSession = {
   login: 'octocat',
@@ -22,6 +23,19 @@ const SESSION: BffSession = {
 };
 
 const CLONED: ClonedRepo = { fs: {}, dir: '/' };
+
+/** Container article with spec-conformant front matter. */
+const ARTICLE = `---
+metadata-files:
+- _author.yml
+- _abstract.yml
+- _frontmatter.yml
+bibliography: ../references.bib
+---
+
+::: {#refs}
+:::
+`;
 
 /** Build conversion dependencies with inert defaults and spy hooks. */
 function makeDeps(overrides: Partial<ConvertDeps> = {}): ConvertDeps {
@@ -39,7 +53,7 @@ function makeDeps(overrides: Partial<ConvertDeps> = {}): ConvertDeps {
     cloneRepo: vi.fn(async () => CLONED),
     relayUrl: vi.fn((owner: string, repo: string) => `${owner}/${repo}.git`),
     push: vi.fn(async () => undefined),
-    scaffold: vi.fn(async () => undefined),
+    protocol: PROTOCOL,
     commitFilesOnBranch: vi.fn(async () => 'sha'),
     readWorkingFiles: vi.fn(async () => new Map<string, string>()),
     sleep: vi.fn(async () => undefined),
@@ -47,13 +61,20 @@ function makeDeps(overrides: Partial<ConvertDeps> = {}): ConvertDeps {
   };
 }
 
-describe('slug', () => {
-  it('lowercases, replaces separators and trims dashes', () => {
-    expect(slug('My Draft!')).toBe('my-draft');
-    expect(slug('--Hello--World--')).toBe('hello--world');
-    expect(slug('!!!')).toBe('manuscript');
-  });
-});
+/**
+ * Build the working files of a valid manuscript folder.
+ *
+ * @param id - Manuscript folder name.
+ * @returns Repo-relative file map.
+ */
+function validManuscript(id: string): Map<string, string> {
+  return new Map([
+    [`manuscripts/${id}/article.qmd`, ARTICLE],
+    [`manuscripts/${id}/_author.yml`, 'authors: []\n'],
+    [`manuscripts/${id}/_abstract.yml`, 'abstract: ""\n'],
+    [`manuscripts/${id}/_frontmatter.yml`, 'title: "Case"\n'],
+  ]);
+}
 
 describe('convertRepository direct flow', () => {
   it('pushes opendraft/init upstream and returns the pull request url', async () => {
@@ -80,7 +101,7 @@ describe('convertRepository direct flow', () => {
     });
   });
 
-  it('commits the scaffold commit message and session author', async () => {
+  it('commits the initialization commit message and session author', async () => {
     const deps = makeDeps();
 
     await convertRepository({ owner: 'octocat', repo: 'draft', session: SESSION }, deps);
@@ -136,46 +157,72 @@ describe('convertRepository fork flow', () => {
 });
 
 describe('convertRepository file selection', () => {
-  it('commits only newly scaffolded paths from the real scaffold', async () => {
-    const working = new Map([
-      ['README.md', '# Draft\n'],
-      ['manuscripts/existing/article.qmd', 'existing\n'],
-    ]);
+  it('registers an existing manuscript without committing files under its folder', async () => {
     const deps = makeDeps({
-      readWorkingFiles: vi.fn(async () => working),
-      scaffold: (ws, manuscriptId) => scaffoldProject(ws, { manuscriptId }),
+      readWorkingFiles: vi.fn(async () => validManuscript('case-series-review')),
     });
 
     await convertRepository({ owner: 'octocat', repo: 'Draft', session: SESSION }, deps);
 
     const opts = vi.mocked(deps.commitFilesOnBranch).mock.calls[0][2];
-    const paths = [...opts.files.keys()].sort();
+    const paths = [...opts.files.keys()];
 
     expect(paths).toContain('opendraft.yml');
-    expect(paths).toContain('manuscripts/draft/article.qmd');
-    expect(paths).not.toContain('README.md');
-    expect(paths).not.toContain('manuscripts/existing/article.qmd');
-    expect(opts.files.get('README.md')).toBeUndefined();
+    expect(paths.some((path) => path.startsWith('manuscripts/case-series-review/'))).toBe(false);
+
+    const config = parse(opts.files.get('opendraft.yml') ?? '');
+    expect(config.manuscripts).toEqual([
+      { id: 'case-series-review', path: 'manuscripts/case-series-review' },
+    ]);
   });
 
-  it('never commits a path that already existed even when scaffold rewrites it', async () => {
-    const working = new Map([
-      ['README.md', '# Draft\n'],
-      ['opendraft.yml', 'old: true\n'],
-    ]);
-    const deps = makeDeps({
-      readWorkingFiles: vi.fn(async () => working),
-      scaffold: vi.fn(async (ws: WorkspaceAdapter) => {
-        await ws.writeFile('README.md', 'overwritten\n');
-        await ws.writeFile('opendraft.yml', 'new: true\n');
-        await ws.writeFile('manuscripts/draft/article.qmd', 'fresh\n');
-      }),
-    });
+  it('commits starter files for a requested new manuscript', async () => {
+    const deps = makeDeps();
 
-    await convertRepository({ owner: 'octocat', repo: 'draft', session: SESSION }, deps);
+    await convertRepository(
+      {
+        owner: 'octocat',
+        repo: 'draft',
+        session: SESSION,
+        decisions: { newManuscriptId: 'my-paper' },
+      },
+      deps,
+    );
 
     const opts = vi.mocked(deps.commitFilesOnBranch).mock.calls[0][2];
-    expect([...opts.files.keys()]).toEqual(['manuscripts/draft/article.qmd']);
-    expect(opts.files.get('manuscripts/draft/article.qmd')).toBe('fresh\n');
+    const paths = [...opts.files.keys()];
+
+    expect(paths).toContain('opendraft.yml');
+    expect(paths).toContain('manuscripts/references.bib');
+    expect(paths).toContain('manuscripts/my-paper/article.qmd');
+    expect(paths).toContain('manuscripts/my-paper/_author.yml');
+    expect(paths).toContain('manuscripts/my-paper/_abstract.yml');
+    expect(paths).toContain('manuscripts/my-paper/_frontmatter.yml');
+  });
+});
+
+describe('buildPrBody', () => {
+  it('lists registered ids, file paths and warnings', () => {
+    const plan: InitPlan = {
+      files: [
+        { path: 'opendraft.yml', content: '', op: 'create', reason: 'config' },
+        {
+          path: 'manuscripts/my-paper/article.qmd',
+          content: '',
+          op: 'create',
+          reason: 'starter',
+        },
+      ],
+      registered: ['case-series-review', 'my-paper'],
+      warnings: [{ id: 'case-series-review', warning: 'bibliography-mismatch' }],
+    };
+
+    const body = buildPrBody(plan);
+
+    expect(body).toContain('case-series-review');
+    expect(body).toContain('my-paper');
+    expect(body).toContain('opendraft.yml');
+    expect(body).toContain('manuscripts/my-paper/article.qmd');
+    expect(body).toContain('case-series-review: bibliography-mismatch');
   });
 });
