@@ -2,7 +2,7 @@
  * Read-only metadata block of the reader.
  *
  * Reads the three manuscript metadata files from the workspace and renders
- * the title, author names, abstract and keywords as plain text. The block is
+ * the title, author byline, markdown abstract and keywords. The block is
  * purely presentational: there are no inputs, buttons or editable regions.
  */
 
@@ -10,6 +10,11 @@ import { Fragment, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { parse } from 'yaml';
+import { InlineMarkdown } from '../components/inline-markdown';
+import { buildByline } from '../components/metadata-panel/byline-model';
+import type { AffiliationEntry } from '../components/metadata-panel/byline-model';
+import type { MetadataAuthor } from '../components/metadata-panel/use-manuscript-metadata';
+import { ReaderByline } from './ReaderByline';
 
 /** Props for {@link ReaderMetadata}. */
 export interface ReaderMetadataProps {
@@ -23,8 +28,10 @@ export interface ReaderMetadataProps {
 interface MetadataText {
   /** Manuscript title from `_frontmatter.yml`; '' when missing. */
   title: string;
-  /** Author display names in file order. */
-  authors: string[];
+  /** Author entries in file order. */
+  authors: MetadataAuthor[];
+  /** Affiliation registry entries used by the author superscripts. */
+  affiliations: AffiliationEntry[];
   /** Abstract text from `_abstract.yml`; '' when missing. */
   abstract: string;
   /** Keyword list from `_frontmatter.yml`. */
@@ -58,26 +65,6 @@ async function readYaml(
 }
 
 /**
- * Derive an author's display name from a `_author.yml` entry.
- *
- * A string name is used verbatim, `{ literal }` for group authors, and
- * `{ given, family }` is joined with a single space.
- *
- * @param entry - One entry of the `authors` array.
- * @returns The display name, or '' when no usable name is present.
- */
-function authorName(entry: unknown): string {
-  const name = asRecord(entry)['name'];
-  if (typeof name === 'string') return name.trim();
-  const record = asRecord(name);
-  if (typeof record['literal'] === 'string') return record['literal'].trim();
-  return [record['given'], record['family']]
-    .filter((part): part is string => typeof part === 'string' && part.length > 0)
-    .join(' ')
-    .trim();
-}
-
-/**
  * Normalize the `keywords` value of `_frontmatter.yml`.
  *
  * @param value - Parsed keywords value: an array or a comma separated string.
@@ -103,12 +90,12 @@ function toMetadataText(
 ): MetadataText {
   const title = frontmatter?.['title'];
   const authors = author?.['authors'];
+  const affiliations = author?.['affiliations'];
   const abstractText = abstract?.['abstract'];
   return {
     title: typeof title === 'string' ? title : title == null ? '' : String(title),
-    authors: Array.isArray(authors)
-      ? authors.map(authorName).filter((name) => name.length > 0)
-      : [],
+    authors: Array.isArray(authors) ? authors as MetadataAuthor[] : [],
+    affiliations: Array.isArray(affiliations) ? affiliations as AffiliationEntry[] : [],
     abstract: typeof abstractText === 'string' ? abstractText : '',
     keywords: keywordList(frontmatter?.['keywords']),
   };
@@ -132,7 +119,7 @@ function joined(values: string[]): ReactNode {
 /**
  * Render one titled section of the metadata block.
  *
- * @param props - Section title, body text and body class names.
+ * @param props - Section title, body content and body class names.
  * @returns A labelled section element.
  */
 function Section(
@@ -141,7 +128,7 @@ function Section(
   return (
     <section className="mb-6">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{heading}</h2>
-      <p className={`mt-2 ${className}`}>{body}</p>
+      <div className={`mt-2 ${className}`}>{body}</div>
     </section>
   );
 }
@@ -149,10 +136,10 @@ function Section(
 /**
  * Presentational body of the metadata block.
  *
- * @param props - Normalized metadata display strings.
- * @returns The title, authors, abstract and keywords as plain text.
+ * @param props - Normalized metadata display values.
+ * @returns The title, byline, markdown abstract and keywords.
  */
-function MetadataContent({ title, authors, abstract, keywords }: MetadataText) {
+function MetadataContent({ title, authors, affiliations, abstract, keywords }: MetadataText) {
   return (
     <article className="mb-8">
       <header className="mb-6">
@@ -160,14 +147,14 @@ function MetadataContent({ title, authors, abstract, keywords }: MetadataText) {
           <h1 className="text-3xl font-semibold leading-tight text-black">{title}</h1>
         ) : null}
         {authors.length > 0 ? (
-          <p className="mt-3 text-base text-muted">{joined(authors)}</p>
+          <ReaderByline model={buildByline(authors, affiliations)} />
         ) : null}
       </header>
       {abstract ? (
         <Section
           heading="Abstract"
-          body={abstract}
-          className="whitespace-pre-line text-base leading-relaxed text-black"
+          body={<InlineMarkdown source={abstract} />}
+          className="space-y-3 text-base leading-relaxed text-black"
         />
       ) : null}
       {keywords.length > 0 ? (
@@ -180,13 +167,13 @@ function MetadataContent({ title, authors, abstract, keywords }: MetadataText) {
 /**
  * Read-only metadata header of a reader manuscript.
  *
- * Loads `_frontmatter.yml` (title, keywords), `_author.yml` (authors) and
- * `_abstract.yml` (abstract) through the workspace adapter. Missing or
- * unparsable files simply omit that part of the block. Renders nothing until
- * the first load settles.
+ * Loads `_frontmatter.yml` (title, keywords), `_author.yml` (authors and
+ * affiliations) and `_abstract.yml` (abstract) through the workspace adapter.
+ * Missing or unparsable files simply omit that part of the block. Renders
+ * nothing until the first load settles.
  *
  * @param props - See {@link ReaderMetadataProps}.
- * @returns The title, authors, abstract and keywords as plain text.
+ * @returns The title, byline, markdown abstract and keywords.
  */
 export function ReaderMetadata({ workspace, manuscriptRoot }: ReaderMetadataProps) {
   const [metadata, setMetadata] = useState<MetadataText | null>(null);
