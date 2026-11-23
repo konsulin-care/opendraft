@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { ProjectRecord, ProjectSource, WorkspaceAdapter } from '@opendraft/workspace';
-import type { BffSession } from './github/bff-client';
+import type { BffSession, Owner } from './github/bff-client';
+import { listOwners } from './github/bff-client';
 import { AppHeader } from './components/AppHeader';
 import type { SaveStatus } from './components/AppHeader';
 import type { ManuscriptSwitcherOption } from './components/header/ManuscriptSwitcher';
 import { EditorArea } from './components/EditorArea';
-import { SuggestionBanner } from './components/suggestion/SuggestionBanner';
+import { useDraftSection } from './hooks/use-draft-section';
+import type { DraftSectionDeps } from './hooks/use-draft-section';
 import { ProjectDrawer, useDrawerState } from './components/project-drawer/ProjectDrawer';
 import { ProjectSwitcher } from './components/project-drawer/ProjectSwitcher';
 import { DeleteProjectAction } from './components/project-drawer/DeleteProjectDialog';
@@ -58,23 +60,44 @@ function resolveContentPath(
   return { isDir, contentPath };
 }
 
-/** Banner section that renders only when a project is active. */
-function SuggestionSection({
-  active,
-  workspace,
-}: {
-  active: ProjectRecord | null;
-  workspace: WorkspaceAdapter;
-}) {
-  return active ? <SuggestionBanner project={active} workspace={workspace} /> : null;
+/** Browser-backed draft actions for {@link useDraftSection}. */
+function browserDraftDeps(session: BffSession | null): DraftSectionDeps {
+  const need = (): BffSession => { if (session === null) throw new Error('Sign in to GitHub first.'); return session; };
+  return {
+    load: async (project) => {
+      if (project.source.kind !== 'github') return { status: { state: 'local-only' }, pendingSaves: 0 };
+      const [{ checkSuggestion }, { createCheckDeps }] = await Promise.all([import('./suggest/status'), import('./suggest/browser-deps')]);
+      return { status: await checkSuggestion(project.source, await createCheckDeps()) };
+    },
+    save: async (context) => {
+      const [{ saveDraft }, { createSaveDeps }] = await Promise.all([import('./suggest/save'), import('./suggest/browser-deps')]);
+      return saveDraft(context.project.id, await createSaveDeps(need(), context.resolveConflicts));
+    },
+    send: async (context, input) => {
+      const [{ sendSuggestion }, { createSubmitDeps }] = await Promise.all([import('./suggest/submit'), import('./suggest/browser-deps')]);
+      return sendSuggestion(context.project.id, input, await createSubmitDeps(need()));
+    },
+    update: async (context, input) => {
+      const [{ sendUpdate }, { createSubmitDeps }] = await Promise.all([import('./suggest/submit'), import('./suggest/browser-deps')]);
+      return sendUpdate(context.project.id, input, await createSubmitDeps(need()));
+    },
+    startNew: async (context) => {
+      const [{ restartSuggestion }, { createRestartDeps }] = await Promise.all([import('./suggest/restart'), import('./suggest/browser-deps')]);
+      return restartSuggestion(context.project.id, await createRestartDeps(need()));
+    },
+    publish: async () => { throw new Error('Publishing to GitHub is not available in this build yet.'); },
+  };
 }
 
-/**
- * Load the active file's content, dropping the previous content when the path changes.
- * @param workspace - Workspace of the active project, or null before boot.
- * @param activePath - Repo-relative path of the active file, or null.
- * @returns The loaded `{ path, text }`, or null while loading.
- */
+/** Load the GitHub accounts the signed-in viewer can publish to. */
+function useOwners(session: BffSession | null): Owner[] {
+  const [owners, setOwners] = useState<Owner[]>([]);
+  useEffect(() => {
+    if (session === null) { setOwners([]); return; }
+    void listOwners().then(setOwners, () => undefined);
+  }, [session]);
+  return owners;
+}
 function useActiveFileContent(
   workspace: WorkspaceAdapter | null,
   activePath: string | null,
@@ -101,9 +124,6 @@ function useActiveFileContent(
 
   return file;
 }
-
-/** List every file path in the active project's workspace; empty while loading.
- * Re-lists when `opendraft:files-changed` fires after a block mutation. */
 function useWorkspacePaths(workspace: WorkspaceAdapter | null, active: ProjectRecord | null): string[] {
   const [paths, setPaths] = useState<string[]>([]);
   const [version, setVersion] = useState(0);
@@ -128,7 +148,6 @@ function useWorkspacePaths(workspace: WorkspaceAdapter | null, active: ProjectRe
 
   return paths;
 }
-
 /** Props for {@link HeaderSection}. */
 interface HeaderSectionProps {
   active: ProjectRecord | null;
@@ -150,7 +169,6 @@ interface HeaderSectionProps {
   drawer: ReturnType<typeof useDrawerState>;
 }
 
-/** Icon header with manuscript title, save status, action slot and account menu. */
 function HeaderSection({
   active, source, dirName, workspace, openFile, activePath, switchTo,
   saveStatus, manuscripts, onSelectManuscript, onSelectAllManuscripts,
@@ -187,7 +205,6 @@ interface DrawerSectionProps {
   onOpen: (path: string) => void;
 }
 
-/** Overlay project drawer: switcher header, file tree body, delete action footer. */
 function DrawerSection({
   projects,
   active,
@@ -232,12 +249,6 @@ function DrawerSection({
   );
 }
 
-/**
- * App shell: shared header plus the single continuous editor region for the
- * active project path. Boots into the auto-created "Untitled project" and
- * opens the project's default path (the manuscript directory for a fresh
- * scaffold).
- */
 export function App() {
   const {
     workspace, projects, active, loading, error, switchTo, create, rename, remove,
@@ -245,16 +256,13 @@ export function App() {
   const { activePath, openFile } = useActiveFile(workspace, active?.id ?? null);
   const paths = useWorkspacePaths(workspace, active);
   const { session, loginEnabled, logout } = useSession();
+  const owners = useOwners(session);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
-  // T11 removed the header toggle and its Ctrl/Cmd+\ shortcut: the source
-  // editor's formatting toolbar stays on unconditionally.
-  const formattingToolbar = true;
-  // The listing loads asynchronously: until it arrives the active path is
-  // treated as unresolved so a directory is never rendered as a file.
   const { isDir, contentPath } = resolveContentPath(activePath, paths);
   const file = useActiveFileContent(workspace, contentPath);
   const drawer = useDrawerState();
   const manuscripts = manuscriptOptions(paths, active);
+  const draft = useDraftSection({ project: active, workspace, session, owners, deps: browserDraftDeps(session) });
   const returnTo = `${window.location.pathname}${window.location.search}`;
 
   if (loading) return <div>Loading workspace...</div>;
@@ -271,20 +279,20 @@ export function App() {
         onSelectManuscript={(id) => { void openFile(`manuscripts/${id}`); }}
         onSelectAllManuscripts={() => { void openFile('manuscripts'); }}
         session={session} loginEnabled={loginEnabled} onLogout={logout}
-        returnTo={returnTo} action={null} drawer={drawer}
+        returnTo={returnTo} action={<>{draft.extra}{draft.action}</>} drawer={drawer}
       />
-      <SuggestionSection active={active} workspace={workspace} />
       <EditorArea
         workspace={workspace} activePath={activePath} isDir={isDir}
         file={file !== null && file.path === contentPath ? file : null}
         projectId={active?.id ?? ''} onSaveStatusChange={setSaveStatus}
-        formattingToolbar={formattingToolbar} openFile={openFile}
+        formattingToolbar openFile={openFile}
       />
       <DrawerSection
         projects={projects} active={active} switchTo={switchTo}
         create={create} rename={rename} remove={remove} drawer={drawer}
         workspace={workspace} paths={paths} activePath={activePath} onOpen={openFile}
       />
+      {draft.dialogs}
     </div>
   );
 }
