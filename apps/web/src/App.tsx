@@ -8,7 +8,7 @@ import type { SaveStatus } from './components/AppHeader';
 import type { ManuscriptSwitcherOption } from './components/header/ManuscriptSwitcher';
 import { EditorArea } from './components/EditorArea';
 import { useDraftSection } from './hooks/use-draft-section';
-import type { DraftSectionDeps } from './hooks/use-draft-section';
+import { createDraftSectionDeps } from './suggest/draft-deps';
 import { ProjectDrawer, useDrawerState } from './components/project-drawer/ProjectDrawer';
 import { ProjectSwitcher } from './components/project-drawer/ProjectSwitcher';
 import { DeleteProjectAction } from './components/project-drawer/DeleteProjectDialog';
@@ -58,35 +58,6 @@ function resolveContentPath(
   const isDir = activePath !== null && paths.some((p) => p.startsWith(`${activePath}/`));
   const contentPath = activePath !== null && paths.length > 0 && !isDir ? activePath : null;
   return { isDir, contentPath };
-}
-
-/** Browser-backed draft actions for {@link useDraftSection}. */
-function browserDraftDeps(session: BffSession | null): DraftSectionDeps {
-  const need = (): BffSession => { if (session === null) throw new Error('Sign in to GitHub first.'); return session; };
-  return {
-    load: async (project) => {
-      if (project.source.kind !== 'github') return { status: { state: 'local-only' }, pendingSaves: 0 };
-      const [{ checkSuggestion }, { createCheckDeps }] = await Promise.all([import('./suggest/status'), import('./suggest/browser-deps')]);
-      return { status: await checkSuggestion(project.source, await createCheckDeps()) };
-    },
-    save: async (context) => {
-      const [{ saveDraft }, { createSaveDeps }] = await Promise.all([import('./suggest/save'), import('./suggest/browser-deps')]);
-      return saveDraft(context.project.id, await createSaveDeps(need(), context.resolveConflicts));
-    },
-    send: async (context, input) => {
-      const [{ sendSuggestion }, { createSubmitDeps }] = await Promise.all([import('./suggest/submit'), import('./suggest/browser-deps')]);
-      return sendSuggestion(context.project.id, input, await createSubmitDeps(need()));
-    },
-    update: async (context, input) => {
-      const [{ sendUpdate }, { createSubmitDeps }] = await Promise.all([import('./suggest/submit'), import('./suggest/browser-deps')]);
-      return sendUpdate(context.project.id, input, await createSubmitDeps(need()));
-    },
-    startNew: async (context) => {
-      const [{ restartSuggestion }, { createRestartDeps }] = await Promise.all([import('./suggest/restart'), import('./suggest/browser-deps')]);
-      return restartSuggestion(context.project.id, await createRestartDeps(need()));
-    },
-    publish: async () => { throw new Error('Publishing to GitHub is not available in this build yet.'); },
-  };
 }
 
 /** Load the GitHub accounts the signed-in viewer can publish to. */
@@ -262,7 +233,7 @@ export function App() {
   const file = useActiveFileContent(workspace, contentPath);
   const drawer = useDrawerState();
   const manuscripts = manuscriptOptions(paths, active);
-  const draft = useDraftSection({ project: active, workspace, session, owners, deps: browserDraftDeps(session) });
+  const draft = useDraftSection({ project: active, workspace, session, owners, deps: createDraftSectionDeps(session) });
   const returnTo = `${window.location.pathname}${window.location.search}`;
 
   if (loading) return <div>Loading workspace...</div>;
