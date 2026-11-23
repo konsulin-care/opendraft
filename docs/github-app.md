@@ -51,23 +51,35 @@ Set the following for each app.
 | GitHub App name | `OpenDraft` | `OpenDraft Dev` |
 | Homepage URL | `https://publish.konsulin.care` | `http://127.0.0.1:5173` or `https://<host>.ts.net` |
 | Callback URL | `https://publish.konsulin.care/@api/auth/callback` | `http://127.0.0.1:5173/@api/auth/callback` or `https://<host>.ts.net/@api/auth/callback` |
+| Setup URL | `https://publish.konsulin.care/@api/auth/install/callback` | `http://127.0.0.1:5173/@api/auth/install/callback` or `https://<host>.ts.net/@api/auth/install/callback` |
 
-The callback URL is always `BFF_PUBLIC_ORIGIN` + `/@api/auth/callback`. It must
-match the deployed `BFF_PUBLIC_ORIGIN` exactly, including scheme and port.
+The callback URL is always `BFF_PUBLIC_ORIGIN` + `/@api/auth/callback`. The
+setup URL is always `BFF_PUBLIC_ORIGIN` + `/@api/auth/install/callback`. Both
+must match the deployed `BFF_PUBLIC_ORIGIN` exactly, including scheme and port.
+
+OpenDraft does not rely on GitHub's "Request user authorization (OAuth) during
+installation" option. The installation flow is driven by the BFF instead:
+`/@api/auth/install` stores the pending `returnTo` in the sealed transaction
+cookie and redirects to the app install page. After installation GitHub sends
+the user to the setup URL, and the BFF redirects them to `returnTo` when a
+session exists, or to `/@api/auth/login?return_to=<returnTo>` otherwise.
 
 Under **Identifying and authorizing users**:
 
-- **Request user authorization (OAuth) during installation**: ON
+- **Request user authorization (OAuth) during installation**: OFF. The BFF
+  starts authorization explicitly after the install callback.
 - **Expire user authorization tokens**: ON (8-hour access tokens with a
   ~6-month refresh token; the BFF refreshes them server-side)
 - **Enable Device Flow**: OFF
-- Install callback / setup URL: leave empty, OpenDraft returns users to the
-  `returnTo` path carried in the sealed OAuth transaction cookie.
 
 Under **Post installation**:
 
-- **Setup URL**: leave empty.
-- **Redirect on update**: OFF.
+- **Setup URL**: `BFF_PUBLIC_ORIGIN` + `/@api/auth/install/callback` (for
+  example `https://publish.konsulin.care/@api/auth/install/callback` on
+  production). This handler ignores the spoofable `installation_id` query
+  parameter and only uses the sealed `returnTo` cookie.
+- **Redirect on update**: ON. Reinstalls and permission changes must come back
+  through the setup URL so the flow can resume.
 
 Under **Webhook**:
 
@@ -181,9 +193,12 @@ and must match the value registered above.
 
 - Sign in: `/#/…` triggers `GET /@api/auth/login`, which starts the OAuth flow
   with state, PKCE (S256), and the client secret.
-- Install: users start the installation from `/@api/auth/install`, which
-  redirects to the GitHub App installation page. After selecting an account and
-  repositories they return to the pending `returnTo` path.
+- Install: users start the installation from `/@api/auth/install`, which stores
+  the pending `returnTo` in the sealed transaction cookie and redirects to the
+  GitHub App installation page. After selecting an account and repositories
+  GitHub returns to `/@api/auth/install/callback`; that handler ignores the
+  spoofable `installation_id` and redirects to `returnTo` when a session
+exists, or to `/@api/auth/login?return_to=<returnTo>` otherwise.
 - Sign out: `POST /@api/auth/logout` drops the session cookie.
 
 ## 8. Suggest edits (editable reader)
@@ -226,8 +241,11 @@ access.
 
 ## 9. Checklist per environment
 
-- [ ] App created with the correct name, homepage, and callback URL.
-- [ ] OAuth during installation ON; token expiry ON; device flow OFF.
+- [ ] App created with the correct name, homepage, callback URL, and setup URL.
+- [ ] Request user authorization (OAuth) during installation OFF; token expiry
+      ON; device flow OFF.
+- [ ] Setup URL set to `<origin>/@api/auth/install/callback`; Redirect on update
+      ON.
 - [ ] Webhooks inactive.
 - [ ] Public app.
 - [ ] Repository permissions: Metadata read; Contents, Pull requests, Workflows
