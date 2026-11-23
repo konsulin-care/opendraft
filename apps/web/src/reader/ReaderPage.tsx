@@ -120,7 +120,14 @@ const defaultDeps: ReaderPageBaseDeps = {
       cloneViaRelay,
     }),
   getSessionState: () => getSessionState(),
-  logout: () => signOut(),
+  logout: async () => {
+    await signOut();
+    const [{ projectRegistry }, { purgePrivateProjects }] = await Promise.all([
+      import('../hooks/useProjects'),
+      import('../suggest/purge'),
+    ]);
+    await purgePrivateProjects(projectRegistry);
+  },
   convert: convertWithGit,
 };
 
