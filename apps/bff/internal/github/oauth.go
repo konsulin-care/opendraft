@@ -64,6 +64,11 @@ type accessTokenResponse struct {
 // field. It wraps the GitHub error code but never includes token values.
 var ErrOAuth = errors.New("github: oauth error")
 
+// ErrUnverifiedEmail is returned when GitHub refuses a token because the
+// account's primary email address is not verified. It is wrapped with ErrOAuth
+// so callers can treat it as a specific OAuth failure.
+var ErrUnverifiedEmail = errors.New("github: unverified user email")
+
 // NewPKCE returns a fresh PKCE verifier and its S256 challenge. The verifier
 // is 32 random bytes encoded as unpadded base64url; the challenge is the
 // unpadded base64url SHA-256 of the verifier.
@@ -150,6 +155,9 @@ func (c *Client) requestTokens(ctx context.Context, form url.Values) (Tokens, er
 		return Tokens{}, fmt.Errorf("github: decode oauth response: %w", err)
 	}
 	if parsed.Error != "" {
+		if parsed.Error == "unverified_user_email" {
+			return Tokens{}, fmt.Errorf("%w: %w: %s", ErrOAuth, ErrUnverifiedEmail, parsed.Error)
+		}
 		return Tokens{}, fmt.Errorf("%w: %s", ErrOAuth, parsed.Error)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {

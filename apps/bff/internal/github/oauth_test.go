@@ -164,6 +164,24 @@ func TestExchangeCodeTreatsErrorFieldAsFailure(t *testing.T) {
 	}
 }
 
+func TestExchangeCodeReportsUnverifiedEmail(t *testing.T) {
+	now := time.Date(2024, 5, 1, 12, 0, 0, 0, time.UTC)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"error":"unverified_user_email","error_description":"Email not verified"}`))
+	}))
+	defer server.Close()
+
+	client := testClient(server.URL, now)
+	_, err := client.ExchangeCode(context.Background(), "code", "verifier", "https://app.example/cb")
+	if !errors.Is(err, ErrUnverifiedEmail) {
+		t.Fatalf("ExchangeCode error = %v, want ErrUnverifiedEmail", err)
+	}
+	if !errors.Is(err, ErrOAuth) {
+		t.Fatalf("ExchangeCode error = %v, want wrapped ErrOAuth", err)
+	}
+}
+
 func TestRefreshPostsGrantTypeAndReturnsTokens(t *testing.T) {
 	now := time.Date(2024, 5, 1, 12, 0, 0, 0, time.UTC)
 	var gotForm url.Values

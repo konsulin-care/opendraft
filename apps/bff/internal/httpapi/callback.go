@@ -2,8 +2,11 @@ package httpapi
 
 import (
 	"crypto/subtle"
+	"errors"
 	"net/http"
+	"strings"
 
+	"github.com/konsulin-care/opendraft/apps/bff/internal/github"
 	"github.com/konsulin-care/opendraft/apps/bff/internal/session"
 )
 
@@ -14,6 +17,7 @@ const (
 	invalidStateCode  = "invalid_state"
 	authErrorCode     = "exchange_failed"
 	authErrorLocation = "/?auth_error=" + authErrorCode
+	unverifiedEmail   = "unverified_email"
 	seeOtherCode      = http.StatusSeeOther
 )
 
@@ -36,6 +40,10 @@ func (h *authHandler) handleCallback(w http.ResponseWriter, r *http.Request) {
 
 	tokens, err := h.github.ExchangeCode(r.Context(), r.URL.Query().Get(callbackCodeKey), tx.Verifier, h.cfg.CallbackURL())
 	if err != nil {
+		if errors.Is(err, github.ErrUnverifiedEmail) {
+			failUnverifiedEmail(w, r, tx.ReturnTo)
+			return
+		}
 		failExchange(w, r)
 		return
 	}
@@ -77,4 +85,21 @@ func rejectState(w http.ResponseWriter) {
 func failExchange(w http.ResponseWriter, r *http.Request) {
 	session.ClearTx(w)
 	http.Redirect(w, r, authErrorLocation, seeOtherCode)
+}
+
+// failUnverifiedEmail clears the transaction and sends the browser back to the
+// transaction return_to with a friendly unverified-email auth error.
+func failUnverifiedEmail(w http.ResponseWriter, r *http.Request, returnTo string) {
+	session.ClearTx(w)
+	http.Redirect(w, r, appendAuthError(safeReturnTo(returnTo), unverifiedEmail), seeOtherCode)
+}
+
+// appendAuthError appends auth_error=code to target, choosing the query
+// separator so an existing query string is preserved.
+func appendAuthError(target, code string) string {
+	separator := "?"
+	if strings.Contains(target, "?") {
+		separator = "&"
+	}
+	return target + separator + "auth_error=" + code
 }
