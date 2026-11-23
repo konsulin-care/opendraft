@@ -1,11 +1,28 @@
 const OWNER_RE = /^[A-Za-z0-9-]{1,39}$/;
 const REPO_RE = /^[A-Za-z0-9._-]{1,100}$/;
 
-/** A parsed reader URL: the repository and an optional git ref. */
+/** A parsed reader URL: the repository, an optional git ref and manuscript. */
 export interface ReaderRoute {
   owner: string;
   repo: string;
   ref?: string;
+  /** Manuscript id from `?manuscript=<id>`, when present. */
+  manuscript?: string;
+}
+
+/**
+ * Read the optional manuscript id from a query string.
+ *
+ * Accepts a search string with or without the leading `?`. Blank values and
+ * repeated parameters resolve to the first non-empty value.
+ *
+ * @param search - URL query string such as `?manuscript=alpha`.
+ * @returns The manuscript id, or undefined when the parameter is absent.
+ */
+export function readerManuscript(search: string): string | undefined {
+  const raw = search.startsWith('?') ? search.slice(1) : search;
+  const value = new URLSearchParams(raw).get('manuscript');
+  return value === null || value === '' ? undefined : value;
 }
 
 /** Decode one path segment, returning null when the encoding is malformed. */
@@ -82,19 +99,26 @@ function isReaderOwner(owner: string): boolean {
   return !owner.startsWith('@') && !owner.includes('.') && isValidOwner(owner);
 }
 
+/** Add the manuscript id when the query string carries one. */
+function withManuscript(route: ReaderRoute, manuscript: string | undefined): ReaderRoute {
+  return manuscript === undefined ? route : { ...route, manuscript };
+}
+
 /**
  * Parse an SPA pathname into a reader route.
  *
  * Accepts `/{owner}/{repo}`, `/{owner}/{repo}/` and
  * `/{owner}/{repo}/tree/{ref...}` where the ref may contain slashes. Every
- * segment is individually URI-decoded. Returns null for `/`, single-segment
+ * segment is individually URI-decoded. An optional search string supplies the
+ * manuscript id (`?manuscript=<id>`). Returns null for `/`, single-segment
  * paths, reserved or file-like first segments (starting with `@` or
  * containing a dot) and any other shape.
  *
  * @param pathname - The URL pathname to parse.
+ * @param search - Optional URL query string with `?manuscript=<id>`.
  * @returns The parsed route, or null when the path is not a reader route.
  */
-export function parseReaderRoute(pathname: string): ReaderRoute | null {
+export function parseReaderRoute(pathname: string, search?: string): ReaderRoute | null {
   const decoded = splitPath(pathname);
   if (decoded === null || decoded.length < 2) {
     return null;
@@ -106,12 +130,14 @@ export function parseReaderRoute(pathname: string): ReaderRoute | null {
     return null;
   }
 
+  const manuscript = search === undefined ? undefined : readerManuscript(search);
+
   if (decoded.length === 2) {
-    return { owner, repo };
+    return withManuscript({ owner, repo }, manuscript);
   }
 
   if (decoded.length > 3 && decoded[2] === 'tree') {
-    return { owner, repo, ref: decoded.slice(3).join('/') };
+    return withManuscript({ owner, repo, ref: decoded.slice(3).join('/') }, manuscript);
   }
 
   return null;
