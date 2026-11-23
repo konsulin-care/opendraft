@@ -69,6 +69,18 @@ export interface ForkResult {
   defaultBranch: string;
 }
 
+/** An account the viewer can publish a repository to. */
+export interface Owner {
+  /** GitHub login of the account. */
+  login: string;
+  /** Account type: `User` or `Organization`. */
+  type: string;
+  /** Avatar image URL of the account. */
+  avatarUrl: string;
+  /** Whether the app installation covers all repositories. */
+  allRepos: boolean;
+}
+
 /** Input of {@link createRepo}. */
 export interface CreateRepoInput {
   owner: string;
@@ -87,6 +99,7 @@ export interface CreateRepoResult {
 
 const AUTH_PREFIX = '/@api/auth';
 const REPOS_PATH = '/@api/repos';
+const OWNERS_PATH = '/@api/owners';
 
 /**
  * Fetch the current session and whether login is enabled.
@@ -181,6 +194,17 @@ export async function forkRepo(
   const result = await readJson<ForkResult>(response);
   if (!result) throw new BffError('empty_response', response.status);
   return result;
+}
+
+/**
+ * List the accounts the viewer can create repositories under.
+ *
+ * @param fetchFn - Fetch implementation; injectable for tests.
+ * @returns Owners from the GitHub App installations visible to the viewer.
+ */
+export async function listOwners(fetchFn: typeof fetch = fetch): Promise<Owner[]> {
+  const response = await get(OWNERS_PATH, fetchFn);
+  return (await response.json()) as Owner[];
 }
 
 /**

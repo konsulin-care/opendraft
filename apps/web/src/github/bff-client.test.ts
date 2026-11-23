@@ -12,6 +12,7 @@ import {
   getSession,
   getSessionState,
   installUrl,
+  listOwners,
   loginUrl,
   logout,
   type BffSession,
@@ -215,6 +216,19 @@ describe('POST helper error fallback', () => {
       code: 'http_500',
       status: 500,
     });
+  });
+});
+
+describe('listOwners', () => {
+  it('sends a same-origin GET to /@api/owners and returns the owner list', async () => {
+    const owners = [
+      { login: 'octocat', type: 'User', avatarUrl: 'https://avatars.example/1', allRepos: true },
+      { login: 'konsulin-care', type: 'Organization', avatarUrl: 'https://avatars.example/2', allRepos: false },
+    ];
+    const fetchFn = vi.fn(async () => response(owners));
+
+    await expect(listOwners(fetchFn as unknown as typeof fetch)).resolves.toEqual(owners);
+    expect(fetchFn).toHaveBeenCalledWith('/@api/owners', { credentials: 'same-origin' });
   });
 });
 
