@@ -17,6 +17,7 @@ import type { ConvertResult } from './convert';
 import type { LoadedRepo } from './load-repo';
 import { NotFoundError, RateLimitedError } from './github-public';
 import type { ReaderRoute } from './route';
+import { SuggestEdits } from './SuggestEdits';
 import { UnlistedBanner } from './UnlistedBanner';
 
 /** Reader state loaded from the route and injected dependencies. */
@@ -49,6 +50,8 @@ export interface ReaderContentProps {
   convert: (decisions: InitDecisions) => Promise<ConvertResult>;
   /** Register unlisted manuscript ids in the project configuration. */
   register: (ids: string[]) => Promise<ConvertResult>;
+  /** URL query string used by the suggest-edits entry point. */
+  search?: string;
 }
 
 /** Return the reader path (`/{owner}/{repo}[/tree/{ref}]`) for a route. */
@@ -142,16 +145,64 @@ function useDiscovery(repo: LoadedRepo | null): {
   return { discovery, error };
 }
 
+/** Render the suggest-edits entry point, banner, switcher and manuscript. */
+function OpenDraftContent({
+  route,
+  state,
+  repo,
+  discovery,
+  register,
+  query,
+}: {
+  route: ReaderRoute;
+  state: ReaderState;
+  repo: LoadedRepo;
+  discovery: ProjectDiscovery | null;
+  register: (ids: string[]) => Promise<ConvertResult>;
+  query: string;
+}) {
+  const manuscript = repo.manuscripts[state.selected] ?? repo.manuscripts[0];
+  return (
+    <>
+      <SuggestEdits
+        route={route}
+        session={state.session}
+        loginEnabled={state.loginEnabled}
+        search={query}
+      />
+      {discovery !== null && discovery.unlisted.length > 0 && state.session !== null ? (
+        <UnlistedBanner discovery={discovery} session={state.session} register={register} />
+      ) : null}
+      <ManuscriptSwitcher
+        manuscripts={repo.manuscripts}
+        selected={state.selected}
+        onSelect={state.select}
+      />
+      {manuscript === undefined ? (
+        <p className="text-sm text-black">No manuscripts found.</p>
+      ) : (
+        <ManuscriptView
+          workspace={repo.workspace}
+          dir={manuscript.path}
+          projectKey={`reader:${route.owner}/${route.repo}@${repo.sha}`}
+          readOnly
+        />
+      )}
+    </>
+  );
+}
+
 /**
  * Render the loading indicator, load error, conversion panel or reader view.
  *
  * @param props - See {@link ReaderContentProps}.
  * @returns The content for the current reader state.
  */
-export function ReaderContent({ route, state, convert, register }: ReaderContentProps) {
-  const { session, loginEnabled, repo, error, loading, selected, select } = state;
+export function ReaderContent({ route, state, convert, register, search }: ReaderContentProps) {
+  const { session, loginEnabled, repo, error, loading } = state;
   const { discovery, error: discoveryError } = useDiscovery(repo);
   const returnTo = readerPath(route);
+  const query = search ?? (typeof window === 'undefined' ? '' : window.location.search);
 
   if (loading) return <p className="text-sm text-black">Loading…</p>;
   if (error !== null) return <LoadError error={error} returnTo={returnTo} />;
@@ -174,24 +225,15 @@ export function ReaderContent({ route, state, convert, register }: ReaderContent
     );
   }
 
-  const manuscript = repo.manuscripts[selected] ?? repo.manuscripts[0];
   return (
-    <>
-      {discovery !== null && discovery.unlisted.length > 0 && session !== null ? (
-        <UnlistedBanner discovery={discovery} session={session} register={register} />
-      ) : null}
-      <ManuscriptSwitcher manuscripts={repo.manuscripts} selected={selected} onSelect={select} />
-      {manuscript === undefined ? (
-        <p className="text-sm text-black">No manuscripts found.</p>
-      ) : (
-        <ManuscriptView
-          workspace={repo.workspace}
-          dir={manuscript.path}
-          projectKey={`reader:${route.owner}/${route.repo}@${repo.sha}`}
-          readOnly
-        />
-      )}
-    </>
+    <OpenDraftContent
+      route={route}
+      state={state}
+      repo={repo}
+      discovery={discovery}
+      register={register}
+      query={query}
+    />
   );
 }
 
