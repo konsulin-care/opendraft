@@ -1,23 +1,25 @@
 /**
  * Reader content for a loaded repository.
  *
- * Renders the loading indicator, load error, conversion panel or read-only
- * manuscript view. Plain repositories are discovered read-only so the
- * conversion panel can offer the existing manuscripts as a checklist.
+ * Renders the loading indicator, load error, non-compliant notice or read-only
+ * manuscript view. Plain repositories are discovered read-only so the notice
+ * can list the detected manuscripts as candidates.
  */
 
-import { useEffect, useState } from 'react';
-import type { InitDecisions, ProjectDiscovery } from '@opendraft/manuscript';
-import { discoverProject, normalizeManuscriptId } from '@opendraft/manuscript';
+import { useEffect, useRef, useState } from 'react';
+import type { ProjectDiscovery } from '@opendraft/manuscript';
+import { discoverProject } from '@opendraft/manuscript';
 import type { BffSession } from '../github/bff-client';
 import { loginUrl } from '../github/bff-client';
 import { ManuscriptView } from '../components/ManuscriptView';
-import { ConvertPanel } from './ConvertPanel';
 import { ManuscriptIndex } from './ManuscriptIndex';
+import { NonCompliantNotice } from './NonCompliantNotice';
 import type { ConvertResult } from './convert';
 import type { LoadedRepo } from './load-repo';
 import { NotFoundError, RateLimitedError } from './github-public';
+import { clearIntent } from './intent-url';
 import type { ReaderRoute } from './route';
+import { readerManuscript } from './route';
 import { UnlistedBanner } from './UnlistedBanner';
 
 /** Reader state loaded from the route and injected dependencies. */
@@ -42,16 +44,89 @@ export interface ReaderContentProps {
   route: ReaderRoute;
   /** Reader state loaded from the route and dependencies. */
   state: ReaderState;
-  /** Start a conversion with the chosen registration decisions. */
-  convert: (decisions: InitDecisions) => Promise<ConvertResult>;
   /** Register unlisted manuscript ids in the project configuration. */
   register: (ids: string[]) => Promise<ConvertResult>;
+  /** Read-only discovery result, or null while it is still loading. */
+  discovery: ProjectDiscovery | null;
+  /** Discovery error, or null when discovery succeeded. */
+  discoveryError: unknown;
+  /** Whether the viewer may push to the repository. */
+  canWrite: boolean;
 }
 
 /** Return the reader path (`/{owner}/{repo}[/tree/{ref}]`) for a route. */
-function readerPath(route: ReaderRoute): string {
+export function readerPath(route: ReaderRoute): string {
   const base = `/${route.owner}/${route.repo}`;
   return route.ref === undefined ? base : `${base}/tree/${route.ref}`;
+}
+
+/** Read the manuscript id from the browser URL query. */
+function locationManuscript(): string | undefined {
+  return typeof window === 'undefined' ? undefined : readerManuscript(window.location.search);
+}
+
+/** Resolve the manuscript requested by the route, if any. */
+function resolveCurrent(
+  manuscripts: LoadedRepo['manuscripts'],
+  requested: string | undefined,
+): LoadedRepo['manuscripts'][number] | undefined {
+  if (manuscripts.length === 1) return manuscripts[0];
+  if (requested === undefined) return undefined;
+  return manuscripts.find((manuscript) => manuscript.id === requested);
+}
+
+export function useReaderNavigation(
+  route: ReaderRoute,
+  manuscripts: LoadedRepo['manuscripts'],
+): {
+  current: LoadedRepo['manuscripts'][number] | undefined;
+  contentRoute: ReaderRoute;
+  navigateTo: (id: string | null) => void;
+} {
+  const [override, setOverride] = useState<string | null | undefined>(undefined);
+  const requested = override === undefined
+    ? route.manuscript ?? locationManuscript()
+    : override ?? undefined;
+  const current = resolveCurrent(manuscripts, requested);
+
+  useEffect(() => {
+    setOverride(undefined);
+  }, [route.owner, route.repo, route.ref, route.manuscript]);
+
+  useEffect(() => {
+    const restore = (): void => setOverride(undefined);
+    window.addEventListener('popstate', restore);
+    return () => window.removeEventListener('popstate', restore);
+  }, []);
+
+  const navigateTo = (id: string | null): void => {
+    setOverride(id);
+    if (typeof window === 'undefined') return;
+    const href = id === null
+      ? readerPath(route)
+      : `${readerPath(route)}?manuscript=${encodeURIComponent(id)}`;
+    window.history.pushState({}, '', href);
+  };
+
+  const contentRoute = requested === undefined
+    ? { ...route, manuscript: undefined }
+    : { ...route, manuscript: requested };
+  return { current, contentRoute, navigateTo };
+}
+
+/** Auto-start an edit intent once for a signed-in viewer and clear it from the URL. */
+export function useEditIntentAutoStart(
+  enabled: boolean,
+  session: BffSession | null,
+  trigger: () => Promise<void>,
+): void {
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!enabled || autoStarted.current || session === null) return;
+    if (new URLSearchParams(window.location.search).get('intent') !== 'edit') return;
+    autoStarted.current = true;
+    void trigger().then(() => clearIntent());
+  }, [enabled, session, trigger]);
 }
 
 /** Render the rate-limit, not-found or generic load error. */
@@ -81,7 +156,7 @@ function LoadError({ error, returnTo }: { error: unknown; returnTo: string }) {
 }
 
 /** Discover a repository's existing manuscripts, read-only. */
-function useDiscovery(repo: LoadedRepo | null): {
+export function useDiscovery(repo: LoadedRepo | null): {
   discovery: ProjectDiscovery | null;
   error: unknown;
 } {
@@ -178,9 +253,15 @@ function OpenDraftContent({
  * @param props - See {@link ReaderContentProps}.
  * @returns The content for the current reader state.
  */
-export function ReaderContent({ route, state, convert, register }: ReaderContentProps) {
-  const { session, loginEnabled, repo, error, loading } = state;
-  const { discovery, error: discoveryError } = useDiscovery(repo);
+export function ReaderContent({
+  route,
+  state,
+  register,
+  discovery,
+  discoveryError,
+  canWrite,
+}: ReaderContentProps) {
+  const { repo, error, loading } = state;
   const returnTo = readerPath(route);
 
   if (loading) return <p className="text-sm text-black">Loading…</p>;
@@ -193,13 +274,11 @@ export function ReaderContent({ route, state, convert, register }: ReaderContent
     }
     if (discovery === null) return <p className="text-sm text-black">Loading…</p>;
     return (
-      <ConvertPanel
-        session={session}
-        returnTo={returnTo}
+      <NonCompliantNotice
         discovery={discovery}
-        defaultId={normalizeManuscriptId(route.repo)}
-        convert={convert}
-        loginEnabled={loginEnabled}
+        canWrite={canWrite}
+        owner={route.owner}
+        repo={route.repo}
       />
     );
   }

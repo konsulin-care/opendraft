@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 /**
  * ReaderPage tests: the read-only manuscript view for an OpenDraft project,
- * the unlisted-manuscript banner, the conversion panel for a plain repository,
- * and the dedicated rate-limit and not-found messages.
+ * the unlisted-manuscript banner, the non-compliant notice and convert dialog
+ * for a plain repository, and the dedicated rate-limit and not-found messages.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -195,47 +195,48 @@ describe('ReaderPage unlisted manuscripts', () => {
   });
 });
 
-describe('ReaderPage plain repository', () => {
-  it('renders the ConvertPanel when opendraft.yml is missing', async () => {
-    const deps = makeDeps({ loadRepo: vi.fn(async () => makeRepo([])) });
-    render(<ReaderPage route={ROUTE} deps={deps} />);
-    expect(await screen.findByText('This repository is not an OpenDraft project yet.')).toBeInTheDocument();
-    expect(screen.queryByTestId('manuscript-view')).toBeNull();
-  });
-});
-
-describe('ReaderPage plain repository conversion', () => {
-  it('offers conversion to a signed-in viewer', async () => {
+describe('ReaderPage non-compliant repository', () => {
+  it('shows the notice body and opens the convert dialog for a signed-in viewer', async () => {
     const deps = makeDeps({
       loadRepo: vi.fn(async () =>
         makePlainRepo({ 'manuscripts/case-series-review/article.qmd': '# Case series\n' }),
       ),
       getSessionState: vi.fn(async () => ({ session: SESSION, loginEnabled: true })),
+      getAccess: vi.fn(async () => PUSH_INSTALLED),
     });
     render(<ReaderPage route={ROUTE} deps={deps} />);
-    expect(await screen.findByRole('button', { name: 'Convert to OpenDraft' })).toBeInTheDocument();
+
+    expect(
+      await screen.findByText("This repository isn't an OpenDraft project yet"),
+    ).toBeInTheDocument();
+    expect(screen.getByText('We found these possible manuscripts:')).toBeInTheDocument();
+    expect(screen.getByText(/case-series-review needs/)).toBeInTheDocument();
+    expect(screen.queryByTestId('manuscript-view')).toBeNull();
+
+    const header = screen.getByTestId('header-shell');
+    fireEvent.click(within(header).getByRole('button', { name: 'Convert to OpenDraft' }));
+
+    expect(
+      screen.getByRole('dialog', { name: 'Convert to OpenDraft' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: /case-series-review/ })).toBeChecked();
   });
 
-  it('converts with the checked registration decisions', async () => {
-    const convert = vi.fn(async () => ({ kind: 'pr' as const, url: 'https://example.test/pr/1' }));
+  it('shows the sign-in popover for a signed-out viewer', async () => {
     const deps = makeDeps({
       loadRepo: vi.fn(async () =>
         makePlainRepo({ 'manuscripts/case-series-review/article.qmd': '# Case series\n' }),
       ),
-      getSessionState: vi.fn(async () => ({ session: SESSION, loginEnabled: true })),
-      convert,
     });
     render(<ReaderPage route={ROUTE} deps={deps} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Convert to OpenDraft' }));
-    await waitFor(() => {
-      expect(convert).toHaveBeenCalledWith({
-        owner: ROUTE.owner,
-        repo: ROUTE.repo,
-        session: SESSION,
-        decisions: { register: ['case-series-review'] },
-      });
-    });
+
+    await screen.findByText("This repository isn't an OpenDraft project yet");
+    const header = screen.getByTestId('header-shell');
+    fireEvent.click(within(header).getByRole('button', { name: 'Convert to OpenDraft' }));
+
+    expect(
+      screen.getByText('Sign in to check whether you can convert this repository.'),
+    ).toBeInTheDocument();
   });
 });
 
