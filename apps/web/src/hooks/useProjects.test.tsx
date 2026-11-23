@@ -1,10 +1,37 @@
 import 'fake-indexeddb/auto';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
+import type { ProjectSourceGitHub } from '@opendraft/workspace';
 import { workspaceManager } from '@opendraft/workspace';
 import { useProjects, projectRegistry, ACTIVE_PROJECT_KEY } from './useProjects';
 
+vi.mock('../github/bff-client', () => ({
+  getSessionState: vi.fn(async () => ({ session: null, loginEnabled: true })),
+}));
+
+import { getSessionState } from '../github/bff-client';
+
 // @vitest-environment jsdom
+
+/**
+ * Build a private GitHub project source for the purge boot case.
+ *
+ * @returns A GitHub source whose upstream repository is private.
+ */
+function privateGitHubSource(): ProjectSourceGitHub {
+  return {
+    kind: 'github',
+    owner: 'octocat',
+    repo: 'draft',
+    branch: 'opendraft/octocat/20260102-030405',
+    upstream: { owner: 'octocat', repo: 'draft', defaultBranch: 'main' },
+    private: true,
+    pushed: false,
+    syncedSha: 'aaa111',
+    digest: {},
+    pullNumber: null,
+  };
+}
 
 /**
  * Reset the shared registry to an empty state: remove every project
@@ -48,6 +75,7 @@ async function expectScaffolded(projectId: string, manuscriptId: string): Promis
 }
 
 beforeEach(async () => {
+  vi.mocked(getSessionState).mockResolvedValue({ session: null, loginEnabled: true });
   await resetRegistry();
 });
 
@@ -70,6 +98,17 @@ describe('useProjects boot', () => {
     expect(ws).not.toBeNull();
     expect(await ws!.readFile('opendraft.yml')).not.toBeNull();
     expect(await ws!.readFile('manuscripts/untitled-project/article.qmd')).not.toBeNull();
+  });
+
+  it('purges a stored private GitHub project when the session state reports no session', async () => {
+    const privateProject = await projectRegistry.create('Private draft', privateGitHubSource());
+    localStorage.setItem(ACTIVE_PROJECT_KEY, privateProject.id);
+
+    const { result } = await bootProjects();
+
+    expect(result.current.projects.map((project) => project.id)).not.toContain(privateProject.id);
+    expect(await projectRegistry.get(privateProject.id)).toBeUndefined();
+    expect(result.current.active?.name).toBe('Untitled project');
   });
 });
 

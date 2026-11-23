@@ -7,8 +7,10 @@ import {
   type ProjectRecord,
 } from '@opendraft/workspace';
 import { isDebugEnabled } from '../debug-flags';
+import { getSessionState } from '../github/bff-client';
 import { cleanupLegacyDatabases } from '../project/legacy-cleanup';
 import { scaffoldProject } from '../project/scaffold';
+import { purgeIfSignedOut } from '../suggest/purge';
 
 /** localStorage key holding the active project id. */
 export const ACTIVE_PROJECT_KEY = 'opendraft:active-project';
@@ -110,8 +112,9 @@ export interface UseProjectsResult {
 }
 
 /**
- * Boot effect: legacy cleanup, ensure at least one project exists, then
- * activate the persisted (or most recent) project. The loading flag clears
+ * Boot effect: legacy cleanup, purge private GitHub projects when the viewer
+ * is signed out, ensure at least one project exists, then activate the
+ * persisted (or most recent) project. The loading flag clears
  * through `onSettled` once boot settles, successfully or not.
  *
  * @param activate - Callback that makes the given project active.
@@ -128,6 +131,7 @@ function useBootEffect(
     (async () => {
       try {
         await cleanupLegacyDatabases();
+        await purgeIfSignedOut(() => getSessionState(), projectRegistry);
         let list = await projectRegistry.list();
         if (list.length === 0) {
           await ensureUntitledProject(projectRegistry);
