@@ -186,7 +186,45 @@ and must match the value registered above.
   repositories they return to the pending `returnTo` path.
 - Sign out: `POST /@api/auth/logout` drops the session cookie.
 
-## 8. Checklist per environment
+## 8. Suggest edits (editable reader)
+
+The reader at `/{owner}/{repo}` is editable by any signed-in GitHub user. The
+web app never says fork, branch, or pull request: it offers "Suggest edits",
+"Save to my copy", "Submit suggestion", and "Update suggestion". Every
+suggestion goes through a pull request; OpenDraft never commits directly to the
+default branch.
+
+### Install scope for contributors
+
+A contributor **without write access** must install OpenDraft on their
+**personal account with All repositories** access. This is not optional.
+GitHub's fork API requires the app to be installed on the destination account
+(the contributor's personal account) with access to **all repositories**, and
+on the source account with access to the source repository. A selected-
+repositories install on the personal account is not enough, so the app prompts
+the contributor to install again with All repositories before forking.
+
+Upstream repository owners must install the app for suggestions: without an
+install on the source account granting access to the source repository, GitHub
+refuses the fork and the suggestion flow is blocked. For private upstream
+repositories, an install that does not allow forking also blocks suggestions;
+viewers are asked to request write access from a maintainer.
+
+The suggest-edit endpoints are sign-in only and use the same user access token:
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /@api/repos/{owner}/{repo}/branches?prefix=opendraft/{login}/` | List suggestion branches and their head SHAs. |
+| `GET /@api/repos/{owner}/{repo}/pulls?head={owner}:{branch}` | Find the open pull request for a suggestion branch. |
+| `POST /@api/repos/{owner}/{repo}/merge-upstream` | Best-effort sync a fork branch from the upstream default branch (`{"branch":"..."}` body; `409 conflict` on a merge conflict). |
+
+These endpoints require only **Contents read/write** and **Pull requests
+read/write** (plus the implied Metadata read); no additional permissions are
+needed for suggest edits. Branch names use `opendraft/<login>/<YYYYMMDD-HHmmss>`
+(UTC) on the contributor's fork or on the upstream when the viewer has push
+access.
+
+## 9. Checklist per environment
 
 - [ ] App created with the correct name, homepage, and callback URL.
 - [ ] OAuth during installation ON; token expiry ON; device flow OFF.
@@ -196,6 +234,9 @@ and must match the value registered above.
       read/write; repository creation (or Administration read/write if the
       narrower option is unavailable).
 - [ ] No account permissions.
+- [ ] Suggest edits: required permissions stay Contents and Pull requests
+      read/write; contributors without write access install on their personal
+      account with All repositories.
 - [ ] Client secret generated and stored as a deployment secret.
 - [ ] Session key generated with `openssl rand -base64 32` and stored as a
       deployment secret.

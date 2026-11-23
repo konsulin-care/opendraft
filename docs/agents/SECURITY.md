@@ -42,6 +42,50 @@ against `api.github.com` and `raw.githubusercontent.com`. Both send CORS `*`,
 so the BFF is not involved in the reader path. No OpenDraft credentials are
 attached.
 
+Anonymous viewers never reach private repos or private repositories. The
+browser only fetches repositories that GitHub already serves publicly; a
+private repository has no anonymous path and the reader answers "not found or
+private". The git transport relay requires a session cookie, so anonymous
+viewers cannot clone or push a private repository either.
+
+## Suggestion Editing and Install Scope
+
+The editable reader's suggestion flow uses the same GitHub App user access
+token as every other privileged operation.
+
+### All-repositories install scope
+
+A contributor without write access must install OpenDraft on their personal
+account with **All repositories** access. GitHub's fork API requires the app to
+be installed on the destination account with access to all repositories and on
+the source account with access to the source repository. Upstream repository
+owners must therefore install the app for suggestions, and contributors must
+grant the personal-account install all-repositories access. A selected-
+repositories install cannot create the fork. The project accepts this broader
+install scope because it is the only way to offer the in-app suggestion flow
+without asking contributors for repository-by-repository installs.
+
+### Token confinement
+
+User access tokens stay server-side inside the sealed `__Host-od_session`
+cookie and are never exposed to browser JavaScript. The BFF sends them only to
+GitHub and never returns them, upstream bodies, or cookie contents to the web
+app. A user token can act only within the **intersection** of the signed-in
+user's own permissions and the repositories the app installation can access,
+that is the intersection of user and app access. Losing either side revokes the
+capability; the app never accumulates rights beyond that intersection, and no
+installation token or private key is minted at runtime.
+
+### Private suggestion project purge
+
+Suggestion projects imported from private repositories are stored in the
+browser. Private suggestion projects are purged on sign-out and at signed-out
+boot: once when the user signs out, and again when the editor starts and the
+BFF definitively reports that there is no session (`401`, or
+`loginEnabled:false` from `/@api/auth/session`). Network errors never purge:
+only a definitive signed-out answer clears private projects, so a transient
+outage cannot destroy local work.
+
 ## Session
 
 Sign-in uses OAuth with PKCE (S256) plus a random `state`. The transaction is
