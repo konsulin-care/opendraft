@@ -1,14 +1,14 @@
 /**
- * Submit suggestion tests: creating a pull request, updating an open one, and
- * refusing to push when the stored pull request was merged or closed.
+ * Send and update tests: fixed send title/message, update commit messages and
+ * retry-safe pull request creation.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryWorkspace } from '@opendraft/workspace';
 import type { ProjectRecord, ProjectSourceGitHub } from '@opendraft/workspace';
 import type { BffSession } from '../github/bff-client';
 import { fileDigest } from './file-diff';
-import { submitSuggestion } from './submit';
-import type { SubmitDeps } from './submit';
+import { SEND_MESSAGE, sendSuggestion, sendUpdate } from './submit';
+import type { SendSuggestionDeps } from './submit';
 
 const SESSION: BffSession = {
   login: 'octocat',
@@ -17,13 +17,12 @@ const SESSION: BffSession = {
   expiresAt: '2026-01-01T00:00:00Z',
 };
 
-const BRANCH = 'opendraft/octocat/20260102-030405';
+const BRANCH = 'od-octocat/paper';
 const CONFIG_OLD = 'project: old\n';
 const CONFIG_NEW = 'project: new\n';
 const PR_URL = 'https://github.com/konsulin-care/draft/pull/7';
-const INPUT = { title: 'Add results', body: 'Please review.' } as const;
 
-/** Build a GitHub project source for the submit tests. */
+/** Build a GitHub project source for the tests. */
 function source(overrides: Partial<ProjectSourceGitHub> = {}): ProjectSourceGitHub {
   return {
     kind: 'github',
@@ -32,7 +31,7 @@ function source(overrides: Partial<ProjectSourceGitHub> = {}): ProjectSourceGitH
     branch: BRANCH,
     upstream: { owner: 'konsulin-care', repo: 'draft', defaultBranch: 'main' },
     private: false,
-    pushed: false,
+    pushed: true,
     syncedSha: 'base-sha',
     digest: fileDigest(new Map([['opendraft.yml', CONFIG_OLD]])),
     pullNumber: null,
@@ -45,16 +44,31 @@ function record(value: ProjectSourceGitHub): ProjectRecord {
   return { id: 'project-1', name: 'draft', source: value, createdAt: 1, lastOpenedAt: 1 };
 }
 
-/** Build an edited workspace that saveToCopy can commit. */
-async function editedWorkspace(): Promise<MemoryWorkspace> {
-  const workspace = new MemoryWorkspace();
-  await workspace.writeFile('opendraft.yml', CONFIG_NEW);
-  return workspace;
+/** Build a workspace with either the old or a changed config file. */
+async function workspace(edited: boolean): Promise<MemoryWorkspace> {
+  const memory = new MemoryWorkspace();
+  await memory.writeFile('opendraft.yml', edited ? CONFIG_NEW : CONFIG_OLD);
+  return memory;
 }
 
-/** In-memory registry double whose setSource is observable. */
+/** Test harness exposing commit messages and mutable project records. */
+interface Harness {
+  deps: SendSuggestionDeps;
+  records: Map<string, ProjectRecord>;
+  messages: string[];
+}
+
+/** Options controlling the send/update test doubles. */
+interface MakeOptions {
+  /** Whether the workspace contains an edited config. */
+  edited?: boolean;
+  /** Existing open pull request returned by the lookup. */
+  existingPull?: { number: number; url: string; state: 'open' } | null;
+}
+
+/** Build an in-memory registry whose setSource updates stored records. */
 function makeRegistry(project: ProjectRecord): {
-  registry: SubmitDeps['registry'];
+  registry: SendSuggestionDeps['registry'];
   records: Map<string, ProjectRecord>;
 } {
   const records = new Map([[project.id, project]]);
@@ -72,130 +86,143 @@ function makeRegistry(project: ProjectRecord): {
   };
 }
 
-/** Build submit dependencies with inert save, GitHub and registry doubles. */
-function makeDeps(
-  project: ProjectRecord,
-  overrides: Partial<SubmitDeps> = {},
-): { deps: SubmitDeps; records: Map<string, ProjectRecord> } {
-  const { registry, records } = makeRegistry(project);
+/** Build an applyName double that rewrites the stored draft branch. */
+function makeApplyName(
+  records: Map<string, ProjectRecord>,
+): SendSuggestionDeps['applyName'] {
+  return vi.fn(async (id: string, name: string) => {
+    const existing = records.get(id);
+    if (!existing) throw new Error(`missing ${id}`);
+    const branch = `od-octocat/${name.toLowerCase()}`;
+    const stored = existing.source as ProjectSourceGitHub;
+    records.set(id, { ...existing, source: { ...stored, branch } });
+    return branch;
+  });
+}
+
+/** Build the git, workspace and commit dependencies of a send. */
+function makeRepoDeps(
+  records: Map<string, ProjectRecord>,
+  options: MakeOptions,
+): { repo: Omit<SendSuggestionDeps, 'registry' | 'applyName' | 'findSuggestionPull' | 'createPullRequest'>; messages: string[] } {
+  const messages: string[] = [];
   const files = new Map([['opendraft.yml', CONFIG_OLD]]);
-  const deps: SubmitDeps = {
-    registry,
-    getWorkspace: vi.fn(async () => editedWorkspace()),
+  const repo = {
+    getWorkspace: vi.fn(async () => workspace(options.edited ?? true)),
     clone: vi.fn(async () => ({ sha: 'base-sha', fs: {}, dir: '/' })),
-    relayUrl: vi.fn((owner: string, repo: string) => `${owner}/${repo}.git`),
+    relayUrl: vi.fn((owner: string, name: string) => `${owner}/${name}.git`),
     readWorkingFiles: vi.fn(async () => new Map(files)),
-    commitFilesOnBranch: vi.fn(async (_fs, _dir, commit) => {
-      for (const [path, content] of commit.files) files.set(path, content);
-      return 'new-sha';
-    }),
+    commitFilesOnBranch: vi.fn(async () => 'new-sha'),
     push: vi.fn(async () => undefined),
     session: SESSION,
-    findSuggestionPull: vi.fn(async () => null),
-    createPullRequest: vi.fn(async () => ({ number: 7, url: PR_URL })),
-    ...overrides,
+    openRepo: vi.fn(async () => {
+      const stored = records.get('project-1')?.source;
+      const branch =
+        stored && stored.kind === 'github' ? stored.branch : BRANCH;
+      return { fs: {}, dir: '/repo', branch };
+    }),
+    commitWorkspace: vi.fn(async (_id: string, message: string) => {
+      messages.push(message);
+      return 'new-sha';
+    }),
+    headSha: vi.fn(async () => 'new-sha'),
+    fetch: vi.fn(async () => undefined),
+    remoteHead: vi.fn(async () => null),
+    unpushed: vi.fn(async () => []),
+    rebaseOnto: vi.fn(async () => ({ tip: 'new-sha', backup: 'base-sha' })),
+    resolveConflicts: vi.fn(() => ({})),
   };
-  return { deps, records };
+  return { repo, messages };
 }
 
-/** Assert the stored source after a successful create. */
-function expectStoredSource(
-  records: Map<string, ProjectRecord>,
-  expected: Record<string, unknown>,
-): void {
-  const stored = records.get('project-1')?.source;
-  expect(stored).toMatchObject({ kind: 'github', ...expected });
+/** Build send/update dependencies with an in-memory repository and registry. */
+async function makeDeps(
+  project: ProjectRecord,
+  options: MakeOptions = {},
+): Promise<Harness> {
+  const { registry, records } = makeRegistry(project);
+  const { repo, messages } = makeRepoDeps(records, options);
+
+  const deps: SendSuggestionDeps = {
+    ...repo,
+    registry,
+    applyName: makeApplyName(records),
+    findSuggestionPull: vi.fn(async () => options.existingPull ?? null),
+    createPullRequest: vi.fn(async () => ({ number: 7, url: PR_URL })),
+  };
+
+  return { deps, records, messages };
 }
 
-describe('submitSuggestion create', () => {
-  it('opens a pull request on the upstream with a fork-qualified head and stores its number', async () => {
-    const { deps, records } = makeDeps(record(source()));
+describe('sendSuggestion', () => {
+  it('names an unpushed draft, saves with the send message and opens the pull request', async () => {
+    const { deps, records, messages } = await makeDeps(
+      record(source({ branch: 'od-octocat/untitled-draft', pushed: false })),
+    );
 
-    const result = await submitSuggestion('project-1', INPUT, deps);
+    const result = await sendSuggestion(
+      'project-1',
+      { name: 'Paper', note: 'Please review.' },
+      deps,
+    );
 
-    expect(deps.findSuggestionPull).not.toHaveBeenCalled();
+    expect(deps.applyName).toHaveBeenCalledWith('project-1', 'Paper');
+    expect(messages).toEqual([SEND_MESSAGE]);
     expect(deps.createPullRequest).toHaveBeenCalledWith('konsulin-care', 'draft', {
-      title: INPUT.title,
-      body: INPUT.body,
+      title: 'What did you change?',
+      body: 'Please review.',
       head: `octocat:${BRANCH}`,
       base: 'main',
     });
     expect(result).toEqual({ kind: 'created', number: 7, url: PR_URL });
-    expectStoredSource(records, {
-      branch: BRANCH,
+    expect(records.get('project-1')?.source).toMatchObject({
       pushed: true,
-      syncedSha: 'new-sha',
       pullNumber: 7,
     });
   });
 
-  it('uses the plain branch as head when the viewer writes to the upstream', async () => {
-    const { deps } = makeDeps(
-      record(
-        source({
-          owner: 'konsulin-care',
-          upstream: { owner: 'konsulin-care', repo: 'draft', defaultBranch: 'main' },
-        }),
-      ),
-    );
+  it('reuses an existing pull request after a failed creation instead of opening a duplicate', async () => {
+    const existing = { number: 7, url: PR_URL, state: 'open' as const };
+    const { deps } = await makeDeps(record(source()), {
+      edited: false,
+      existingPull: existing,
+    });
 
-    await submitSuggestion('project-1', INPUT, deps);
-
-    expect(deps.createPullRequest).toHaveBeenCalledWith(
-      'konsulin-care',
-      'draft',
-      expect.objectContaining({ head: BRANCH }),
-    );
-  });
-});
-
-describe('submitSuggestion update', () => {
-  it('saves through saveToCopy and returns updated without opening a pull request when the pull is open', async () => {
-    const { deps } = makeDeps(
-      record(source({ pullNumber: 5, pushed: true, syncedSha: 'base-sha' })),
-      {
-        findSuggestionPull: vi.fn(async () => ({
-          number: 5,
-          url: PR_URL,
-          state: 'open' as const,
-        })),
-      },
-    );
-
-    const result = await submitSuggestion('project-1', INPUT, deps);
+    const result = await sendSuggestion('project-1', { note: 'Retry' }, deps);
 
     expect(deps.findSuggestionPull).toHaveBeenCalledWith(
       'konsulin-care',
       'draft',
       `octocat:${BRANCH}`,
     );
-    expect(deps.push).toHaveBeenCalledWith({}, '/', 'octocat/draft.git', BRANCH);
     expect(deps.createPullRequest).not.toHaveBeenCalled();
-    expect(result).toEqual({ kind: 'updated', number: 5, url: PR_URL });
+    expect(result).toEqual({ kind: 'updated', number: 7, url: PR_URL });
   });
 });
 
-describe('submitSuggestion closed', () => {
-  it.each(['merged', 'closed'] as const)(
-    'returns closed with state %s without pushing when the stored pull is %s',
-    async (state) => {
-      const { deps } = makeDeps(
-        record(source({ pullNumber: 5, pushed: true })),
-        {
-          findSuggestionPull: vi.fn(async () => ({
-            number: 5,
-            url: PR_URL,
-            state,
-          })),
-        },
-      );
+describe('sendUpdate', () => {
+  it('pushes with the "What\'s new?" text and never creates a pull request', async () => {
+    const { deps, messages } = await makeDeps(record(source({ pullNumber: 5 })));
 
-      const result = await submitSuggestion('project-1', INPUT, deps);
+    const result = await sendUpdate(
+      'project-1',
+      { message: "What's new?" },
+      deps,
+    );
 
-      expect(result).toEqual({ kind: 'closed', state });
-      expect(deps.commitFilesOnBranch).not.toHaveBeenCalled();
-      expect(deps.push).not.toHaveBeenCalled();
-      expect(deps.createPullRequest).not.toHaveBeenCalled();
-    },
-  );
+    expect(messages).toEqual(["What's new?"]);
+    expect(result).toEqual({ kind: 'saved', sha: 'new-sha' });
+    expect(deps.findSuggestionPull).not.toHaveBeenCalled();
+    expect(deps.createPullRequest).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the automatic commit message when no text is given', async () => {
+    const { deps, messages } = await makeDeps(record(source({ pullNumber: 5 })));
+
+    const result = await sendUpdate('project-1', {}, deps);
+
+    expect(messages).toEqual(['Update opendraft.yml']);
+    expect(result).toEqual({ kind: 'saved', sha: 'new-sha' });
+    expect(deps.createPullRequest).not.toHaveBeenCalled();
+  });
 });

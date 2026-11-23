@@ -25,13 +25,19 @@ import {
 import type { SuggestionBranch, SuggestionPull } from '../github/bff-suggest';
 import { projectRegistry } from '../hooks/useProjects';
 import { isSuggestionPath } from './file-diff';
-import { createSaveDeps, prepareProjectDraft } from './repo-deps';
+import { applyDraftName } from './name-draft';
+import { openProjectRepo } from './project-repo';
+import {
+  createProjectRepoDeps,
+  createSaveDeps,
+  prepareProjectDraft,
+} from './repo-deps';
 import type { CheckSuggestionDeps } from './status';
 import type { RestartDeps } from './restart';
 import type { StartSuggestionDeps } from './start';
 
 export { createSaveDeps };
-import type { SubmitDeps } from './submit';
+import type { SendSuggestionDeps, SubmitDeps } from './submit';
 
 type GitModule = typeof import('@opendraft/git');
 type GitRemoteOptions = ConstructorParameters<GitModule['RemoteGit']>[0];
@@ -207,15 +213,50 @@ export async function createStartDeps(): Promise<StartSuggestionDeps> {
 }
 
 /**
+ * Rename a draft's local branch and store its new name.
+ *
+ * @param projectId - Project id of the draft.
+ * @param name - Human readable draft name.
+ * @param session - Signed-in viewer naming the draft.
+ * @returns The new local draft branch name.
+ */
+async function applyDraftNameFor(
+  projectId: string,
+  name: string,
+  session: BffSession,
+): Promise<string> {
+  const [deps, project, browser] = await Promise.all([
+    createProjectRepoDeps(session),
+    projectRegistry.get(projectId),
+    loadGit(),
+  ]);
+  if (!project) throw new Error(`Project not found: ${projectId}`);
+  const repo = await openProjectRepo(project, deps);
+  const local = new browser.git.LocalRepo(repo.fs as GitFs, repo.dir);
+  return applyDraftName(projectId, name, {
+    registry: projectStore(),
+    login: session.login,
+    repo: {
+      renameBranch: (oldName, newName) =>
+        local.renameBranch(oldName, newName),
+    },
+  });
+}
+
+/**
  * Build the dependencies of {@link submitSuggestion} for the browser.
  *
  * @param session - Signed-in viewer used as the commit author.
- * @returns Save dependencies plus pull request lookup and creation.
+ * @returns Save dependencies plus draft naming and pull request operations.
  */
-export async function createSubmitDeps(session: BffSession): Promise<SubmitDeps> {
+export async function createSubmitDeps(
+  session: BffSession,
+): Promise<SubmitDeps & SendSuggestionDeps> {
   const save = await createSaveDeps(session);
   return {
     ...save,
+    applyName: (projectId, name) =>
+      applyDraftNameFor(projectId, name, session),
     findSuggestionPull,
     createPullRequest: createPull,
   };
