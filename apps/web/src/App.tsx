@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import type { ProjectRecord, WorkspaceAdapter } from '@opendraft/workspace';
+import type { ReactNode } from 'react';
+import type { ProjectRecord, ProjectSource, WorkspaceAdapter } from '@opendraft/workspace';
+import type { BffSession } from './github/bff-client';
 import { AppHeader } from './components/AppHeader';
 import type { SaveStatus } from './components/AppHeader';
+import type { ManuscriptSwitcherOption } from './components/header/ManuscriptSwitcher';
 import { EditorArea } from './components/EditorArea';
-import { CommitDialog } from './components/CommitDialog';
 import { SuggestionBanner } from './components/suggestion/SuggestionBanner';
 import { ProjectDrawer, useDrawerState } from './components/project-drawer/ProjectDrawer';
 import { ProjectSwitcher } from './components/project-drawer/ProjectSwitcher';
@@ -11,6 +13,7 @@ import { DeleteProjectAction } from './components/project-drawer/DeleteProjectDi
 import { FileTree } from './components/project-drawer/FileTree';
 import { useProjects, projectRegistry } from './hooks/useProjects';
 import { useActiveFile } from './hooks/useActiveFile';
+import { useSession } from './hooks/use-session';
 import { loadFile } from './persistence';
 import { createOpenManuscriptRenamer } from './project/rename-manuscript';
 
@@ -21,6 +24,28 @@ const FILES_CHANGED_EVENT = 'opendraft:files-changed';
 function manuscriptDirName(path: string): string | null {
   const [root, dir] = path.split('/');
   return root === 'manuscripts' && dir ? dir : null;
+}
+
+/**
+ * List the manuscript folders under `manuscripts/` as switcher options.
+ *
+ * @param paths - Every repo-relative path in the workspace.
+ * @param active - The active project, supplying display names.
+ * @returns Sorted switcher options, one per manuscript folder.
+ */
+function manuscriptOptions(
+  paths: string[],
+  active: ProjectRecord | null,
+): ManuscriptSwitcherOption[] {
+  const ids = new Set<string>();
+  for (const path of paths) {
+    const segments = path.split('/').filter((segment) => segment !== '');
+    if (segments[0] === 'manuscripts' && segments.length >= 3) ids.add(segments[1]);
+  }
+  return [...ids].sort().map((id) => ({
+    id,
+    title: active?.manuscriptNames?.[id] ?? id,
+  }));
 }
 
 /** Resolve whether the active path is a directory and which file to render. */
@@ -107,30 +132,41 @@ function useWorkspacePaths(workspace: WorkspaceAdapter | null, active: ProjectRe
 /** Props for {@link HeaderSection}. */
 interface HeaderSectionProps {
   active: ProjectRecord | null;
+  source?: ProjectSource;
   dirName: string | null;
   workspace: WorkspaceAdapter;
   openFile: (path: string) => Promise<void>;
   activePath: string;
   switchTo: (id: string) => Promise<void>;
-  rename: (id: string, name: string) => Promise<void>;
   saveStatus: SaveStatus;
-  onCommit: () => void;
+  manuscripts: readonly ManuscriptSwitcherOption[];
+  onSelectManuscript: (id: string) => void;
+  onSelectAllManuscripts: () => void;
+  session: BffSession | null;
+  loginEnabled: boolean;
+  onLogout: () => void;
+  returnTo: string;
+  action?: ReactNode;
   drawer: ReturnType<typeof useDrawerState>;
 }
 
-/** Icon header with rename, save status, commit, and sidebar actions. */
+/** Icon header with manuscript title, save status, action slot and account menu. */
 function HeaderSection({
-  active, dirName, workspace, openFile, activePath, switchTo,
-  rename, saveStatus, onCommit, drawer,
+  active, source, dirName, workspace, openFile, activePath, switchTo,
+  saveStatus, manuscripts, onSelectManuscript, onSelectAllManuscripts,
+  session, loginEnabled, onLogout, returnTo, action, drawer,
 }: HeaderSectionProps) {
   return (
     <AppHeader
-      projectName={active?.name} manuscriptDir={dirName ?? undefined}
+      source={source} manuscriptDir={dirName ?? undefined}
       manuscriptName={dirName !== null ? active?.manuscriptNames?.[dirName] : undefined}
-      onRenameProject={active ? (name) => rename(active.id, name) : undefined}
+      manuscripts={manuscripts} manuscriptId={dirName ?? undefined}
+      onSelectManuscript={onSelectManuscript}
+      onSelectAllManuscripts={onSelectAllManuscripts}
       onRenameManuscript={createOpenManuscriptRenamer(active, dirName, { workspace, registry: projectRegistry, openFile, activePath, refresh: () => { if (active) switchTo(active.id); } })}
       saveStatus={saveStatus}
-      onCommit={onCommit}
+      action={action}
+      session={session} loginEnabled={loginEnabled} onLogout={onLogout} returnTo={returnTo}
       sidebarOpen={drawer.open} onToggleSidebar={drawer.toggle} toggleButtonRef={drawer.toggleRef}
     />
   );
@@ -142,6 +178,7 @@ interface DrawerSectionProps {
   active: ReturnType<typeof useProjects>['active'];
   switchTo: (id: string) => void;
   create: (name: string, manuscriptId: string) => void;
+  rename: (id: string, name: string) => Promise<void>;
   remove: (id: string) => void;
   drawer: ReturnType<typeof useDrawerState>;
   workspace: WorkspaceAdapter;
@@ -156,6 +193,7 @@ function DrawerSection({
   active,
   switchTo,
   create,
+  rename,
   remove,
   drawer,
   workspace,
@@ -169,6 +207,7 @@ function DrawerSection({
       onClose={drawer.close}
       toggleRef={drawer.toggleRef}
       title={active?.name}
+      onRenameProject={active ? (name) => rename(active.id, name) : undefined}
       header={
         <ProjectSwitcher
           projects={projects}
@@ -193,31 +232,11 @@ function DrawerSection({
   );
 }
 
-/** Commit dialog shown after the header's Commit action. */
-function CommitSection({
-  open,
-  onClose,
-  workspace,
-}: {
-  open: boolean;
-  onClose: () => void;
-  workspace: WorkspaceAdapter;
-}) {
-  return (
-    <CommitDialog
-      isOpen={open}
-      onClose={onClose}
-      onCommit={(message) => console.log('Committed:', message)}
-      workspace={workspace}
-    />
-  );
-}
-
 /**
- * App shell: icon header with commit action plus the single continuous
- * editor region for the active project path. Boots into the auto-created
- * "Untitled project" and opens the project's default path (the manuscript
- * directory for a fresh scaffold).
+ * App shell: shared header plus the single continuous editor region for the
+ * active project path. Boots into the auto-created "Untitled project" and
+ * opens the project's default path (the manuscript directory for a fresh
+ * scaffold).
  */
 export function App() {
   const {
@@ -225,7 +244,7 @@ export function App() {
   } = useProjects();
   const { activePath, openFile } = useActiveFile(workspace, active?.id ?? null);
   const paths = useWorkspacePaths(workspace, active);
-  const [showCommitDialog, setShowCommitDialog] = useState(false);
+  const { session, loginEnabled, logout } = useSession();
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   // T11 removed the header toggle and its Ctrl/Cmd+\ shortcut: the source
   // editor's formatting toolbar stays on unconditionally.
@@ -235,6 +254,8 @@ export function App() {
   const { isDir, contentPath } = resolveContentPath(activePath, paths);
   const file = useActiveFileContent(workspace, contentPath);
   const drawer = useDrawerState();
+  const manuscripts = manuscriptOptions(paths, active);
+  const returnTo = `${window.location.pathname}${window.location.search}`;
 
   if (loading) return <div>Loading workspace...</div>;
   if (error) return <div>Error: {error.message}</div>;
@@ -244,9 +265,13 @@ export function App() {
   return (
     <div className="flex h-dvh flex-col">
       <HeaderSection
-        active={active} dirName={dirName} workspace={workspace} openFile={openFile}
-        activePath={activePath} switchTo={switchTo} rename={rename} saveStatus={saveStatus}
-        onCommit={() => setShowCommitDialog(true)} drawer={drawer}
+        active={active} source={active?.source} dirName={dirName}
+        workspace={workspace} openFile={openFile} activePath={activePath}
+        switchTo={switchTo} saveStatus={saveStatus} manuscripts={manuscripts}
+        onSelectManuscript={(id) => { void openFile(`manuscripts/${id}`); }}
+        onSelectAllManuscripts={() => { void openFile('manuscripts'); }}
+        session={session} loginEnabled={loginEnabled} onLogout={logout}
+        returnTo={returnTo} action={null} drawer={drawer}
       />
       <SuggestionSection active={active} workspace={workspace} />
       <EditorArea
@@ -257,13 +282,8 @@ export function App() {
       />
       <DrawerSection
         projects={projects} active={active} switchTo={switchTo}
-        create={create} remove={remove} drawer={drawer}
+        create={create} rename={rename} remove={remove} drawer={drawer}
         workspace={workspace} paths={paths} activePath={activePath} onOpen={openFile}
-      />
-      <CommitSection
-        open={showCommitDialog}
-        onClose={() => setShowCommitDialog(false)}
-        workspace={workspace}
       />
     </div>
   );

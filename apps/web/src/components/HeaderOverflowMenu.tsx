@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { EllipsisVertical } from 'lucide-react';
 
 /** Props for {@link HeaderOverflowMenu}. */
 export interface HeaderOverflowMenuProps {
-  /** Called when the Commit action is activated. */
-  onCommit: () => void;
+  /**
+   * Optional extra entries for the overflow menu. The commit action was
+   * removed with the git-first draft workflow, so this may stay empty.
+   */
+  children?: ReactNode;
 }
 
 const MENU_ITEM = 'block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100';
@@ -35,11 +39,12 @@ export function useOutsideClose(
 }
 
 /**
- * Overflow menu for small screens: commits the pending changes.
+ * Overflow menu for small screens. The former commit entry was removed with
+ * the git-first draft workflow; callers may supply replacement entries.
  *
  * @param props - See {@link HeaderOverflowMenuProps}.
  */
-export function HeaderOverflowMenu({ onCommit }: HeaderOverflowMenuProps) {
+export function HeaderOverflowMenu({ children }: HeaderOverflowMenuProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const closeMenu = useRef(() => setMenuOpen(false)).current;
@@ -57,20 +62,14 @@ export function HeaderOverflowMenu({ onCommit }: HeaderOverflowMenuProps) {
       >
         <EllipsisVertical className="h-4 w-4" aria-hidden="true" />
       </button>
-      {menuOpen && (
+      {menuOpen && children !== undefined && (
         <div className="absolute right-0 z-20 mt-1 w-44 rounded-md border border-gray-200 bg-white py-1 shadow-lg">
-          <button
-            type="button"
-            className={MENU_ITEM}
-            onClick={() => {
-              setMenuOpen(false);
-              onCommit();
-            }}
-          >
-            Commit changes
-          </button>
+          {children}
         </div>
       )}
     </div>
   );
 }
+
+/** Shared class list for overflow-menu entries. */
+export { MENU_ITEM };

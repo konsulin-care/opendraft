@@ -161,18 +161,19 @@ async function expectManuscriptRenameMovesFiles(): Promise<void> {
 }
 
 describe('App header', () => {
-  it('shows the icon header with the manuscript title over the project name', async () => {
+  it('shows the icon header with the manuscript title and repo subtitle', async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('app-header')).toBeDefined());
     const logo = screen.getByRole('button', { name: 'OpenDraft' });
     expect(logo.getAttribute('title')).toBe('OpenDraft');
     expect(screen.queryByText('OpenDraft')).toBeNull();
     // The header shows the manuscript dir name (no display name stored
-    // yet) over the active project name.
+    // yet) over the read-only source subtitle.
     const header = screen.getByTestId('app-header');
     const title = within(header).getByTestId('manuscript-title') as HTMLInputElement;
     expect(title.value).toBe('untitled-project');
-    expect(within(header).getByDisplayValue('Untitled project')).toBeDefined();
+    expect(within(header).getByText('Only on this device')).toBeDefined();
+    expect(within(header).queryByTestId('project-name')).toBeNull();
   });
 
   it('shows no mode switch in the header', async () => {
@@ -188,12 +189,13 @@ describe('App header', () => {
 });
 
 describe('App mode and commit', () => {
-  it('renders no Formatting toolbar button next to Commit in the header', async () => {
+  it('renders no Formatting toolbar button and no Commit button in the header', async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('app-header')).toBeDefined());
     const header = screen.getByTestId('app-header');
     expect(within(header).queryByRole('button', { name: 'Formatting toolbar' })).toBeNull();
-    expect(within(header).getByRole('button', { name: 'Commit' })).toBeDefined();
+    expect(within(header).queryByRole('button', { name: 'Commit' })).toBeNull();
+    expect(within(header).getByRole('button', { name: 'Account' })).toBeDefined();
   });
 
   it('leaves the formatting toolbar rendered after Ctrl/Cmd+\\', async () => {
@@ -213,11 +215,10 @@ describe('App mode and commit', () => {
     expect(screen.getByRole('toolbar')).not.toBeNull();
   });
 
-  it('opens the commit dialog from the header Commit button', async () => {
+  it('does not render the removed commit dialog', async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('app-header')).toBeDefined());
-    fireEvent.click(screen.getByRole('button', { name: 'Commit' }));
-    expect(screen.getByText('Commit Changes')).toBeDefined();
+    expect(screen.queryByText('Commit Changes')).toBeNull();
   });
 });
 

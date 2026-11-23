@@ -2,14 +2,39 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { AppHeader } from './AppHeader';
 import type { AppHeaderProps } from './AppHeader';
+import type { ProjectSource } from '@opendraft/workspace';
+import type { BffSession } from '../github/bff-client';
 import { APP_BAR_HEIGHT } from './app-bar-layout';
 
 // @vitest-environment jsdom
 
+const LOCAL_SOURCE: ProjectSource = { kind: 'local' };
+
+const FORK_SOURCE: ProjectSource = {
+  kind: 'github',
+  owner: 'octocat',
+  repo: 'paper',
+  branch: 'od-octocat/intro',
+  upstream: { owner: 'upstream', repo: 'paper', defaultBranch: 'main' },
+  private: false,
+  pushed: false,
+  syncedSha: 'abc123',
+  digest: {},
+  pullNumber: null,
+};
+
+const SESSION: BffSession = {
+  login: 'octocat',
+  id: 583231,
+  name: 'The Octocat',
+  expiresAt: '2099-01-01T00:00:00Z',
+};
+
 const BASE_PROPS: AppHeaderProps = {
   fileName: 'manuscript.md',
+  manuscriptDir: 'intro',
+  source: LOCAL_SOURCE,
   saveStatus: 'saved',
-  onCommit: vi.fn(),
   sidebarOpen: false,
   onToggleSidebar: vi.fn(),
 };
@@ -45,203 +70,108 @@ describe('AppHeader save status', () => {
   });
 });
 
-describe('AppHeader identity', () => {
-  it('shows an OpenDraft icon button without visible OpenDraft text', () => {
-    renderHeader();
-    const logo = screen.getByRole('button', { name: 'OpenDraft' });
-    expect(logo).toBeDefined();
-    expect(logo.getAttribute('title')).toBe('OpenDraft');
-    expect(screen.queryByText('OpenDraft')).toBeNull();
-  });
+describe('AppHeader title and subtitle', () => {
+  it('keeps the manuscript title inline-editable', () => {
+    const onRenameManuscript = vi.fn();
+    renderHeader({ manuscriptName: 'My Thesis', onRenameManuscript });
 
-  it('shows the manuscript display name over the project name', () => {
-    renderHeader({ manuscriptName: 'My Thesis', projectName: 'Test Project' });
     const title = screen.getByTestId('manuscript-title') as HTMLInputElement;
     expect(title.value).toBe('My Thesis');
-    const subtitle = screen.getByTestId('project-name') as HTMLInputElement;
-    expect(subtitle.value).toBe('Test Project');
+    fireEvent.change(title, { target: { value: 'My Thesis edited' } });
+    fireEvent.keyDown(title, { key: 'Enter' });
+    expect(onRenameManuscript).toHaveBeenCalledWith('My Thesis edited');
   });
 
   it('falls back to the manuscript dir name when no display name is set', () => {
-    renderHeader({ manuscriptDir: 'my-thesis', projectName: 'Test Project' });
+    renderHeader({ manuscriptDir: 'my-thesis' });
     const title = screen.getByTestId('manuscript-title') as HTMLInputElement;
     expect(title.value).toBe('my-thesis');
+  });
+
+  it('renders the repo subtitle as read-only text with no project-name input', () => {
+    renderHeader({ source: LOCAL_SOURCE, projectName: 'Test Project' });
+
+    expect(screen.getByText('Only on this device')).toBeDefined();
+    expect(screen.queryByTestId('project-name')).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Project name' })).toBeNull();
+  });
+
+  it('describes forks with their upstream repository', () => {
+    renderHeader({ source: FORK_SOURCE });
+    expect(screen.getByText('Forked from upstream/paper')).toBeDefined();
+  });
+
+  it('offers the manuscript switcher when several manuscripts exist', () => {
+    const onSelectManuscript = vi.fn();
+    renderHeader({
+      manuscripts: [
+        { id: 'intro', title: 'Intro' },
+        { id: 'methods', title: 'Methods' },
+      ],
+      manuscriptId: 'intro',
+      onSelectManuscript,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Switch manuscript' }));
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Methods' }));
+    expect(onSelectManuscript).toHaveBeenCalledWith('methods');
   });
 });
 
 describe('AppHeader layout', () => {
-  it('keeps the title and project name in an h-9 left-aligned column', () => {
-    renderHeader({ manuscriptName: 'My Thesis', projectName: 'Test Project' });
-    const block = screen.getByTestId('header-title');
-    expect(block.className).toMatch(/\bh-9\b/);
-    expect(block.className).toMatch(/\bitems-start\b/);
-    expect(block.className).not.toMatch(/\bitems-center\b/);
-  });
-
-  it('carries the APP_BAR_HEIGHT class on the header root', () => {
+  it('carries the APP_BAR_HEIGHT class on the shared header shell', () => {
     renderHeader();
-    const header = screen.getByTestId('app-header');
+    const header = screen.getByTestId('header-shell');
     for (const cls of APP_BAR_HEIGHT.split(/\s+/)) {
       expect(header.className.split(/\s+/)).toContain(cls);
     }
   });
 
-  it('shows the project name field only when a project name is provided', () => {
-    const { unmount } = renderHeader();
-    expect(screen.queryByRole('textbox', { name: 'Project name' })).toBeNull();
-    unmount();
-
-    renderHeader({ projectName: 'My Project' });
-    const input = screen.getByRole('textbox', { name: 'Project name' }) as HTMLInputElement;
-    expect(input.value).toBe('My Project');
+  it('shows the drawer toggle as the leading control', () => {
+    renderHeader();
+    const toggle = screen.getByRole('button', { name: 'OpenDraft' });
+    expect(toggle.getAttribute('title')).toBe('OpenDraft');
+    expect(toggle.querySelector('.lucide-book-open-text')).not.toBeNull();
+    expect(screen.queryByText('OpenDraft')).toBeNull();
   });
 });
 
-describe('AppHeader inline project rename', () => {
-  // The project-name InlineEditField is the subtitle line of the title
-  // column; the save/revert behavior itself is covered by
-  // InlineEditField.test.tsx.
-  it('renders the project name as a plain-text input with a hover/focus SquarePen icon', () => {
-    const { container } = renderHeader({ projectName: 'My Project' });
-    const input = screen.getByTestId('project-name');
-    expect((input as HTMLInputElement).value).toBe('My Project');
-    expect(input.className).toMatch(/\bborder-0\b/);
-    const pen = container.querySelector('.lucide-square-pen');
-    expect(pen).not.toBeNull();
-    expect(pen?.getAttribute('class')).toMatch(/opacity-0/);
-    expect(pen?.getAttribute('class')).toMatch(/group-hover:opacity-100/);
-    expect(pen?.getAttribute('class')).toMatch(/group-focus-within:opacity-100/);
-  });
-
-  it('calls onRenameProject with the trimmed name on Enter', () => {
-    const onRenameProject = vi.fn();
-    renderHeader({ projectName: 'My Project', onRenameProject });
-    const input = screen.getByTestId('project-name');
-    fireEvent.change(input, { target: { value: '  New Name  ' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
-    expect(onRenameProject).toHaveBeenCalledTimes(1);
-    expect(onRenameProject).toHaveBeenCalledWith('New Name');
-  });
-
-  it('calls onRenameProject with the trimmed name on blur', () => {
-    const onRenameProject = vi.fn();
-    renderHeader({ projectName: 'My Project', onRenameProject });
-    const input = screen.getByTestId('project-name');
-    fireEvent.change(input, { target: { value: 'Renamed ' } });
-    fireEvent.blur(input);
-    expect(onRenameProject).toHaveBeenCalledTimes(1);
-    expect(onRenameProject).toHaveBeenCalledWith('Renamed');
-  });
-});
-
-describe('AppHeader manuscript title rename', () => {
-  it('calls onRenameManuscript with the edited title on Enter', () => {
-    const onRenameManuscript = vi.fn();
+describe('AppHeader action slot and account', () => {
+  it('renders the action slot and the signed-in user avatar', () => {
     renderHeader({
-      manuscriptName: 'My Thesis',
-      projectName: 'Test Project',
-      onRenameManuscript,
+      action: <button type="button">Edit</button>,
+      session: SESSION,
     });
-    const title = screen.getByTestId('manuscript-title');
-    fireEvent.change(title, { target: { value: 'My Thesis edited' } });
-    fireEvent.keyDown(title, { key: 'Enter' });
-    expect(onRenameManuscript).toHaveBeenCalledTimes(1);
-    expect(onRenameManuscript).toHaveBeenCalledWith('My Thesis edited');
+
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeDefined();
+    const avatar = screen.getByRole('img', { name: '@octocat' });
+    expect(avatar.getAttribute('src')).toBe('https://avatars.githubusercontent.com/u/583231?s=64');
+  });
+
+  it('renders no Commit button', () => {
+    renderHeader();
+    expect(screen.queryByRole('button', { name: 'Commit' })).toBeNull();
+    expect(screen.queryByText('Commit')).toBeNull();
+  });
+
+  it('hides the account menu when login is disabled', () => {
+    renderHeader({ loginEnabled: false });
+    expect(screen.queryByRole('button', { name: 'Account' })).toBeNull();
   });
 });
 
-describe('AppHeader inline rename cancellation', () => {
-  it('restores the previous name on Escape without calling onRenameProject', () => {
-    const onRenameProject = vi.fn();
-    renderHeader({ projectName: 'My Project', onRenameProject });
-    const input = screen.getByTestId('project-name') as HTMLInputElement;
-    fireEvent.change(input, { target: { value: 'Typo' } });
-    fireEvent.keyDown(input, { key: 'Escape' });
-    expect(onRenameProject).not.toHaveBeenCalled();
-    expect(input.value).toBe('My Project');
-  });
-
-  it('rejects an empty or whitespace-only name and restores the old name', () => {
-    const onRenameProject = vi.fn();
-    renderHeader({ projectName: 'My Project', onRenameProject });
-    const input = screen.getByTestId('project-name') as HTMLInputElement;
-    fireEvent.change(input, { target: { value: '   ' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
-    expect(onRenameProject).not.toHaveBeenCalled();
-    expect(input.value).toBe('My Project');
-  });
-
-  it('shows an inline error when the rename is rejected', async () => {
-    const onRenameProject = vi.fn().mockRejectedValue(new Error('nope'));
-    renderHeader({ projectName: 'My Project', onRenameProject });
-    const input = screen.getByTestId('project-name');
-    fireEvent.change(input, { target: { value: 'Renamed' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
-    const alert = await screen.findByRole('alert');
-    expect(alert.textContent).toMatch(/rename/i);
-  });
-});
-
-describe('AppHeader mode removal', () => {
-  it('renders no mode switch: no button names a target mode', () => {
+describe('AppHeader overflow menu', () => {
+  it('has no Commit changes item', () => {
     renderHeader();
-    expect(screen.queryByRole('button', { name: /Switch to/ })).toBeNull();
-    expect(screen.queryByText(/Switch to/)).toBeNull();
-  });
-});
-
-describe('AppHeader toolbar toggle removal', () => {
-  it('renders no Formatting toolbar button next to Commit', () => {
-    renderHeader();
-    const header = screen.getByTestId('app-header');
-    expect(within(header).queryByRole('button', { name: 'Formatting toolbar' })).toBeNull();
-    expect(within(header).getByRole('button', { name: 'Commit' })).toBeDefined();
-  });
-});
-
-describe('AppHeader commit and overflow', () => {
-  it('styles the header Commit button with the black token', () => {
-    renderHeader();
-    const commit = screen.getByRole('button', { name: 'Commit' });
-    const classes = commit.className.split(/\s+/);
-    expect(classes).toContain('bg-black');
-    expect(classes).not.toContain('bg-gray-900');
-    expect(classes).toContain('text-white');
-    expect(commit.className).toMatch(/hover:bg-gray-900/);
-    expect(commit.className).not.toMatch(/\btext-gray-600\b/);
-    expect(commit.className).not.toMatch(/hover:bg-gray-100/);
-    expect(commit.querySelector('.lucide-git-branch')).not.toBeNull();
-    expect(commit.querySelector('.lucide-git-commit-horizontal')).toBeNull();
-    expect(commit.textContent).toBe('Commit');
-  });
-
-  it('shares an h-9 height across the book and Commit buttons, labeling Commit at text-xs', () => {
-    renderHeader();
-    const book = screen.getByRole('button', { name: 'OpenDraft' });
-    const commit = screen.getByRole('button', { name: 'Commit' });
-    expect(book.className).toMatch(/\bh-9\b/);
-    expect(commit.className).toMatch(/\bh-9\b/);
-    expect(commit.querySelector('span')?.className).toMatch(/\btext-xs\b/);
-  });
-
-  it('calls onCommit when the Commit button is clicked', () => {
-    const onCommit = vi.fn();
-    renderHeader({ onCommit });
-    const commit = screen.getByRole('button', { name: 'Commit' });
-    expect(commit.getAttribute('title')).toBe('Commit');
-    fireEvent.click(commit);
-    expect(onCommit).toHaveBeenCalledTimes(1);
-  });
-
-  it('moves the Commit action into the overflow menu when open', () => {
-    const onCommit = vi.fn();
-    renderHeader({ onCommit });
     fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    expect(screen.queryByText('Commit changes')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Commit changes' })).toBeNull();
+  });
 
-    const items = screen.getAllByRole('button');
-    expect(items.some((b) => /Switch to/.test(b.textContent ?? ''))).toBe(false);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Commit changes' }));
-    expect(onCommit).toHaveBeenCalledTimes(1);
+  it('renders supplied overflow entries', () => {
+    renderHeader();
+    // Default header has no replacement entries; the trigger still exists.
+    const trigger = screen.getByRole('button', { name: 'More actions' });
+    expect(within(trigger.closest('div') as HTMLElement).queryByText('Commit changes')).toBeNull();
   });
 });
