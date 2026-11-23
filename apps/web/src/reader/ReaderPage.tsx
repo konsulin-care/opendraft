@@ -12,19 +12,13 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { InitDecisions } from '@opendraft/manuscript';
 import type { BffSession, SessionState } from '../github/bff-client';
-import {
-  createPullRequest,
-  forkRepo,
-  getRepoPermissions,
-  getSession as fetchSession,
-  getSessionState,
-  logout as signOut,
-} from '../github/bff-client';
+import { createPullRequest, forkRepo, getRepoPermissions, getSession as fetchSession, getSessionState, logout as signOut } from '../github/bff-client';
 import { ReaderHeader } from './ReaderHeader';
 import { loadPublicSnapshot, resolveCommit } from './github-public';
 import { cloneViaRelay, loadRepo as loadReaderRepo } from './load-repo';
 import type { LoadedRepo } from './load-repo';
 import { loadSnapshot, saveSnapshot } from './reader-cache';
+import { readerManuscript } from './route';
 import type { ReaderRoute } from './route';
 import { ReaderContent } from './ReaderContent';
 import type { ReaderState } from './ReaderContent';
@@ -68,6 +62,67 @@ type GitRemoteOptions = ConstructorParameters<GitModule['RemoteGit']>[0];
 function readerPath(route: ReaderRoute): string {
   const base = `/${route.owner}/${route.repo}`;
   return route.ref === undefined ? base : `${base}/tree/${route.ref}`;
+}
+
+/** Read the manuscript id from the current location, when one is present. */
+function locationManuscript(): string | undefined {
+  return typeof window === 'undefined' ? undefined : readerManuscript(window.location.search);
+}
+
+/**
+ * Resolve the manuscript to display.
+ *
+ * A single manuscript is always shown directly. With several manuscripts the
+ * requested id selects one; without a (valid) id the reader shows the index.
+ *
+ * @param manuscripts - Manuscripts declared by the repository.
+ * @param requested - Manuscript id from the URL, when present.
+ * @returns The selected manuscript, or undefined for the index.
+ */
+function resolveCurrent(
+  manuscripts: LoadedRepo['manuscripts'],
+  requested: string | undefined,
+): LoadedRepo['manuscripts'][number] | undefined {
+  if (manuscripts.length === 1) return manuscripts[0];
+  if (requested === undefined) return undefined;
+  return manuscripts.find((manuscript) => manuscript.id === requested);
+}
+
+/** Track the manuscript chosen in the header switcher and mirror it in the URL. */
+function useReaderNavigation(route: ReaderRoute, manuscripts: LoadedRepo['manuscripts']): {
+  current: LoadedRepo['manuscripts'][number] | undefined;
+  contentRoute: ReaderRoute;
+  navigateTo: (id: string | null) => void;
+} {
+  const [override, setOverride] = useState<string | null | undefined>(undefined);
+  const requested = override === undefined
+    ? route.manuscript ?? locationManuscript()
+    : override ?? undefined;
+  const current = resolveCurrent(manuscripts, requested);
+
+  useEffect(() => {
+    setOverride(undefined);
+  }, [route.owner, route.repo, route.ref, route.manuscript]);
+
+  useEffect(() => {
+    const restore = (): void => setOverride(undefined);
+    window.addEventListener('popstate', restore);
+    return () => window.removeEventListener('popstate', restore);
+  }, []);
+
+  const navigateTo = (id: string | null): void => {
+    setOverride(id);
+    if (typeof window === 'undefined') return;
+    const href = id === null
+      ? readerPath(route)
+      : `${readerPath(route)}?manuscript=${encodeURIComponent(id)}`;
+    window.history.pushState({}, '', href);
+  };
+
+  const contentRoute = requested === undefined
+    ? { ...route, manuscript: undefined }
+    : { ...route, manuscript: requested };
+  return { current, contentRoute, navigateTo };
 }
 
 /** Build dependencies on the browser git client, Buffer polyfill and protocol. */
@@ -141,14 +196,12 @@ function useReaderState(route: ReaderRoute, deps: ReaderPageBaseDeps): ReaderSta
   const [repo, setRepo] = useState<LoadedRepo | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
     setRepo(null);
-    setSelected(0);
 
     void (async () => {
       try {
@@ -179,7 +232,7 @@ function useReaderState(route: ReaderRoute, deps: ReaderPageBaseDeps): ReaderSta
     })();
   };
 
-  return { session, loginEnabled, repo, error, loading, selected, select: setSelected, logout };
+  return { session, loginEnabled, repo, error, loading, logout };
 }
 
 /** Bind conversion and registration handlers to a route, session and deps. */
@@ -216,18 +269,9 @@ function useReaderHandlers(
 export function ReaderPage({ route, deps, action }: ReaderPageProps) {
   const baseDeps = deps ?? defaultDeps;
   const state = useReaderState(route, baseDeps);
-  const { handleConvert, handleRegister } = useReaderHandlers(
-    route,
-    deps,
-    baseDeps,
-    state.session,
-  );
+  const { handleConvert, handleRegister } = useReaderHandlers(route, deps, baseDeps, state.session);
   const manuscripts = state.repo?.manuscripts ?? [];
-  const current = manuscripts[state.selected] ?? manuscripts[0];
-  const switchManuscript = (id: string): void => {
-    const index = manuscripts.findIndex((manuscript) => manuscript.id === id);
-    if (index >= 0) state.select(index);
-  };
+  const { current, contentRoute, navigateTo } = useReaderNavigation(route, manuscripts);
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -237,21 +281,14 @@ export function ReaderPage({ route, deps, action }: ReaderPageProps) {
         onLogout={state.logout}
         loginEnabled={state.loginEnabled}
         title={current?.id ?? 'All manuscripts'}
-        manuscripts={manuscripts.map((manuscript) => ({
-          id: manuscript.id,
-          title: manuscript.id,
-        }))}
+        manuscripts={manuscripts.map((manuscript) => ({ id: manuscript.id, title: manuscript.id }))}
         selectedId={current?.id}
-        onSelect={switchManuscript}
+        onSelect={(id) => navigateTo(id)}
+        onSelectAll={() => navigateTo(null)}
         action={action}
       />
       <main className="flex flex-1 flex-col gap-4 p-4">
-        <ReaderContent
-          route={route}
-          state={state}
-          convert={handleConvert}
-          register={handleRegister}
-        />
+        <ReaderContent route={contentRoute} state={state} convert={handleConvert} register={handleRegister} />
       </main>
     </div>
   );

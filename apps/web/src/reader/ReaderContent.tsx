@@ -13,6 +13,7 @@ import type { BffSession } from '../github/bff-client';
 import { loginUrl } from '../github/bff-client';
 import { ManuscriptView } from '../components/ManuscriptView';
 import { ConvertPanel } from './ConvertPanel';
+import { ManuscriptIndex } from './ManuscriptIndex';
 import type { ConvertResult } from './convert';
 import type { LoadedRepo } from './load-repo';
 import { NotFoundError, RateLimitedError } from './github-public';
@@ -32,10 +33,6 @@ export interface ReaderState {
   error: unknown;
   /** Whether the repository is still loading. */
   loading: boolean;
-  /** Index of the selected manuscript. */
-  selected: number;
-  /** Select a manuscript by index. */
-  select: (index: number) => void;
   /** Clear the session. */
   logout: () => void;
 }
@@ -86,34 +83,6 @@ function LoadError({ error, returnTo }: { error: unknown; returnTo: string }) {
   );
 }
 
-/** Render one button per manuscript when more than one is declared. */
-function ManuscriptSwitcher({
-  manuscripts,
-  selected,
-  onSelect,
-}: {
-  manuscripts: LoadedRepo['manuscripts'];
-  selected: number;
-  onSelect: (index: number) => void;
-}) {
-  if (manuscripts.length <= 1) return null;
-  return (
-    <nav aria-label="Manuscripts" className="flex flex-wrap gap-2">
-      {manuscripts.map((manuscript, index) => (
-        <button
-          key={manuscript.id}
-          type="button"
-          aria-pressed={index === selected}
-          onClick={() => onSelect(index)}
-          className="rounded-md border border-outline px-3 py-1.5 text-sm font-medium text-black"
-        >
-          {manuscript.id}
-        </button>
-      ))}
-    </nav>
-  );
-}
-
 /** Discover a repository's existing manuscripts, read-only. */
 function useDiscovery(repo: LoadedRepo | null): {
   discovery: ProjectDiscovery | null;
@@ -145,7 +114,26 @@ function useDiscovery(repo: LoadedRepo | null): {
   return { discovery, error };
 }
 
-/** Render the suggest-edits entry point, banner, switcher and manuscript. */
+/**
+ * Resolve the manuscript selected by the route.
+ *
+ * A single manuscript is always shown directly; with several manuscripts the
+ * `?manuscript=<id>` value picks one and an absent or unknown id shows the index.
+ *
+ * @param manuscripts - Manuscripts declared by the repository.
+ * @param requested - Manuscript id from the URL, when present.
+ * @returns The selected manuscript, or undefined for the index.
+ */
+function resolveManuscript(
+  manuscripts: LoadedRepo['manuscripts'],
+  requested: string | undefined,
+): LoadedRepo['manuscripts'][number] | undefined {
+  if (manuscripts.length === 1) return manuscripts[0];
+  if (requested === undefined) return undefined;
+  return manuscripts.find((manuscript) => manuscript.id === requested);
+}
+
+/** Render the suggest-edits entry point, banner, index or manuscript. */
 function OpenDraftContent({
   route,
   state,
@@ -161,7 +149,7 @@ function OpenDraftContent({
   register: (ids: string[]) => Promise<ConvertResult>;
   query: string;
 }) {
-  const manuscript = repo.manuscripts[state.selected] ?? repo.manuscripts[0];
+  const manuscript = resolveManuscript(repo.manuscripts, route.manuscript);
   return (
     <>
       <SuggestEdits
@@ -173,13 +161,16 @@ function OpenDraftContent({
       {discovery !== null && discovery.unlisted.length > 0 && state.session !== null ? (
         <UnlistedBanner discovery={discovery} session={state.session} register={register} />
       ) : null}
-      <ManuscriptSwitcher
-        manuscripts={repo.manuscripts}
-        selected={state.selected}
-        onSelect={state.select}
-      />
       {manuscript === undefined ? (
-        <p className="text-sm text-black">No manuscripts found.</p>
+        repo.manuscripts.length > 1 ? (
+          <ManuscriptIndex
+            workspace={repo.workspace}
+            manuscripts={repo.manuscripts}
+            route={route}
+          />
+        ) : (
+          <p className="text-sm text-black">No manuscripts found.</p>
+        )
       ) : (
         <ManuscriptView
           workspace={repo.workspace}

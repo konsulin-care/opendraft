@@ -19,17 +19,9 @@ import { ReaderPage } from './ReaderPage';
 import type { ReaderRoute } from './route';
 
 vi.mock('../components/ManuscriptView', () => ({
-  ManuscriptView: (props: {
-    dir: string;
-    projectKey: string;
-    readOnly?: boolean;
-  }) => (
-    <div
-      data-testid="manuscript-view"
-      data-dir={props.dir}
-      data-project-key={props.projectKey}
-      data-readonly={String(props.readOnly)}
-    />
+  ManuscriptView: (props: { dir: string; projectKey: string; readOnly?: boolean }) => (
+    <div data-testid="manuscript-view" data-dir={props.dir}
+      data-project-key={props.projectKey} data-readonly={String(props.readOnly)} />
   ),
 }));
 
@@ -56,20 +48,10 @@ async function makeRepo(
     for (const id of unlisted) {
       await workspace.writeFile(`manuscripts/${id}/article.qmd`, `# ${id}\n`);
     }
-    return {
-      sha: 'sha1',
-      workspace: readOnlyWorkspace(workspace),
-      isOpenDraft: true,
-      manuscripts: parseManuscripts(yml),
-    };
+    return { sha: 'sha1', workspace: readOnlyWorkspace(workspace), isOpenDraft: true, manuscripts: parseManuscripts(yml) };
   }
   await workspace.writeFile('README.md', '# Plain repository\n');
-  return {
-    sha: 'sha1',
-    workspace: readOnlyWorkspace(workspace),
-    isOpenDraft: false,
-    manuscripts: [],
-  };
+  return { sha: 'sha1', workspace: readOnlyWorkspace(workspace), isOpenDraft: false, manuscripts: [] };
 }
 
 /** Build a plain (non-OpenDraft) repository fixture with extra files. */
@@ -79,12 +61,7 @@ async function makePlainRepo(files: Record<string, string> = {}): Promise<Loaded
   for (const [path, content] of Object.entries(files)) {
     await workspace.writeFile(path, content);
   }
-  return {
-    sha: 'sha1',
-    workspace: readOnlyWorkspace(workspace),
-    isOpenDraft: false,
-    manuscripts: [],
-  };
+  return { sha: 'sha1', workspace: readOnlyWorkspace(workspace), isOpenDraft: false, manuscripts: [] };
 }
 
 /** Build reader dependencies with inert defaults and spy hooks. */
@@ -99,23 +76,19 @@ function makeDeps(overrides: Partial<ReaderPageDeps> = {}): ReaderPageDeps {
   };
 }
 
+const TWO = [
+  { id: 'first', path: 'manuscripts/first' },
+  { id: 'second', path: 'manuscripts/second' },
+];
+
 describe('ReaderPage OpenDraft repository', () => {
-  it('renders a read-only ManuscriptView for the first manuscript', async () => {
-    const deps = makeDeps({
-      loadRepo: vi.fn(async () =>
-        makeRepo([
-          { id: 'first', path: 'manuscripts/first' },
-          { id: 'second', path: 'manuscripts/second' },
-        ]),
-      ),
-    });
+  it('shows the manuscript index and All manuscripts title for several manuscripts', async () => {
+    const deps = makeDeps({ loadRepo: vi.fn(async () => makeRepo(TWO)) });
     render(<ReaderPage route={ROUTE} deps={deps} action={<button type="button">Edit</button>} />);
-    const view = await screen.findByTestId('manuscript-view');
-    expect(view).toHaveAttribute('data-dir', 'manuscripts/first');
-    expect(view).toHaveAttribute('data-project-key', 'reader:konsulin-care/citizen-science@sha1');
-    expect(view).toHaveAttribute('data-readonly', 'true');
+    expect(await screen.findByTestId('manuscript-index')).toBeInTheDocument();
+    expect(screen.queryByTestId('manuscript-view')).toBeNull();
     const header = screen.getByTestId('header-shell');
-    expect(within(header).getByText('first')).toBeInTheDocument();
+    expect(within(header).getByText('All manuscripts')).toBeInTheDocument();
     expect(within(header).getByText('Published at konsulin-care/citizen-science')).toBeInTheDocument();
     expect(within(header).getByTestId('manuscript-switcher')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Edit' }).compareDocumentPosition(
@@ -123,35 +96,36 @@ describe('ReaderPage OpenDraft repository', () => {
     ) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('lists every manuscript and switches the rendered directory', async () => {
-    const deps = makeDeps({
-      loadRepo: vi.fn(async () =>
-        makeRepo([
-          { id: 'first', path: 'manuscripts/first' },
-          { id: 'second', path: 'manuscripts/second' },
-        ]),
-      ),
-    });
+  it('shows the manuscript named by ?manuscript without a button-row switcher', async () => {
+    const deps = makeDeps({ loadRepo: vi.fn(async () => makeRepo(TWO)) });
+    render(<ReaderPage route={{ ...ROUTE, manuscript: 'second' }} deps={deps} />);
+    const view = await screen.findByTestId('manuscript-view');
+    expect(view).toHaveAttribute('data-dir', 'manuscripts/second');
+    expect(view).toHaveAttribute('data-project-key', 'reader:konsulin-care/citizen-science@sha1');
+    expect(view).toHaveAttribute('data-readonly', 'true');
+    expect(screen.queryByTestId('manuscript-index')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'second' })).toBeNull();
+    const header = screen.getByTestId('header-shell');
+    expect(within(header).getByText('second')).toBeInTheDocument();
+  });
+});
+
+describe('ReaderPage single manuscript', () => {
+  it('shows a single manuscript directly', async () => {
+    const deps = makeDeps();
     render(<ReaderPage route={ROUTE} deps={deps} />);
-    expect(await screen.findByRole('button', { name: 'first' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'second' }));
-    expect(screen.getByTestId('manuscript-view')).toHaveAttribute(
-      'data-dir',
-      'manuscripts/second',
-    );
-    expect(screen.getByRole('button', { name: 'second' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    const view = await screen.findByTestId('manuscript-view');
+    expect(view).toHaveAttribute('data-dir', 'manuscripts/demo');
+    expect(screen.queryByTestId('manuscript-index')).toBeNull();
+    const header = screen.getByTestId('header-shell');
+    expect(within(header).getByText('demo')).toBeInTheDocument();
+    expect(within(header).queryByTestId('manuscript-switcher')).toBeNull();
   });
 });
 
 describe('ReaderPage unlisted manuscripts', () => {
   it('banners unlisted manuscripts and registers the checked ids', async () => {
-    const register = vi.fn(async () => ({
-      kind: 'pr' as const,
-      url: 'https://example.test/pr/2',
-    }));
+    const register = vi.fn(async () => ({ kind: 'pr' as const, url: 'https://example.test/pr/2' }));
     const deps = makeDeps({
       loadRepo: vi.fn(async () =>
         makeRepo([{ id: 'intro', path: 'manuscripts/intro' }], ['case-series-review']),
@@ -160,9 +134,7 @@ describe('ReaderPage unlisted manuscripts', () => {
       register,
     });
     render(<ReaderPage route={ROUTE} deps={deps} />);
-    expect(
-      await screen.findByText('1 manuscript(s) not listed in opendraft.yml'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('1 manuscript(s) not listed in opendraft.yml')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'case-series-review' })).toBeChecked();
     fireEvent.click(screen.getByRole('button', { name: 'Add to opendraft.yml' }));
     await waitFor(() => {
@@ -180,9 +152,7 @@ describe('ReaderPage unlisted manuscripts', () => {
     });
     render(<ReaderPage route={ROUTE} deps={deps} />);
     await screen.findByTestId('manuscript-view');
-    expect(
-      screen.queryByText('1 manuscript(s) not listed in opendraft.yml'),
-    ).toBeNull();
+    expect(screen.queryByText('1 manuscript(s) not listed in opendraft.yml')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Add to opendraft.yml' })).toBeNull();
   });
 });
@@ -191,9 +161,7 @@ describe('ReaderPage plain repository', () => {
   it('renders the ConvertPanel when opendraft.yml is missing', async () => {
     const deps = makeDeps({ loadRepo: vi.fn(async () => makeRepo([])) });
     render(<ReaderPage route={ROUTE} deps={deps} />);
-    expect(
-      await screen.findByText('This repository is not an OpenDraft project yet.'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('This repository is not an OpenDraft project yet.')).toBeInTheDocument();
     expect(screen.queryByTestId('manuscript-view')).toBeNull();
   });
 });
@@ -202,29 +170,20 @@ describe('ReaderPage plain repository conversion', () => {
   it('offers conversion to a signed-in viewer', async () => {
     const deps = makeDeps({
       loadRepo: vi.fn(async () =>
-        makePlainRepo({
-          'manuscripts/case-series-review/article.qmd': '# Case series\n',
-        }),
+        makePlainRepo({ 'manuscripts/case-series-review/article.qmd': '# Case series\n' }),
       ),
       getSessionState: vi.fn(async () => ({ session: SESSION, loginEnabled: true })),
     });
     render(<ReaderPage route={ROUTE} deps={deps} />);
     expect(await screen.findByRole('button', { name: 'Convert to OpenDraft' })).toBeInTheDocument();
-    expect(
-      screen.getByRole('checkbox', { name: /case-series-review/ }),
-    ).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /case-series-review/ })).toBeChecked();
   });
 
   it('converts with the checked registration decisions', async () => {
-    const convert = vi.fn(async () => ({
-      kind: 'pr' as const,
-      url: 'https://example.test/pr/1',
-    }));
+    const convert = vi.fn(async () => ({ kind: 'pr' as const, url: 'https://example.test/pr/1' }));
     const deps = makeDeps({
       loadRepo: vi.fn(async () =>
-        makePlainRepo({
-          'manuscripts/case-series-review/article.qmd': '# Case series\n',
-        }),
+        makePlainRepo({ 'manuscripts/case-series-review/article.qmd': '# Case series\n' }),
       ),
       getSessionState: vi.fn(async () => ({ session: SESSION, loginEnabled: true })),
       convert,
@@ -270,15 +229,9 @@ describe('ReaderPage login availability', () => {
 
 describe('ReaderPage load errors', () => {
   it('shows the rate-limit message with a sign-in link', async () => {
-    const deps = makeDeps({
-      loadRepo: vi.fn(async () => {
-        throw new RateLimitedError();
-      }),
-    });
+    const deps = makeDeps({ loadRepo: vi.fn(async () => { throw new RateLimitedError(); }) });
     render(<ReaderPage route={ROUTE} deps={deps} />);
-    expect(
-      await screen.findByText('GitHub rate limit reached. Sign in for higher limits.'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('GitHub rate limit reached. Sign in for higher limits.')).toBeInTheDocument();
     const link = screen.getByRole('link', { name: 'Sign in for higher limits' });
     expect(link).toHaveAttribute(
       'href',
@@ -287,14 +240,8 @@ describe('ReaderPage load errors', () => {
   });
 
   it('shows the not-found message for a missing or private repository', async () => {
-    const deps = makeDeps({
-      loadRepo: vi.fn(async () => {
-        throw new NotFoundError();
-      }),
-    });
+    const deps = makeDeps({ loadRepo: vi.fn(async () => { throw new NotFoundError(); }) });
     render(<ReaderPage route={ROUTE} deps={deps} />);
-    expect(
-      await screen.findByText('Repository not found or private.'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Repository not found or private.')).toBeInTheDocument();
   });
 });
