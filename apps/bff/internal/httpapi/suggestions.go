@@ -18,9 +18,11 @@ const (
 	conflictCode      = "conflict"
 )
 
-// branchPrefixPattern limits suggestion branch prefixes to the opendraft/
-// namespace so the endpoint can never enumerate unrelated branches.
-var branchPrefixPattern = regexp.MustCompile(`^opendraft/[A-Za-z0-9._/-]{1,200}$`)
+// branchPrefixPattern limits suggestion branch prefixes to the legacy
+// opendraft/ namespace and the od-<login> namespace so the endpoint can never
+// enumerate unrelated branches. Both `od-<login>` and `od-<login>/...` forms
+// are accepted; od-/x and bare od- are rejected.
+var branchPrefixPattern = regexp.MustCompile(`^(opendraft/[A-Za-z0-9._/-]{1,200}|od-[A-Za-z0-9-]{1,39}(/[A-Za-z0-9._/-]{0,200})?)$`)
 
 // suggestionsHandler serves the branch, pull request and upstream-merge
 // endpoints used by the suggestion flow.

@@ -16,10 +16,7 @@ func TestBranchesEndpointListsMatchingRefs(t *testing.T) {
 		if r.URL.Path != "/repos/octocat/draft/git/matching-refs/heads/opendraft/ada/" {
 			t.Errorf("path = %q", r.URL.Path)
 		}
-		_, _ = w.Write([]byte(`[
-			{"ref":"refs/heads/opendraft/ada/20260101-120000","object":{"sha":"aaa111"}},
-			{"ref":"refs/heads/opendraft/ada/20260102-130000","object":{"sha":"bbb222"}}
-		]`))
+		_, _ = w.Write([]byte(`[{"ref":"refs/heads/opendraft/ada/20260101-120000","object":{"sha":"aaa111"}},{"ref":"refs/heads/opendraft/ada/20260102-130000","object":{"sha":"bbb222"}}]`))
 	}}
 	handler, sealer := newRepoActionsServer(t, fake, now)
 
@@ -44,21 +41,50 @@ func TestBranchesEndpointListsMatchingRefs(t *testing.T) {
 	}
 }
 
-// TestBranchesEndpointRejectsForeignPrefix checks a prefix outside opendraft/
-// is rejected before any GitHub call.
-func TestBranchesEndpointRejectsForeignPrefix(t *testing.T) {
+// TestBranchesEndpointAcceptsODPrefix checks od-<login> prefixes are forwarded
+// to GitHub matching-refs alongside the legacy opendraft/ namespace.
+func TestBranchesEndpointAcceptsODPrefix(t *testing.T) {
 	now := time.Unix(authTestNowUnix, 0).UTC()
-	tests := []string{"main/", "opendraft/", "/opendraft/ada/"}
-	for _, prefix := range tests {
+	for _, prefix := range []string{"od-ada", "od-ada/", "od-ada/paper"} {
 		t.Run(prefix, func(t *testing.T) {
-			fake := &fakeRepoActions{router: func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(http.StatusOK)
+			fake := &fakeRepoActions{router: func(w http.ResponseWriter, r *http.Request) {
+				want := "/repos/octocat/draft/git/matching-refs/heads/" + prefix
+				if r.URL.Path != want {
+					t.Errorf("path = %q, want %q", r.URL.Path, want)
+				}
+				_, _ = w.Write([]byte(`[{"ref":"refs/heads/x","object":{"sha":"abc123"}}]`))
 			}}
 			handler, sealer := newRepoActionsServer(t, fake, now)
-
 			rec := serveRepoAction(t, handler, sealer, now, http.MethodGet,
 				"/@api/repos/octocat/draft/branches?prefix="+prefix, nil)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200: %s", rec.Code, rec.Body.String())
+			}
+			var body []map[string]string
+			if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+				t.Fatalf("decode body: %v", err)
+			}
+			if len(body) != 1 || body[0]["sha"] != "abc123" {
+				t.Errorf("body = %v, want one matching branch", body)
+			}
+			if fake.count() != 1 {
+				t.Errorf("GitHub received %d requests, want 1", fake.count())
+			}
+		})
+	}
+}
 
+// TestBranchesEndpointRejectsForeignPrefix checks a prefix outside the accepted
+// opendraft/ and od-<login> namespaces is rejected before any GitHub call.
+func TestBranchesEndpointRejectsForeignPrefix(t *testing.T) {
+	now := time.Unix(authTestNowUnix, 0).UTC()
+	tests := []string{"main/", "opendraft/", "/opendraft/ada/", "od-", "od-/x", "xod-ada"}
+	for _, prefix := range tests {
+		t.Run(prefix, func(t *testing.T) {
+			fake := &fakeRepoActions{router: func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }}
+			handler, sealer := newRepoActionsServer(t, fake, now)
+			rec := serveRepoAction(t, handler, sealer, now, http.MethodGet,
+				"/@api/repos/octocat/draft/branches?prefix="+prefix, nil)
 			if rec.Code != http.StatusBadRequest {
 				t.Fatalf("status = %d, want 400: %s", rec.Code, rec.Body.String())
 			}
@@ -122,21 +148,9 @@ func TestPullLookupEndpointReviewStates(t *testing.T) {
 		reviews string
 		want    string
 	}{
-		{
-			name:    "changes requested",
-			reviews: `[{"id":1,"state":"APPROVED","user":{"login":"ada"}},{"id":2,"state":"CHANGES_REQUESTED","user":{"login":"grace"}}]`,
-			want:    "changes_requested",
-		},
-		{
-			name:    "approved after earlier change request",
-			reviews: `[{"id":1,"state":"CHANGES_REQUESTED","user":{"login":"grace"}},{"id":2,"state":"APPROVED","user":{"login":"ada"}},{"id":3,"state":"APPROVED","user":{"login":"grace"}}]`,
-			want:    "approved",
-		},
-		{
-			name:    "no reviews",
-			reviews: `[]`,
-			want:    "none",
-		},
+		{name: "changes requested", reviews: `[{"id":1,"state":"APPROVED","user":{"login":"ada"}},{"id":2,"state":"CHANGES_REQUESTED","user":{"login":"grace"}}]`, want: "changes_requested"},
+		{name: "approved after earlier change request", reviews: `[{"id":1,"state":"CHANGES_REQUESTED","user":{"login":"grace"}},{"id":2,"state":"APPROVED","user":{"login":"ada"}},{"id":3,"state":"APPROVED","user":{"login":"grace"}}]`, want: "approved"},
+		{name: "no reviews", reviews: `[]`, want: "none"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -169,9 +183,7 @@ func TestPullLookupEndpointReviewStates(t *testing.T) {
 // TestPullLookupEndpointNotFound checks an empty pull list answers 404.
 func TestPullLookupEndpointNotFound(t *testing.T) {
 	now := time.Unix(authTestNowUnix, 0).UTC()
-	fake := &fakeRepoActions{router: func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`[]`))
-	}}
+	fake := &fakeRepoActions{router: func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(`[]`)) }}
 	handler, sealer := newRepoActionsServer(t, fake, now)
 
 	rec := serveRepoAction(t, handler, sealer, now, http.MethodGet,
@@ -190,9 +202,7 @@ func TestPullLookupEndpointNotFound(t *testing.T) {
 // before any GitHub call.
 func TestPullLookupEndpointRejectsInvalidHead(t *testing.T) {
 	now := time.Unix(authTestNowUnix, 0).UTC()
-	fake := &fakeRepoActions{router: func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}}
+	fake := &fakeRepoActions{router: func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }}
 	handler, sealer := newRepoActionsServer(t, fake, now)
 
 	rec := serveRepoAction(t, handler, sealer, now, http.MethodGet,
@@ -258,9 +268,7 @@ func TestMergeUpstreamEndpoint(t *testing.T) {
 // 401 without a session.
 func TestSuggestionsRequireSession(t *testing.T) {
 	now := time.Unix(authTestNowUnix, 0).UTC()
-	fake := &fakeRepoActions{router: func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}}
+	fake := &fakeRepoActions{router: func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }}
 	handler, _ := newRepoActionsServer(t, fake, now)
 
 	tests := []struct {
