@@ -4,7 +4,7 @@
  * send, publish and conflict dialogs as project state changes.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import type { ProjectRecord } from '@opendraft/workspace';
 import type { BffSession, Owner } from '../github/bff-client';
@@ -203,5 +203,28 @@ describe('useDraftSection dialogs', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
     await waitFor(() => expect(choices).toEqual({ 'manuscripts/paper/index.qmd': 'theirs' }));
+  });
+});
+
+describe('useDraftSection send dialog', () => {
+  it('submits the change text as the send title', async () => {
+    const deps = makeDeps();
+    render(<Section {...makeInput(DRAFT, deps)} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send for review' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Send for review' });
+    fireEvent.change(screen.getByLabelText('What did you change?'), {
+      target: { value: 'Fix the abstract' },
+    });
+    const submit = within(dialog).getByRole('button', { name: 'Send for review' });
+    await waitFor(() => expect(submit).toBeEnabled());
+    fireEvent.click(submit);
+
+    await waitFor(() =>
+      expect(deps.send).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ title: 'Fix the abstract' }),
+      ),
+    );
   });
 });

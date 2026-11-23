@@ -157,7 +157,7 @@ async function submitDialog(
   draft: UseDraftResult,
   input: PublishDialogInput,
 ): Promise<void> {
-  if (mode === 'send') await draft.send({ name: input.draftName, note: input.note });
+  if (mode === 'send') await draft.send({ name: input.draftName, note: input.note, title: input.change });
   else await draft.update({ message: input.note });
 }
 
