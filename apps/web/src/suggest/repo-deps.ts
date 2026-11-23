@@ -12,14 +12,17 @@ import type { ProjectRecord, ProjectSourceGitHub } from '@opendraft/workspace';
 import type { FsClient } from '../../../../packages/git/node_modules/isomorphic-git/index.js';
 import type { HttpClient } from '../../../../packages/git/node_modules/isomorphic-git/http/web/index.js';
 import type { BffSession } from '../github/bff-client';
+import { syncFork } from '../github/bff-suggest';
 import { projectRegistry } from '../hooks/useProjects';
 import { author } from '../reader/convert';
 import type { PreparedDraftRepo } from './import';
 import {
+  checkoutToWorkspace as checkoutProjectWorkspace,
   commitWorkspace as commitProjectWorkspace,
   openProjectRepo,
 } from './project-repo';
 import type { ProjectRepoDeps } from './project-repo';
+import type { RestartDeps } from './restart';
 import type {
   SaveClone,
   SaveConflictChoice,
@@ -60,14 +63,6 @@ async function loadGit(): Promise<BrowserRepoGit> {
   return { git, iso, http };
 }
 
-/**
- * Check whether a filesystem already contains a repository with a HEAD.
- *
- * @param iso - Raw isomorphic-git functions.
- * @param fs - Project filesystem.
- * @param dir - Repository directory.
- * @returns `true` when HEAD resolves.
- */
 async function repoExists(
   iso: IsoGit,
   fs: unknown,
@@ -81,14 +76,6 @@ async function repoExists(
   }
 }
 
-/**
- * Read the currently checked-out branch of a repository.
- *
- * @param iso - Raw isomorphic-git functions.
- * @param fs - Project filesystem.
- * @param dir - Repository directory.
- * @returns Branch name, or an empty string when HEAD is detached.
- */
 async function currentBranch(
   iso: IsoGit,
   fs: unknown,
@@ -98,14 +85,6 @@ async function currentBranch(
   return branch ?? '';
 }
 
-/**
- * Resolve the HEAD commit SHA of a repository.
- *
- * @param iso - Raw isomorphic-git functions.
- * @param fs - Project filesystem.
- * @param dir - Repository directory.
- * @returns The HEAD commit SHA.
- */
 async function headSha(
   iso: IsoGit,
   fs: unknown,
@@ -148,7 +127,6 @@ export async function createProjectRepoDeps(
   };
 }
 
-/** Build registry operations used by the suggestion modules. */
 function projectStore() {
   return {
     get: (id: string) => projectRegistry.get(id),
@@ -159,12 +137,10 @@ function projectStore() {
   };
 }
 
-/** Keep the accepted remote version for every conflict by default. */
 function acceptedByDefault(paths: string[]): Record<string, SaveConflictChoice> {
   return Object.fromEntries(paths.map((path) => [path, 'theirs' as const]));
 }
 
-/** Clone a repository through the BFF relay and read its working files. */
 async function cloneRepo(
   git: GitModule,
   http: HttpClient,
@@ -278,6 +254,44 @@ export async function prepareProjectDraft(
  */
 export function createRepoDeps(session: BffSession): Promise<ProjectRepoDeps> {
   return createProjectRepoDeps(session);
+}
+
+/**
+ * Build the dependencies of {@link restartSuggestion} and {@link pullLatest}.
+ *
+ * The save dependencies supply the persistent repository, fetch, rebase and
+ * registry operations. Restart adds workspace checkout, a local branch rename
+ * and the legacy clone used by pull-latest.
+ *
+ * @param session - Signed-in viewer whose login names the new draft branch.
+ * @returns Repository, remote, registry and conflict dependencies.
+ */
+export async function createRestartBrowserDeps(
+  session: BffSession,
+): Promise<RestartDeps> {
+  const { git, http } = await loadGit();
+  const save = await createSaveDeps(session);
+
+  return {
+    ...save,
+    registry: projectStore(),
+    checkoutToWorkspace: (id) => checkoutProjectWorkspace(id),
+    renameBranch: async (fs, dir, oldName, newName) => {
+      const local = new git.LocalRepo(fs as FsClient, dir);
+      await local.renameBranch(oldName, newName);
+    },
+    clone: async (owner, repo, ref) => {
+      const remote = new git.RemoteGit({ http });
+      const url = git.relayUrl(window.location.origin, owner, repo);
+      const cloned = await remote.clone(url, ref);
+      const files = await git.readWorkingFiles(
+        remote.fs as FsClient,
+        remote.dir,
+      );
+      return { sha: cloned.sha, files };
+    },
+    syncFork: (owner, repo, branch) => syncFork(owner, repo, branch),
+  };
 }
 
 export default createProjectRepoDeps;

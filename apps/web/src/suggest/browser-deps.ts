@@ -24,11 +24,11 @@ import {
 } from '../github/bff-suggest';
 import type { SuggestionBranch, SuggestionPull } from '../github/bff-suggest';
 import { projectRegistry } from '../hooks/useProjects';
-import { isSuggestionPath } from './file-diff';
 import { applyDraftName } from './name-draft';
 import { openProjectRepo } from './project-repo';
 import {
   createProjectRepoDeps,
+  createRestartBrowserDeps,
   createSaveDeps,
   prepareProjectDraft,
 } from './repo-deps';
@@ -44,29 +44,12 @@ type GitRemoteOptions = ConstructorParameters<GitModule['RemoteGit']>[0];
 type GitHttp = GitRemoteOptions['http'];
 type GitFs = Parameters<GitModule['commitFilesOnBranch']>[0];
 
-/** A cloned repository with its head SHA and suggestion-scoped files. */
-interface BrowserClone {
-  /** Head commit SHA of the cloned branch. */
-  sha: string;
-  /** Git filesystem client used by the commit and push helpers. */
-  fs: unknown;
-  /** Repository working directory. */
-  dir: string;
-  /** Suggestion-scoped repository files. */
-  files: Map<string, string>;
-}
-
 /** Loaded git implementation and its HTTP client. */
 interface BrowserGit {
   /** Isomorphic-git wrapper exports. */
   git: GitModule;
   /** HTTP client used by the git remote. */
   http: GitHttp;
-}
-
-/** Keep only the files a suggestion may read or write. */
-function suggestionFiles(files: Map<string, string>): Map<string, string> {
-  return new Map([...files].filter(([path]) => isSuggestionPath(path)));
 }
 
 /**
@@ -81,31 +64,6 @@ async function loadGit(): Promise<BrowserGit> {
     await import('../../../../packages/git/node_modules/isomorphic-git/http/web/index.js')
   ).default;
   return { git, http };
-}
-
-/**
- * Clone a repository through the BFF git relay and read its working files.
- *
- * @param browser - Loaded git implementation and HTTP client.
- * @param owner - Repository owner login.
- * @param repo - Repository name.
- * @param ref - Optional branch to check out.
- * @returns Head SHA, git filesystem, working directory and scoped files.
- */
-async function cloneRepo(
-  browser: BrowserGit,
-  owner: string,
-  repo: string,
-  ref?: string,
-): Promise<BrowserClone> {
-  const { git, http } = browser;
-  const remote = new git.RemoteGit({ http });
-  const url = git.relayUrl(window.location.origin, owner, repo);
-  const cloned = await remote.clone(url, ref);
-  const files = suggestionFiles(
-    await git.readWorkingFiles(remote.fs as GitFs, remote.dir),
-  );
-  return { sha: cloned.sha, fs: remote.fs, dir: remote.dir, files };
 }
 
 /**
@@ -280,13 +238,5 @@ export async function createCheckDeps(): Promise<CheckSuggestionDeps> {
  * @returns Registry, GitHub, git and clock dependencies.
  */
 export async function createRestartDeps(session: BffSession): Promise<RestartDeps> {
-  const browser = await loadGit();
-  return {
-    registry: projectStore(),
-    getWorkspace,
-    clone: (owner, repo, ref) => cloneRepo(browser, owner, repo, ref),
-    syncFork: (owner, repo, branch) => syncFork(owner, repo, branch),
-    session,
-    now: () => new Date(),
-  };
+  return createRestartBrowserDeps(session);
 }
