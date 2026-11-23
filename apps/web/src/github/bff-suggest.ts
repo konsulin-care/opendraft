@@ -19,6 +19,9 @@ export interface SuggestionBranch {
 /** State of a pull request as reported by the BFF. */
 export type SuggestionPullState = 'open' | 'closed' | 'merged';
 
+/** Summary of the latest review per reviewer on a pull request. */
+export type SuggestionReviewState = 'changes_requested' | 'approved' | 'none';
+
 /** A pull request matching a suggestion branch. */
 export interface SuggestionPull {
   /** Pull request number within the repository. */
@@ -27,6 +30,8 @@ export interface SuggestionPull {
   url: string;
   /** Current pull request state. */
   state: SuggestionPullState;
+  /** Latest review summary, when the BFF reports one. */
+  reviewState?: SuggestionReviewState;
 }
 
 /**

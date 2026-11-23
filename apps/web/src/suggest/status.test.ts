@@ -102,6 +102,26 @@ describe('checkSuggestion pull request state', () => {
 
     expect(result).toEqual({ state: 'open', number: 7, url: PR_URL });
   });
+
+  it('reports revision-needed when the open pull request requests changes', async () => {
+    const deps = makeDeps({
+      findSuggestionPull: vi.fn(async () => pull({ reviewState: 'changes_requested' })),
+    });
+
+    const result = await checkSuggestion(source({ pullNumber: 7 }), deps);
+
+    expect(result).toEqual({ state: 'revision-needed', number: 7, url: PR_URL });
+  });
+
+  it('keeps an open pull request open when its latest review approves', async () => {
+    const deps = makeDeps({
+      findSuggestionPull: vi.fn(async () => pull({ reviewState: 'approved' })),
+    });
+
+    const result = await checkSuggestion(source({ pullNumber: 7 }), deps);
+
+    expect(result).toEqual({ state: 'open', number: 7, url: PR_URL });
+  });
 });
 
 describe('checkSuggestion closed pull request state', () => {

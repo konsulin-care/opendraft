@@ -67,6 +67,27 @@ describe('findSuggestionPull', () => {
   });
 });
 
+describe('findSuggestionPull review state', () => {
+  it('returns the review state when the BFF reports one', async () => {
+    const pull = {
+      number: 12,
+      url: 'https://github.example/octocat/draft/pull/12',
+      state: 'open' as const,
+      reviewState: 'changes_requested' as const,
+    };
+    const fetchFn = vi.fn(async () => response(pull));
+
+    await expect(
+      findSuggestionPull(
+        'octocat',
+        'draft',
+        'octocat:opendraft/ada/20260101-120000',
+        fetchFn as unknown as typeof fetch,
+      ),
+    ).resolves.toEqual(pull);
+  });
+});
+
 describe('syncFork', () => {
   it('posts the branch to merge-upstream', async () => {
     const fetchFn = vi.fn(async () => response({ merged: true }));

@@ -15,6 +15,7 @@ export type SuggestionState =
   | 'local-only'
   | 'draft'
   | 'open'
+  | 'revision-needed'
   | 'merged'
   | 'closed'
   | 'branch-deleted'
@@ -72,6 +73,24 @@ function headRef(source: ProjectSourceGitHub): string {
 }
 
 /**
+ * Resolve the suggestion state of a pull request.
+ *
+ * An open pull request whose latest review requests changes is
+ * `revision-needed`; every other request maps to its own state.
+ *
+ * @param pull - Matching pull request.
+ * @returns Suggestion state derived from the pull request.
+ */
+function pullState(
+  pull: SuggestionPull,
+): 'open' | 'revision-needed' | 'merged' | 'closed' {
+  if (pull.state === 'open' && pull.reviewState === 'changes_requested') {
+    return 'revision-needed';
+  }
+  return pull.state;
+}
+
+/**
  * Build a status that carries the pull request identity.
  *
  * @param state - Pull request state.
@@ -79,7 +98,7 @@ function headRef(source: ProjectSourceGitHub): string {
  * @returns Status with number and url.
  */
 function withPull(
-  state: 'open' | 'merged' | 'closed',
+  state: 'open' | 'revision-needed' | 'merged' | 'closed',
   pull: SuggestionPull,
 ): SuggestionStatus {
   return { state, number: pull.number, url: pull.url };
@@ -91,7 +110,8 @@ function withPull(
  * An unpushed suggestion is `local-only` without any remote call. A pushed
  * branch that no longer exists is `branch-deleted`; a branch head that differs
  * from the synced commit is `remote-moved`. Otherwise the latest pull request
- * decides between `open`, `merged`, `closed`, and `draft` when none exists.
+ * decides between `open`, `revision-needed`, `merged`, `closed`, and `draft`
+ * when none exists.
  *
  * @param source - Stored GitHub source of the suggestion.
  * @param deps - Injected branch listing and pull request lookup.
@@ -124,7 +144,7 @@ export async function checkSuggestion(
     return { state: 'draft' };
   }
 
-  return withPull(pull.state, pull);
+  return withPull(pullState(pull), pull);
 }
 
 export default checkSuggestion;
