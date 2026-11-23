@@ -1,17 +1,14 @@
 /**
  * Reader page for a GitHub repository: the read-only manuscript view for an
  * OpenDraft project, the conversion panel for a plain repository, and dedicated
- * rate-limit and not-found messages.
- *
- * Every GitHub, git and session operation is injected. The default dependencies
- * lazily import the git implementation (and its Buffer polyfill) only when a
- * conversion starts, so the anonymous reader path never loads isomorphic-git.
+ * rate-limit and not-found messages. Every GitHub, git and session operation
+ * is injected so the anonymous reader path never loads isomorphic-git.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { InitDecisions } from '@opendraft/manuscript';
-import type { BffSession, SessionState } from '../github/bff-client';
+import type { BffSession, RepoPermissions, SessionState } from '../github/bff-client';
 import { createPullRequest, forkRepo, getRepoPermissions, getSession as fetchSession, getSessionState, logout as signOut } from '../github/bff-client';
 import { ReaderHeader } from './ReaderHeader';
 import { loadPublicSnapshot, resolveCommit } from './github-public';
@@ -26,31 +23,28 @@ import { convertRepository } from './convert';
 import type { ConvertDeps, ConvertInput, ConvertResult } from './convert';
 import { registerManuscripts } from './register';
 import type { RegisterManuscriptsInput } from './register';
+import { clearIntent } from './intent-url';
+import { ReaderAction } from './ReaderAction';
+import { useRepoAccess } from './use-repo-access';
+import { useSuggestEdit } from './use-suggest-edit';
+import type { StartSuggestionInput, StartSuggestionResult } from '../suggest/start';
 
-/** Reader page dependencies, injectable for tests. */
 export interface ReaderPageDeps {
-  /** Load the repository at a route into a read-only workspace. */
   loadRepo: (route: ReaderRoute) => Promise<LoadedRepo>;
-  /** Read the current BFF session and whether login is configured. */
   getSessionState: () => Promise<SessionState>;
-  /** Clear the BFF session. */
   logout: () => Promise<void>;
-  /** Convert a plain repository into an OpenDraft project. */
   convert: (input: ConvertInput) => Promise<ConvertResult>;
-  /** Register unlisted manuscript ids in an existing project. */
   register: (ids: string[]) => Promise<ConvertResult>;
+  getAccess?: (owner: string, repo: string) => Promise<RepoPermissions>;
+  start?: (input: StartSuggestionInput) => Promise<StartSuggestionResult>;
+  navigate?: (path: string) => void;
 }
 
-/** Reader page dependencies without the route-dependent register hook. */
 type ReaderPageBaseDeps = Omit<ReaderPageDeps, 'register'>;
 
-/** Props for {@link ReaderPage}. */
 export interface ReaderPageProps {
-  /** Repository owner, name and optional ref from the URL. */
   route: ReaderRoute;
-  /** Injected dependencies; defaults to the live GitHub and BFF clients. */
   deps?: ReaderPageDeps;
-  /** Main reader action supplied by the surrounding app shell. */
   action?: ReactNode;
 }
 
@@ -58,27 +52,15 @@ type GitModule = typeof import('@opendraft/git');
 type GitFs = Parameters<GitModule['commitFilesOnBranch']>[0];
 type GitRemoteOptions = ConstructorParameters<GitModule['RemoteGit']>[0];
 
-/** Return the reader path (`/{owner}/{repo}[/tree/{ref}]`) for a route. */
 function readerPath(route: ReaderRoute): string {
   const base = `/${route.owner}/${route.repo}`;
   return route.ref === undefined ? base : `${base}/tree/${route.ref}`;
 }
 
-/** Read the manuscript id from the current location, when one is present. */
 function locationManuscript(): string | undefined {
   return typeof window === 'undefined' ? undefined : readerManuscript(window.location.search);
 }
 
-/**
- * Resolve the manuscript to display.
- *
- * A single manuscript is always shown directly. With several manuscripts the
- * requested id selects one; without a (valid) id the reader shows the index.
- *
- * @param manuscripts - Manuscripts declared by the repository.
- * @param requested - Manuscript id from the URL, when present.
- * @returns The selected manuscript, or undefined for the index.
- */
 function resolveCurrent(
   manuscripts: LoadedRepo['manuscripts'],
   requested: string | undefined,
@@ -125,7 +107,6 @@ function useReaderNavigation(route: ReaderRoute, manuscripts: LoadedRepo['manusc
   return { current, contentRoute, navigateTo };
 }
 
-/** Build dependencies on the browser git client, Buffer polyfill and protocol. */
 async function browserConvertDeps(): Promise<ConvertDeps> {
   await import('../github/buffer-polyfill');
   const git = await import('@opendraft/git');
@@ -157,17 +138,14 @@ async function browserConvertDeps(): Promise<ConvertDeps> {
   };
 }
 
-/** Convert lazily with the browser git client, Buffer polyfill and protocol. */
 async function convertWithGit(input: ConvertInput): Promise<ConvertResult> {
   return convertRepository(input, await browserConvertDeps());
 }
 
-/** Register manuscripts lazily with the browser git client and protocol. */
 async function registerWithGit(input: RegisterManuscriptsInput): Promise<ConvertResult> {
   return registerManuscripts(input, await browserConvertDeps());
 }
 
-/** Live reader dependencies backed by the anonymous API, relay and BFF. */
 const defaultDeps: ReaderPageBaseDeps = {
   loadRepo: (route) =>
     loadReaderRepo(route, {
@@ -189,7 +167,6 @@ const defaultDeps: ReaderPageBaseDeps = {
   convert: convertWithGit,
 };
 
-/** Load the session and repository snapshot for a route. */
 function useReaderState(route: ReaderRoute, deps: ReaderPageBaseDeps): ReaderState {
   const [session, setSession] = useState<BffSession | null>(null);
   const [loginEnabled, setLoginEnabled] = useState(true);
@@ -235,7 +212,6 @@ function useReaderState(route: ReaderRoute, deps: ReaderPageBaseDeps): ReaderSta
   return { session, loginEnabled, repo, error, loading, logout };
 }
 
-/** Bind conversion and registration handlers to a route, session and deps. */
 function useReaderHandlers(
   route: ReaderRoute,
   deps: ReaderPageDeps | undefined,
@@ -259,19 +235,45 @@ function useReaderHandlers(
   return { handleConvert, handleRegister };
 }
 
-/**
- * Render the reader page for a repository.
- *
- * @param props - See {@link ReaderPageProps}.
- * @returns The header plus the loading indicator, error message, conversion
- *          panel or read-only manuscript view.
- */
+function useEditIntentAutoStart(
+  enabled: boolean,
+  session: BffSession | null,
+  trigger: () => Promise<void>,
+): void {
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!enabled || autoStarted.current || session === null) return;
+    if (new URLSearchParams(window.location.search).get('intent') !== 'edit') return;
+    autoStarted.current = true;
+    void trigger().then(() => clearIntent());
+  }, [enabled, session, trigger]);
+}
+
+/** Render the reader page for a repository, with its main action in the header. */
 export function ReaderPage({ route, deps, action }: ReaderPageProps) {
   const baseDeps = deps ?? defaultDeps;
   const state = useReaderState(route, baseDeps);
-  const { handleConvert, handleRegister } = useReaderHandlers(route, deps, baseDeps, state.session);
+  const handlers = useReaderHandlers(route, deps, baseDeps, state.session);
   const manuscripts = state.repo?.manuscripts ?? [];
   const { current, contentRoute, navigateTo } = useReaderNavigation(route, manuscripts);
+  const access = useRepoAccess({
+    owner: route.owner, repo: route.repo, session: state.session,
+    loginEnabled: state.loginEnabled, getAccess: baseDeps.getAccess,
+  });
+  const suggest = useSuggestEdit({
+    route, session: state.session, loginEnabled: state.loginEnabled,
+    getAccess: baseDeps.getAccess, start: baseDeps.start, navigate: baseDeps.navigate,
+  });
+  useEditIntentAutoStart(state.repo?.isOpenDraft === true, state.session, suggest.trigger);
+
+  const headerAction = state.repo?.isOpenDraft === true ? (
+    <ReaderAction
+      kind="opendraft" access={access.access} status={suggest.status}
+      intent={suggest.intent} error={suggest.error} route={route}
+      manuscriptId={current?.id} onTrigger={() => void suggest.trigger()}
+      onConvert={() => undefined} onClose={suggest.reset}
+    />
+  ) : action;
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -285,10 +287,13 @@ export function ReaderPage({ route, deps, action }: ReaderPageProps) {
         selectedId={current?.id}
         onSelect={(id) => navigateTo(id)}
         onSelectAll={() => navigateTo(null)}
-        action={action}
+        action={headerAction}
       />
       <main className="flex flex-1 flex-col gap-4 p-4">
-        <ReaderContent route={contentRoute} state={state} convert={handleConvert} register={handleRegister} />
+        <ReaderContent
+          route={contentRoute} state={state}
+          convert={handlers.handleConvert} register={handlers.handleRegister}
+        />
       </main>
     </div>
   );

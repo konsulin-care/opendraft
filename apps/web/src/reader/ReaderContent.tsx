@@ -18,7 +18,6 @@ import type { ConvertResult } from './convert';
 import type { LoadedRepo } from './load-repo';
 import { NotFoundError, RateLimitedError } from './github-public';
 import type { ReaderRoute } from './route';
-import { SuggestEdits } from './SuggestEdits';
 import { UnlistedBanner } from './UnlistedBanner';
 
 /** Reader state loaded from the route and injected dependencies. */
@@ -47,8 +46,6 @@ export interface ReaderContentProps {
   convert: (decisions: InitDecisions) => Promise<ConvertResult>;
   /** Register unlisted manuscript ids in the project configuration. */
   register: (ids: string[]) => Promise<ConvertResult>;
-  /** URL query string used by the suggest-edits entry point. */
-  search?: string;
 }
 
 /** Return the reader path (`/{owner}/{repo}[/tree/{ref}]`) for a route. */
@@ -133,31 +130,23 @@ function resolveManuscript(
   return manuscripts.find((manuscript) => manuscript.id === requested);
 }
 
-/** Render the suggest-edits entry point, banner, index or manuscript. */
+/** Render the unlisted banner, index or manuscript. */
 function OpenDraftContent({
   route,
   state,
   repo,
   discovery,
   register,
-  query,
 }: {
   route: ReaderRoute;
   state: ReaderState;
   repo: LoadedRepo;
   discovery: ProjectDiscovery | null;
   register: (ids: string[]) => Promise<ConvertResult>;
-  query: string;
 }) {
   const manuscript = resolveManuscript(repo.manuscripts, route.manuscript);
   return (
     <>
-      <SuggestEdits
-        route={route}
-        session={state.session}
-        loginEnabled={state.loginEnabled}
-        search={query}
-      />
       {discovery !== null && discovery.unlisted.length > 0 && state.session !== null ? (
         <UnlistedBanner discovery={discovery} session={state.session} register={register} />
       ) : null}
@@ -189,11 +178,10 @@ function OpenDraftContent({
  * @param props - See {@link ReaderContentProps}.
  * @returns The content for the current reader state.
  */
-export function ReaderContent({ route, state, convert, register, search }: ReaderContentProps) {
+export function ReaderContent({ route, state, convert, register }: ReaderContentProps) {
   const { session, loginEnabled, repo, error, loading } = state;
   const { discovery, error: discoveryError } = useDiscovery(repo);
   const returnTo = readerPath(route);
-  const query = search ?? (typeof window === 'undefined' ? '' : window.location.search);
 
   if (loading) return <p className="text-sm text-black">Loading…</p>;
   if (error !== null) return <LoadError error={error} returnTo={returnTo} />;
@@ -223,7 +211,6 @@ export function ReaderContent({ route, state, convert, register, search }: Reade
       repo={repo}
       discovery={discovery}
       register={register}
-      query={query}
     />
   );
 }

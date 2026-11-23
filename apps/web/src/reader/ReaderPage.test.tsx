@@ -10,7 +10,7 @@ import '@testing-library/jest-dom/vitest';
 import { MemoryWorkspace, readOnlyWorkspace } from '@opendraft/workspace';
 import { stringify } from 'yaml';
 import { PROTOCOL } from '../project/scaffold';
-import type { BffSession } from '../github/bff-client';
+import type { BffSession, RepoPermissions } from '../github/bff-client';
 import { RateLimitedError, NotFoundError } from './github-public';
 import type { LoadedRepo } from './load-repo';
 import { parseManuscripts } from './load-repo';
@@ -31,6 +31,13 @@ const SESSION: BffSession = {
   id: 1,
   name: 'The Octocat',
   expiresAt: '2030-01-01T00:00:00Z',
+};
+
+/** Access fixture for a writer on an installed repository. */
+const PUSH_INSTALLED: RepoPermissions = {
+  push: true,
+  installed: true,
+  defaultBranch: 'main',
 };
 
 /** Build a loaded repository fixture from an opendraft.yml manuscript list. */
@@ -84,15 +91,17 @@ const TWO = [
 describe('ReaderPage OpenDraft repository', () => {
   it('shows the manuscript index and All manuscripts title for several manuscripts', async () => {
     const deps = makeDeps({ loadRepo: vi.fn(async () => makeRepo(TWO)) });
-    render(<ReaderPage route={ROUTE} deps={deps} action={<button type="button">Edit</button>} />);
+    render(<ReaderPage route={ROUTE} deps={deps} />);
     expect(await screen.findByTestId('manuscript-index')).toBeInTheDocument();
     expect(screen.queryByTestId('manuscript-view')).toBeNull();
     const header = screen.getByTestId('header-shell');
     expect(within(header).getByText('All manuscripts')).toBeInTheDocument();
     expect(within(header).getByText('Published at konsulin-care/citizen-science')).toBeInTheDocument();
     expect(within(header).getByTestId('manuscript-switcher')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Edit' }).compareDocumentPosition(
-      screen.getByRole('button', { name: 'Account' }),
+    expect(within(header).getByRole('button', { name: 'Suggest edits' })).toBeInTheDocument();
+    expect(within(screen.getByRole('main')).queryByText('Suggest edits')).toBeNull();
+    expect(within(header).getByRole('button', { name: 'Suggest edits' }).compareDocumentPosition(
+      within(header).getByRole('button', { name: 'Account' }),
     ) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
@@ -107,6 +116,35 @@ describe('ReaderPage OpenDraft repository', () => {
     expect(screen.queryByRole('button', { name: 'second' })).toBeNull();
     const header = screen.getByTestId('header-shell');
     expect(within(header).getByText('second')).toBeInTheDocument();
+  });
+});
+
+describe('ReaderPage edit intent', () => {
+  it('auto-starts once for a signed-in viewer and clears the intent from the URL', async () => {
+    window.history.replaceState({}, '', `${ROUTE.owner}/${ROUTE.repo}?intent=edit`);
+    const replace = vi.spyOn(window.history, 'replaceState');
+    const start = vi.fn(async () => ({ projectId: 'project-1', resumed: 'fresh' as const }));
+    const navigate = vi.fn();
+    const deps = makeDeps({
+      getSessionState: vi.fn(async () => ({ session: SESSION, loginEnabled: true })),
+      getAccess: vi.fn(async () => PUSH_INSTALLED),
+      start,
+      navigate,
+    });
+
+    render(<ReaderPage route={ROUTE} deps={deps} />);
+
+    await waitFor(() => {
+      expect(start).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(window.location.search).not.toContain('intent=edit');
+    });
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(replace).toHaveBeenCalled();
+
+    replace.mockRestore();
+    window.history.replaceState({}, '', '/');
   });
 });
 
