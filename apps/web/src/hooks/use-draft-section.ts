@@ -21,7 +21,6 @@ import type { UseDraftDeps, UseDraftResult } from './use-draft';
 type DialogMode = 'send' | 'update' | 'publish';
 type Gate = 'sign-in' | 'install';
 const h = createElement;
-
 /** Dependencies of `useDraftSection`: draft deps plus optional UI hooks. */
 export interface DraftSectionDeps extends UseDraftDeps {
   /** Open a workspace file from a preflight finding. */
@@ -74,11 +73,9 @@ interface DialogNodesProps {
   closeDialog: () => void;
   closeGate: () => void;
 }
-
 const MODAL = 'fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-4 sm:items-center';
 const PANEL = 'max-h-[90dvh] w-full overflow-y-auto rounded-t-2xl bg-white p-4 shadow-xl sm:max-w-lg sm:rounded-2xl';
 const CANCEL = 'mt-2 min-h-11 rounded-md px-3 py-1 text-sm text-gray-600 hover:bg-gray-100';
-
 /** Open the sign-in or install gate when the action needs one. */
 function hasAccess(context: SectionContext): boolean {
   if (context.session === null) {
@@ -126,7 +123,10 @@ function chipNode(context: SectionContext | null): ReactNode {
   if (context === null) return null;
   const { project, draft } = context;
   if (project.source.kind !== 'github') {
-    return h(StatusChip, { label: draft.view.chip, notice: draft.notice });
+    return h(StatusChip, {
+      label: draft.view.chip,
+      notice: draft.error ?? draft.notice,
+    });
   }
   return h(StatusChip, {
     label: draft.view.chip,
@@ -134,7 +134,7 @@ function chipNode(context: SectionContext | null): ReactNode {
     repo: project.source.repo,
     draftName: project.source.branch,
     pullRequestUrl: draft.status?.url,
-    notice: draft.notice,
+    notice: draft.error ?? draft.notice,
   });
 }
 

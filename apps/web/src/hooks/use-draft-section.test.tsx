@@ -118,6 +118,44 @@ describe('useDraftSection action and chip', () => {
   });
 });
 
+describe('useDraftSection status chip', () => {
+  it('shows the draft error text in the status chip when an action fails', async () => {
+    const deps = makeDeps({
+      save: vi.fn(async () => {
+        throw new Error('Could not save');
+      }),
+    });
+    render(<Section {...makeInput(DRAFT, deps)} />);
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Draft' })).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Save to GitHub' }));
+
+    expect(
+      await screen.findByRole('button', { name: 'Could not save' }),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the regular notice in the status chip when there is no draft error', async () => {
+    const deps = makeDeps({
+      save: vi.fn(async (): Promise<SaveGitHubResult> => ({ kind: 'saved' as const, sha: 'next-sha' })),
+    });
+    render(<Section {...makeInput(DRAFT, deps)} />);
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Draft' })).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Save to GitHub' }));
+
+    expect(
+      await screen.findByRole('button', { name: 'Saved to GitHub' }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe('useDraftSection dialogs', () => {
   it('opens the send dialog from the primary action of a draft', async () => {
     render(<Section {...makeInput(DRAFT, makeDeps())} />);
