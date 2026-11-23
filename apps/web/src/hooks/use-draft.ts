@@ -14,6 +14,7 @@ import type {
   SendSuggestionResult,
   SendUpdateInput,
 } from '../suggest/submit';
+import { errorMessage, useRunner } from './use-draft-runner';
 
 export const DRAFT_NOTICE_TIMEOUT_MS = 4000;
 const SAVED_NOTICE = 'Saved to GitHub';
@@ -69,9 +70,6 @@ interface ActionEffects {
   showNotice: (message: string) => void;
   setPendingSaves: (count: number) => void;
   currentStatus: () => SuggestionStatus | null;
-}
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 function sentNotice(number: number): string {
   return `Suggestion #${number} sent`;
@@ -169,51 +167,6 @@ function useUi() {
   );
   return { notice, setNotice, showNotice, conflicts, resolver, resolveConflicts };
 }
-function useRunner(
-  project: ProjectRecord | null,
-  resolveConflicts: SaveConflictResolver,
-  report: {
-    refresh: () => Promise<void>;
-    setError: (error: string | null) => void;
-    setNotice: (notice: string | null) => void;
-  },
-) {
-  const [busy, setBusy] = useState(false);
-  const busyRef = useRef(false);
-  const latestProject = useRef(project);
-  latestProject.current = project;
-  const { refresh, setError, setNotice } = report;
-  const run = useCallback(
-    async <T,>(work: () => Promise<T>): Promise<T | null> => {
-      if (busyRef.current) return null;
-      busyRef.current = true;
-      setBusy(true);
-      setError(null);
-      setNotice(null);
-      let result: T | null = null;
-      try {
-        result = await work();
-      } catch (thrown) {
-        setError(errorMessage(thrown));
-      } finally {
-        try {
-          await refresh();
-        } catch (thrown) {
-          setError(errorMessage(thrown));
-        }
-        busyRef.current = false;
-        setBusy(false);
-      }
-      return result;
-    },
-    [refresh, setError, setNotice],
-  );
-  const context = useCallback((): DraftActionContext | null => {
-    const active = latestProject.current;
-    return active === null ? null : { project: active, resolveConflicts };
-  }, [resolveConflicts]);
-  return { busy, run, context };
-}
 function createActions(
   deps: UseDraftDeps,
   runner: ReturnType<typeof useRunner>,
@@ -232,7 +185,9 @@ function createActions(
     send: async (input = {}) => {
       const action = context();
       if (action === null) return;
-      const result = await run(() => deps.send(action, input));
+      const result = await run(() => deps.send(action, input), {
+        rethrow: true,
+      });
       if (result?.kind === 'created' || result?.kind === 'updated') {
         showNotice(sentNotice(result.number));
       }
@@ -241,7 +196,9 @@ function createActions(
     update: async (input = {}) => {
       const action = context();
       if (action === null) return;
-      const result = await run(() => deps.update(action, input));
+      const result = await run(() => deps.update(action, input), {
+        rethrow: true,
+      });
       if (result?.kind === 'saved') {
         const number = currentStatus()?.number;
         showNotice(number === undefined ? SAVED_NOTICE : sentNotice(number));

@@ -1,9 +1,5 @@
 // @vitest-environment jsdom
-/**
- * Draft hook tests: state loads on mount and focus (never on an interval),
- * actions set busy and refresh afterwards, conflicts wait for the dialog
- * resolver, and success notices clear themselves after four seconds.
- */
+// Draft hook tests: load/focus refresh, busy tracking, conflicts, notices and error rejection.
 import { describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ProjectRecord } from '@opendraft/workspace';
@@ -31,23 +27,12 @@ const PROJECT: ProjectRecord = {
   lastOpenedAt: 1,
 };
 
-/**
- * Build hook dependencies with inert defaults and spy hooks.
- *
- * @param overrides - Dependency overrides for the scenario under test.
- * @returns Complete hook dependencies.
- */
+/** Build hook dependencies with inert defaults and spy hooks. */
 function makeDeps(overrides: Partial<UseDraftDeps> = {}): UseDraftDeps {
   return {
-    load: vi.fn(async () => ({
-      status: { state: 'draft' as const },
-      pendingSaves: 1,
-    })),
+    load: vi.fn(async () => ({ status: { state: 'draft' as const }, pendingSaves: 1 })),
     save: vi.fn(async (): Promise<SaveGitHubResult> => ({ kind: 'unchanged' })),
-    send: vi.fn(async (): Promise<SendSuggestionResult> => ({
-      kind: 'closed',
-      state: 'closed',
-    })),
+    send: vi.fn(async (): Promise<SendSuggestionResult> => ({ kind: 'closed', state: 'closed' })),
     update: vi.fn(async (): Promise<SaveGitHubResult> => ({ kind: 'unchanged' })),
     startNew: vi.fn(async () => ({ projectId: 'project-1' })),
     publish: vi.fn(async () => ({ repo: 'draft' })),
@@ -55,24 +40,14 @@ function makeDeps(overrides: Partial<UseDraftDeps> = {}): UseDraftDeps {
   };
 }
 
-/**
- * Render the hook and wait until the initial load has finished.
- *
- * @param deps - Hook dependencies.
- * @returns The rendered hook result.
- */
+/** Render the hook and wait until the initial load has finished. */
 async function renderReady(deps: UseDraftDeps) {
   const rendered = renderHook(() => useDraft(PROJECT, deps));
   await waitFor(() => expect(rendered.result.current.loading).toBe(false));
   return rendered;
 }
 
-/**
- * Render the hook under fake timers and flush the initial load promise.
- *
- * @param deps - Hook dependencies.
- * @returns The rendered hook result.
- */
+/** Render the hook under fake timers and flush the initial load promise. */
 async function renderWithFakeTimers(deps: UseDraftDeps) {
   const rendered = renderHook(() => useDraft(PROJECT, deps));
   await act(async () => {
@@ -236,7 +211,6 @@ describe('useDraft notices', () => {
         await result.current.save();
       });
       expect(result.current.notice).toBe('Saved to GitHub');
-
       await advance(DRAFT_NOTICE_TIMEOUT_MS - 1);
       expect(result.current.notice).toBe('Saved to GitHub');
 
@@ -245,6 +219,56 @@ describe('useDraft notices', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('useDraft errors', () => {
+  it('rejects send and records the error when the send dep throws', async () => {
+    const deps = makeDeps({
+      send: vi.fn(async (): Promise<SendSuggestionResult> => {
+        throw new Error('send failed');
+      }),
+    });
+    const { result } = await renderReady(deps);
+
+    await act(async () => {
+      await expect(result.current.send()).rejects.toThrow('send failed');
+    });
+
+    expect(result.current.error).toBe('send failed');
+    expect(result.current.busy).toBe(false);
+  });
+
+  it('rejects update and records the error when the update dep throws', async () => {
+    const deps = makeDeps({
+      update: vi.fn(async (): Promise<SaveGitHubResult> => {
+        throw new Error('update failed');
+      }),
+    });
+    const { result } = await renderReady(deps);
+
+    await act(async () => {
+      await expect(result.current.update()).rejects.toThrow('update failed');
+    });
+
+    expect(result.current.error).toBe('update failed');
+    expect(result.current.busy).toBe(false);
+  });
+
+  it('resolves save and records the error when the save dep throws', async () => {
+    const deps = makeDeps({
+      save: vi.fn(async (): Promise<SaveGitHubResult> => {
+        throw new Error('save failed');
+      }),
+    });
+    const { result } = await renderReady(deps);
+
+    await act(async () => {
+      await expect(result.current.save()).resolves.toBeUndefined();
+    });
+
+    expect(result.current.error).toBe('save failed');
+    expect(result.current.busy).toBe(false);
   });
 });
 
