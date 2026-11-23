@@ -4,6 +4,7 @@ import { AppHeader } from './components/AppHeader';
 import type { SaveStatus } from './components/AppHeader';
 import { EditorArea } from './components/EditorArea';
 import { CommitDialog } from './components/CommitDialog';
+import { SuggestionBanner } from './components/suggestion/SuggestionBanner';
 import { ProjectDrawer, useDrawerState } from './components/project-drawer/ProjectDrawer';
 import { ProjectSwitcher } from './components/project-drawer/ProjectSwitcher';
 import { DeleteProjectAction } from './components/project-drawer/DeleteProjectDialog';
@@ -20,6 +21,27 @@ const FILES_CHANGED_EVENT = 'opendraft:files-changed';
 function manuscriptDirName(path: string): string | null {
   const [root, dir] = path.split('/');
   return root === 'manuscripts' && dir ? dir : null;
+}
+
+/** Resolve whether the active path is a directory and which file to render. */
+function resolveContentPath(
+  activePath: string | null,
+  paths: string[],
+): { isDir: boolean; contentPath: string | null } {
+  const isDir = activePath !== null && paths.some((p) => p.startsWith(`${activePath}/`));
+  const contentPath = activePath !== null && paths.length > 0 && !isDir ? activePath : null;
+  return { isDir, contentPath };
+}
+
+/** Banner section that renders only when a project is active. */
+function SuggestionSection({
+  active,
+  workspace,
+}: {
+  active: ProjectRecord | null;
+  workspace: WorkspaceAdapter;
+}) {
+  return active ? <SuggestionBanner project={active} workspace={workspace} /> : null;
 }
 
 /**
@@ -210,8 +232,7 @@ export function App() {
   const formattingToolbar = true;
   // The listing loads asynchronously: until it arrives the active path is
   // treated as unresolved so a directory is never rendered as a file.
-  const isDir = activePath !== null && paths.some((p) => p.startsWith(`${activePath}/`));
-  const contentPath = activePath !== null && paths.length > 0 && !isDir ? activePath : null;
+  const { isDir, contentPath } = resolveContentPath(activePath, paths);
   const file = useActiveFileContent(workspace, contentPath);
   const drawer = useDrawerState();
 
@@ -227,6 +248,7 @@ export function App() {
         activePath={activePath} switchTo={switchTo} rename={rename} saveStatus={saveStatus}
         onCommit={() => setShowCommitDialog(true)} drawer={drawer}
       />
+      <SuggestionSection active={active} workspace={workspace} />
       <EditorArea
         workspace={workspace} activePath={activePath} isDir={isDir}
         file={file !== null && file.path === contentPath ? file : null}
