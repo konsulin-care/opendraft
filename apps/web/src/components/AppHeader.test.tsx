@@ -31,7 +31,6 @@ const SESSION: BffSession = {
 };
 
 const BASE_PROPS: AppHeaderProps = {
-  fileName: 'manuscript.md',
   manuscriptDir: 'intro',
   source: LOCAL_SOURCE,
   saveStatus: 'saved',
@@ -47,6 +46,17 @@ const BASE_PROPS: AppHeaderProps = {
  */
 function renderHeader(overrides: Partial<AppHeaderProps> = {}) {
   return render(<AppHeader {...BASE_PROPS} {...overrides} />);
+}
+
+/**
+ * Render the header with a removed legacy prop still attached at runtime.
+ *
+ * @param legacy - Props the header no longer declares.
+ * @returns The testing-library render result.
+ */
+function renderLegacyHeader(legacy: Record<string, unknown>) {
+  const props = { ...BASE_PROPS, ...legacy } as unknown as AppHeaderProps;
+  return render(<AppHeader {...props} />);
 }
 
 beforeEach(() => {
@@ -89,11 +99,13 @@ describe('AppHeader title and subtitle', () => {
   });
 
   it('renders the repo subtitle as read-only text with no project-name input', () => {
-    renderHeader({ source: LOCAL_SOURCE, projectName: 'Test Project' });
+    renderHeader({ source: LOCAL_SOURCE });
 
     expect(screen.getByText('Only on this device')).toBeDefined();
     expect(screen.queryByTestId('project-name')).toBeNull();
     expect(screen.queryByRole('textbox', { name: 'Project name' })).toBeNull();
+    const title = screen.getByTestId('manuscript-title') as HTMLInputElement;
+    expect(title.getAttribute('aria-label')).toBe('Manuscript name');
   });
 
   it('describes forks with their upstream repository', () => {
@@ -115,6 +127,24 @@ describe('AppHeader title and subtitle', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Switch manuscript' }));
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Methods' }));
     expect(onSelectManuscript).toHaveBeenCalledWith('methods');
+  });
+});
+
+describe('AppHeader legacy project rename', () => {
+  it('ignores the removed legacy project-name props and renames the manuscript title', () => {
+    const onRename = vi.fn();
+    const onRenameManuscript = vi.fn();
+    renderLegacyHeader({ projectName: 'Legacy Paper', onRename, onRenameManuscript });
+
+    expect(screen.queryByRole('textbox', { name: 'Project name' })).toBeNull();
+    expect(screen.getByText('Only on this device')).toBeDefined();
+
+    const title = screen.getByTestId('manuscript-title') as HTMLInputElement;
+    expect(title.value).toBe('intro');
+    fireEvent.change(title, { target: { value: 'Intro v2' } });
+    fireEvent.keyDown(title, { key: 'Enter' });
+    expect(onRenameManuscript).toHaveBeenCalledWith('Intro v2');
+    expect(onRename).not.toHaveBeenCalled();
   });
 });
 

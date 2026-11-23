@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import type { ProjectRecord } from '@opendraft/workspace';
 import { ProjectSwitcher, type ProjectSwitcherProps } from './ProjectSwitcher';
-import { AppHeader, type AppHeaderProps } from '../AppHeader';
 
 // @vitest-environment jsdom
 
@@ -202,12 +201,6 @@ describe('project switcher panel positioning', () => {
   });
 });
 
-/** Render the app header that now owns the inline project rename (B7). */
-function renderHeader(overrides: Partial<AppHeaderProps> = {}) {
-  render(<AppHeader fileName="manuscript.md" projectName="Newer Paper" mode="wysiwyg"
-    onSelectMode={vi.fn()} saveStatus="saved" onCommit={vi.fn()} {...overrides} />);
-}
-
 describe('project switcher rename', () => {
   it('offers Rename project for the active project and saves the trimmed name', () => {
     const onRenameProject = vi.fn<(name: string) => void>();
@@ -220,37 +213,6 @@ describe('project switcher rename', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(onRenameProject).toHaveBeenCalledWith('Renamed Paper');
-  });
-
-  // Legacy header rename remains available until the header move lands.
-  it('renames through the header input with the trimmed name on Enter and blur', async () => {
-    const onRename = vi.fn();
-    renderHeader({ onRename });
-    const input = screen.getByRole('textbox', { name: 'Project name' });
-    fireEvent.change(input, { target: { value: '  Renamed Paper  ' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
-    expect(onRename).toHaveBeenCalledWith('Renamed Paper');
-    // InlineEditField ignores saves while the Enter save is in flight;
-    // let it settle before the next edit+blur (same as InlineEditField.test).
-    await act(async () => {});
-
-    fireEvent.change(input, { target: { value: 'Blurred Name' } });
-    fireEvent.blur(input);
-    expect(onRename).toHaveBeenCalledWith('Blurred Name');
-  });
-
-  it('restores the previous name on Escape or an empty entry, without renaming', () => {
-    const onRename = vi.fn();
-    renderHeader({ onRename });
-    const input = screen.getByRole('textbox', { name: 'Project name' }) as HTMLInputElement;
-    fireEvent.change(input, { target: { value: 'Typo' } });
-    fireEvent.keyDown(input, { key: 'Escape' });
-    expect(onRename).not.toHaveBeenCalled();
-    expect(input.value).toBe('Newer Paper');
-    fireEvent.change(input, { target: { value: '   ' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
-    expect(onRename).not.toHaveBeenCalled();
-    expect(input.value).toBe('Newer Paper');
   });
 });
 

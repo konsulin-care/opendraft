@@ -162,52 +162,24 @@ function HeaderTitle({
 
 /** Props for {@link AppHeader}. */
 export interface AppHeaderProps {
-  /** @deprecated No longer rendered; kept for legacy callers. */
-  fileName?: string;
-  /** @deprecated Use {@link AppHeaderProps.source}; no longer rendered. */
-  projectName?: string;
   /** Display name of the open manuscript (line 1 of the title column). */
   manuscriptName?: string;
   /** Manuscript directory name; used when no display name is set. */
   manuscriptDir?: string;
   /** Source of the active project, used for the read-only subtitle. */
   source?: ProjectSource;
-  /** Alias for {@link AppHeaderProps.source}. */
-  projectSource?: ProjectSource;
   /** Manuscripts offered by the title switcher. */
   manuscripts?: readonly ManuscriptSwitcherOption[];
   /** Id of the open manuscript. */
   manuscriptId?: string;
-  /** Alias for {@link AppHeaderProps.manuscriptId}. */
-  selectedManuscriptId?: string;
-  /** @deprecated Use {@link AppHeaderProps.onRenameManuscript}. */
-  onRename?: (name: string) => void | Promise<void>;
   /** Called with the trimmed title when the user renames the manuscript. */
   onRenameManuscript?: (name: string) => void | Promise<void>;
-  /** @deprecated Project renaming now lives in the drawer switcher. */
-  onRenameProject?: (name: string) => void | Promise<void>;
   /** Called with the id of the manuscript chosen in the switcher. */
   onSelectManuscript?: (id: string) => void;
-  /** Alias for {@link AppHeaderProps.onSelectManuscript}. */
-  onSelect?: (id: string) => void;
   /** Adds an "All manuscripts" entry to the switcher when given. */
   onSelectAllManuscripts?: () => void;
-  /** Alias for {@link AppHeaderProps.onSelectAllManuscripts}. */
-  onSelectAll?: () => void;
-  /** @deprecated The editor-mode system was removed; ignored. */
-  mode?: 'wysiwyg' | 'source';
-  /** @deprecated The editor-mode system was removed; ignored. */
-  onSelectMode?: (mode: 'wysiwyg' | 'source') => void;
   /** Current autosave state. */
   saveStatus: SaveStatus;
-  /** @deprecated Commit was replaced by the action slot; ignored. */
-  onCommit?: () => void;
-  /** Called when the book button toggles the project drawer. */
-  onToggleSidebar?: () => void;
-  /** Whether the project drawer is currently open. */
-  sidebarOpen?: boolean;
-  /** Receives the book button element so the drawer can return focus to it. */
-  toggleButtonRef?: RefObject<HTMLButtonElement | null>;
   /** Main action slot rendered before the account menu. */
   action?: ReactNode;
   /** Signed-in session, or null for a signed-out viewer. */
@@ -218,6 +190,20 @@ export interface AppHeaderProps {
   onLogout?: () => void;
   /** Relative path to reopen after sign-in or installation. */
   returnTo?: string;
+  /** Called when the book button toggles the project drawer. */
+  onToggleSidebar?: () => void;
+  /** Whether the project drawer is currently open. */
+  sidebarOpen?: boolean;
+  /** Receives the book button element so the drawer can return focus to it. */
+  toggleButtonRef?: RefObject<HTMLButtonElement | null>;
+  /** @deprecated No longer rendered; kept so legacy callers still type-check. */
+  fileName?: string;
+  /** @deprecated Replaced by {@link AppHeaderProps.action}; ignored. */
+  onCommit?: () => void;
+  /** @deprecated The editor-mode system was removed; ignored. */
+  mode?: 'wysiwyg' | 'source';
+  /** @deprecated The editor-mode system was removed; ignored. */
+  onSelectMode?: (mode: 'wysiwyg' | 'source') => void;
 }
 
 /**
@@ -227,42 +213,86 @@ export interface AppHeaderProps {
  * account menu.
  *
  * @param props - See {@link AppHeaderProps}.
+ * @returns The editor header.
  */
-export function AppHeader(props: AppHeaderProps) {
-  const projectSource = props.source ?? props.projectSource;
-  const subtitle = projectSource ? repoSubtitle(projectSource) : props.projectName;
+/**
+ * Drawer toggle node for the header's leading slot.
+ *
+ * @param sidebarOpen - Whether the drawer is open.
+ * @param onToggle - Called when the toggle is activated.
+ * @param toggleButtonRef - Receives the button element for focus return.
+ * @returns The leading drawer toggle.
+ */
+function leadingNode(
+  sidebarOpen: boolean,
+  onToggle: (() => void) | undefined,
+  toggleButtonRef?: RefObject<HTMLButtonElement | null>,
+) {
+  return (
+    <DrawerToggle sidebarOpen={sidebarOpen} onToggle={onToggle} toggleButtonRef={toggleButtonRef} />
+  );
+}
 
+/**
+ * Account menu node for the header's trailing slot.
+ *
+ * @param props - Session, return path, sign-out handler and login flag.
+ * @returns The account menu.
+ */
+function accountNode(props: {
+  session: BffSession | null;
+  returnTo: string;
+  onLogout: () => void;
+  loginEnabled: boolean;
+}) {
+  return <UserMenu {...props} />;
+}
+
+/**
+ * Editor header built on the shared two-line shell: drawer toggle, editable
+ * manuscript title with its switcher, read-only repo subtitle, autosave
+ * state, main action and account menu.
+ *
+ * @param props - See {@link AppHeaderProps}.
+ * @returns The editor header.
+ */
+export function AppHeader({
+  manuscriptName,
+  manuscriptDir,
+  source,
+  manuscripts,
+  manuscriptId,
+  onRenameManuscript,
+  onSelectManuscript,
+  onSelectAllManuscripts,
+  saveStatus,
+  action,
+  session = null,
+  loginEnabled = true,
+  onLogout = NOOP_LOGOUT,
+  returnTo = '/',
+  onToggleSidebar,
+  sidebarOpen = false,
+  toggleButtonRef,
+}: AppHeaderProps) {
   return (
     <div data-testid="app-header">
       <HeaderShell
-        leading={
-          <DrawerToggle
-            sidebarOpen={props.sidebarOpen ?? false}
-            onToggle={props.onToggleSidebar}
-            toggleButtonRef={props.toggleButtonRef}
-          />
-        }
+        leading={leadingNode(sidebarOpen, onToggleSidebar, toggleButtonRef)}
         title={
           <HeaderTitle
-            title={props.manuscriptName ?? props.manuscriptDir}
-            manuscripts={props.manuscripts}
-            currentId={props.manuscriptId ?? props.selectedManuscriptId}
-            onRenameManuscript={props.onRenameManuscript ?? props.onRename}
-            onSelect={props.onSelectManuscript ?? props.onSelect}
-            onSelectAll={props.onSelectAllManuscripts ?? props.onSelectAll}
+            title={manuscriptName ?? manuscriptDir}
+            manuscripts={manuscripts}
+            currentId={manuscriptId}
+            onRenameManuscript={onRenameManuscript}
+            onSelect={onSelectManuscript}
+            onSelectAll={onSelectAllManuscripts}
           />
         }
-        subtitle={subtitle}
-        extra={<SaveIndicator status={props.saveStatus} />}
-        action={<HeaderActions action={props.action} />}
-        userMenu={
-          <UserMenu
-            session={props.session ?? null}
-            returnTo={props.returnTo ?? '/'}
-            onLogout={props.onLogout ?? NOOP_LOGOUT}
-            loginEnabled={props.loginEnabled ?? true}
-          />
-        }
+        subtitle={source ? repoSubtitle(source) : undefined}
+        extra={<SaveIndicator status={saveStatus} />}
+        action={<HeaderActions action={action} />}
+        userMenu={accountNode({ session, returnTo, onLogout, loginEnabled })}
       />
     </div>
   );
