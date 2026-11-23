@@ -166,8 +166,11 @@ func TestInstallRedirectsWithSameState(t *testing.T) {
 	if tx.State != state {
 		t.Errorf("stored state = %q, want %q", tx.State, state)
 	}
-	if tx.Verifier == "" {
-		t.Error("stored verifier is empty")
+	if tx.Verifier != "" {
+		t.Errorf("stored verifier = %q, want empty for install", tx.Verifier)
+	}
+	if tx.ReturnTo != "/" {
+		t.Errorf("ReturnTo = %q, want /", tx.ReturnTo)
 	}
 }
 

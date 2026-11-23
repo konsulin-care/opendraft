@@ -71,19 +71,18 @@ func (h *authHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, h.authorize(state, challenge), redirectCode)
 }
 
-// handleInstall redirects to the GitHub App installation flow while storing the
-// same state and PKCE verifier in the transaction cookie.
+// handleInstall redirects to the GitHub App installation flow. It stores the
+// state and return path in the transaction cookie without a PKCE verifier
+// because an installation is not an OAuth authorization step.
 func (h *authHandler) handleInstall(w http.ResponseWriter, r *http.Request) {
 	state, err := newState()
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal"})
 		return
 	}
-	verifier, _ := github.NewPKCE()
 
 	tx := session.Tx{
 		State:     state,
-		Verifier:  verifier,
 		ReturnTo:  safeReturnTo(r.URL.Query().Get(returnToKey)),
 		ExpiresAt: h.now().Add(session.TxMaxAge * time.Second),
 	}
