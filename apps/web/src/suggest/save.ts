@@ -1,11 +1,9 @@
 /**
- * Save the local edits of a suggestion project to its remote branch.
+ * Save draft edits to GitHub.
  *
- * The target is cloned at the suggestion branch when it has already been
- * pushed, otherwise at the upstream default branch. Only files that differ
- * from the stored per-file digest are committed, so untouched upstream content
- * is never reverted. Every GitHub, git, registry and workspace operation is
- * injected to keep the module unit-testable.
+ * A save commits the workspace into the project's persistent repository with an
+ * automatic message, then pushes the draft branch. Offline pushes keep the
+ * local commit. A moved remote branch is fetched and rebased onto before push.
  */
 
 import type {
@@ -15,14 +13,13 @@ import type {
 } from '@opendraft/workspace';
 import type { BffSession } from '../github/bff-client';
 import { author } from '../reader/convert';
-import { fileDigest, isSuggestionPath, localChanges } from './file-diff';
+import { fileDigest, isSuggestionPath } from './file-diff';
 
-/** Commit message used when saving suggestion edits. */
+/** Commit message used by the legacy save-to-copy path. */
 export const SAVE_COMMIT_MESSAGE = 'docs: save suggestion changes';
 
 /** Options of {@link saveToCopy}. */
 export interface SaveOptions {
-  /** Commit local versions even when the remote branch moved since the last sync. */
   overwrite?: boolean;
 }
 
@@ -34,116 +31,222 @@ export type SaveResult =
 
 /** A cloned repository filesystem and working directory. */
 export interface SaveClone {
-  /** Head commit SHA of the cloned branch or default branch. */
   sha: string;
-  /** Git filesystem client used by the commit and push helpers. */
   fs: unknown;
-  /** Repository working directory. */
   dir: string;
 }
 
-/** Commit request handed to the injected `commitFilesOnBranch`. */
+/** Commit request handed to `commitFilesOnBranch`. */
 export interface SaveCommitOptions {
-  /** Branch to create and commit on. */
   branch: string;
-  /** Repository-relative paths and their new contents. */
   files: Map<string, string>;
-  /** Repository-relative paths deleted locally. */
   remove: string[];
-  /** Commit message. */
   message: string;
-  /** Commit author identity. */
   author: { name: string; email: string };
 }
 
-/** Registry operations needed by {@link saveToCopy}. */
+/** Registry operations needed by saves. */
 export interface SaveRegistry {
-  /** Read a project record. */
   get: (id: string) => Promise<ProjectRecord | undefined>;
-  /** Replace a project's GitHub source. */
-  setSource: (
-    id: string,
-    source: ProjectSourceGitHub,
-  ) => Promise<{ id: string; source: ProjectSourceGitHub }>;
+  setSource: (id: string, source: ProjectSourceGitHub) => Promise<unknown>;
 }
 
-/** Injected dependencies of {@link saveToCopy}. */
+/** Injected dependencies of the legacy {@link saveToCopy}. */
 export interface SaveDeps {
-  /** Registry used to read and update the project source. */
   registry: SaveRegistry;
-  /** Open the workspace of a project id. */
   getWorkspace: (id: string) => Promise<WorkspaceAdapter>;
-  /** Clone a repository, optionally at a branch, through the git relay. */
   clone: (owner: string, repo: string, ref?: string) => Promise<SaveClone>;
-  /** Build the relay URL for a repository. */
   relayUrl: (owner: string, repo: string) => string;
-  /** Read all working-tree files of a cloned repository. */
   readWorkingFiles: (fs: unknown, dir: string) => Promise<Map<string, string>>;
-  /** Commit a file map and removals onto a branch. */
-  commitFilesOnBranch: (
-    fs: unknown,
-    dir: string,
-    opts: SaveCommitOptions,
-  ) => Promise<string>;
-  /** Push a local branch to a relay URL. */
+  commitFilesOnBranch: (fs: unknown, dir: string, opts: SaveCommitOptions) => Promise<string>;
   push: (fs: unknown, dir: string, url: string, branch: string) => Promise<void>;
-  /** Signed-in BFF session identity used as the commit author. */
   session: BffSession;
 }
 
+/** An opened persistent draft repository. */
+export interface SaveGitHubRepo {
+  fs: unknown;
+  dir: string;
+  branch: string;
+}
+
+/** Per-file conflict choice. */
+export type SaveConflictChoice = 'mine' | 'theirs';
+
+/** Resolve conflicting paths after replaying local commits. */
+export type SaveConflictResolver = (
+  paths: string[],
+) => Promise<Record<string, SaveConflictChoice>> | Record<string, SaveConflictChoice>;
+
+/** Options of the injected rebase operation. */
+export interface SaveRebaseOptions {
+  fs: unknown;
+  dir: string;
+  branch: string;
+  onto: string;
+  from: string;
+  resolve: SaveConflictResolver;
+}
+
+/** Dependencies of {@link saveDraft}. */
+export interface SaveGitHubDeps extends SaveDeps {
+  openRepo: (project: ProjectRecord) => Promise<SaveGitHubRepo>;
+  commitWorkspace: (projectId: string, message: string) => Promise<string | null>;
+  headSha: (fs: unknown, dir: string) => Promise<string>;
+  fetch: (fs: unknown, dir: string, url: string, branch: string) => Promise<void>;
+  remoteHead: (fs: unknown, dir: string, branch: string) => Promise<string | null>;
+  unpushed: (fs: unknown, dir: string, ref: string) => Promise<string[]>;
+  rebaseOnto: (opts: SaveRebaseOptions) => Promise<{ tip: string; backup: string }>;
+  resolveConflicts: SaveConflictResolver;
+}
+
+/** Result of {@link saveDraft}. */
+export type SaveGitHubResult =
+  | { kind: 'saved'; sha: string }
+  | { kind: 'pending'; pendingSaves: number }
+  | { kind: 'unchanged' };
+
 /**
- * Read the suggestion-scoped files of a workspace.
+ * Build a save commit message from changed repository paths.
  *
- * @param workspace - Project workspace.
- * @returns Map of repository-relative path to file content.
+ * @param paths - Changed or removed repository-relative paths.
+ * @returns Message using up to three basenames, then `+N more`.
  */
+export function saveCommitMessage(paths: string[]): string {
+  const names = [...new Set(paths.map((path) => path.split('/').pop() ?? path))].sort();
+  const shown = names.slice(0, 3);
+  const suffix = names.length > 3 ? `, +${names.length - 3} more` : '';
+  return `Update ${shown.join(', ')}${suffix}`;
+}
+
+/** Read the suggestion-scoped files of a workspace. */
 async function readScopedFiles(workspace: WorkspaceAdapter): Promise<Map<string, string>> {
   const files = new Map<string, string>();
-
   for (const path of await workspace.listAll()) {
     if (!isSuggestionPath(path)) continue;
     const content = await workspace.readFile(path);
     if (content !== null) files.set(path, content);
   }
-
   return files;
 }
 
-/**
- * Load the GitHub source of a suggestion project.
- *
- * @param projectId - Project id to load.
- * @param deps - Injected dependencies.
- * @returns The stored GitHub source.
- * @throws Error when the project is missing or is not backed by GitHub.
- */
-async function loadSource(
+/** Keep only suggestion-scoped repository files. */
+function scoped(files: ReadonlyMap<string, string>): Map<string, string> {
+  return new Map([...files].filter(([path]) => isSuggestionPath(path)));
+}
+
+/** List workspace paths that differ from the repository worktree. */
+async function changedPaths(
   projectId: string,
-  deps: SaveDeps,
-): Promise<ProjectSourceGitHub> {
+  repo: SaveGitHubRepo,
+  deps: SaveGitHubDeps,
+): Promise<string[]> {
+  const local = await readScopedFiles(await deps.getWorkspace(projectId));
+  const remote = scoped(await deps.readWorkingFiles(repo.fs, repo.dir));
+  const paths: string[] = [];
+  for (const [path, content] of local) if (remote.get(path) !== content) paths.push(path);
+  for (const path of remote.keys()) if (!local.has(path)) paths.push(path);
+  return paths;
+}
+
+/** Load the GitHub source of a draft project. */
+async function loadSource(projectId: string, deps: SaveDeps): Promise<ProjectSourceGitHub> {
   const project = await deps.registry.get(projectId);
   if (!project) throw new Error(`Project not found: ${projectId}`);
   if (project.source.kind !== 'github') {
-    throw new Error(`Project is not a GitHub suggestion: ${projectId}`);
+    throw new Error(`Project is not a GitHub project: ${projectId}`);
   }
   return project.source;
 }
 
+/** Decide whether a thrown value looks like a network failure. */
+function isNetworkFailure(error: unknown): boolean {
+  if (error instanceof TypeError) return true;
+  if (typeof error !== 'object' || error === null) return false;
+  const code = 'code' in error ? String((error as { code: unknown }).code) : '';
+  if (/network|fetch|timeout|offline/i.test(code)) return true;
+  if (code === 'HttpError') {
+    const status = (error as { data?: { statusCode?: number } }).data?.statusCode;
+    return status === undefined || status >= 500 || status === 408 || status === 429;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  return /failed to fetch|network|offline|timeout/i.test(message);
+}
+
+/** Rebase onto a moved remote draft branch when needed. */
+async function rebaseIfMoved(
+  source: ProjectSourceGitHub,
+  repo: SaveGitHubRepo,
+  deps: SaveGitHubDeps,
+): Promise<void> {
+  if (!source.pushed || !source.syncedSha) return;
+  const branch = source.branch;
+  await deps.fetch(repo.fs, repo.dir, deps.relayUrl(source.owner, source.repo), branch);
+  const head = await deps.remoteHead(repo.fs, repo.dir, branch);
+  if (head === null || head === source.syncedSha) return;
+  await deps.rebaseOnto({
+    fs: repo.fs, dir: repo.dir, branch, onto: `origin/${branch}`,
+    from: source.syncedSha, resolve: deps.resolveConflicts,
+  });
+}
+
+/** Store the synced digest of the repository worktree. */
+async function storeDigest(
+  projectId: string,
+  source: ProjectSourceGitHub,
+  repo: SaveGitHubRepo,
+  deps: SaveGitHubDeps,
+): Promise<void> {
+  const files = await deps.readWorkingFiles(repo.fs, repo.dir);
+  await deps.registry.setSource(projectId, {
+    ...source,
+    digest: fileDigest(files),
+  });
+}
+
 /**
- * Save local suggestion edits to the project's remote branch.
+ * Commit workspace changes and push the draft branch to GitHub.
  *
- * The project is cloned at the pushed suggestion branch, or at the upstream
- * default branch when it has not been pushed yet. When the pushed branch head
- * differs from the synced commit, the call returns `remote-moved` unless
- * `overwrite` asks to commit the local versions on top of the remote head.
- * Changed and removed scoped files are committed and pushed; a clean workspace
- * returns `unchanged` without touching the remote. An unpushed suggestion whose
- * base moved is saved with `upstreamMoved: true` as a warning only.
+ * @param projectId - Project id of the draft.
+ * @param deps - Injected repository, git, registry and conflict dependencies.
+ * @returns Saved, pending with a save count, or unchanged.
+ */
+export async function saveDraft(
+  projectId: string,
+  deps: SaveGitHubDeps,
+): Promise<SaveGitHubResult> {
+  const project = await deps.registry.get(projectId);
+  if (!project) throw new Error(`Project not found: ${projectId}`);
+  const source = await loadSource(projectId, deps);
+  const repo = await deps.openRepo(project);
+  const paths = await changedPaths(projectId, repo, deps);
+  const commit = paths.length > 0
+    ? await deps.commitWorkspace(projectId, saveCommitMessage(paths))
+    : null;
+  const remoteRef = source.pushed ? `origin/${source.branch}` : source.syncedSha;
+  const pending = await deps.unpushed(repo.fs, repo.dir, remoteRef);
+  if (commit === null && pending.length === 0) return { kind: 'unchanged' };
+  try {
+    await rebaseIfMoved(source, repo, deps);
+    await deps.push(repo.fs, repo.dir, deps.relayUrl(source.owner, source.repo), source.branch);
+    const sha = await deps.headSha(repo.fs, repo.dir);
+    await storeDigest(projectId, { ...source, pushed: true, syncedSha: sha }, repo, deps);
+    return { kind: 'saved', sha };
+  } catch (error) {
+    if (!isNetworkFailure(error)) throw error;
+    const waiting = await deps.unpushed(repo.fs, repo.dir, remoteRef);
+    await storeDigest(projectId, source, repo, deps);
+    return { kind: 'pending', pendingSaves: waiting.length };
+  }
+}
+
+/**
+ * Save local suggestion edits to a cloned copy (legacy submit flow).
  *
- * @param projectId - Project id of the suggestion.
- * @param options - Optional overwrite of a moved remote branch.
- * @param deps - Injected GitHub, git, registry and workspace dependencies.
- * @returns The save outcome, the new commit SHA and an upstream-moved warning.
+ * @param projectId - Project id.
+ * @param options - Optional overwrite of a moved branch.
+ * @param deps - Injected dependencies.
+ * @returns The legacy save outcome.
  */
 export async function saveToCopy(
   projectId: string,
@@ -153,46 +256,28 @@ export async function saveToCopy(
   const source = await loadSource(projectId, deps);
   const ref = source.pushed ? source.branch : source.upstream.defaultBranch;
   const cloned = await deps.clone(source.owner, source.repo, ref);
-
-  const remoteMoved = source.pushed && cloned.sha !== source.syncedSha;
-  if (remoteMoved && options.overwrite !== true) {
+  if (source.pushed && cloned.sha !== source.syncedSha && options.overwrite !== true) {
     return { kind: 'remote-moved' };
   }
-
-  const workspace = await deps.getWorkspace(projectId);
-  const local = await readScopedFiles(workspace);
-  const { changed, removed } = localChanges(local, source.digest);
-  if (changed.size === 0 && removed.length === 0) {
-    return { kind: 'unchanged' };
-  }
-
+  const local = await readScopedFiles(await deps.getWorkspace(projectId));
+  const remote = scoped(await deps.readWorkingFiles(cloned.fs, cloned.dir));
+  const files = new Map<string, string>();
+  for (const [path, content] of local) if (remote.get(path) !== content) files.set(path, content);
+  const remove = [...remote.keys()].filter((path) => !local.has(path));
+  if (files.size === 0 && remove.length === 0) return { kind: 'unchanged' };
   const sha = await deps.commitFilesOnBranch(cloned.fs, cloned.dir, {
-    branch: source.branch,
-    files: changed,
-    remove: removed,
-    message: SAVE_COMMIT_MESSAGE,
+    branch: source.branch, files, remove, message: SAVE_COMMIT_MESSAGE,
     author: author(deps.session),
   });
-  await deps.push(
-    cloned.fs,
-    cloned.dir,
-    deps.relayUrl(source.owner, source.repo),
-    source.branch,
-  );
-
+  await deps.push(cloned.fs, cloned.dir, deps.relayUrl(source.owner, source.repo), source.branch);
   const committed = await deps.readWorkingFiles(cloned.fs, cloned.dir);
   await deps.registry.setSource(projectId, {
-    ...source,
-    pushed: true,
-    syncedSha: sha,
-    digest: fileDigest(committed),
+    ...source, pushed: true, syncedSha: sha, digest: fileDigest(committed),
   });
-
-  return {
-    kind: 'saved',
-    sha,
-    upstreamMoved: !source.pushed && cloned.sha !== source.syncedSha,
-  };
+  return { kind: 'saved', sha, upstreamMoved: !source.pushed && cloned.sha !== source.syncedSha };
 }
 
-export default saveToCopy;
+/** Alias of {@link saveDraft} using the Save to GitHub wording. */
+export const saveToGitHub = saveDraft;
+
+export default saveDraft;

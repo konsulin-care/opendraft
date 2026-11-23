@@ -25,11 +25,12 @@ import {
 import type { SuggestionBranch, SuggestionPull } from '../github/bff-suggest';
 import { projectRegistry } from '../hooks/useProjects';
 import { isSuggestionPath } from './file-diff';
-import { prepareProjectDraft } from './repo-deps';
+import { createSaveDeps, prepareProjectDraft } from './repo-deps';
 import type { CheckSuggestionDeps } from './status';
 import type { RestartDeps } from './restart';
-import type { SaveDeps } from './save';
 import type { StartSuggestionDeps } from './start';
+
+export { createSaveDeps };
 import type { SubmitDeps } from './submit';
 
 type GitModule = typeof import('@opendraft/git');
@@ -202,37 +203,6 @@ export async function createStartDeps(): Promise<StartSuggestionDeps> {
     listSuggestionBranches,
     findSuggestionPull,
     prepareRepo: prepareProjectDraft,
-  };
-}
-
-/**
- * Build the dependencies of {@link saveToCopy} for the browser.
- *
- * @param session - Signed-in viewer used as the commit author.
- * @returns Registry, git, relay and workspace dependencies.
- */
-export async function createSaveDeps(session: BffSession): Promise<SaveDeps> {
-  const browser = await loadGit();
-  const { git, http } = browser;
-
-  return {
-    registry: projectStore(),
-    getWorkspace,
-    clone: (owner, repo, ref) => cloneRepo(browser, owner, repo, ref),
-    relayUrl: (owner, repo) => git.relayUrl(window.location.origin, owner, repo),
-    readWorkingFiles: async (fs, dir) =>
-      suggestionFiles(await git.readWorkingFiles(fs as GitFs, dir)),
-    commitFilesOnBranch: (fs, dir, opts) =>
-      git.commitFilesOnBranch(fs as GitFs, dir, opts),
-    push: async (fs, dir, url, branch) => {
-      const remote = new git.RemoteGit({
-        http,
-        fs: fs as GitRemoteOptions['fs'],
-        dir,
-      });
-      await remote.push(url, branch);
-    },
-    session,
   };
 }
 
