@@ -30,6 +30,8 @@ export interface ProjectDrawerContextValue {
    * below 1024px and stays open at 1024px and wider.
    */
   onFileSelected: () => void;
+  /** Rename the active project, when the drawer was given a handler. */
+  onRenameProject?: (name: string) => void | Promise<void>;
 }
 
 const NOOP_CONTEXT: ProjectDrawerContextValue = { onFileSelected: () => {} };
@@ -39,7 +41,6 @@ const ProjectDrawerContext = createContext<ProjectDrawerContextValue>(NOOP_CONTE
 /**
  * Access the enclosing project drawer's actions. Outside a drawer a no-op
  * handler is returned so components like the file tree render standalone.
- *
  * @returns See {@link ProjectDrawerContextValue}.
  */
 export function useProjectDrawer(): ProjectDrawerContextValue {
@@ -88,7 +89,6 @@ export function useDrawerState(): DrawerState {
 
 /**
  * Track the viewport width, updating on resize.
- *
  * @returns The current window width in pixels.
  */
 function useViewportWidth(): number {
@@ -104,7 +104,6 @@ function useViewportWidth(): number {
 /**
  * Move focus into the drawer when it opens; closing (e.g. via Escape)
  * returns focus to the toggle button.
- *
  * @param open - Whether the drawer is visible.
  * @param panelRef - Ref to the drawer panel element.
  * @param toggleRef - Ref to the toggle button that regains focus.
@@ -128,7 +127,6 @@ function useDrawerFocus(
 
 /**
  * Close the drawer when Escape is pressed, from anywhere on the page.
- *
  * @param open - Whether the drawer is visible.
  * @param onClose - Close handler invoked on Escape.
  */
@@ -145,7 +143,6 @@ function useEscapeClose(open: boolean, onClose: () => void): void {
 
 /**
  * Persist the open state, but only at viewports 1024px and wider.
- *
  * @param open - Whether the drawer is visible.
  * @param width - Current viewport width in pixels.
  */
@@ -172,6 +169,8 @@ export interface ProjectDrawerProps {
   footer?: ReactNode;
   /** Drawer body, typically the file tree; only this region scrolls. */
   children?: ReactNode;
+  /** Rename the active project; passed to the header switcher via context. */
+  onRenameProject?: (name: string) => void | Promise<void>;
 }
 
 /** Dimmed backdrop behind the drawer at 640px and wider. */
@@ -261,6 +260,7 @@ export function ProjectDrawer({
   header,
   footer,
   children,
+  onRenameProject,
 }: ProjectDrawerProps) {
   const width = useViewportWidth();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -273,8 +273,9 @@ export function ProjectDrawer({
       onFileSelected: () => {
         if (width < PERSIST_MIN_WIDTH) onClose();
       },
+      onRenameProject,
     }),
-    [width, onClose],
+    [width, onClose, onRenameProject],
   );
 
   if (!open) return null;

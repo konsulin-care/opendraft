@@ -2,10 +2,8 @@ import { useState } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import type { ProjectRecord } from '@opendraft/workspace';
-import { ProjectSwitcher } from './ProjectSwitcher';
-import type { ProjectSwitcherProps } from './ProjectSwitcher';
-import { AppHeader } from '../AppHeader';
-import type { AppHeaderProps } from '../AppHeader';
+import { ProjectSwitcher, type ProjectSwitcherProps } from './ProjectSwitcher';
+import { AppHeader, type AppHeaderProps } from '../AppHeader';
 
 // @vitest-environment jsdom
 
@@ -38,6 +36,7 @@ function Harness(overrides: Partial<ProjectSwitcherProps> = {}) {
         setActiveId(id);
       }}
       create={(name, manuscriptId) => overrides.create?.(name, manuscriptId)}
+      onRenameProject={(name) => overrides.onRenameProject?.(name)}
     />
   );
 }
@@ -205,20 +204,25 @@ describe('project switcher panel positioning', () => {
 
 /** Render the app header that now owns the inline project rename (B7). */
 function renderHeader(overrides: Partial<AppHeaderProps> = {}) {
-  render(
-    <AppHeader fileName="manuscript.md" projectName="Newer Paper" mode="wysiwyg"
-      onSelectMode={vi.fn()} saveStatus="saved" onCommit={vi.fn()} {...overrides} />,
-  );
+  render(<AppHeader fileName="manuscript.md" projectName="Newer Paper" mode="wysiwyg"
+    onSelectMode={vi.fn()} saveStatus="saved" onCommit={vi.fn()} {...overrides} />);
 }
 
 describe('project switcher rename', () => {
-  it('offers no Rename action in the dropdown', () => {
-    render(<Harness />);
+  it('offers Rename project for the active project and saves the trimmed name', () => {
+    const onRenameProject = vi.fn<(name: string) => void>();
+    render(<Harness onRenameProject={onRenameProject} />);
     openDropdown();
-    expect(screen.queryByRole('button', { name: 'Rename' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rename project' }));
+    const input = screen.getByRole('textbox', { name: 'Project name' });
+    fireEvent.change(input, { target: { value: '  Renamed Paper  ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onRenameProject).toHaveBeenCalledWith('Renamed Paper');
   });
 
-  // Rename moved out of the dropdown into the header inline input.
+  // Legacy header rename remains available until the header move lands.
   it('renames through the header input with the trimmed name on Enter and blur', async () => {
     const onRename = vi.fn();
     renderHeader({ onRename });
@@ -275,15 +279,15 @@ describe('project switcher new project dialog', () => {
 });
 
 describe('project switcher new project action', () => {
-  it('offers New project as the panel’s only action, full width and black', () => {
-    render(<Harness />);
+  it('offers New project in the panel footer, full width and black', () => {
+    render(<Harness onRenameProject={vi.fn()} />);
     openDropdown();
 
     // The panel's only button outside the project list is New project.
     const list = screen.getByRole('list', { name: 'Projects' });
     const panel = list.parentElement as HTMLElement;
     const outsideList = within(panel).getAllByRole('button').filter((b) => !list.contains(b));
-    expect(outsideList.map((b) => b.textContent)).toEqual(['New project']);
+    expect(outsideList.map((b) => b.textContent)).toEqual(['Rename project', 'New project']);
     // Deletion moved to the drawer footer dialog; the dropdown offers none.
     expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
 
