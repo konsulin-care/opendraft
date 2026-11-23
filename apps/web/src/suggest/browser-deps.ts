@@ -25,6 +25,7 @@ import {
 import type { SuggestionBranch, SuggestionPull } from '../github/bff-suggest';
 import { projectRegistry } from '../hooks/useProjects';
 import { isSuggestionPath } from './file-diff';
+import { prepareProjectDraft } from './repo-deps';
 import type { CheckSuggestionDeps } from './status';
 import type { RestartDeps } from './restart';
 import type { SaveDeps } from './save';
@@ -129,16 +130,6 @@ function projectStore() {
 }
 
 /**
- * Sleep for a number of milliseconds.
- *
- * @param ms - Delay in milliseconds.
- * @returns A promise resolving after the delay.
- */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
  * Build the list of suggestion branches of a repository.
  *
  * @param owner - Repository owner login.
@@ -200,10 +191,9 @@ function createPull(
 /**
  * Build the dependencies of {@link startSuggestion} for the browser.
  *
- * @returns Registry, GitHub, git and clock dependencies.
+ * @returns Registry, GitHub, persistent repository and branch dependencies.
  */
 export async function createStartDeps(): Promise<StartSuggestionDeps> {
-  const browser = await loadGit();
   return {
     registry: projectStore(),
     getWorkspace,
@@ -211,9 +201,7 @@ export async function createStartDeps(): Promise<StartSuggestionDeps> {
     syncFork: (owner, repo, branch) => syncFork(owner, repo, branch),
     listSuggestionBranches,
     findSuggestionPull,
-    clone: (owner, repo, ref) => cloneRepo(browser, owner, repo, ref),
-    sleep,
-    now: () => new Date(),
+    prepareRepo: prepareProjectDraft,
   };
 }
 

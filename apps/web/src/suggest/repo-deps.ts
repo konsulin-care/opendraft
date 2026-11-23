@@ -8,10 +8,13 @@
  */
 
 import { workspaceManager } from '@opendraft/workspace';
+import type { ProjectRecord } from '@opendraft/workspace';
 import type { FsClient } from '../../../../packages/git/node_modules/isomorphic-git/index.js';
 import type { HttpClient } from '../../../../packages/git/node_modules/isomorphic-git/http/web/index.js';
 import type { BffSession } from '../github/bff-client';
 import { author } from '../reader/convert';
+import type { PreparedDraftRepo } from './import';
+import { openProjectRepo } from './project-repo';
 import type { ProjectRepoDeps } from './project-repo';
 
 type GitModule = typeof import('@opendraft/git');
@@ -133,6 +136,41 @@ export async function createProjectRepoDeps(
       return repo.commitFiles(opts.changes, opts.message, identity);
     },
   };
+}
+
+/**
+ * Open or clone a project's persistent repository for a draft.
+ *
+ * The repository is opened through {@link openProjectRepo}, so an existing
+ * IndexedDB repository is reused. A fresh draft renames the locally cloned
+ * default branch to its placeholder draft branch; a resume checks the remote
+ * branch out through the project source.
+ *
+ * @param project - Project record whose source names the repository.
+ * @param branch - Draft branch to check out.
+ * @param createBranch - Whether the local draft branch must be created.
+ * @param session - Signed-in viewer used to open the repository.
+ * @returns Head SHA, checked-out branch and working files of the repository.
+ */
+export async function prepareProjectDraft(
+  project: ProjectRecord,
+  branch: string,
+  createBranch: boolean,
+  session: BffSession,
+): Promise<PreparedDraftRepo> {
+  const deps = await createProjectRepoDeps(session);
+  const repo = await openProjectRepo(project, deps);
+  let checkedOut = repo.branch;
+
+  if (createBranch && checkedOut !== branch) {
+    const { git } = await loadGit();
+    const local = new git.LocalRepo(repo.fs as FsClient, repo.dir);
+    await local.renameBranch(checkedOut, branch);
+    checkedOut = branch;
+  }
+
+  const files = await deps.readWorkingFiles(repo.fs, repo.dir);
+  return { sha: repo.sha, branch: checkedOut, files };
 }
 
 /**
