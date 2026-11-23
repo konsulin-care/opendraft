@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { InitDecisions } from '@opendraft/manuscript';
 import type { BffSession, SessionState } from '../github/bff-client';
 import {
@@ -55,6 +56,8 @@ export interface ReaderPageProps {
   route: ReaderRoute;
   /** Injected dependencies; defaults to the live GitHub and BFF clients. */
   deps?: ReaderPageDeps;
+  /** Main reader action supplied by the surrounding app shell. */
+  action?: ReactNode;
 }
 
 type GitModule = typeof import('@opendraft/git');
@@ -179,6 +182,30 @@ function useReaderState(route: ReaderRoute, deps: ReaderPageBaseDeps): ReaderSta
   return { session, loginEnabled, repo, error, loading, selected, select: setSelected, logout };
 }
 
+/** Bind conversion and registration handlers to a route, session and deps. */
+function useReaderHandlers(
+  route: ReaderRoute,
+  deps: ReaderPageDeps | undefined,
+  baseDeps: ReaderPageBaseDeps,
+  session: BffSession | null,
+): {
+  handleConvert: (decisions: InitDecisions) => Promise<ConvertResult>;
+  handleRegister: (ids: string[]) => Promise<ConvertResult>;
+} {
+  const handleConvert = async (decisions: InitDecisions): Promise<ConvertResult> => {
+    if (session === null) throw new Error('Sign in to convert this repository.');
+    return baseDeps.convert({ owner: route.owner, repo: route.repo, session, decisions });
+  };
+
+  const handleRegister = async (ids: string[]): Promise<ConvertResult> => {
+    if (session === null) throw new Error('Sign in to register manuscripts.');
+    if (deps !== undefined) return deps.register(ids);
+    return registerWithGit({ owner: route.owner, repo: route.repo, session, ids });
+  };
+
+  return { handleConvert, handleRegister };
+}
+
 /**
  * Render the reader page for a repository.
  *
@@ -186,31 +213,20 @@ function useReaderState(route: ReaderRoute, deps: ReaderPageBaseDeps): ReaderSta
  * @returns The header plus the loading indicator, error message, conversion
  *          panel or read-only manuscript view.
  */
-export function ReaderPage({ route, deps }: ReaderPageProps) {
+export function ReaderPage({ route, deps, action }: ReaderPageProps) {
   const baseDeps = deps ?? defaultDeps;
   const state = useReaderState(route, baseDeps);
-
-  /** Run the conversion for the signed-in viewer with its decisions. */
-  const handleConvert = async (decisions: InitDecisions): Promise<ConvertResult> => {
-    if (state.session === null) throw new Error('Sign in to convert this repository.');
-    return baseDeps.convert({
-      owner: route.owner,
-      repo: route.repo,
-      session: state.session,
-      decisions,
-    });
-  };
-
-  /** Register unlisted manuscripts for the signed-in viewer. */
-  const handleRegister = async (ids: string[]): Promise<ConvertResult> => {
-    if (state.session === null) throw new Error('Sign in to register manuscripts.');
-    if (deps !== undefined) return deps.register(ids);
-    return registerWithGit({
-      owner: route.owner,
-      repo: route.repo,
-      session: state.session,
-      ids,
-    });
+  const { handleConvert, handleRegister } = useReaderHandlers(
+    route,
+    deps,
+    baseDeps,
+    state.session,
+  );
+  const manuscripts = state.repo?.manuscripts ?? [];
+  const current = manuscripts[state.selected] ?? manuscripts[0];
+  const switchManuscript = (id: string): void => {
+    const index = manuscripts.findIndex((manuscript) => manuscript.id === id);
+    if (index >= 0) state.select(index);
   };
 
   return (
@@ -220,6 +236,14 @@ export function ReaderPage({ route, deps }: ReaderPageProps) {
         returnTo={readerPath(route)}
         onLogout={state.logout}
         loginEnabled={state.loginEnabled}
+        title={current?.id ?? 'All manuscripts'}
+        manuscripts={manuscripts.map((manuscript) => ({
+          id: manuscript.id,
+          title: manuscript.id,
+        }))}
+        selectedId={current?.id}
+        onSelect={switchManuscript}
+        action={action}
       />
       <main className="flex flex-1 flex-col gap-4 p-4">
         <ReaderContent

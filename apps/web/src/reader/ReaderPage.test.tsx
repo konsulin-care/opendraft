@@ -5,7 +5,7 @@
  * and the dedicated rate-limit and not-found messages.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { MemoryWorkspace, readOnlyWorkspace } from '@opendraft/workspace';
 import { stringify } from 'yaml';
@@ -109,11 +109,18 @@ describe('ReaderPage OpenDraft repository', () => {
         ]),
       ),
     });
-    render(<ReaderPage route={ROUTE} deps={deps} />);
+    render(<ReaderPage route={ROUTE} deps={deps} action={<button type="button">Edit</button>} />);
     const view = await screen.findByTestId('manuscript-view');
     expect(view).toHaveAttribute('data-dir', 'manuscripts/first');
     expect(view).toHaveAttribute('data-project-key', 'reader:konsulin-care/citizen-science@sha1');
     expect(view).toHaveAttribute('data-readonly', 'true');
+    const header = screen.getByTestId('header-shell');
+    expect(within(header).getByText('first')).toBeInTheDocument();
+    expect(within(header).getByText('Published at konsulin-care/citizen-science')).toBeInTheDocument();
+    expect(within(header).getByTestId('manuscript-switcher')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit' }).compareDocumentPosition(
+      screen.getByRole('button', { name: 'Account' }),
+    ) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('lists every manuscript and switches the rendered directory', async () => {
@@ -236,24 +243,28 @@ describe('ReaderPage plain repository conversion', () => {
 });
 
 describe('ReaderPage login availability', () => {
-  it('shows no sign-in link when login is disabled', async () => {
+  it('shows no account menu when login is disabled', async () => {
     const deps = makeDeps({
       getSessionState: vi.fn(async () => ({ session: null, loginEnabled: false })),
     });
     render(<ReaderPage route={ROUTE} deps={deps} />);
     await screen.findByTestId('manuscript-view');
-    expect(screen.queryByRole('link', { name: 'Sign in with GitHub' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Install OpenDraft' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Account' })).toBeNull();
   });
 
-  it('offers sign-in when login is enabled without a session', async () => {
+  it('offers sign-in from the account menu when login is enabled without a session', async () => {
     const deps = makeDeps({
       getSessionState: vi.fn(async () => ({ session: null, loginEnabled: true })),
     });
     render(<ReaderPage route={ROUTE} deps={deps} />);
-    expect(
-      await screen.findByRole('link', { name: 'Sign in with GitHub' }),
-    ).toBeInTheDocument();
+    await screen.findByTestId('manuscript-view');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Account' }));
+    const signIn = screen.getByRole('menuitem', { name: 'Sign in with GitHub' });
+    expect(signIn).toHaveAttribute(
+      'href',
+      `/@api/auth/login?return_to=${encodeURIComponent('/konsulin-care/citizen-science')}`,
+    );
   });
 });
 

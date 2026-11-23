@@ -1,17 +1,17 @@
 // @vitest-environment jsdom
 /**
- * ReaderHeader tests: anonymous visitors get sign-in and install links that
- * return to the current reader path; signed-in users see their login and can
- * sign out.
+ * ReaderHeader tests: the header links its book mark back to the editor, shows
+ * the selected manuscript with its switcher and the published repository, and
+ * places the main action before the account menu.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import type { BffSession } from '../github/bff-client';
 import { ReaderHeader } from './ReaderHeader';
 
 /** Reader path used as the return target in every fixture. */
-const RETURN_TO = '/konsulin-care/opendraft';
+const RETURN_TO = '/konsulin-care/citizen-science';
 
 /** Signed-in session fixture. */
 const SESSION: BffSession = {
@@ -21,33 +21,58 @@ const SESSION: BffSession = {
   expiresAt: '2030-01-01T00:00:00Z',
 };
 
-describe('ReaderHeader', () => {
-  it('links the anonymous sign-in action to the login route with return_to', () => {
+const MANUSCRIPTS = [
+  { id: 'alpha', title: 'Alpha study' },
+  { id: 'beta', title: 'Beta study' },
+];
+
+describe('ReaderHeader basics', () => {
+  it('renders no OpenDraft text and links the book icon to the editor', () => {
     render(<ReaderHeader session={null} returnTo={RETURN_TO} onLogout={vi.fn()} />);
 
-    const signIn = screen.getByRole('link', { name: 'Sign in with GitHub' });
-    expect(signIn).toHaveAttribute(
-      'href',
-      `/@api/auth/login?return_to=${encodeURIComponent(RETURN_TO)}`,
-    );
-    expect(screen.getByRole('link', { name: 'Install OpenDraft' })).toHaveAttribute(
-      'href',
-      `/@api/auth/install?return_to=${encodeURIComponent(RETURN_TO)}`,
-    );
+    expect(screen.queryByText('OpenDraft')).toBeNull();
+    const editorLink = screen.getByRole('link', { name: 'Open editor' });
+    expect(editorLink).toHaveAttribute('href', '/');
   });
 
-  it('shows the login and calls onLogout when signing out', () => {
-    const onLogout = vi.fn();
-    render(<ReaderHeader session={SESSION} returnTo={RETURN_TO} onLogout={onLogout} />);
+  it('shows the selected manuscript title with the switcher and the published subtitle', () => {
+    render(
+      <ReaderHeader
+        session={SESSION}
+        returnTo={RETURN_TO}
+        onLogout={vi.fn()}
+        title="Alpha study"
+        manuscripts={MANUSCRIPTS}
+        selectedId="alpha"
+        onSelect={vi.fn()}
+      />,
+    );
 
-    expect(screen.getByText('@octocat')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Sign in with GitHub' })).toBeNull();
+    expect(screen.getByText('Alpha study')).toBeInTheDocument();
+    expect(screen.getByTestId('manuscript-switcher')).toBeInTheDocument();
+    expect(
+      screen.getByText('Published at konsulin-care/citizen-science'),
+    ).toBeInTheDocument();
+  });
+});
 
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
-    expect(onLogout).toHaveBeenCalledTimes(1);
+describe('ReaderHeader actions', () => {
+  it('renders the action node before the user menu avatar', () => {
+    render(
+      <ReaderHeader
+        session={SESSION}
+        returnTo={RETURN_TO}
+        onLogout={vi.fn()}
+        action={<button type="button">Edit</button>}
+      />,
+    );
+
+    const action = screen.getByRole('button', { name: 'Edit' });
+    const account = screen.getByRole('button', { name: 'Account' });
+    expect(action.compareDocumentPosition(account) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('renders no sign-in or install links when login is disabled', () => {
+  it('hides the account menu when login is disabled', () => {
     render(
       <ReaderHeader
         session={null}
@@ -57,7 +82,7 @@ describe('ReaderHeader', () => {
       />,
     );
 
-    expect(screen.queryByRole('link', { name: 'Sign in with GitHub' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Install OpenDraft' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Account' })).toBeNull();
+    expect(screen.queryByText('OpenDraft')).toBeNull();
   });
 });
