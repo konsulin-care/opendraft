@@ -78,13 +78,17 @@ func TestBranchesEndpointRejectsForeignPrefix(t *testing.T) {
 func TestPullLookupEndpoint(t *testing.T) {
 	now := time.Unix(authTestNowUnix, 0).UTC()
 	fake := &fakeRepoActions{router: func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/repos/octocat/draft/pulls" {
+		switch r.URL.Path {
+		case "/repos/octocat/draft/pulls":
+			if head := r.URL.Query().Get("head"); head != "octocat:opendraft/ada/20260101-120000" {
+				t.Errorf("head = %q", head)
+			}
+			_, _ = w.Write([]byte(`[{"number":12,"html_url":"https://github.example/octocat/draft/pull/12","state":"open","merged_at":null}]`))
+		case "/repos/octocat/draft/pulls/12/reviews":
+			_, _ = w.Write([]byte(`[]`))
+		default:
 			t.Errorf("path = %q", r.URL.Path)
 		}
-		if head := r.URL.Query().Get("head"); head != "octocat:opendraft/ada/20260101-120000" {
-			t.Errorf("head = %q", head)
-		}
-		_, _ = w.Write([]byte(`[{"number":12,"html_url":"https://github.example/octocat/draft/pull/12","state":"open","merged_at":null}]`))
 	}}
 	handler, sealer := newRepoActionsServer(t, fake, now)
 
@@ -103,6 +107,62 @@ func TestPullLookupEndpoint(t *testing.T) {
 	}
 	if body["state"] != "open" {
 		t.Errorf("state = %v, want open", body["state"])
+	}
+	if body["reviewState"] != "none" {
+		t.Errorf("reviewState = %v, want none", body["reviewState"])
+	}
+}
+
+// TestPullLookupEndpointReviewStates checks reviewState summarises the latest
+// review per reviewer: change requests win, then approvals, else none.
+func TestPullLookupEndpointReviewStates(t *testing.T) {
+	now := time.Unix(authTestNowUnix, 0).UTC()
+	tests := []struct {
+		name    string
+		reviews string
+		want    string
+	}{
+		{
+			name:    "changes requested",
+			reviews: `[{"id":1,"state":"APPROVED","user":{"login":"ada"}},{"id":2,"state":"CHANGES_REQUESTED","user":{"login":"grace"}}]`,
+			want:    "changes_requested",
+		},
+		{
+			name:    "approved after earlier change request",
+			reviews: `[{"id":1,"state":"CHANGES_REQUESTED","user":{"login":"grace"}},{"id":2,"state":"APPROVED","user":{"login":"ada"}},{"id":3,"state":"APPROVED","user":{"login":"grace"}}]`,
+			want:    "approved",
+		},
+		{
+			name:    "no reviews",
+			reviews: `[]`,
+			want:    "none",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake := &fakeRepoActions{router: func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/repos/octocat/draft/pulls":
+					_, _ = w.Write([]byte(`[{"number":12,"html_url":"https://github.example/octocat/draft/pull/12","state":"open","merged_at":null}]`))
+				case "/repos/octocat/draft/pulls/12/reviews":
+					_, _ = w.Write([]byte(tt.reviews))
+				default:
+					t.Errorf("path = %q", r.URL.Path)
+				}
+			}}
+			handler, sealer := newRepoActionsServer(t, fake, now)
+
+			rec := serveRepoAction(t, handler, sealer, now, http.MethodGet,
+				"/@api/repos/octocat/draft/pulls?head=octocat:opendraft/ada/20260101-120000", nil)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200: %s", rec.Code, rec.Body.String())
+			}
+			body := decodeAnyJSON(t, rec)
+			if body["reviewState"] != tt.want {
+				t.Errorf("reviewState = %v, want %q", body["reviewState"], tt.want)
+			}
+		})
 	}
 }
 

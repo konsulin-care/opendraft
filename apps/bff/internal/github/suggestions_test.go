@@ -66,40 +66,64 @@ func TestMatchingBranchesEmpty(t *testing.T) {
 
 func TestLatestPullStates(t *testing.T) {
 	tests := []struct {
-		name  string
-		body  string
-		found bool
-		want  PullInfo
+		name    string
+		body    string
+		reviews string
+		found   bool
+		want    PullInfo
 	}{
 		{
-			name:  "open",
-			body:  `[{"number":12,"html_url":"https://github.example/octocat/draft/pull/12","state":"open","merged_at":null}]`,
-			found: true,
-			want:  PullInfo{Number: 12, HTMLURL: "https://github.example/octocat/draft/pull/12", State: "open"},
+			name:    "open",
+			body:    `[{"number":12,"html_url":"https://github.example/octocat/draft/pull/12","state":"open","merged_at":null}]`,
+			reviews: `[]`,
+			found:   true,
+			want:    PullInfo{Number: 12, HTMLURL: "https://github.example/octocat/draft/pull/12", State: "open", ReviewState: "none"},
 		},
 		{
-			name:  "closed",
-			body:  `[{"number":13,"html_url":"https://github.example/octocat/draft/pull/13","state":"closed","merged_at":null}]`,
-			found: true,
-			want:  PullInfo{Number: 13, HTMLURL: "https://github.example/octocat/draft/pull/13", State: "closed"},
+			name:    "closed",
+			body:    `[{"number":13,"html_url":"https://github.example/octocat/draft/pull/13","state":"closed","merged_at":null}]`,
+			reviews: `[]`,
+			found:   true,
+			want:    PullInfo{Number: 13, HTMLURL: "https://github.example/octocat/draft/pull/13", State: "closed", ReviewState: "none"},
 		},
 		{
-			name:  "merged",
-			body:  `[{"number":14,"html_url":"https://github.example/octocat/draft/pull/14","state":"closed","merged_at":"2026-01-01T12:00:00Z"}]`,
-			found: true,
-			want:  PullInfo{Number: 14, HTMLURL: "https://github.example/octocat/draft/pull/14", State: "merged"},
+			name:    "merged",
+			body:    `[{"number":14,"html_url":"https://github.example/octocat/draft/pull/14","state":"closed","merged_at":"2026-01-01T12:00:00Z"}]`,
+			reviews: `[]`,
+			found:   true,
+			want:    PullInfo{Number: 14, HTMLURL: "https://github.example/octocat/draft/pull/14", State: "merged", ReviewState: "none"},
 		},
 		{
-			name:  "none",
-			body:  `[]`,
-			found: false,
-			want:  PullInfo{},
+			name:    "changes requested",
+			body:    `[{"number":12,"html_url":"https://github.example/octocat/draft/pull/12","state":"open","merged_at":null}]`,
+			reviews: `[{"id":1,"state":"APPROVED","user":{"login":"ada"}},{"id":2,"state":"CHANGES_REQUESTED","user":{"login":"grace"}}]`,
+			found:   true,
+			want:    PullInfo{Number: 12, HTMLURL: "https://github.example/octocat/draft/pull/12", State: "open", ReviewState: "changes_requested"},
+		},
+		{
+			name:    "approved after earlier change request",
+			body:    `[{"number":12,"html_url":"https://github.example/octocat/draft/pull/12","state":"open","merged_at":null}]`,
+			reviews: `[{"id":1,"state":"CHANGES_REQUESTED","user":{"login":"grace"}},{"id":2,"state":"APPROVED","user":{"login":"ada"}},{"id":3,"state":"APPROVED","user":{"login":"grace"}}]`,
+			found:   true,
+			want:    PullInfo{Number: 12, HTMLURL: "https://github.example/octocat/draft/pull/12", State: "open", ReviewState: "approved"},
+		},
+		{
+			name:    "none",
+			body:    `[]`,
+			reviews: `[]`,
+			found:   false,
+			want:    PullInfo{},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fake := &fakeActions{router: func(w http.ResponseWriter, _ *http.Request) {
-				_, _ = w.Write([]byte(tt.body))
+			fake := &fakeActions{router: func(w http.ResponseWriter, r *http.Request) {
+				switch {
+				case strings.HasSuffix(r.URL.Path, "/reviews"):
+					_, _ = w.Write([]byte(tt.reviews))
+				default:
+					_, _ = w.Write([]byte(tt.body))
+				}
 			}}
 			server := httptest.NewServer(fake.handler())
 			t.Cleanup(server.Close)
@@ -115,8 +139,12 @@ func TestLatestPullStates(t *testing.T) {
 				t.Fatalf("pull = %+v, want %+v", pull, tt.want)
 			}
 			calls := fake.snapshot()
-			if len(calls) != 1 {
-				t.Fatalf("calls = %+v", calls)
+			wantCalls := 1
+			if tt.found {
+				wantCalls = 2
+			}
+			if len(calls) != wantCalls {
+				t.Fatalf("calls = %+v, want %d", calls, wantCalls)
 			}
 			if calls[0].path != "/repos/octocat/draft/pulls" {
 				t.Errorf("path = %q", calls[0].path)
@@ -131,6 +159,11 @@ func TestLatestPullStates(t *testing.T) {
 			} {
 				if !strings.Contains(query, param) {
 					t.Errorf("query %q does not contain %q", query, param)
+				}
+			}
+			if tt.found {
+				if !strings.HasSuffix(calls[1].path, "/pulls/12/reviews") && !strings.Contains(calls[1].path, "/pulls/13/reviews") && !strings.Contains(calls[1].path, "/pulls/14/reviews") {
+					t.Errorf("reviews path = %q", calls[1].path)
 				}
 			}
 		})

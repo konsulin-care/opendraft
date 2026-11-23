@@ -43,9 +43,10 @@ type branchRefResponse struct {
 
 // pullInfoResponse is the JSON answer of the pull lookup endpoint.
 type pullInfoResponse struct {
-	Number int    `json:"number"`
-	URL    string `json:"url"`
-	State  string `json:"state"`
+	Number      int    `json:"number"`
+	URL         string `json:"url"`
+	State       string `json:"state"`
+	ReviewState string `json:"reviewState"`
 }
 
 // mergeUpstreamBody is the JSON body of the merge-upstream endpoint.
@@ -111,9 +112,10 @@ func (h *suggestionsHandler) handlePullLookup(w http.ResponseWriter, r *http.Req
 			return
 		}
 		writeJSON(w, http.StatusOK, pullInfoResponse{
-			Number: pull.Number,
-			URL:    pull.HTMLURL,
-			State:  pull.State,
+			Number:      pull.Number,
+			URL:         pull.HTMLURL,
+			State:       pull.State,
+			ReviewState: pull.ReviewState,
 		})
 	}).ServeHTTP(w, r)
 }

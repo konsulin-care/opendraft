@@ -31,6 +31,9 @@ type PullInfo struct {
 	HTMLURL string
 	// State is "open", "closed" or "merged".
 	State string
+	// ReviewState summarises the latest review per reviewer: "changes_requested",
+	// "approved" or "none".
+	ReviewState string
 }
 
 // matchingRef mirrors one entry of GET /git/matching-refs/heads/{prefix}.
@@ -47,6 +50,15 @@ type pullSummary struct {
 	HTMLURL  string  `json:"html_url"`
 	State    string  `json:"state"`
 	MergedAt *string `json:"merged_at"`
+}
+
+// reviewSummary mirrors the subset of a pull request review the BFF reads.
+type reviewSummary struct {
+	ID    int64  `json:"id"`
+	State string `json:"state"`
+	User  struct {
+		Login string `json:"login"`
+	} `json:"user"`
 }
 
 // mergeUpstreamRequest is the JSON body of a merge-upstream call.
@@ -99,7 +111,55 @@ func (c *Client) LatestPull(ctx context.Context, token, owner, repo, head string
 	if newest.MergedAt != nil {
 		state = "merged"
 	}
-	return PullInfo{Number: newest.Number, HTMLURL: newest.HTMLURL, State: state}, true, nil
+	reviewState, err := c.pullReviewState(ctx, token, owner, repo, newest.Number)
+	if err != nil {
+		return PullInfo{}, false, err
+	}
+	return PullInfo{
+		Number:      newest.Number,
+		HTMLURL:     newest.HTMLURL,
+		State:       state,
+		ReviewState: reviewState,
+	}, true, nil
+}
+
+// pullReviewState reads the reviews of a pull request and summarises the latest
+// review per reviewer. Change requests win over approvals; no relevant review
+// yields "none".
+func (c *Client) pullReviewState(ctx context.Context, token, owner, repo string, number int) (string, error) {
+	target := c.APIURL + "/repos/" + url.PathEscape(owner) + "/" + url.PathEscape(repo) +
+		"/pulls/" + fmt.Sprint(number) + "/reviews?per_page=100"
+	var reviews []reviewSummary
+	if err := c.getActionJSON(ctx, token, target, &reviews); err != nil {
+		return "", err
+	}
+	return summarizeReviews(reviews), nil
+}
+
+// summarizeReviews keeps the latest review per reviewer (by review id) and
+// returns changes_requested when any latest review requests changes, approved
+// when any latest review approves, and none otherwise.
+func summarizeReviews(reviews []reviewSummary) string {
+	latest := make(map[string]reviewSummary, len(reviews))
+	for _, review := range reviews {
+		if previous, ok := latest[review.User.Login]; ok && previous.ID > review.ID {
+			continue
+		}
+		latest[review.User.Login] = review
+	}
+	approved := false
+	for _, review := range latest {
+		switch review.State {
+		case "CHANGES_REQUESTED":
+			return "changes_requested"
+		case "APPROVED":
+			approved = true
+		}
+	}
+	if approved {
+		return "approved"
+	}
+	return "none"
 }
 
 // MergeUpstream asks GitHub to merge the upstream default branch into the fork
