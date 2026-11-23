@@ -98,3 +98,11 @@ export type { CommitFilesOnBranchOptions } from './branch-commit.js';
 export { preCommitAssembly } from './commit.js';
 export { RemoteGit, relayUrl } from './remote.js';
 export type { CloneResult, RemoteGitOptions } from './remote.js';
+export { LocalRepo } from './local-repo.js';
+export type {
+  CloneShallowOptions,
+  CloneShallowResult,
+  FetchOptions,
+  LocalRepoAuthor,
+  PushOptions,
+} from './local-repo.js';
