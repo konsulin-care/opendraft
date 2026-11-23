@@ -99,6 +99,12 @@ export { preCommitAssembly } from './commit.js';
 export { RemoteGit, relayUrl } from './remote.js';
 export type { CloneResult, RemoteGitOptions } from './remote.js';
 export { LocalRepo } from './local-repo.js';
+export { rebaseOnto } from './rebase.js';
+export type {
+  RebaseOntoOptions,
+  RebaseOntoResult,
+  RebaseResolution,
+} from './rebase.js';
 export type {
   CloneShallowOptions,
   CloneShallowResult,
