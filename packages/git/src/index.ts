@@ -92,6 +92,7 @@ export class GitOperations {
 }
 
 export { MemoryFS } from './memory-fs.js';
+export { openProjectFs, deleteProjectFs } from './indexeddb-fs.js';
 export { commitFilesOnBranch, readWorkingFiles } from './branch-commit.js';
 export type { CommitFilesOnBranchOptions } from './branch-commit.js';
 export { preCommitAssembly } from './commit.js';
