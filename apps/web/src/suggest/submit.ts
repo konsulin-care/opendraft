@@ -1,59 +1,27 @@
 /**
  * Submit and update suggestions as pull requests on the upstream repository.
  *
- * Sending a draft names it while unpushed, saves it with the fixed "What did
- * you change?" message, then opens a pull request (or reuses the one a failed
- * retry already created). Sending an update only saves with the viewer's
- * message, or the automatic message when none is given. The legacy
- * `submitSuggestion` export keeps the old banner flow working.
+ * Sending a draft names it while unpushed, saves it with the viewer's title
+ * (or the fixed "What did you change?" message), then opens a pull request (or
+ * reuses the one a failed retry already created). Sending an update only saves
+ * with the viewer's message, or the automatic message when none is given. The
+ * legacy `submitSuggestion` export lives in `./submit-legacy` and is re-exported
+ * here to keep the old banner flow working.
  */
 
 import type { ProjectSourceGitHub } from '@opendraft/workspace';
 import type { PullRequestInput, PullRequestResult } from '../github/bff-client';
 import type { SuggestionPull } from '../github/bff-suggest';
-import { saveDraft, saveToCopy } from './save';
+import { saveDraft } from './save';
 import type {
-  SaveDeps,
   SaveGitHubDeps,
   SaveGitHubResult,
   SaveRegistry,
-  SaveResult,
 } from './save';
+import type { SubmitClosedState } from './submit-legacy';
 
 /** Commit message and pull request title used when a draft is sent. */
 export const SEND_MESSAGE = 'What did you change?';
-/** Input of the legacy {@link submitSuggestion}. */
-export interface SubmitSuggestionInput {
-  /** Pull request title. */
-  title: string;
-  /** Pull request body. */
-  body: string;
-}
-
-/** Closed state of a suggestion's pull request. */
-export type SubmitClosedState = 'merged' | 'closed';
-
-/** Result of the legacy {@link submitSuggestion}. */
-export type SubmitResult =
-  | { kind: 'created' | 'updated'; number: number; url: string }
-  | { kind: 'closed'; state: SubmitClosedState }
-  | { kind: 'remote-moved' };
-
-/** Injected dependencies of the legacy {@link submitSuggestion}. */
-export interface SubmitDeps extends SaveDeps {
-  /** Find the pull request whose head matches a suggestion branch. */
-  findSuggestionPull: (
-    owner: string,
-    repo: string,
-    head: string,
-  ) => Promise<SuggestionPull | null>;
-  /** Open a pull request between a head and a base branch. */
-  createPullRequest: (
-    owner: string,
-    repo: string,
-    input: PullRequestInput,
-  ) => Promise<PullRequestResult>;
-}
 
 /** Input of {@link sendSuggestion}. */
 export interface SendSuggestionInput {
@@ -61,6 +29,8 @@ export interface SendSuggestionInput {
   name?: string;
   /** Alias of {@link SendSuggestionInput.name}. */
   draftName?: string;
+  /** Title used for both the pull request and the send commit message. */
+  title?: string;
   /** Note stored as the pull request body. */
   note?: string;
 }
@@ -200,9 +170,10 @@ export async function sendSuggestion(
     if (name !== '') await deps.applyName(projectId, name);
   }
 
+  const title = input.title?.trim() || SEND_MESSAGE;
   const saved = await saveDraft(
     projectId,
-    withCommitMessage(deps, SEND_MESSAGE),
+    withCommitMessage(deps, title),
   );
   if (saved.kind === 'pending') {
     return { kind: 'pending', pendingSaves: saved.pendingSaves };
@@ -223,7 +194,7 @@ export async function sendSuggestion(
   }
 
   const created = await deps.createPullRequest(owner, repo, {
-    title: SEND_MESSAGE,
+    title,
     head,
     base: defaultBranch,
     body: input.note ?? '',
@@ -255,46 +226,13 @@ export async function sendUpdate(
 /** Alias of {@link sendUpdate} for callers that prefer the longer name. */
 export const updateSuggestion = sendUpdate;
 
-/**
- * Submit the local edits of a legacy suggestion as a pull request.
- *
- * @param projectId - Project id of the suggestion.
- * @param input - Pull request title and body.
- * @param deps - Injected GitHub, git, registry and workspace dependencies.
- * @returns The created or updated pull request, a closed state, or a moved remote.
- */
-export async function submitSuggestion(
-  projectId: string,
-  input: SubmitSuggestionInput,
-  deps: SubmitDeps,
-): Promise<SubmitResult> {
-  const source = await loadSource(projectId, deps);
-  const head = headRef(source);
-  const { owner, repo, defaultBranch } = source.upstream;
-
-  let open: SuggestionPull | null = null;
-  if (source.pullNumber !== null) {
-    const pull = await deps.findSuggestionPull(owner, repo, head);
-    if (pull !== null && pull.state !== 'open') {
-      return { kind: 'closed', state: pull.state };
-    }
-    open = pull;
-  }
-
-  const saved: SaveResult = await saveToCopy(projectId, {}, deps);
-  if (saved.kind === 'remote-moved') return { kind: 'remote-moved' };
-  if (open !== null) {
-    return { kind: 'updated', number: open.number, url: open.url };
-  }
-
-  const created = await deps.createPullRequest(owner, repo, {
-    title: input.title,
-    head,
-    base: defaultBranch,
-    body: input.body,
-  });
-  await storePullNumber(projectId, created.number, deps);
-  return { kind: 'created', number: created.number, url: created.url };
-}
-
-export default submitSuggestion;
+export {
+  submitSuggestion,
+  submitSuggestion as default,
+} from './submit-legacy';
+export type {
+  SubmitClosedState,
+  SubmitDeps,
+  SubmitResult,
+  SubmitSuggestionInput,
+} from './submit-legacy';

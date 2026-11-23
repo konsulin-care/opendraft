@@ -180,8 +180,46 @@ describe('sendSuggestion', () => {
       pullNumber: 7,
     });
   });
+});
 
+describe('sendSuggestion title', () => {
+  it('uses the trimmed input title for both the commit message and the pull request', async () => {
+    const { deps, messages } = await makeDeps(record(source()));
+
+    const result = await sendSuggestion(
+      'project-1',
+      { title: '  Fix the config  ', note: 'Please review.' },
+      deps,
+    );
+
+    expect(messages).toEqual(['Fix the config']);
+    expect(deps.createPullRequest).toHaveBeenCalledWith('konsulin-care', 'draft', {
+      title: 'Fix the config',
+      body: 'Please review.',
+      head: `octocat:${BRANCH}`,
+      base: 'main',
+    });
+    expect(result).toEqual({ kind: 'created', number: 7, url: PR_URL });
+  });
+
+  it('falls back to SEND_MESSAGE when the title is blank', async () => {
+    const { deps, messages } = await makeDeps(record(source()));
+
+    await sendSuggestion('project-1', { title: '   ' }, deps);
+
+    expect(messages).toEqual([SEND_MESSAGE]);
+    expect(deps.createPullRequest).toHaveBeenCalledWith('konsulin-care', 'draft', {
+      title: SEND_MESSAGE,
+      body: '',
+      head: `octocat:${BRANCH}`,
+      base: 'main',
+    });
+  });
+});
+
+describe('sendSuggestion retry', () => {
   it('reuses an existing pull request after a failed creation instead of opening a duplicate', async () => {
+
     const existing = { number: 7, url: PR_URL, state: 'open' as const };
     const { deps } = await makeDeps(record(source()), {
       edited: false,
