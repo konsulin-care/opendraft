@@ -118,6 +118,9 @@ export async function createProjectRepoDeps(
         ref: opts.ref,
       });
     },
+    ensureBranch: async (fs, dir, branch) => {
+      await git.ensureBranch(fs as FsClient, dir, branch);
+    },
     readWorkingFiles: (fs, dir) =>
       git.readWorkingFiles(fs as FsClient, dir),
     commitFiles: (fs, dir, opts) => {

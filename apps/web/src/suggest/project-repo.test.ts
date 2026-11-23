@@ -76,6 +76,7 @@ function makeDeps(options: {
       exists = true;
       return { sha: 'clone-sha', branch: opts.ref ?? 'main' };
     }),
+    ensureBranch: vi.fn(async () => undefined),
     readWorkingFiles: vi.fn(async () => new Map(files)),
     commitFiles: vi.fn(async (_fs, _dir, opts) => {
       if (opts.changes.size === 0) return null;
@@ -132,7 +133,48 @@ describe('openProjectRepo', () => {
       expect.objectContaining({ ref: 'main' }),
     );
   });
+});
 
+describe('openProjectRepo branch handling', () => {
+  it('creates the source branch after cloning an unpushed project', async () => {
+    const { deps } = makeDeps({ exists: false });
+    const source = githubSource({ pushed: false });
+
+    const repo = await openProjectRepo(project(source), deps);
+
+    expect(deps.ensureBranch).toHaveBeenCalledWith(
+      { name: 'project-fs' },
+      '/repo',
+      source.branch,
+    );
+    expect(repo.branch).toBe(source.branch);
+  });
+
+  it('ensures the source branch when reusing a repo on a different branch', async () => {
+    const { deps } = makeDeps({ exists: true });
+    vi.mocked(deps.currentBranch).mockResolvedValue('main');
+    const source = githubSource({ pushed: false });
+
+    const repo = await openProjectRepo(project(source), deps);
+
+    expect(deps.ensureBranch).toHaveBeenCalledWith(
+      { name: 'project-fs' },
+      '/repo',
+      source.branch,
+    );
+    expect(repo.branch).toBe(source.branch);
+  });
+
+  it('never ensures a branch for a pushed draft', async () => {
+    const { deps } = makeDeps({ exists: false });
+
+    await openProjectRepo(project(), deps);
+
+    expect(deps.ensureBranch).not.toHaveBeenCalled();
+  });
+});
+
+describe('openProjectRepo reuse', () => {
   it('reuses the existing repository instead of cloning again', async () => {
     const { deps } = makeDeps({ exists: true });
 

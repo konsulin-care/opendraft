@@ -14,71 +14,17 @@ import type {
   WorkspaceAdapter,
 } from '@opendraft/workspace';
 import { isSuggestionPath } from './file-diff';
+import type { ProjectRepo, ProjectRepoDeps } from './project-repo-types';
+
+export type {
+  ProjectRepo,
+  ProjectRepoCloneOptions,
+  ProjectRepoCommitOptions,
+  ProjectRepoDeps,
+} from './project-repo-types';
 
 /** Repository working directory inside the project filesystem. */
 export const PROJECT_REPO_DIR = '/repo';
-
-/** Options for cloning a project's source repository. */
-export interface ProjectRepoCloneOptions {
-  /** Repository owner login. */
-  owner: string;
-  /** Repository name. */
-  repo: string;
-  /** Branch to clone; omitted means the remote default branch. */
-  ref?: string;
-}
-
-/** Options for committing workspace changes into the repository. */
-export interface ProjectRepoCommitOptions {
-  /** Scoped paths to write or delete (null deletes). */
-  changes: Map<string, string | null>;
-  /** Commit message. */
-  message: string;
-}
-
-/** An opened project repository. */
-export interface ProjectRepo {
-  /** Project that owns the repository. */
-  projectId: string;
-  /** Persistent isomorphic-git filesystem. */
-  fs: unknown;
-  /** Repository working directory. */
-  dir: string;
-  /** Currently checked-out branch. */
-  branch: string;
-  /** Current HEAD commit SHA. */
-  sha: string;
-  /** Whether this open shallow-cloned the repository. */
-  cloned: boolean;
-}
-
-/** Injected dependencies of the project repository operations. */
-export interface ProjectRepoDeps {
-  /** Open the project's editor workspace. */
-  getWorkspace: (id: string) => Promise<WorkspaceAdapter>;
-  /** Open the project's persistent IndexedDB filesystem. */
-  openFs: (projectId: string) => unknown | Promise<unknown>;
-  /** Whether the filesystem already contains a repository with a HEAD. */
-  repoExists: (fs: unknown, dir: string) => Promise<boolean>;
-  /** Read the currently checked-out branch. */
-  currentBranch: (fs: unknown, dir: string) => Promise<string>;
-  /** Resolve the current HEAD commit SHA. */
-  headSha: (fs: unknown, dir: string) => Promise<string>;
-  /** Shallow-clone the source repository into the filesystem. */
-  clone: (
-    fs: unknown,
-    dir: string,
-    opts: ProjectRepoCloneOptions,
-  ) => Promise<{ sha: string; branch: string }>;
-  /** Read every tracked working-tree file as UTF-8 text. */
-  readWorkingFiles: (fs: unknown, dir: string) => Promise<Map<string, string>>;
-  /** Write and stage changes, then commit; returns null when nothing changed. */
-  commitFiles: (
-    fs: unknown,
-    dir: string,
-    opts: ProjectRepoCommitOptions,
-  ) => Promise<string | null>;
-}
 
 /** Opened repositories keyed by project id, with the deps that opened them. */
 const OPEN_REPOS = new Map<
@@ -203,11 +149,14 @@ export async function openProjectRepo(
       repo: source.repo,
       ref,
     });
+    if (!source.pushed) {
+      await deps.ensureBranch?.(fs, PROJECT_REPO_DIR, source.branch);
+    }
     const repo: ProjectRepo = {
       projectId: project.id,
       fs,
       dir: PROJECT_REPO_DIR,
-      branch: cloned.branch || ref,
+      branch: source.pushed ? cloned.branch || ref : source.branch,
       sha: cloned.sha,
       cloned: true,
     };
@@ -216,11 +165,14 @@ export async function openProjectRepo(
   }
 
   const branch = await deps.currentBranch(fs, PROJECT_REPO_DIR);
+  if (!source.pushed && branch !== source.branch) {
+    await deps.ensureBranch?.(fs, PROJECT_REPO_DIR, source.branch);
+  }
   const repo: ProjectRepo = {
     projectId: project.id,
     fs,
     dir: PROJECT_REPO_DIR,
-    branch: branch || source.branch,
+    branch: source.pushed ? branch || source.branch : source.branch,
     sha: await deps.headSha(fs, PROJECT_REPO_DIR),
     cloned: false,
   };
