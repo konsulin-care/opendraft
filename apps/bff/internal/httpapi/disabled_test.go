@@ -26,6 +26,7 @@ func TestDisabledGatedRoutesAnswerLoginDisabled(t *testing.T) {
 	}{
 		{http.MethodGet, "/@api/auth/login"},
 		{http.MethodGet, "/@api/auth/install"},
+		{http.MethodGet, "/@api/auth/install/callback"},
 		{http.MethodGet, "/@api/auth/callback"},
 		{http.MethodPost, "/@api/auth/logout"},
 		{http.MethodPost, "/@api/repos"},

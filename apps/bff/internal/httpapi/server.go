@@ -58,6 +58,7 @@ func New(cfg config.Config, deps Deps) http.Handler {
 
 		api.HandleFunc("GET "+loginPath, auth.handleLogin)
 		api.HandleFunc("GET "+installPath, auth.handleInstall)
+		api.HandleFunc("GET "+installCallbackPath, auth.handleInstallCallback)
 		api.HandleFunc("GET "+callbackPath, auth.handleCallback)
 		api.HandleFunc("GET "+sessionPath, auth.handleSession)
 		api.HandleFunc("POST "+logoutPath, logout.handleLogout)

@@ -29,6 +29,7 @@ func handleSessionDisabled(w http.ResponseWriter, _ *http.Request) {
 func registerDisabledRoutes(api *http.ServeMux) {
 	api.HandleFunc("GET "+loginPath, handleLoginDisabled)
 	api.HandleFunc("GET "+installPath, handleLoginDisabled)
+	api.HandleFunc("GET "+installCallbackPath, handleLoginDisabled)
 	api.HandleFunc("GET "+callbackPath, handleLoginDisabled)
 	api.HandleFunc("POST "+logoutPath, handleLoginDisabled)
 	api.HandleFunc("GET "+sessionPath, handleSessionDisabled)
