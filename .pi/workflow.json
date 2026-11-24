@@ -85,6 +85,32 @@
           "cwd": "apps/bff"
         }
       ]
+    },
+    "commands": {
+      "lint-go": [
+        "mise",
+        "run",
+        "lint-go"
+      ],
+      "govulncheck": [
+        "mise",
+        "run",
+        "govulncheck"
+      ],
+      "coverage-go": [
+        "mise",
+        "run",
+        "coverage-go"
+      ],
+      "yamllint-golangci": [
+        "mise",
+        "exec",
+        "--",
+        "yamllint",
+        "-c",
+        ".yamllint.yml",
+        ".golangci.yml"
+      ]
     }
   }
 }
