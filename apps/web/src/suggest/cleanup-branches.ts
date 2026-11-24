@@ -49,6 +49,12 @@ export interface SweepResult {
   skipped: string[];
 }
 
+/** Optional bounds of one sweep. */
+export interface SweepOptions {
+  /** Maximum number of candidate branches to evaluate. */
+  limit?: number;
+}
+
 /**
  * Decide whether a branch can be deleted from its latest pull request.
  *
@@ -85,13 +91,19 @@ function isDeletable(
  * @param source - Repository to inspect.
  * @param login - GitHub login of the viewer.
  * @param deps - Injected branch listing dependency.
+ * @param limit - Maximum number of candidates to collect.
  * @returns Candidate branches in listing order.
  */
 async function collectCandidates(
   source: SweepSource,
   login: string,
   deps: SweepDeps,
+  limit: number,
 ): Promise<SuggestionBranch[]> {
+  if (limit <= 0) {
+    return [];
+  }
+
   const prefixes = [draftPrefix(login), suggestionPrefix(login)];
   const candidates: SuggestionBranch[] = [];
   const seen = new Set<string>();
@@ -114,13 +126,45 @@ async function collectCandidates(
 
       seen.add(branch.name);
       candidates.push(branch);
-      if (candidates.length >= MAX_CANDIDATES) {
+      if (candidates.length >= limit) {
         return candidates;
       }
     }
   }
 
   return candidates;
+}
+
+/**
+ * Check whether a branch is still listed under either supported prefix.
+ *
+ * @param source - Repository to inspect.
+ * @param login - GitHub login of the viewer.
+ * @param branch - Branch name to find.
+ * @param deps - Injected branch listing dependency.
+ * @returns True when the branch is still listed after its delete.
+ */
+async function isStillListed(
+  source: SweepSource,
+  login: string,
+  branch: string,
+  deps: SweepDeps,
+): Promise<boolean> {
+  const prefixes = [draftPrefix(login), suggestionPrefix(login)];
+
+  for (const prefix of prefixes) {
+    const branches = await deps.listSuggestionBranches(
+      source.owner,
+      source.repo,
+      prefix,
+    );
+
+    if (branches.some((candidate) => candidate.name === branch)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -135,15 +179,18 @@ async function collectCandidates(
  * @param source - Repository and current branch to protect.
  * @param login - GitHub login whose branch prefixes are swept.
  * @param deps - Injected branch listing, pull request and delete operations.
+ * @param options - Optional sweep bounds, such as the candidate limit.
  * @returns The deleted and kept branch names.
  */
 export async function sweepBranches(
   source: SweepSource,
   login: string,
   deps: SweepDeps,
+  options: SweepOptions = {},
 ): Promise<SweepResult> {
   const result: SweepResult = { deleted: [], skipped: [] };
-  const candidates = await collectCandidates(source, login, deps);
+  const limit = options.limit ?? MAX_CANDIDATES;
+  const candidates = await collectCandidates(source, login, deps, limit);
 
   for (const branch of candidates) {
     if (branch.name === source.branch) {
@@ -162,8 +209,18 @@ export async function sweepBranches(
       continue;
     }
 
-    await deps.deleteBranch(source.owner, source.repo, branch.name);
-    result.deleted.push(branch.name);
+    try {
+      await deps.deleteBranch(source.owner, source.repo, branch.name);
+    } catch {
+      result.skipped.push(branch.name);
+      continue;
+    }
+
+    if (await isStillListed(source, login, branch.name, deps)) {
+      result.skipped.push(branch.name);
+    } else {
+      result.deleted.push(branch.name);
+    }
   }
 
   return result;
