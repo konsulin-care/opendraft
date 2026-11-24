@@ -93,7 +93,7 @@ async function expectDrawerTreeOpensFiles(): Promise<void> {
   await waitFor(async () => {
     expect(await projectRegistry.getLastPath(records[0].id)).toBe('manuscripts/untitled-project/article.qmd');
   });
-  expect(screen.getByTestId('manuscript-editor')).toBeDefined();
+  await screen.findByTestId('manuscript-editor');
 }
 
 describe('App project drawer', () => {

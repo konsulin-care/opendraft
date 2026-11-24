@@ -1,11 +1,16 @@
+import { lazy, Suspense } from 'react';
 import type { ReactNode } from 'react';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import type { SaveStatus } from './AppHeader';
 import { FolderNotice } from './FolderNotice';
 import { ManuscriptOverview } from './ManuscriptOverview';
-import { ManuscriptEditor } from './ManuscriptEditor';
 import { ManuscriptView } from './ManuscriptView';
 import { folderView } from '../project/folder-view';
+
+/** Source-only editor chunk, loaded on demand for file paths. */
+const ManuscriptEditor = lazy(() =>
+  import('./ManuscriptEditor').then((module) => ({ default: module.ManuscriptEditor })),
+);
 
 /** The manuscripts root folder opened by the folder notice's action. */
 const MANUSCRIPTS_ROOT = 'manuscripts';
@@ -56,13 +61,15 @@ function editorBody({
   }
   if (file === null) return null;
   return (
-    <ManuscriptEditor
-      workspace={workspace}
-      defaultValue={file.text}
-      path={file.path}
-      onSaveStatusChange={onSaveStatusChange}
-      formattingToolbar={formattingToolbar}
-    />
+    <Suspense fallback={null}>
+      <ManuscriptEditor
+        workspace={workspace}
+        defaultValue={file.text}
+        path={file.path}
+        onSaveStatusChange={onSaveStatusChange}
+        formattingToolbar={formattingToolbar}
+      />
+    </Suspense>
   );
 }
 
