@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -25,6 +26,78 @@ const (
 	testPublicVisibility  = "public"
 	testPrivateVisibility = "private"
 )
+
+const testRepoPath = "/repos/" + testOwner + "/" + testRepo
+const testRepoAPIPath = "/@api/repos/" + testOwner + "/" + testRepo
+const testPullsPath = testRepoPath + "/pulls"
+const testReviewsPath = testPullsPath + "/12/reviews"
+const testPullHead = testOwner + ":opendraft/ada/20260101-120000"
+const testPullLookupPrefix = testRepoAPIPath + "/pulls?head="
+const testPullLookupPath = testPullLookupPrefix + testPullHead
+const testBranchesPath = testRepoAPIPath + "/branches"
+const testBranchAPIPrefix = testBranchesPath + "/"
+const testMergeUpstreamPath = testRepoPath + "/merge-upstream"
+const testMergeUpstreamAPI = testRepoAPIPath + "/merge-upstream"
+const testMatchingRefsPath = testRepoPath + "/git/matching-refs/heads/"
+const testRefsPath = testRepoPath + "/git/refs/heads/"
+
+// assertRejectedRepoAction asserts method path answers 400 invalid_request with
+// wantField and makes no GitHub request.
+func assertRejectedRepoAction(t *testing.T, now time.Time, method, path, wantField string) {
+	t.Helper()
+
+	fake := &fakeRepoActions{router: func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}}
+	handler, sealer := newRepoActionsServer(t, fake, now)
+	rec := serveRepoAction(t, handler, sealer, now, method, path, nil)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400: %s", rec.Code, rec.Body.String())
+	}
+	body := decodeJSON(t, rec)
+	if body[errorKey] != invalidRequestCode || body["field"] != wantField {
+		t.Errorf("body = %v, want field %q", body, wantField)
+	}
+	if fake.count() != 0 {
+		t.Errorf("GitHub received %d requests, want 0", fake.count())
+	}
+}
+
+// newPullLookupFake returns a fake GitHub router answering the pulls list and
+// reviews endpoints with the given JSON bodies.
+func newPullLookupFake(t *testing.T, pullsJSON, reviewsJSON string) *fakeRepoActions {
+	t.Helper()
+	return &fakeRepoActions{router: func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case testPullsPath:
+			_, _ = w.Write([]byte(pullsJSON))
+		case testReviewsPath:
+			_, _ = w.Write([]byte(reviewsJSON))
+		default:
+			t.Errorf("path = %q", r.URL.Path)
+		}
+	}}
+}
+
+// decodeBranchRefs decodes a branches endpoint answer.
+func decodeBranchRefs(t *testing.T, rec *httptest.ResponseRecorder) []map[string]string {
+	t.Helper()
+	var body []map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	return body
+}
+
+// decodePullLookup asserts rec is a 200 answer and decodes its JSON body.
+func decodePullLookup(t *testing.T, rec *httptest.ResponseRecorder) map[string]any {
+	t.Helper()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+	return decodeAnyJSON(t, rec)
+}
 
 // newGitHubBackedServer builds the full BFF handler against a fake GitHub
 // server used for both the web and API URLs.
