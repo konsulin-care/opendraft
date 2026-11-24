@@ -50,6 +50,7 @@ type pullInfoResponse struct {
 	URL         string `json:"url"`
 	State       string `json:"state"`
 	ReviewState string `json:"reviewState"`
+	HeadSHA     string `json:"headSha"`
 }
 
 // mergeUpstreamBody is the JSON body of the merge-upstream endpoint.
@@ -123,6 +124,7 @@ func (h *suggestionsHandler) handlePullLookup(w http.ResponseWriter, r *http.Req
 			URL:         pull.HTMLURL,
 			State:       pull.State,
 			ReviewState: pull.ReviewState,
+			HeadSHA:     pull.HeadSHA,
 		})
 	}).ServeHTTP(w, r)
 }

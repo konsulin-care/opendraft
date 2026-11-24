@@ -34,6 +34,8 @@ type PullInfo struct {
 	// ReviewState summarises the latest review per reviewer: "changes_requested",
 	// "approved" or "none".
 	ReviewState string
+	// HeadSHA is the commit SHA the pull request head branch points at.
+	HeadSHA string
 }
 
 // matchingRef mirrors one entry of GET /git/matching-refs/heads/{prefix}.
@@ -52,6 +54,7 @@ type pullSummary struct {
 	MergedAt *string `json:"merged_at"`
 	Head     struct {
 		Label string `json:"label"`
+		SHA   string `json:"sha"`
 	} `json:"head"`
 }
 
@@ -129,6 +132,7 @@ func (c *Client) LatestPull(ctx context.Context, token, owner, repo, head string
 		HTMLURL:     newest.HTMLURL,
 		State:       state,
 		ReviewState: reviewState,
+		HeadSHA:     newest.Head.SHA,
 	}, true, nil
 }
 
