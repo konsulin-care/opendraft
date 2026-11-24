@@ -46,4 +46,6 @@ const (
 	testSuggestionRefs    = settingsPath + "/git/matching-refs/heads/" + testSuggestionPrefix
 	testHeadLabel         = testOwner + ":" + testSuggestionBranch
 	testPaperHead         = testOwner + ":" + testBranch
+	testStateOpen         = "open"
+	testReviewNone        = "none"
 )
