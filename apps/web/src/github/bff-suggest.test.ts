@@ -4,7 +4,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import { BffError } from './bff-client';
-import { findSuggestionPull, listSuggestionBranches, syncFork } from './bff-suggest';
+import { deleteSuggestionBranch, findSuggestionPull, listSuggestionBranches, syncFork } from './bff-suggest';
 
 /** Build a minimal fetch Response double. */
 function response(body: unknown, status = 200): Response {
@@ -85,6 +85,105 @@ describe('findSuggestionPull review state', () => {
         fetchFn as unknown as typeof fetch,
       ),
     ).resolves.toEqual(pull);
+  });
+});
+
+describe('findSuggestionPull headSha', () => {
+  it('returns the headSha field from the BFF answer', async () => {
+    const pull = {
+      number: 12,
+      url: 'https://github.example/octocat/draft/pull/12',
+      state: 'merged' as const,
+      headSha: 'abc123def456',
+    };
+    const fetchFn = vi.fn(async () => response(pull));
+
+    await expect(
+      findSuggestionPull(
+        'octocat',
+        'draft',
+        'octocat:opendraft/ada/20260101-120000',
+        fetchFn as unknown as typeof fetch,
+      ),
+    ).resolves.toEqual(pull);
+  });
+});
+
+describe('findSuggestionPull head sha', () => {
+  it('returns the headSha field from the BFF answer', async () => {
+    const pull = {
+      number: 12,
+      url: 'https://github.example/octocat/draft/pull/12',
+      state: 'open' as const,
+      headSha: 'abc123def456',
+    };
+    const fetchFn = vi.fn(async () => response(pull));
+
+    await expect(
+      findSuggestionPull(
+        'octocat',
+        'draft',
+        'octocat:opendraft/ada/20260101-120000',
+        fetchFn as unknown as typeof fetch,
+      ),
+    ).resolves.toMatchObject({ headSha: 'abc123def456' });
+  });
+});
+
+describe('deleteSuggestionBranch', () => {
+  it('deletes the branch with every segment encoded', async () => {
+    const fetchFn = vi.fn(async () => response(undefined, 204));
+
+    await deleteSuggestionBranch(
+      'octocat',
+      'draft',
+      'opendraft/ada/20260101-120000',
+      fetchFn as unknown as typeof fetch,
+    );
+
+    expect(fetchFn).toHaveBeenCalledWith(
+      '/@api/repos/octocat/draft/branches/opendraft/ada/20260101-120000',
+      { method: 'DELETE', credentials: 'same-origin' },
+    );
+  });
+
+  it('encodes special characters in each branch segment', async () => {
+    const fetchFn = vi.fn(async () => response(undefined, 204));
+
+    await deleteSuggestionBranch(
+      'octo cat',
+      'dra/ft',
+      'od-ada/feature branch#1',
+      fetchFn as unknown as typeof fetch,
+    );
+
+    expect(fetchFn).toHaveBeenCalledWith(
+      '/@api/repos/octo%20cat/dra%2Fft/branches/od-ada/feature%20branch%231',
+      { method: 'DELETE', credentials: 'same-origin' },
+    );
+  });
+});
+
+describe('deleteSuggestionBranch errors', () => {
+  it('raises BffError carrying the code of a non-2xx answer', async () => {
+    const fetchFn = vi.fn(async () => response({ error: 'forbidden' }, 403));
+
+    await expect(
+      deleteSuggestionBranch(
+        'octocat',
+        'draft',
+        'opendraft/ada/20260101-120000',
+        fetchFn as unknown as typeof fetch,
+      ),
+    ).rejects.toBeInstanceOf(BffError);
+    await expect(
+      deleteSuggestionBranch(
+        'octocat',
+        'draft',
+        'opendraft/ada/20260101-120000',
+        fetchFn as unknown as typeof fetch,
+      ),
+    ).rejects.toMatchObject({ name: 'BffError', code: 'forbidden', status: 403 });
   });
 });
 

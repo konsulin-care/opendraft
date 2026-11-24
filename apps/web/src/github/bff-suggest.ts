@@ -32,6 +32,8 @@ export interface SuggestionPull {
   state: SuggestionPullState;
   /** Latest review summary, when the BFF reports one. */
   reviewState?: SuggestionReviewState;
+  /** Head commit SHA of the pull request, when the BFF reports one. */
+  headSha?: string;
 }
 
 /**
@@ -82,6 +84,29 @@ export async function findSuggestionPull(
   if (response.status === 404) return null;
   if (!response.ok) throw await toBffError(response);
   return (await readJson<SuggestionPull>(response)) ?? null;
+}
+
+/**
+ * Delete a suggestion branch through the BFF.
+ * @param owner - Repository owner login.
+ * @param repo - Repository name.
+ * @param branch - Branch name, e.g. `od-ada/20260101-120000`.
+ * @param fetchFn - Fetch implementation; injectable for tests.
+ * @throws {@link BffError} for any non-2xx BFF answer.
+ */
+export async function deleteSuggestionBranch(
+  owner: string,
+  repo: string,
+  branch: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<void> {
+  const segments = branch
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+  const path = `${repoPath(owner, repo)}/branches/${segments}`;
+  const response = await fetchFn(path, { method: 'DELETE', credentials: 'same-origin' });
+  if (!response.ok) throw await toBffError(response);
 }
 
 /**
