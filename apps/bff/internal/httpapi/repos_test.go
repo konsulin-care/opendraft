@@ -10,22 +10,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/konsulin-care/opendraft/apps/bff/internal/config"
-	"github.com/konsulin-care/opendraft/apps/bff/internal/github"
 	"github.com/konsulin-care/opendraft/apps/bff/internal/session"
 )
-
-const reposTestOrigin = "https://publish.example"
 
 // fakeRepos is a fake GitHub repo creation endpoint.
 type fakeRepos struct {
 	server   *httptest.Server
-	mu       sync.Mutex
-	requests int
+	response string
 	paths    []string
 	bodies   []map[string]any
+	mu       sync.Mutex
+	requests int
 	status   int
-	response string
 }
 
 func newFakeRepos(t *testing.T) *fakeRepos {
@@ -56,34 +52,7 @@ func newFakeRepos(t *testing.T) *fakeRepos {
 // newReposServer builds the full BFF handler against a fake GitHub server.
 func newReposServer(t *testing.T, fake *fakeRepos, now time.Time) (http.Handler, *session.Sealer) {
 	t.Helper()
-	cfg := config.Config{
-		PublicOrigin:       reposTestOrigin,
-		GitHubClientID:     "client-id",
-		GitHubClientSecret: "client-secret",
-		GitHubAppSlug:      "opendraft-app",
-		GitHubWebURL:       fake.server.URL,
-		GitHubAPIURL:       fake.server.URL,
-	}
-	key := make([]byte, 32)
-	for i := range key {
-		key[i] = byte(i + 1)
-	}
-	sealer, err := session.NewSealer(key, nil)
-	if err != nil {
-		t.Fatalf("NewSealer: %v", err)
-	}
-	deps := Deps{
-		Now: func() time.Time { return now },
-		GitHub: &github.Client{
-			WebURL:       cfg.GitHubWebURL,
-			APIURL:       cfg.GitHubAPIURL,
-			ClientID:     cfg.GitHubClientID,
-			ClientSecret: cfg.GitHubClientSecret,
-			Now:          func() time.Time { return now },
-		},
-		Sealer: sealer,
-	}
-	return New(cfg, deps), sealer
+	return newGitHubBackedServer(t, fake.server.URL, now)
 }
 
 // postRepo issues an authenticated POST /@api/repos request with body.
@@ -105,17 +74,17 @@ func postRepo(t *testing.T, handler http.Handler, sealer *session.Sealer, now ti
 func TestCreateRepoRejectsInvalidRequestsBeforeGitHub(t *testing.T) {
 	now := time.Unix(authTestNowUnix, 0).UTC()
 	tests := []struct {
-		name  string
 		body  map[string]any
+		name  string
 		field string
 	}{
-		{name: "invalid name", body: map[string]any{"owner": "octocat", "name": "bad name!", "visibility": "public"}, field: nameField},
-		{name: "dot name", body: map[string]any{"owner": "octocat", "name": ".", "visibility": "public"}, field: nameField},
-		{name: "dot dot name", body: map[string]any{"owner": "octocat", "name": "..", "visibility": "public"}, field: nameField},
-		{name: "missing owner", body: map[string]any{"name": "draft", "visibility": "public"}, field: ownerField},
-		{name: "invalid owner", body: map[string]any{"owner": "bad owner", "name": "draft", "visibility": "public"}, field: ownerField},
-		{name: "invalid visibility", body: map[string]any{"owner": "octocat", "name": "draft", "visibility": "internal"}, field: visibilityField},
-		{name: "missing visibility", body: map[string]any{"owner": "octocat", "name": "draft"}, field: visibilityField},
+		{name: "invalid name", body: map[string]any{ownerField: testOwner, nameField: "bad name!", visibilityField: testPublicVisibility}, field: nameField},
+		{name: "dot name", body: map[string]any{ownerField: testOwner, nameField: ".", visibilityField: testPublicVisibility}, field: nameField},
+		{name: "dot dot name", body: map[string]any{ownerField: testOwner, nameField: "..", visibilityField: testPublicVisibility}, field: nameField},
+		{name: "missing owner", body: map[string]any{nameField: testRepo, visibilityField: testPublicVisibility}, field: ownerField},
+		{name: testInvalidOwner, body: map[string]any{ownerField: testInvalidOwner, nameField: testRepo, visibilityField: testPublicVisibility}, field: ownerField},
+		{name: "invalid visibility", body: map[string]any{ownerField: testOwner, nameField: testRepo, visibilityField: "internal"}, field: visibilityField},
+		{name: "missing visibility", body: map[string]any{ownerField: testOwner, nameField: testRepo}, field: visibilityField},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -128,8 +97,8 @@ func TestCreateRepoRejectsInvalidRequestsBeforeGitHub(t *testing.T) {
 				t.Fatalf("status = %d, want 400", rec.Code)
 			}
 			body := decodeJSON(t, rec)
-			if body["error"] != invalidRequestCode {
-				t.Errorf("error = %q, want %q", body["error"], invalidRequestCode)
+			if body[errorKey] != invalidRequestCode {
+				t.Errorf("error = %q, want %q", body[errorKey], invalidRequestCode)
 			}
 			if body["field"] != tt.field {
 				t.Errorf("field = %q, want %q", body["field"], tt.field)
@@ -147,10 +116,10 @@ func TestCreateRepoForSessionUser(t *testing.T) {
 	handler, sealer := newReposServer(t, fake, now)
 
 	rec := postRepo(t, handler, sealer, now, map[string]any{
-		"owner":       "OctoCat",
-		"name":        "draft",
-		"visibility":  "public",
-		"description": "A draft",
+		ownerField:      "OctoCat",
+		nameField:       testRepo,
+		visibilityField: testPublicVisibility,
+		"description":   "A draft",
 	})
 
 	if rec.Code != http.StatusCreated {
@@ -161,10 +130,10 @@ func TestCreateRepoForSessionUser(t *testing.T) {
 		t.Fatalf("decode body: %v", err)
 	}
 	want := map[string]string{
-		"owner":         "octocat",
-		"name":          "draft",
+		ownerField:      testOwner,
+		nameField:       testRepo,
 		"htmlUrl":       "https://github.example/octocat/draft",
-		"defaultBranch": "main",
+		"defaultBranch": testDefaultBranch,
 	}
 	for key, value := range want {
 		if body[key] != value {
@@ -195,9 +164,9 @@ func TestCreateRepoForOrgIsPrivate(t *testing.T) {
 	handler, sealer := newReposServer(t, fake, now)
 
 	rec := postRepo(t, handler, sealer, now, map[string]any{
-		"owner":      "acme",
-		"name":       "draft",
-		"visibility": "private",
+		ownerField:      "acme",
+		nameField:       testRepo,
+		visibilityField: testPrivateVisibility,
 	})
 
 	if rec.Code != http.StatusCreated {
@@ -218,9 +187,9 @@ func TestCreateRepoErrorMapping(t *testing.T) {
 	now := time.Unix(authTestNowUnix, 0).UTC()
 	tests := []struct {
 		name       string
+		wantCode   string
 		status     int
 		wantStatus int
-		wantCode   string
 	}{
 		{name: "name taken", status: http.StatusUnprocessableEntity, wantStatus: http.StatusConflict, wantCode: nameTakenCode},
 		{name: "forbidden", status: http.StatusForbidden, wantStatus: http.StatusForbidden, wantCode: forbiddenCode},
@@ -235,17 +204,17 @@ func TestCreateRepoErrorMapping(t *testing.T) {
 			handler, sealer := newReposServer(t, fake, now)
 
 			rec := postRepo(t, handler, sealer, now, map[string]any{
-				"owner":      "octocat",
-				"name":       "draft",
-				"visibility": "public",
+				ownerField:      testOwner,
+				nameField:       testRepo,
+				visibilityField: testPublicVisibility,
 			})
 
 			if rec.Code != tt.wantStatus {
 				t.Fatalf("status = %d, want %d", rec.Code, tt.wantStatus)
 			}
 			body := decodeJSON(t, rec)
-			if body["error"] != tt.wantCode {
-				t.Errorf("error = %q, want %q", body["error"], tt.wantCode)
+			if body[errorKey] != tt.wantCode {
+				t.Errorf("error = %q, want %q", body[errorKey], tt.wantCode)
 			}
 			if strings.Contains(rec.Body.String(), "secret detail") {
 				t.Errorf("response relays upstream body: %s", rec.Body.String())

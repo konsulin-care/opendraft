@@ -1,0 +1,142 @@
+package httpapi
+
+import (
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/konsulin-care/opendraft/apps/bff/internal/config"
+	"github.com/konsulin-care/opendraft/apps/bff/internal/github"
+	"github.com/konsulin-care/opendraft/apps/bff/internal/session"
+)
+
+const (
+	reposTestOrigin       = "https://publish.example"
+	testClientID          = "client-id"
+	testClientSecret      = "client-secret"
+	testAppSlug           = "opendraft-app"
+	testOwner             = "octocat"
+	testRepo              = "draft"
+	testDefaultBranch     = "main"
+	testInvalidOwner      = "invalid owner"
+	testPublicVisibility  = "public"
+	testPrivateVisibility = "private"
+)
+
+// newGitHubBackedServer builds the full BFF handler against a fake GitHub
+// server used for both the web and API URLs.
+func newGitHubBackedServer(t *testing.T, apiURL string, now time.Time) (http.Handler, *session.Sealer) {
+	t.Helper()
+
+	cfg := config.Config{
+		PublicOrigin:       reposTestOrigin,
+		GitHubClientID:     testClientID,
+		GitHubClientSecret: testClientSecret,
+		GitHubAppSlug:      testAppSlug,
+		GitHubWebURL:       apiURL,
+		GitHubAPIURL:       apiURL,
+	}
+	key := make([]byte, 32)
+	for i := range key {
+		key[i] = byte(i + 1)
+	}
+	sealer, err := session.NewSealer(key, nil)
+	if err != nil {
+		t.Fatalf("NewSealer: %v", err)
+	}
+	deps := Deps{
+		Now: func() time.Time { return now },
+		GitHub: &github.Client{
+			WebURL:       cfg.GitHubWebURL,
+			APIURL:       cfg.GitHubAPIURL,
+			ClientID:     cfg.GitHubClientID,
+			ClientSecret: cfg.GitHubClientSecret,
+			Now:          func() time.Time { return now },
+		},
+		Sealer: sealer,
+	}
+	return New(cfg, deps), sealer
+}
+
+type relayCall struct {
+	header http.Header
+	path   string
+	query  string
+	body   string
+}
+
+type fakeGitRelay struct {
+	server       *httptest.Server
+	response     string
+	contentType  string
+	cacheControl string
+	calls        []relayCall
+	mu           sync.Mutex
+	status       int
+}
+
+func newFakeGitRelay(t *testing.T) *fakeGitRelay {
+	t.Helper()
+	f := &fakeGitRelay{
+		status:       http.StatusOK,
+		response:     "upstream-body",
+		contentType:  "application/x-git-upload-pack-advertisement",
+		cacheControl: "no-cache",
+	}
+	f.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		f.mu.Lock()
+		f.calls = append(f.calls, relayCall{
+			path:   r.URL.Path,
+			query:  r.URL.RawQuery,
+			header: r.Header.Clone(),
+			body:   string(body),
+		})
+		status, response := f.status, f.response
+		contentType, cacheControl := f.contentType, f.cacheControl
+		f.mu.Unlock()
+
+		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("Cache-Control", cacheControl)
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(response))
+	}))
+	t.Cleanup(f.server.Close)
+	return f
+}
+
+func (f *fakeGitRelay) count() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.calls)
+}
+
+func (f *fakeGitRelay) last(t *testing.T) relayCall {
+	t.Helper()
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.calls) == 0 {
+		t.Fatal("upstream received no requests")
+	}
+	return f.calls[len(f.calls)-1]
+}
+
+func newGitRelayServer(t *testing.T, fake *fakeGitRelay, now time.Time) (http.Handler, *session.Sealer) {
+	t.Helper()
+	return newGitHubBackedServer(t, fake.server.URL, now)
+}
+
+func serveGitRelay(t *testing.T, handler http.Handler, sealer *session.Sealer, now time.Time, method, target string, body io.Reader, authenticated bool) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(method, target, body)
+	req.Header.Set("Origin", reposTestOrigin)
+	if authenticated {
+		req.AddCookie(sessionCookie(t, sealer, liveSession(now), now))
+	}
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	return rec
+}

@@ -34,8 +34,8 @@ const (
 // frontend with the session's user token.
 type gitRelayHandler struct {
 	auth   *authHandler
-	webURL string
 	client *http.Client
+	webURL string
 }
 
 // newGitRelayHandler builds the git relay handler on the shared auth handler.
@@ -54,7 +54,7 @@ func (h *gitRelayHandler) handleRelay(w http.ResponseWriter, r *http.Request) {
 	repo := r.PathValue(repoParam)
 	rest := r.PathValue(gitRestParam)
 	if !validGitRelayTarget(owner, repo, rest, r) {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": errorCode})
+		writeError(w, http.StatusNotFound, errorCode)
 		return
 	}
 
@@ -96,7 +96,7 @@ func allowedGitService(service string) bool {
 // status, content headers and body.
 func (h *gitRelayHandler) forward(w http.ResponseWriter, r *http.Request, sess session.Session, owner, repo, rest string) {
 	if r.ContentLength > maxGitBodyBytes {
-		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": tooLargeCode})
+		writeError(w, http.StatusRequestEntityTooLarge, tooLargeCode)
 		return
 	}
 
@@ -105,12 +105,12 @@ func (h *gitRelayHandler) forward(w http.ResponseWriter, r *http.Request, sess s
 	if r.Body != nil {
 		limited := http.MaxBytesReader(w, r.Body, maxGitBodyBytes)
 		body = limited
-		defer limited.Close()
+		defer func() { _ = limited.Close() }()
 	}
 
 	req, err := http.NewRequestWithContext(r.Context(), r.Method, target, body)
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": upstreamErrorCode})
+		writeError(w, http.StatusBadGateway, upstreamErrorCode)
 		return
 	}
 	req.ContentLength = r.ContentLength
@@ -122,13 +122,13 @@ func (h *gitRelayHandler) forward(w http.ResponseWriter, r *http.Request, sess s
 	if err != nil {
 		var maxErr *http.MaxBytesError
 		if errors.As(err, &maxErr) {
-			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": tooLargeCode})
+			writeError(w, http.StatusRequestEntityTooLarge, tooLargeCode)
 			return
 		}
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": upstreamErrorCode})
+		writeError(w, http.StatusBadGateway, upstreamErrorCode)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.Header.Get("Content-Type") != "" {
 		w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
