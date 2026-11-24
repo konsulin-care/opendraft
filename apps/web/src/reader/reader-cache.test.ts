@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { IndexedDBWorkspace } from '@opendraft/workspace';
 import {
   COMPLETE_MARKER,
+  loadLatest,
   loadSnapshot,
   purgePrivateSnapshots,
   readerWorkspaceId,
+  saveLatest,
   saveSnapshot,
 } from './reader-cache';
 
@@ -52,6 +54,38 @@ describe('saveSnapshot / loadSnapshot', () => {
     await workspace.close();
 
     await expect(loadSnapshot(OWNER, REPO, partialSha)).resolves.toBeNull();
+  });
+});
+
+describe('saveLatest / loadLatest', () => {
+  it('returns the saved sha regardless of owner, repo and ref letter case', async () => {
+    const sha = 'LATESTSHA1';
+    await saveSnapshot(OWNER, REPO, sha, FILES);
+    await saveLatest('Konsulin-Care', 'Citizen-Science', 'Main', sha);
+
+    await expect(loadLatest('konsulin-care', 'citizen-science', 'MAIN')).resolves.toBe(sha);
+  });
+
+  it('uses HEAD for an undefined ref', async () => {
+    const sha = 'LATESTSHA2';
+    await saveSnapshot(OWNER, REPO, sha, FILES);
+    await saveLatest(OWNER, REPO, undefined, sha);
+
+    await expect(loadLatest(OWNER, REPO, 'head')).resolves.toBe(sha);
+  });
+
+  it('returns null when no pointer exists', async () => {
+    await expect(loadLatest(OWNER, REPO, 'missing')).resolves.toBeNull();
+  });
+
+  it('returns null when the pointed snapshot is incomplete', async () => {
+    const partialSha = 'LATESTNOMARKER';
+    const workspace = new IndexedDBWorkspace(readerWorkspaceId(OWNER, REPO, partialSha));
+    await workspace.writeFile('opendraft.yml', 'title: Broken');
+    await workspace.close();
+    await saveLatest(OWNER, REPO, 'broken', partialSha);
+
+    await expect(loadLatest(OWNER, REPO, 'broken')).resolves.toBeNull();
   });
 });
 

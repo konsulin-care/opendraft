@@ -166,6 +166,70 @@ export async function loadSnapshot(
 }
 
 /**
+ * Compute the pointer path that stores the latest SHA for a repository ref.
+ *
+ * @param owner - Repository owner login.
+ * @param repo - Repository name.
+ * @param ref - Branch or tag name, or undefined for the default branch.
+ * @returns The lowercased pointer path `latest/<owner>/<repo>@<ref|HEAD>`.
+ */
+function latestPointerPath(owner: string, repo: string, ref: string | undefined): string {
+  return `${LATEST_PREFIX}${owner}/${repo}@${ref ?? 'HEAD'}`.toLowerCase();
+}
+
+/**
+ * Save the latest known commit SHA for a repository ref.
+ *
+ * The pointer is stored in the shared reader registry so a later load can
+ * open the cached snapshot without asking the backend for the SHA first.
+ *
+ * @param owner - Repository owner login.
+ * @param repo - Repository name.
+ * @param ref - Branch or tag name, or undefined for the default branch.
+ * @param sha - Commit SHA currently considered the latest for this ref.
+ * @returns Resolves when the pointer file is stored.
+ */
+export async function saveLatest(
+  owner: string,
+  repo: string,
+  ref: string | undefined,
+  sha: string,
+): Promise<void> {
+  const registry = new IndexedDBWorkspace(PRIVATE_REGISTRY_ID);
+  try {
+    await registry.writeFile(latestPointerPath(owner, repo, ref), sha);
+  } finally {
+    await registry.close();
+  }
+}
+
+/**
+ * Load the cached latest commit SHA for a repository ref.
+ *
+ * @param owner - Repository owner login.
+ * @param repo - Repository name.
+ * @param ref - Branch or tag name, or undefined for the default branch.
+ * @returns The pointed SHA when the pointer exists and its snapshot is
+ * complete, otherwise null.
+ */
+export async function loadLatest(
+  owner: string,
+  repo: string,
+  ref: string | undefined,
+): Promise<string | null> {
+  const registry = new IndexedDBWorkspace(PRIVATE_REGISTRY_ID);
+  try {
+    const sha = await registry.readFile(latestPointerPath(owner, repo, ref));
+    if (sha === null) return null;
+
+    const snapshot = await loadSnapshot(owner, repo, sha);
+    return snapshot === null ? null : sha;
+  } finally {
+    await registry.close();
+  }
+}
+
+/**
  * Delete every snapshot recorded as private and clear the registry.
  *
  * Latest-SHA pointer files that refer to a purged snapshot are removed as
