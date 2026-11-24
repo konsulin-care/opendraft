@@ -1,6 +1,31 @@
-import App from './App.js';
-import { ReaderPage } from './reader/ReaderPage.js';
+import { lazy, Suspense } from 'react';
+import { LoaderCircle } from 'lucide-react';
 import { parseReaderRoute } from './reader/route.js';
+
+const App = lazy(() => import('./App.js'));
+
+const ReaderPage = lazy(() =>
+  import('./reader/ReaderPage.js').then((module) => ({
+    default: module.ReaderPage,
+  })),
+);
+
+/** Centered, accessible status indicator shown while a route chunk loads. */
+function RouteLoading() {
+  return (
+    <div
+      role="status"
+      aria-busy="true"
+      data-testid="route-loading"
+      className="flex min-h-screen items-center justify-center"
+    >
+      <LoaderCircle
+        aria-hidden="true"
+        className="h-6 w-6 animate-spin motion-reduce:animate-none"
+      />
+    </div>
+  );
+}
 
 /** Props for {@link Root}. */
 export interface RootProps {
@@ -17,7 +42,11 @@ export interface RootProps {
  */
 export function Root({ pathname = window.location.pathname }: RootProps) {
   const route = parseReaderRoute(pathname);
-  return route ? <ReaderPage route={route} /> : <App />;
+  return (
+    <Suspense fallback={<RouteLoading />}>
+      {route ? <ReaderPage route={route} /> : <App />}
+    </Suspense>
+  );
 }
 
 export default Root;
