@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MemoryWorkspace } from '@opendraft/workspace';
 import type { ProjectRecord, ProjectSourceGitHub } from '@opendraft/workspace';
 import type { BffSession } from '../github/bff-client';
+import type { SuggestionPull } from '../github/bff-suggest';
 import { fileDigest } from './file-diff';
 import { SEND_MESSAGE, sendSuggestion, sendUpdate } from './submit';
 import type { SendSuggestionDeps } from './submit';
@@ -21,6 +22,7 @@ const BRANCH = 'od-octocat/paper';
 const CONFIG_OLD = 'project: old\n';
 const CONFIG_NEW = 'project: new\n';
 const PR_URL = 'https://github.com/konsulin-care/draft/pull/7';
+const UPPER_HEAD = `konsulin-care:${BRANCH}`;
 
 /** Build a GitHub project source for the tests. */
 function source(overrides: Partial<ProjectSourceGitHub> = {}): ProjectSourceGitHub {
@@ -62,8 +64,8 @@ interface Harness {
 interface MakeOptions {
   /** Whether the workspace contains an edited config. */
   edited?: boolean;
-  /** Existing open pull request returned by the lookup. */
-  existingPull?: { number: number; url: string; state: 'open' } | null;
+  /** Existing pull request returned by the lookup. */
+  existingPull?: { number: number; url: string; state: SuggestionPull['state'] } | null;
 }
 
 /** Build an in-memory registry whose setSource updates stored records. */
@@ -219,7 +221,6 @@ describe('sendSuggestion title', () => {
 
 describe('sendSuggestion retry', () => {
   it('reuses an existing pull request after a failed creation instead of opening a duplicate', async () => {
-
     const existing = { number: 7, url: PR_URL, state: 'open' as const };
     const { deps } = await makeDeps(record(source()), {
       edited: false,
@@ -235,6 +236,37 @@ describe('sendSuggestion retry', () => {
     );
     expect(deps.createPullRequest).not.toHaveBeenCalled();
     expect(result).toEqual({ kind: 'updated', number: 7, url: PR_URL });
+  });
+});
+
+describe('sendSuggestion pull request lookup', () => {
+  it('qualifies the head with the owner when the branch lives on the upstream', async () => {
+    const { deps } = await makeDeps(record(source({ owner: 'konsulin-care' })));
+    await sendSuggestion('project-1', { note: 'Please review.' }, deps);
+
+    expect(deps.findSuggestionPull).toHaveBeenCalledWith('konsulin-care', 'draft', UPPER_HEAD);
+    expect(deps.createPullRequest).toHaveBeenCalledWith('konsulin-care', 'draft', {
+      title: SEND_MESSAGE, body: 'Please review.', head: UPPER_HEAD, base: 'main',
+    });
+  });
+
+  it('opens a new pull request when the latest one for the head is merged or closed', async () => {
+    for (const state of ['merged', 'closed'] as const) {
+      const existing = { number: 6, url: PR_URL, state };
+      const { deps } = await makeDeps(record(source()), { existingPull: existing });
+
+      const result = await sendSuggestion('project-1', { note: 'More' }, deps);
+
+      expect(deps.createPullRequest).toHaveBeenCalled();
+      expect(result).toEqual({ kind: 'created', number: 7, url: PR_URL });
+    }
+  });
+
+  it('propagates the GitHub error when the pull request cannot be created', async () => {
+    const { deps } = await makeDeps(record(source()));
+    vi.mocked(deps.createPullRequest).mockRejectedValue(new Error('no commits between'));
+
+    await expect(sendSuggestion('project-1', { note: 'More' }, deps)).rejects.toThrow('no commits between');
   });
 });
 

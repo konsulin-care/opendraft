@@ -95,13 +95,15 @@ async function loadSource(
 /**
  * Build the pull request head ref of a suggestion.
  *
+ * The head is always qualified as `owner:branch`; GitHub ignores an unqualified
+ * head filter, so a bare branch name would select the newest pull request of the
+ * whole repository.
+ *
  * @param source - Stored GitHub source of the suggestion.
- * @returns Head ref, prefixed with the fork owner when needed.
+ * @returns Head ref accepted by the pull request API.
  */
 function headRef(source: ProjectSourceGitHub): string {
-  const onUpstream =
-    source.owner.toLowerCase() === source.upstream.owner.toLowerCase();
-  return onUpstream ? source.branch : `${source.owner}:${source.branch}`;
+  return `${source.owner}:${source.branch}`;
 }
 
 /**
@@ -151,13 +153,15 @@ function draftName(input: SendSuggestionInput): string {
 /**
  * Send a draft for review: name it, save it and open a pull request.
  *
- * The pull request is looked up after the save, so a retry after a failed
- * creation reuses the existing pull request instead of opening a duplicate.
+ * Only an open pull request counts as existing: the branch push already updated
+ * it. A merged or closed pull request is not reopened, so a new one is created
+ * for the current head. Creation errors (for example "no commits between") are
+ * left to the caller so the UI can show GitHub's message.
  *
  * @param projectId - Project id of the draft.
  * @param input - Draft name and pull request note.
  * @param deps - Injected save, naming and GitHub dependencies.
- * @returns The created or reused pull request, a closed state, or a pending save.
+ * @returns The created or reused pull request, or a pending save.
  */
 export async function sendSuggestion(
   projectId: string,
@@ -183,10 +187,7 @@ export async function sendSuggestion(
   const head = headRef(stored);
   const { owner, repo, defaultBranch } = stored.upstream;
   const existing = await deps.findSuggestionPull(owner, repo, head);
-  if (existing !== null) {
-    if (existing.state !== 'open') {
-      return { kind: 'closed', state: existing.state };
-    }
+  if (existing !== null && existing.state === 'open') {
     if (stored.pullNumber !== existing.number) {
       await storePullNumber(projectId, existing.number, deps);
     }
