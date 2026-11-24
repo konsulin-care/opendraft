@@ -61,15 +61,15 @@ function branchPrefix(branch: string): string {
 /**
  * Build the pull request head ref of a suggestion.
  *
- * Branches on a fork need the `owner:` prefix; branches on the upstream do not.
+ * The head is always qualified as `owner:branch`. GitHub ignores an unqualified
+ * head filter and answers with the newest pull request of the repository, so a
+ * branch on the upstream must be qualified too.
  *
  * @param source - Stored GitHub source of the suggestion.
  * @returns Head ref accepted by the pull request API.
  */
 function headRef(source: ProjectSourceGitHub): string {
-  const onUpstream =
-    source.owner.toLowerCase() === source.upstream.owner.toLowerCase();
-  return onUpstream ? source.branch : `${source.owner}:${source.branch}`;
+  return `${source.owner}:${source.branch}`;
 }
 
 /**

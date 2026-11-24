@@ -145,7 +145,7 @@ describe('checkSuggestion closed pull request state', () => {
     expect(result).toEqual({ state: 'closed', number: 7, url: PR_URL });
   });
 
-  it('uses an unqualified head when the branch lives on the upstream', async () => {
+  it('qualifies the head with the owner even when the branch lives on the upstream', async () => {
     const deps = makeDeps({ findSuggestionPull: vi.fn(async () => pull()) });
 
     await checkSuggestion(
@@ -156,7 +156,7 @@ describe('checkSuggestion closed pull request state', () => {
     expect(deps.findSuggestionPull).toHaveBeenCalledWith(
       'konsulin-care',
       'draft',
-      'opendraft/octocat/20260102-030405',
+      'konsulin-care:opendraft/octocat/20260102-030405',
     );
   });
 });
