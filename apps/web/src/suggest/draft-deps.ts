@@ -18,11 +18,22 @@ import type { SendSuggestionInput } from './submit';
 import type { SendUpdateInput } from './submit';
 import type { PublishProjectDeps, PublishTarget } from './publish';
 
+/** Remote branch sweep run once when a project opens. */
+type SweepProject = (
+  project: ProjectRecord,
+  session: BffSession,
+) => Promise<void>;
+
 /** Optional injection points for tests and alternate shells. */
 export interface DraftSectionDepsOptions {
   /** Publish dependencies; the browser builds them lazily when omitted. */
   publishDeps?: PublishProjectDeps;
+  /** Remote branch sweep; the browser sweeps the viewer's own branches lazily. */
+  sweep?: SweepProject;
 }
+
+/** Project ids already swept on this page load. */
+const SWEPT_PROJECTS = new Set<string>();
 
 /** Draft input captured by the publish dialog. */
 interface PublishInputLike {
@@ -119,12 +130,59 @@ async function createBrowserPublishDeps(
 }
 
 /**
+ * Sweep the viewer's stale draft branches through the browser dependencies.
+ *
+ * @param project - Project whose draft branches are swept.
+ * @param session - Signed-in viewer whose branch prefixes are swept.
+ * @returns A promise that settles when the sweep finishes.
+ */
+async function defaultSweep(
+  project: ProjectRecord,
+  session: BffSession,
+): Promise<void> {
+  if (project.source.kind !== 'github') return;
+  const { sweepOwnBranches } = await import('./browser-deps');
+  await sweepOwnBranches(project.source, session);
+}
+
+/**
+ * Fire the remote sweep at most once per project on this page load.
+ *
+ * The sweep runs after the snapshot check succeeded, so a failed or slow sweep
+ * can never change the snapshot or repeat on a window-focus refresh.
+ *
+ * @param project - Project whose draft branches are swept.
+ * @param session - Signed-in viewer whose branch prefixes are swept.
+ * @param options - Optional injected sweep for tests.
+ */
+function fireSweep(
+  project: ProjectRecord,
+  session: BffSession,
+  options: DraftSectionDepsOptions,
+): void {
+  if (SWEPT_PROJECTS.has(project.id)) return;
+  SWEPT_PROJECTS.add(project.id);
+  const sweep = options.sweep ?? defaultSweep;
+  try {
+    void Promise.resolve(sweep(project, session)).catch(() => undefined);
+  } catch {
+    // A sweep is best-effort and must never fail the snapshot load.
+  }
+}
+
+/**
  * Load the draft status of a project through the suggestion check.
  *
  * @param project - Project whose draft state is checked.
+ * @param session - Signed-in viewer, or null for an anonymous editor.
+ * @param options - Optional injected sweep for tests.
  * @returns Draft snapshot with its pending save count.
  */
-async function loadSnapshot(project: ProjectRecord): Promise<DraftSnapshot> {
+async function loadSnapshot(
+  project: ProjectRecord,
+  session: BffSession | null,
+  options: DraftSectionDepsOptions,
+): Promise<DraftSnapshot> {
   if (project.source.kind !== 'github') {
     return { status: { state: 'local-only' }, pendingSaves: 0 };
   }
@@ -132,7 +190,9 @@ async function loadSnapshot(project: ProjectRecord): Promise<DraftSnapshot> {
     import('./status'),
     import('./browser-deps'),
   ]);
-  return { status: await checkSuggestion(project.source, await createCheckDeps()) };
+  const status = await checkSuggestion(project.source, await createCheckDeps());
+  if (session !== null) fireSweep(project, session, options);
+  return { status };
 }
 
 /**
@@ -224,7 +284,7 @@ export function createDraftSectionDeps(
   };
 
   return {
-    load: loadSnapshot,
+    load: (project) => loadSnapshot(project, session, options),
     ...draftLifecycle(need),
     ...submitActions(need),
     publish: publishAction(need, options),
