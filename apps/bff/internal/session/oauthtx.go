@@ -17,14 +17,14 @@ const (
 // Tx is the short-lived OAuth transaction stored in the sealed cookie between
 // the login redirect and the callback.
 type Tx struct {
+	// ExpiresAt is when the transaction stops being usable.
+	ExpiresAt time.Time `json:"expires_at"`
 	// State is the random anti-CSRF state sent to GitHub.
 	State string `json:"state"`
 	// Verifier is the PKCE code verifier for the authorization code exchange.
 	Verifier string `json:"verifier"`
 	// ReturnTo is the same-origin path to send the browser to after login.
 	ReturnTo string `json:"return_to"`
-	// ExpiresAt is when the transaction stops being usable.
-	ExpiresAt time.Time `json:"expires_at"`
 }
 
 // WriteTx seals tx and sets the OAuth transaction cookie on w with a Max-Age

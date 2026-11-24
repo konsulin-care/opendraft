@@ -26,14 +26,14 @@ var ErrExpired = errors.New("session: session expired")
 // Session is the authenticated identity stored in the sealed cookie. Tokens
 // never leave the server in plaintext; the cookie value is AES-256-GCM sealed.
 type Session struct {
-	Login            string    `json:"login"`
-	ID               int64     `json:"id"`
-	Name             string    `json:"name"`
-	AccessToken      string    `json:"access_token"`
 	AccessExpiresAt  time.Time `json:"access_expires_at"`
-	RefreshToken     string    `json:"refresh_token"`
 	RefreshExpiresAt time.Time `json:"refresh_expires_at"`
 	IssuedAt         time.Time `json:"issued_at"`
+	Login            string    `json:"login"`
+	Name             string    `json:"name"`
+	AccessToken      string    `json:"access_token"`
+	RefreshToken     string    `json:"refresh_token"`
+	ID               int64     `json:"id"`
 }
 
 // Write seals sess and sets the session cookie on w. MaxAge is the remaining

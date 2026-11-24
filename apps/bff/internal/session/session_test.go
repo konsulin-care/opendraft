@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+const writeFailed = "Write: %v"
+
 func newTestSealer(t *testing.T) *Sealer {
 	t.Helper()
 	sealer, err := NewSealer(testKey(t, 0x5a), nil)
@@ -50,7 +52,7 @@ func TestWriteSetsSecureCookieAttributes(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	if err := Write(w, sealer, sampleSession(now), now); err != nil {
-		t.Fatalf("Write: %v", err)
+		t.Fatalf(writeFailed, err)
 	}
 	cookie := readSessionCookie(t, w)
 
@@ -80,19 +82,19 @@ func TestWriteMaxAgeIsRemainingLifetime(t *testing.T) {
 
 	cases := []struct {
 		now  time.Time
-		want int
 		name string
+		want int
 	}{
-		{issued, int((7 * 24 * time.Hour) / time.Second), "fresh"},
-		{issued.Add(time.Hour), int((7*24*time.Hour - time.Hour) / time.Second), "one hour later"},
-		{issued.Add(7 * 24 * time.Hour), 0, "almost expired"},
-		{issued.Add(8 * 24 * time.Hour), 0, "past lifetime"},
+		{issued, "fresh", int((7 * 24 * time.Hour) / time.Second)},
+		{issued.Add(time.Hour), "one hour later", int((7*24*time.Hour - time.Hour) / time.Second)},
+		{issued.Add(7 * 24 * time.Hour), "almost expired", 0},
+		{issued.Add(8 * 24 * time.Hour), "past lifetime", 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
 			if err := Write(w, sealer, sampleSession(issued), tc.now); err != nil {
-				t.Fatalf("Write: %v", err)
+				t.Fatalf(writeFailed, err)
 			}
 			if got := readSessionCookie(t, w).MaxAge; got != tc.want {
 				t.Fatalf("MaxAge = %d, want %d", got, tc.want)
@@ -108,7 +110,7 @@ func TestWriteThenReadRoundTrip(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	if err := Write(w, sealer, want, now); err != nil {
-		t.Fatalf("Write: %v", err)
+		t.Fatalf(writeFailed, err)
 	}
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	r.AddCookie(readSessionCookie(t, w))
@@ -132,7 +134,7 @@ func TestCookieValueHidesTokens(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	if err := Write(w, sealer, sess, now); err != nil {
-		t.Fatalf("Write: %v", err)
+		t.Fatalf(writeFailed, err)
 	}
 	value := readSessionCookie(t, w).Value
 
@@ -153,7 +155,7 @@ func TestReadMissingOrInvalidCookie(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	if err := Write(w, sealer, sampleSession(now), now); err != nil {
-		t.Fatalf("Write: %v", err)
+		t.Fatalf(writeFailed, err)
 	}
 	valid := readSessionCookie(t, w).Value
 
@@ -203,7 +205,7 @@ func TestReadRejectsOldSessions(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	if err := Write(w, sealer, sampleSession(issued), issued); err != nil {
-		t.Fatalf("Write: %v", err)
+		t.Fatalf(writeFailed, err)
 	}
 	cookie := readSessionCookie(t, w)
 
@@ -256,7 +258,7 @@ func TestReadRejectsExpiredRefreshToken(t *testing.T) {
 
 			w := httptest.NewRecorder()
 			if err := Write(w, sealer, sess, issued); err != nil {
-				t.Fatalf("Write: %v", err)
+				t.Fatalf(writeFailed, err)
 			}
 			r := httptest.NewRequest(http.MethodGet, "/", nil)
 			r.AddCookie(readSessionCookie(t, w))
