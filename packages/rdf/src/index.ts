@@ -7,7 +7,8 @@ export type {
   ResolveProtocolOptions,
   ResolveProtocolResult,
 } from './resolve-protocol.js';
-export { loadTurtle, validateShacl } from './shacl.js';
+export { loadTurtle } from './load-turtle.js';
+export { validateShacl } from './shacl.js';
 export type {
   Profile,
   ProfileValidationOptions,
