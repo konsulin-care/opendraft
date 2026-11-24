@@ -34,13 +34,14 @@ func TestCreateRepoForUser(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&call.body); err != nil {
 			t.Errorf("decode request body: %v", err)
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"name":"draft","html_url":"https://github.example/octocat/draft","default_branch":"main","owner":{"login":"octocat"}}`))
+		w.Header().Set("Content-Type", testContentType)
+		_, _ = w.Write([]byte(`{"name":"` + testRepo + `","html_url":"` + testRepoURL +
+			`","default_branch":"` + testDefaultBranch + `","owner":{"login":"` + testOwner + `"}}`))
 	}))
 	t.Cleanup(server.Close)
 
 	client := testClient(server.URL, time.Now())
-	repo, err := client.CreateRepo(context.Background(), "ghu_token", "octocat", true, "draft", "A draft", false)
+	repo, err := client.CreateRepo(context.Background(), testToken, testOwner, true, testRepo, "A draft", false)
 	if err != nil {
 		t.Fatalf("CreateRepo: %v", err)
 	}
@@ -51,7 +52,7 @@ func TestCreateRepoForUser(t *testing.T) {
 	if call.path != "/user/repos" {
 		t.Errorf("path = %q, want /user/repos", call.path)
 	}
-	if call.auth != "Bearer ghu_token" {
+	if call.auth != testBearer {
 		t.Errorf("Authorization = %q, want Bearer token", call.auth)
 	}
 	if call.accept != "application/vnd.github+json" {
@@ -63,7 +64,7 @@ func TestCreateRepoForUser(t *testing.T) {
 	if call.agent != "opendraft-bff" {
 		t.Errorf("User-Agent = %q", call.agent)
 	}
-	if call.body.Name != "draft" || call.body.Description != "A draft" {
+	if call.body.Name != testRepo || call.body.Description != "A draft" {
 		t.Errorf("body = %+v", call.body)
 	}
 	if call.body.Private {
@@ -73,7 +74,7 @@ func TestCreateRepoForUser(t *testing.T) {
 		t.Error("auto_init = true, want false")
 	}
 
-	want := Repo{Owner: "octocat", Name: "draft", HTMLURL: "https://github.example/octocat/draft", DefaultBranch: "main"}
+	want := Repo{Owner: testOwner, Name: testRepo, HTMLURL: testRepoURL, DefaultBranch: testDefaultBranch}
 	if repo != want {
 		t.Errorf("repo = %+v, want %+v", repo, want)
 	}
@@ -84,33 +85,34 @@ func TestCreateRepoForOrg(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		call.path = r.URL.Path
 		_ = json.NewDecoder(r.Body).Decode(&call.body)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"name":"draft","html_url":"https://github.example/acme/draft","default_branch":"trunk","owner":{"login":"acme"}}`))
+		w.Header().Set("Content-Type", testContentType)
+		_, _ = w.Write([]byte(`{"name":"` + testRepo + `","html_url":"` + testOrgRepoURL +
+			`","default_branch":"trunk","owner":{"login":"` + testOrg + `"}}`))
 	}))
 	t.Cleanup(server.Close)
 
 	client := testClient(server.URL, time.Now())
-	repo, err := client.CreateRepo(context.Background(), "ghu_token", "acme", false, "draft", "", true)
+	repo, err := client.CreateRepo(context.Background(), testToken, testOrg, false, testRepo, "", true)
 	if err != nil {
 		t.Fatalf("CreateRepo: %v", err)
 	}
 
-	if call.path != "/orgs/acme/repos" {
-		t.Errorf("path = %q, want /orgs/acme/repos", call.path)
+	if call.path != "/orgs/"+testOrg+"/repos" {
+		t.Errorf("path = %q, want /orgs/%s/repos", call.path, testOrg)
 	}
 	if !call.body.Private {
 		t.Error("private = false, want true")
 	}
-	if repo.Owner != "acme" || repo.DefaultBranch != "trunk" {
+	if repo.Owner != testOrg || repo.DefaultBranch != "trunk" {
 		t.Errorf("repo = %+v", repo)
 	}
 }
 
 func TestCreateRepoStatusMapping(t *testing.T) {
 	tests := []struct {
+		want   error
 		name   string
 		status int
-		want   error
 	}{
 		{name: "name taken", status: http.StatusUnprocessableEntity, want: ErrNameTaken},
 		{name: "unauthorized", status: http.StatusUnauthorized, want: ErrForbidden},
@@ -128,7 +130,7 @@ func TestCreateRepoStatusMapping(t *testing.T) {
 			t.Cleanup(server.Close)
 
 			client := testClient(server.URL, time.Now())
-			_, err := client.CreateRepo(context.Background(), "ghu_token", "octocat", true, "draft", "", false)
+			_, err := client.CreateRepo(context.Background(), testToken, testOwner, true, testRepo, "", false)
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("err = %v, want %v", err, tt.want)
 			}

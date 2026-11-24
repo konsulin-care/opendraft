@@ -12,18 +12,18 @@ import (
 // sha into PullInfo.HeadSHA.
 func TestLatestPullIncludesHeadSHA(t *testing.T) {
 	fake := &fakeActions{router: func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/repos/octocat/draft/pulls/12/reviews" {
-			_, _ = w.Write([]byte(`[]`))
+		if r.URL.Path == testReviewsPath12 {
+			_, _ = w.Write([]byte(testEmptyJSON))
 			return
 		}
-		_, _ = w.Write([]byte(`[{"number":12,"html_url":"https://github.example/octocat/draft/pull/12","state":"open","merged_at":null,"head":{"label":"octocat:od-ada/paper","sha":"abc123def456"}}]`))
+		_, _ = w.Write([]byte(`[{"number":12,"html_url":"` + pullURL + `","state":"open","merged_at":null,"head":{"label":"` + testPaperHead + `","sha":"abc123def456"}}]`))
 	}}
 	server := httptest.NewServer(fake.handler())
 	t.Cleanup(server.Close)
 
-	pull, found, err := testClient(server.URL, time.Now()).LatestPull(context.Background(), "ghu_token", "octocat", "draft", "octocat:od-ada/paper")
+	pull, found, err := testClient(server.URL, time.Now()).LatestPull(context.Background(), testToken, testOwner, testRepo, testPaperHead)
 	if err != nil {
-		t.Fatalf("LatestPull: %v", err)
+		t.Fatalf(latestPullFailed, err)
 	}
 	if !found {
 		t.Fatal("found = false, want true")
@@ -37,18 +37,18 @@ func TestLatestPullIncludesHeadSHA(t *testing.T) {
 // HeadSHA without failing.
 func TestLatestPullWithoutHeadSHA(t *testing.T) {
 	fake := &fakeActions{router: func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/repos/octocat/draft/pulls/12/reviews" {
-			_, _ = w.Write([]byte(`[]`))
+		if r.URL.Path == testReviewsPath12 {
+			_, _ = w.Write([]byte(testEmptyJSON))
 			return
 		}
-		_, _ = w.Write([]byte(`[{"number":12,"html_url":"https://github.example/octocat/draft/pull/12","state":"open","merged_at":null,"head":{"label":"octocat:od-ada/paper"}}]`))
+		_, _ = w.Write([]byte(`[{"number":12,"html_url":"` + pullURL + `","state":"open","merged_at":null,"head":{"label":"` + testPaperHead + `"}}]`))
 	}}
 	server := httptest.NewServer(fake.handler())
 	t.Cleanup(server.Close)
 
-	pull, found, err := testClient(server.URL, time.Now()).LatestPull(context.Background(), "ghu_token", "octocat", "draft", "octocat:od-ada/paper")
+	pull, found, err := testClient(server.URL, time.Now()).LatestPull(context.Background(), testToken, testOwner, testRepo, testPaperHead)
 	if err != nil {
-		t.Fatalf("LatestPull: %v", err)
+		t.Fatalf(latestPullFailed, err)
 	}
 	if !found {
 		t.Fatal("found = false, want true")
