@@ -1,12 +1,15 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadTurtle } from '../src/index.js';
 
 /** Absolute path of the scanned source directory: `packages/rdf/src`. */
 const SRC_DIR = fileURLToPath(new URL('../src', import.meta.url));
+
+/** Absolute path of the browser entry module. */
+const BROWSER_ENTRY = join(SRC_DIR, 'browser.ts');
 
 /**
  * Matches static imports of Node built-ins: an import/export clause with a
@@ -20,6 +23,12 @@ const STATIC_NODE_IMPORT = /(?:\bfrom\s*|\bimport\s*)['"]node:[^'"]*['"]/;
  * dynamic `import('node:...')` call.
  */
 const ANY_NODE_SPECIFIER = /['"]node:/;
+
+/**
+ * Matches the specifier of a relative import or re-export, including
+ * side-effect imports (`import './x.js'`) and type-only imports.
+ */
+const RELATIVE_SPECIFIER = /(?:\bfrom\s*|\bimport\s*|\bexport\s*)[^'"]*?['"](\.[^'"]+)['"]/g;
 
 /** File name of the single module allowed to reference `node:` built-ins. */
 const NODE_MODULE = 'load-turtle.ts';
@@ -42,6 +51,31 @@ async function collectTypeScriptFiles(dir: string): Promise<string[]> {
     }
   }
   return files;
+}
+
+/**
+ * Walks the relative static imports and re-exports of an entry module,
+ * following `.js` specifiers to their `.ts` sources.
+ *
+ * @param entry - Absolute path of the starting module.
+ * @returns Resolves to the absolute paths of every reachable module.
+ */
+async function collectReachableModules(entry: string): Promise<Set<string>> {
+  const seen = new Set<string>();
+  const queue = [entry];
+  while (queue.length > 0) {
+    const file = queue.pop();
+    if (file === undefined || seen.has(file)) continue;
+    seen.add(file);
+    const source = await readFile(file, 'utf8');
+    for (const match of source.matchAll(RELATIVE_SPECIFIER)) {
+      const specifier = match[1];
+      if (specifier === undefined) continue;
+      const target = resolve(dirname(file), specifier.replace(/\.js$/, '.ts'));
+      if (!seen.has(target)) queue.push(target);
+    }
+  }
+  return seen;
 }
 
 describe('browser safety', () => {
@@ -77,6 +111,42 @@ describe('browser safety', () => {
     }
 
     expect(offenders).toEqual([]);
+  });
+});
+
+describe('browser graph', () => {
+  it('no module reachable from browser.ts imports load-turtle.ts', async () => {
+    const reachable = await collectReachableModules(BROWSER_ENTRY);
+    expect(reachable.size).toBeGreaterThan(1);
+
+    const offenders = [...reachable]
+      .map((file) => file.slice(SRC_DIR.length + 1))
+      .filter((relative) => relative === NODE_MODULE);
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('no module reachable from browser.ts contains a node: specifier', async () => {
+    const reachable = await collectReachableModules(BROWSER_ENTRY);
+
+    const offenders: string[] = [];
+    for (const file of reachable) {
+      const source = await readFile(file, 'utf8');
+      if (ANY_NODE_SPECIFIER.test(source)) {
+        offenders.push(file.slice(SRC_DIR.length + 1));
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('browser.ts exposes the runtime exports of index.ts except loadTurtle', async () => {
+    const browserExports = Object.keys(await import('../src/browser.js')).sort();
+    const indexExports = Object.keys(await import('../src/index.js'))
+      .filter((name) => name !== 'loadTurtle')
+      .sort();
+
+    expect(browserExports).toEqual(indexExports);
   });
 });
 
