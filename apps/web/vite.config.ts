@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
+import { vendorChunk, chunkFileName } from './vite.chunks.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -21,6 +22,13 @@ export default defineConfig({
   },
   build: {
     assetsDir: '@assets',
+    manifest: true,
+    rollupOptions: {
+      output: {
+        manualChunks: vendorChunk,
+        chunkFileNames: chunkFileName,
+      },
+    },
   },
   plugins: [react(), tailwindcss()],
   resolve: {

@@ -21,7 +21,7 @@ async function loadWebConfig(command: 'build' | 'serve') {
   return result?.config;
 }
 
-describe('vite.config', () => {
+describe('vite.config server', () => {
   it('should bind server to IPv4 localhost for Tailscale compatibility', async () => {
     const config = await loadWebConfig('serve');
 
@@ -35,12 +35,6 @@ describe('vite.config', () => {
       .flat()
       .map((p) => (p as { name?: string }).name);
     expect(pluginNames.some((name) => name?.includes('tailwind'))).toBe(true);
-  });
-
-  it('should build assets under the reserved @assets path', async () => {
-    const config = await loadWebConfig('build');
-
-    expect(config?.build?.assetsDir).toBe('@assets');
   });
 
   it('should proxy /@api to the local BFF while binding 127.0.0.1', async () => {
@@ -68,5 +62,40 @@ describe('vite.config', () => {
     // A `test` block typed by vite's defineConfig fails tsc with TS2769,
     // because UserConfigExport has no `test` key.
     expect(source).toMatch(/import\s*\{\s*defineConfig\s*\}\s*from\s*['"]vitest\/config['"]/);
+  });
+});
+
+describe('vite.config build', () => {
+  it('should build assets under the reserved @assets path', async () => {
+    const config = await loadWebConfig('build');
+
+    expect(config?.build?.assetsDir).toBe('@assets');
+  });
+
+  it('should enable the build manifest and wire the chunk helpers', async () => {
+    const config = await loadWebConfig('build');
+
+    expect(config?.build?.manifest).toBe(true);
+    const output = config?.build?.rollupOptions?.output;
+    const outputOptions = Array.isArray(output) ? output[0] : output;
+    expect(typeof outputOptions?.manualChunks).toBe('function');
+    expect(typeof outputOptions?.chunkFileNames).toBe('function');
+
+    const manualChunks = outputOptions?.manualChunks as
+      | ((id: string) => string | undefined)
+      | undefined;
+    const chunkFileNames = outputOptions?.chunkFileNames as
+      | ((chunk: { moduleIds: string[] }) => string)
+      | undefined;
+
+    expect(manualChunks?.('/repo/node_modules/react/index.js')).toBe(
+      'vendor-react',
+    );
+    expect(manualChunks?.('/repo/apps/web/src/main.tsx')).toBeUndefined();
+    expect(
+      chunkFileNames?.({
+        moduleIds: ['/repo/node_modules/@codemirror/legacy-modes/mode/clike.js'],
+      }),
+    ).toBe('@assets/lang/[name]-[hash].js');
   });
 });
