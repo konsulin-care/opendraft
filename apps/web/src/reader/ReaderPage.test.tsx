@@ -2,17 +2,17 @@
 /**
  * ReaderPage tests: the read-only manuscript view for an OpenDraft project,
  * the unlisted-manuscript banner, the non-compliant notice and convert dialog
- * for a plain repository, and the dedicated rate-limit and not-found messages.
+ * for a plain repository, the loading phases/update banner, and load errors.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { MemoryWorkspace, readOnlyWorkspace } from '@opendraft/workspace';
 import { stringify } from 'yaml';
 import { PROTOCOL } from '../project/scaffold';
 import type { BffSession, RepoPermissions } from '../github/bff-client';
 import { RateLimitedError, NotFoundError } from './github-public';
-import type { LoadedRepo } from './load-repo';
+import type { LoadedRepo, LoadPhase } from './load-repo';
 import { parseManuscripts } from './load-repo';
 import type { ReaderPageDeps } from './ReaderPage';
 import { ReaderPage } from './ReaderPage';
@@ -27,18 +27,9 @@ vi.mock('../components/ManuscriptView', () => ({
 
 const ROUTE: ReaderRoute = { owner: 'konsulin-care', repo: 'citizen-science' };
 const SESSION: BffSession = {
-  login: 'octocat',
-  id: 1,
-  name: 'The Octocat',
-  expiresAt: '2030-01-01T00:00:00Z',
+  login: 'octocat', id: 1, name: 'The Octocat', expiresAt: '2030-01-01T00:00:00Z',
 };
-
-/** Access fixture for a writer on an installed repository. */
-const PUSH_INSTALLED: RepoPermissions = {
-  push: true,
-  installed: true,
-  defaultBranch: 'main',
-};
+const PUSH_INSTALLED: RepoPermissions = { push: true, installed: true, defaultBranch: 'main' };
 
 /** Build a loaded repository fixture from an opendraft.yml manuscript list. */
 async function makeRepo(
@@ -65,16 +56,27 @@ async function makeRepo(
 async function makePlainRepo(files: Record<string, string> = {}): Promise<LoadedRepo> {
   const workspace = new MemoryWorkspace();
   await workspace.writeFile('README.md', '# Plain repository\n');
-  for (const [path, content] of Object.entries(files)) {
-    await workspace.writeFile(path, content);
-  }
+  for (const [path, content] of Object.entries(files)) await workspace.writeFile(path, content);
   return { sha: 'sha1', workspace: readOnlyWorkspace(workspace), isOpenDraft: false, manuscripts: [] };
+}
+
+/** Wrap a workspace so its recursive listing never resolves, stalling discovery. */
+function stalledWorkspace(workspace: LoadedRepo['workspace']): LoadedRepo['workspace'] {
+  return new Proxy(workspace, {
+    get(target, property, receiver) {
+      if (property === 'listAll') return () => new Promise<string[]>(() => undefined);
+      const value = Reflect.get(target, property, receiver) as unknown;
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
 }
 
 /** Build reader dependencies with inert defaults and spy hooks. */
 function makeDeps(overrides: Partial<ReaderPageDeps> = {}): ReaderPageDeps {
   return {
-    loadRepo: vi.fn(async () => makeRepo([{ id: 'demo', path: 'manuscripts/demo' }])),
+    loadRepo: vi.fn<ReaderPageDeps['loadRepo']>(async () =>
+      makeRepo([{ id: 'demo', path: 'manuscripts/demo' }]),
+    ),
     getSessionState: vi.fn(async () => ({ session: null, loginEnabled: true })),
     logout: vi.fn(async () => undefined),
     convert: vi.fn(async () => ({ kind: 'pr' as const, url: 'https://example.test/pr/1' })),
@@ -118,7 +120,6 @@ describe('ReaderPage OpenDraft repository', () => {
     expect(within(header).getByText('second')).toBeInTheDocument();
   });
 });
-
 describe('ReaderPage edit intent', () => {
   it('auto-starts once for a signed-in viewer and clears the intent from the URL', async () => {
     window.history.replaceState({}, '', `${ROUTE.owner}/${ROUTE.repo}?intent=edit`);
@@ -127,27 +128,17 @@ describe('ReaderPage edit intent', () => {
     const navigate = vi.fn();
     const deps = makeDeps({
       getSessionState: vi.fn(async () => ({ session: SESSION, loginEnabled: true })),
-      getAccess: vi.fn(async () => PUSH_INSTALLED),
-      start,
-      navigate,
+      getAccess: vi.fn(async () => PUSH_INSTALLED), start, navigate,
     });
-
     render(<ReaderPage route={ROUTE} deps={deps} />);
-
-    await waitFor(() => {
-      expect(start).toHaveBeenCalledTimes(1);
-    });
-    await waitFor(() => {
-      expect(window.location.search).not.toContain('intent=edit');
-    });
+    await waitFor(() => { expect(start).toHaveBeenCalledTimes(1); });
+    await waitFor(() => { expect(window.location.search).not.toContain('intent=edit'); });
     expect(start).toHaveBeenCalledTimes(1);
     expect(replace).toHaveBeenCalled();
-
     replace.mockRestore();
     window.history.replaceState({}, '', '/');
   });
 });
-
 describe('ReaderPage single manuscript', () => {
   it('shows a single manuscript directly', async () => {
     const deps = makeDeps();
@@ -160,7 +151,6 @@ describe('ReaderPage single manuscript', () => {
     expect(within(header).queryByTestId('manuscript-switcher')).toBeNull();
   });
 });
-
 describe('ReaderPage unlisted manuscripts', () => {
   it('banners unlisted manuscripts and registers the checked ids', async () => {
     const register = vi.fn(async () => ({ kind: 'pr' as const, url: 'https://example.test/pr/2' }));
@@ -175,15 +165,11 @@ describe('ReaderPage unlisted manuscripts', () => {
     expect(await screen.findByText('1 manuscript(s) not listed in opendraft.yml')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'case-series-review' })).toBeChecked();
     fireEvent.click(screen.getByRole('button', { name: 'Add to opendraft.yml' }));
-    await waitFor(() => {
-      expect(register).toHaveBeenCalledWith(['case-series-review']);
-    });
+    await waitFor(() => { expect(register).toHaveBeenCalledWith(['case-series-review']); });
     expect(await screen.findByRole('link', { name: 'View pull request' })).toHaveAttribute(
-      'href',
-      'https://example.test/pr/2',
+      'href', 'https://example.test/pr/2',
     );
   });
-
   it('renders no banner when every manuscript is listed', async () => {
     const deps = makeDeps({
       getSessionState: vi.fn(async () => ({ session: SESSION, loginEnabled: true })),
@@ -194,7 +180,6 @@ describe('ReaderPage unlisted manuscripts', () => {
     expect(screen.queryByRole('button', { name: 'Add to opendraft.yml' })).toBeNull();
   });
 });
-
 describe('ReaderPage non-compliant repository', () => {
   it('shows the notice body and opens the convert dialog for a signed-in viewer', async () => {
     const deps = makeDeps({
@@ -205,23 +190,15 @@ describe('ReaderPage non-compliant repository', () => {
       getAccess: vi.fn(async () => PUSH_INSTALLED),
     });
     render(<ReaderPage route={ROUTE} deps={deps} />);
-
-    expect(
-      await screen.findByText("This repository isn't an OpenDraft project yet"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("This repository isn't an OpenDraft project yet")).toBeInTheDocument();
     expect(screen.getByText('We found these possible manuscripts:')).toBeInTheDocument();
     expect(screen.getByText(/case-series-review needs/)).toBeInTheDocument();
     expect(screen.queryByTestId('manuscript-view')).toBeNull();
-
     const header = screen.getByTestId('header-shell');
     fireEvent.click(within(header).getByRole('button', { name: 'Convert to OpenDraft' }));
-
-    expect(
-      screen.getByRole('dialog', { name: 'Convert to OpenDraft' }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Convert to OpenDraft' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: /case-series-review/ })).toBeChecked();
   });
-
   it('shows the sign-in popover for a signed-out viewer', async () => {
     const deps = makeDeps({
       loadRepo: vi.fn(async () =>
@@ -229,17 +206,12 @@ describe('ReaderPage non-compliant repository', () => {
       ),
     });
     render(<ReaderPage route={ROUTE} deps={deps} />);
-
     await screen.findByText("This repository isn't an OpenDraft project yet");
     const header = screen.getByTestId('header-shell');
     fireEvent.click(within(header).getByRole('button', { name: 'Convert to OpenDraft' }));
-
-    expect(
-      screen.getByText('Sign in to check whether you can convert this repository.'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Sign in to check whether you can convert this repository.')).toBeInTheDocument();
   });
 });
-
 describe('ReaderPage login availability', () => {
   it('shows no account menu when login is disabled', async () => {
     const deps = makeDeps({
@@ -249,23 +221,65 @@ describe('ReaderPage login availability', () => {
     await screen.findByTestId('manuscript-view');
     expect(screen.queryByRole('button', { name: 'Account' })).toBeNull();
   });
-
   it('offers sign-in from the account menu when login is enabled without a session', async () => {
     const deps = makeDeps({
       getSessionState: vi.fn(async () => ({ session: null, loginEnabled: true })),
     });
     render(<ReaderPage route={ROUTE} deps={deps} />);
     await screen.findByTestId('manuscript-view');
-
     fireEvent.click(screen.getByRole('button', { name: 'Account' }));
     const signIn = screen.getByRole('menuitem', { name: 'Sign in with GitHub' });
     expect(signIn).toHaveAttribute(
-      'href',
-      `/@api/auth/login?return_to=${encodeURIComponent('/konsulin-care/citizen-science')}`,
+      'href', `/@api/auth/login?return_to=${encodeURIComponent('/konsulin-care/citizen-science')}`,
     );
   });
 });
-
+describe('ReaderPage loading phases', () => {
+  it('shows the latest reported phase while loadRepo is pending', async () => {
+    const loaded = await makeRepo([{ id: 'demo', path: 'manuscripts/demo' }]);
+    let report: ((phase: LoadPhase) => void) | undefined;
+    let resolveLoad: ((repo: LoadedRepo) => void) | undefined;
+    const loadRepo = vi.fn<ReaderPageDeps['loadRepo']>((_route, onPhase) =>
+      new Promise<LoadedRepo>((resolve) => { report = onPhase; resolveLoad = resolve; }),
+    );
+    const deps = makeDeps({ loadRepo });
+    render(<ReaderPage route={ROUTE} deps={deps} />);
+    await waitFor(() => expect(report).toBeDefined());
+    act(() => report?.('downloading'));
+    expect(await screen.findByText('Downloading the manuscript from GitHub…')).toBeInTheDocument();
+    act(() => report?.('saving'));
+    expect(await screen.findByText('Saving a copy for faster loading next time…')).toBeInTheDocument();
+    await act(async () => resolveLoad?.(loaded));
+    await screen.findByTestId('manuscript-view');
+  });
+});
+describe('ReaderPage update check', () => {
+  it('shows the banner for a newer SHA and refreshes with fresh loading', async () => {
+    const checkForUpdate = vi.fn(async () => 'sha2');
+    const loadRepo = vi.fn<ReaderPageDeps['loadRepo']>(async () => ({
+      ...(await makeRepo([{ id: 'demo', path: 'manuscripts/demo' }])), checkForUpdate,
+    }));
+    const deps = makeDeps({ loadRepo });
+    render(<ReaderPage route={ROUTE} deps={deps} />);
+    await screen.findByTestId('manuscript-view');
+    expect(await screen.findByText('A newer version is available.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    await waitFor(() => {
+      expect(loadRepo).toHaveBeenCalledWith(ROUTE, expect.any(Function), { fresh: true });
+    });
+  });
+});
+describe('ReaderPage discovery loading', () => {
+  it('shows the discovering label while a non-OpenDraft repository is scanned', async () => {
+    const plain = await makePlainRepo();
+    const workspace = stalledWorkspace(plain.workspace);
+    const deps = makeDeps({
+      loadRepo: vi.fn<ReaderPageDeps['loadRepo']>(async () => ({ ...plain, workspace })),
+    });
+    render(<ReaderPage route={ROUTE} deps={deps} />);
+    expect(await screen.findByText('Looking for manuscripts in this repository…')).toBeInTheDocument();
+  });
+});
 describe('ReaderPage load errors', () => {
   it('shows the rate-limit message with a sign-in link', async () => {
     const deps = makeDeps({ loadRepo: vi.fn(async () => { throw new RateLimitedError(); }) });
@@ -273,11 +287,9 @@ describe('ReaderPage load errors', () => {
     expect(await screen.findByText('GitHub rate limit reached. Sign in for higher limits.')).toBeInTheDocument();
     const link = screen.getByRole('link', { name: 'Sign in for higher limits' });
     expect(link).toHaveAttribute(
-      'href',
-      `/@api/auth/login?return_to=${encodeURIComponent('/konsulin-care/citizen-science')}`,
+      'href', `/@api/auth/login?return_to=${encodeURIComponent('/konsulin-care/citizen-science')}`,
     );
   });
-
   it('shows the not-found message for a missing or private repository', async () => {
     const deps = makeDeps({ loadRepo: vi.fn(async () => { throw new NotFoundError(); }) });
     render(<ReaderPage route={ROUTE} deps={deps} />);

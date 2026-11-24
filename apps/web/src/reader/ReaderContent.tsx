@@ -8,7 +8,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { ProjectDiscovery } from '@opendraft/manuscript';
-import { discoverProject } from '@opendraft/manuscript';
 import type { BffSession } from '../github/bff-client';
 import { loginUrl } from '../github/bff-client';
 import { ManuscriptView } from '../components/ManuscriptView';
@@ -18,25 +17,16 @@ import type { ConvertResult } from './convert';
 import type { LoadedRepo } from './load-repo';
 import { NotFoundError, RateLimitedError } from './github-public';
 import { clearIntent } from './intent-url';
+import { READER_COPY } from './reader-copy';
+import { ReaderLoading } from './ReaderLoading';
+import { ReaderUpdateBanner } from './ReaderUpdateBanner';
 import type { ReaderRoute } from './route';
 import { readerManuscript } from './route';
 import { UnlistedBanner } from './UnlistedBanner';
+import type { ReaderState } from './use-reader-state';
 
-/** Reader state loaded from the route and injected dependencies. */
-export interface ReaderState {
-  /** Signed-in session identity, or null for an anonymous viewer. */
-  session: BffSession | null;
-  /** Whether GitHub login is configured. */
-  loginEnabled: boolean;
-  /** Loaded repository, or null while loading or after a load error. */
-  repo: LoadedRepo | null;
-  /** Load error, or null when the repository loaded. */
-  error: unknown;
-  /** Whether the repository is still loading. */
-  loading: boolean;
-  /** Clear the session. */
-  logout: () => void;
-}
+export { useDiscovery } from './use-reader-state';
+export type { ReaderState } from './use-reader-state';
 
 /** Props for {@link ReaderContent}. */
 export interface ReaderContentProps {
@@ -155,37 +145,6 @@ function LoadError({ error, returnTo }: { error: unknown; returnTo: string }) {
   );
 }
 
-/** Discover a repository's existing manuscripts, read-only. */
-export function useDiscovery(repo: LoadedRepo | null): {
-  discovery: ProjectDiscovery | null;
-  error: unknown;
-} {
-  const [discovery, setDiscovery] = useState<ProjectDiscovery | null>(null);
-  const [error, setError] = useState<unknown>(null);
-
-  useEffect(() => {
-    setDiscovery(null);
-    setError(null);
-    if (repo === null) return;
-
-    let cancelled = false;
-    void (async () => {
-      try {
-        const next = await discoverProject(repo.workspace);
-        if (!cancelled) setDiscovery(next);
-      } catch (thrown) {
-        if (!cancelled) setError(thrown);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [repo]);
-
-  return { discovery, error };
-}
-
 /**
  * Resolve the manuscript selected by the route.
  *
@@ -247,6 +206,32 @@ function OpenDraftContent({
   );
 }
 
+/** Render the discovery, loading or notice branch for a non-OpenDraft repository. */
+function PlainRepositoryContent({
+  route,
+  discovery,
+  discoveryError,
+  canWrite,
+}: {
+  route: ReaderRoute;
+  discovery: ProjectDiscovery | null;
+  discoveryError: unknown;
+  canWrite: boolean;
+}) {
+  if (discoveryError !== null) {
+    return <LoadError error={discoveryError} returnTo={readerPath(route)} />;
+  }
+  if (discovery === null) return <p className="text-sm text-black">{READER_COPY.discovering}</p>;
+  return (
+    <NonCompliantNotice
+      discovery={discovery}
+      canWrite={canWrite}
+      owner={route.owner}
+      repo={route.repo}
+    />
+  );
+}
+
 /**
  * Render the loading indicator, load error, conversion panel or reader view.
  *
@@ -262,28 +247,23 @@ export function ReaderContent({
   canWrite,
 }: ReaderContentProps) {
   const { repo, error, loading } = state;
-  const returnTo = readerPath(route);
-
-  if (loading) return <p className="text-sm text-black">Loading…</p>;
-  if (error !== null) return <LoadError error={error} returnTo={returnTo} />;
-  if (repo === null) return null;
-
-  if (!repo.isOpenDraft) {
-    if (discoveryError !== null) {
-      return <LoadError error={discoveryError} returnTo={returnTo} />;
-    }
-    if (discovery === null) return <p className="text-sm text-black">Loading…</p>;
+  if (loading) {
     return (
-      <NonCompliantNotice
-        discovery={discovery}
-        canWrite={canWrite}
+      <ReaderLoading
+        phase={state.phase}
         owner={route.owner}
         repo={route.repo}
+        firstVisit={state.firstVisit}
       />
     );
   }
+  if (error !== null) return <LoadError error={error} returnTo={readerPath(route)} />;
+  if (repo === null) return null;
 
-  return (
+  const banner = state.updateAvailable === null
+    ? null
+    : <ReaderUpdateBanner onRefresh={state.refresh} />;
+  const body = repo.isOpenDraft ? (
     <OpenDraftContent
       route={route}
       state={state}
@@ -291,6 +271,19 @@ export function ReaderContent({
       discovery={discovery}
       register={register}
     />
+  ) : (
+    <PlainRepositoryContent
+      route={route}
+      discovery={discovery}
+      discoveryError={discoveryError}
+      canWrite={canWrite}
+    />
+  );
+  return (
+    <>
+      {banner}
+      {body}
+    </>
   );
 }
 

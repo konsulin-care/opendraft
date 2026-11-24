@@ -13,11 +13,12 @@ import { createPullRequest, forkRepo, getRepoPermissions, getSession as fetchSes
 import { ReaderHeader } from './ReaderHeader';
 import { loadPublicSnapshot, resolveCommit } from './github-public';
 import { cloneViaRelay, loadRepo as loadReaderRepo } from './load-repo';
-import type { LoadedRepo } from './load-repo';
+import type { LoadedRepo, OnLoadPhase } from './load-repo';
 import { loadSnapshot, saveSnapshot } from './reader-cache';
 import type { ReaderRoute } from './route';
 import { ReaderContent, readerPath, useDiscovery, useEditIntentAutoStart, useReaderNavigation } from './ReaderContent';
-import type { ReaderState } from './ReaderContent';
+import { useReaderState } from './use-reader-state';
+import type { ReaderState } from './use-reader-state';
 import { ConvertDialog } from './ConvertDialog';
 import { convertRepository } from './convert';
 import type { ConvertDeps, ConvertInput, ConvertResult } from './convert';
@@ -33,7 +34,11 @@ import type { SuggestEditController } from './use-suggest-edit';
 import type { StartSuggestionInput, StartSuggestionResult } from '../suggest/start';
 
 export interface ReaderPageDeps {
-  loadRepo: (route: ReaderRoute) => Promise<LoadedRepo>;
+  loadRepo: (
+    route: ReaderRoute,
+    onPhase: OnLoadPhase,
+    options: { fresh?: boolean },
+  ) => Promise<LoadedRepo>;
   getSessionState: () => Promise<SessionState>;
   logout: () => Promise<void>;
   convert: (input: ConvertInput) => Promise<ConvertResult>;
@@ -86,10 +91,10 @@ async function registerWithGit(input: RegisterManuscriptsInput): Promise<Convert
   return registerManuscripts(input, await browserConvertDeps());
 }
 const defaultDeps: ReaderPageBaseDeps = {
-  loadRepo: (route) => loadReaderRepo(route, {
+  loadRepo: (route, onPhase, options) => loadReaderRepo(route, {
     resolveCommit, loadPublicSnapshot, cache: { loadSnapshot, saveSnapshot },
     getSession: () => fetchSession(), cloneViaRelay,
-  }),
+  }, onPhase, options),
   getSessionState: () => getSessionState(),
   logout: async () => {
     await signOut();
@@ -97,36 +102,6 @@ const defaultDeps: ReaderPageBaseDeps = {
   },
   convert: convertWithGit,
 };
-function useReaderState(route: ReaderRoute, deps: ReaderPageBaseDeps): ReaderState {
-  const [session, setSession] = useState<BffSession | null>(null);
-  const [loginEnabled, setLoginEnabled] = useState(true);
-  const [repo, setRepo] = useState<LoadedRepo | null>(null);
-  const [error, setError] = useState<unknown>(null);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true); setError(null); setRepo(null);
-    void (async () => {
-      try {
-        const [nextState, loaded] = await Promise.all([deps.getSessionState(), deps.loadRepo(route)]);
-        if (cancelled) return;
-        setSession(nextState.session); setLoginEnabled(nextState.loginEnabled); setRepo(loaded);
-      } catch (thrown) {
-        if (!cancelled) setError(thrown);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [route.owner, route.repo, route.ref, deps]);
-  const logout = (): void => {
-    void (async () => {
-      try { await deps.logout(); } finally { setSession(null); }
-    })();
-  };
-  return { session, loginEnabled, repo, error, loading, logout };
-}
-
 function useReaderHandlers(
   route: ReaderRoute,
   deps: ReaderPageDeps | undefined,
