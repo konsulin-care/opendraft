@@ -159,36 +159,66 @@ function rawUrl(owner: string, repo: string, sha: string, path: string): string 
   return `${GITHUB_RAW}/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${sha}/${encodedPath}`;
 }
 
+/** Optional controls for {@link loadPublicSnapshot}. */
+export interface LoadPublicSnapshotOptions {
+  /** Pre-resolved commit; when given the commit lookup is skipped. */
+  commit?: ResolvedCommit;
+  /** Maximum number of concurrent blob downloads; defaults to 6. */
+  concurrency?: number;
+}
+
+/** Default number of concurrent blob downloads. */
+const DEFAULT_CONCURRENCY = 6;
+
 /**
  * Load the reader-visible files of a public repository at one commit.
  *
  * Only `opendraft.yml` and `manuscripts/**` blobs up to 1 MB are downloaded.
  * The ref is resolved to a SHA first so every blob pins to the same commit.
+ * Eligible blobs are downloaded through a bounded worker pool; the first error
+ * rejects the whole call. Files are returned in tree order.
  *
  * @param owner - Repository owner login.
  * @param repo - Repository name.
  * @param ref - Ref to load; defaults to `HEAD`.
  * @param fetchFn - Fetch implementation; injectable for tests.
+ * @param options - Optional resolved commit and concurrency cap.
  * @returns The commit SHA and the downloaded files keyed by path.
  */
+// eslint-disable-next-line max-params -- public API keeps ref/fetchFn positional for compatibility
 export async function loadPublicSnapshot(
   owner: string,
   repo: string,
   ref = 'HEAD',
   fetchFn: typeof fetch = fetch,
+  options: LoadPublicSnapshotOptions = {},
 ): Promise<PublicSnapshot> {
-  const commit = await resolveCommit(owner, repo, ref, fetchFn);
+  const commit = options.commit ?? (await resolveCommit(owner, repo, ref, fetchFn));
   const entries = await listTree(owner, repo, commit.treeSha, fetchFn);
 
-  const files = new Map<string, string>();
-  for (const entry of entries) {
-    if (entry.type !== 'blob' || entry.size > MAX_FILE_SIZE || !isSnapshotPath(entry.path)) {
-      continue;
+  const eligible = entries.filter(
+    (entry) =>
+      entry.type === 'blob' && entry.size <= MAX_FILE_SIZE && isSnapshotPath(entry.path),
+  );
+  const concurrency = Math.max(1, Math.floor(options.concurrency ?? DEFAULT_CONCURRENCY));
+  const contents: string[] = new Array(eligible.length);
+  let cursor = 0;
+
+  const worker = async (): Promise<void> => {
+    while (cursor < eligible.length) {
+      const index = cursor++;
+      const entry = eligible[index];
+      const response = await fetchFn(rawUrl(owner, repo, commit.sha, entry.path));
+      assertOk(response);
+      contents[index] = await response.text();
     }
-    const response = await fetchFn(rawUrl(owner, repo, commit.sha, entry.path));
-    assertOk(response);
-    files.set(entry.path, await response.text());
-  }
+  };
+
+  const workers = Math.min(concurrency, eligible.length);
+  await Promise.all(Array.from({ length: workers }, () => worker()));
+
+  const files = new Map<string, string>();
+  eligible.forEach((entry, index) => files.set(entry.path, contents[index]));
 
   return { sha: commit.sha, files };
 }

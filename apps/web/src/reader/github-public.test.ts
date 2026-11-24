@@ -59,6 +59,82 @@ function textResponse(text: string, status = 200): Response {
   } as unknown as Response;
 }
 
+/** One blob request held open until the test resolves it. */
+interface PendingBlob {
+  url: string;
+  resolve: (response: Response) => void;
+}
+
+/** Fetch double that lets the test resolve blob requests manually. */
+interface ManualBlobFetch {
+  fetchFn: ReturnType<typeof vi.fn>;
+  pending: PendingBlob[];
+  maxInFlight: () => number;
+}
+
+/**
+ * Build a fetch double that holds blob requests open until resolved manually.
+ *
+ * @param entries - Tree entries returned by the trees API.
+ * @returns The fetch double plus its pending queue and in-flight tracker.
+ */
+function createManualBlobFetch(entries: TreeEntry[]): ManualBlobFetch {
+  const pending: PendingBlob[] = [];
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const fetchFn = vi.fn((input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes('/git/trees/')) return Promise.resolve(jsonResponse({ tree: entries }));
+    inFlight += 1;
+    maxInFlight = Math.max(maxInFlight, inFlight);
+    return new Promise<Response>((resolve) => {
+      pending.push({
+        url,
+        resolve: (response) => {
+          inFlight -= 1;
+          resolve(response);
+        },
+      });
+    });
+  });
+  return { fetchFn, pending, maxInFlight: () => maxInFlight };
+}
+
+/**
+ * Resolve pending blob requests until the snapshot promise settles.
+ *
+ * @param pending - Queue of blob requests awaiting resolution.
+ * @param promise - Snapshot promise that settles once all work is done.
+ * @returns A promise resolved after the snapshot promise settles.
+ */
+async function drainUntilSettled(pending: PendingBlob[], promise: Promise<unknown>): Promise<void> {
+  let settled = false;
+  promise.finally(() => {
+    settled = true;
+  });
+  while (!settled) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const next = pending.shift();
+    if (next) next.resolve(textResponse(`body:${next.url}`));
+  }
+}
+
+/**
+ * Build a fetch double that answers tree and eligible blob requests.
+ *
+ * @returns A fetch double serving the shared fixture tree and blobs.
+ */
+function snapshotFetch(): ReturnType<typeof vi.fn> {
+  return vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes('/git/trees/')) return jsonResponse(TREE);
+    if (url.endsWith('/opendraft.yml')) return textResponse('schema: 1\n');
+    if (url.endsWith('/manuscripts/chapter%20one.qmd')) return textResponse('# Chapter\n');
+    if (url.endsWith('/manuscripts/sub/notes.md')) return textResponse('notes\n');
+    throw new Error(`unexpected URL ${url}`);
+  });
+}
+
 describe('resolveCommit', () => {
   it('calls the GitHub commits API with the ref and JSON accept header', async () => {
     const fetchFn = vi.fn(async () => jsonResponse(COMMIT));
@@ -141,6 +217,50 @@ describe('loadPublicSnapshot', () => {
     ]);
     expect(rawCalls.some((url) => url.includes('README.md'))).toBe(false);
     expect(rawCalls.some((url) => url.includes('huge.qmd'))).toBe(false);
+  });
+});
+
+describe('loadPublicSnapshot concurrency', () => {
+  it('never has more than 6 blob requests in flight and returns the eligible files', async () => {
+    const entries: TreeEntry[] = Array.from({ length: 20 }, (_, index) => ({
+      type: 'blob', path: `manuscripts/file-${index}.qmd`, size: 1,
+    }));
+    const { fetchFn, pending, maxInFlight } = createManualBlobFetch(entries);
+    const promise = loadPublicSnapshot(OWNER, REPO, SHA, fetchFn as unknown as typeof fetch, {
+      commit: { sha: SHA, treeSha: TREE_SHA },
+    });
+
+    await drainUntilSettled(pending, promise);
+    const snapshot = await promise;
+
+    expect(maxInFlight()).toBe(6);
+    expect(snapshot.files.size).toBe(entries.length);
+    expect([...snapshot.files.keys()]).toEqual(entries.map((e) => e.path));
+    expect(snapshot.files.get('manuscripts/file-0.qmd')).toBe(
+      `body:https://raw.githubusercontent.com/${OWNER}/${REPO}/${SHA}/manuscripts/file-0.qmd`,
+    );
+  });
+
+  it('skips the commit lookup when a resolved commit is given', async () => {
+    const fetchFn = snapshotFetch();
+
+    const snapshot = await loadPublicSnapshot(
+      OWNER,
+      REPO,
+      'main',
+      fetchFn as unknown as typeof fetch,
+      { commit: { sha: SHA, treeSha: TREE_SHA } },
+    );
+
+    expect(snapshot.sha).toBe(SHA);
+    expect([...snapshot.files.keys()]).toEqual([
+      'opendraft.yml',
+      'manuscripts/chapter one.qmd',
+      'manuscripts/sub/notes.md',
+    ]);
+
+    const calledUrls = fetchFn.mock.calls.map(([input]) => String(input));
+    expect(calledUrls.some((url) => url.includes('/commits/'))).toBe(false);
   });
 });
 
