@@ -86,7 +86,7 @@ run = "docker build -t opendraft ."
 
 [tasks.lint-go]
 description = "Run golangci-lint on Go code"
-run = "golangci-lint run ./... || true"
+run = "golangci-lint run ./..."
 
 dir = "apps/bff"
 
@@ -104,7 +104,7 @@ dir = "apps/bff"
 
 [tasks.govulncheck]
 description = "Run govulncheck on Go code"
-run = "govulncheck ./... || true"
+run = "govulncheck ./..."
 
 dir = "apps/bff"
 
@@ -126,7 +126,7 @@ run = "echo 'Placeholder: add vitest config then run pnpm exec vitest run --cove
 
 [tasks.coverage-go]
 description = "Run Go tests with coverage"
-run = "go test -coverprofile=coverage.out ./... || true"
+run = "go test -coverprofile=coverage.out ./..."
 
 dir = "apps/bff"
 
