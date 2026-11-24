@@ -7,12 +7,21 @@
  * preset picker for an assembly with no blocks, and the always-visible
  * '+ Add section' button that needs no hover to show.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { MemoryWorkspace } from '@opendraft/workspace';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { ManuscriptView } from './ManuscriptView';
+
+/** Gate controlling when the lazy block-editor module resolves. */
+const blockEditorGate = vi.hoisted(() => ({ pending: null as Promise<void> | null }));
+
+vi.mock('../block-editor/BlockEditor', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../block-editor/BlockEditor')>();
+  if (blockEditorGate.pending) await blockEditorGate.pending;
+  return actual;
+});
 
 /** Manuscript directory used by every fixture. */
 const DIR = 'manuscripts/x';
@@ -64,6 +73,31 @@ async function renderView(
   render(<ManuscriptView workspace={ws} dir={DIR} projectKey={PROJECT} readOnly={readOnly} />);
   return ws;
 }
+
+describe('ManuscriptView lazy chunks', () => {
+  it('renders the block-editor skeleton while the block-editor chunk is pending', async () => {
+    let release!: () => void;
+    blockEditorGate.pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    try {
+      const ws = new MemoryWorkspace();
+      await ws.writeFile(`${DIR}/article.qmd`, articleWith('intro'));
+      await ws.writeFile(`${DIR}/blocks/_intro.qmd`, blockFile('intro', 'Introduction'));
+      render(<ManuscriptView workspace={ws} dir={DIR} projectKey={PROJECT} />);
+
+      expect(await screen.findByTestId('block-editor-skeleton')).toBeInTheDocument();
+
+      release();
+      expect(
+        await screen.findByRole('button', { name: '+ Add section' }, { timeout: 10000 }),
+      ).toBeInTheDocument();
+    } finally {
+      release();
+      blockEditorGate.pending = null;
+    }
+  }, 20000);
+});
 
 describe('ManuscriptView metadata panel placement', () => {
   it('renders the metadata panel and the block editor list in the same reading column', async () => {

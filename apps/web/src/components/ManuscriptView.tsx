@@ -1,13 +1,20 @@
-import { useRef } from 'react';
+import { lazy, Suspense, useRef } from 'react';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
-import { BlockEditor } from '../block-editor/BlockEditor';
+import { BlockEditorSkeleton } from '../block-editor/BlockEditorSkeleton';
 import { ReadOnlyContext } from '../block-editor/read-only-context';
 import { useEditorCommands } from '../hooks/useEditorCommands';
 import { useFocusScrollGuard } from '../hooks/useFocusScrollGuard';
 import { ReaderMetadata } from '../reader/ReaderMetadata';
 import { EditorToolbars } from './EditorToolbars';
-import { MetadataPanel } from './metadata-panel/MetadataPanel';
 import { ReadingColumn } from './ReadingColumn';
+
+// React.lazy requires a default export; both components are named exports.
+const BlockEditor = lazy(() =>
+  import('../block-editor/BlockEditor').then((m) => ({ default: m.BlockEditor })),
+);
+const MetadataPanel = lazy(() =>
+  import('./metadata-panel/MetadataPanel').then((m) => ({ default: m.MetadataPanel })),
+);
 
 /** Props for {@link ManuscriptView}. */
 export interface ManuscriptViewProps {
@@ -60,15 +67,19 @@ export function ManuscriptView({
           {readOnly ? (
             <ReaderMetadata workspace={workspace} manuscriptRoot={dir} />
           ) : (
-            <MetadataPanel
-              workspace={workspace}
-              manuscriptRoot={dir}
-              projectKey={projectKey}
-              editorFocusRef={scrollContainerRef}
-            />
+            <Suspense fallback={null}>
+              <MetadataPanel
+                workspace={workspace}
+                manuscriptRoot={dir}
+                projectKey={projectKey}
+                editorFocusRef={scrollContainerRef}
+              />
+            </Suspense>
           )}
           <ReadOnlyContext.Provider value={readOnly}>
-            <BlockEditor ws={workspace} dir={dir} projectKey={projectKey} />
+            <Suspense fallback={<BlockEditorSkeleton />}>
+              <BlockEditor ws={workspace} dir={dir} projectKey={projectKey} />
+            </Suspense>
           </ReadOnlyContext.Provider>
         </ReadingColumn>
       </div>
