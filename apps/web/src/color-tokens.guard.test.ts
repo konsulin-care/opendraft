@@ -27,6 +27,7 @@ const COLOR_PREFIXES =
 /** Suffixes that are layout/size utilities, not palette tokens. */
 const NON_PALETTE_SUFFIXES = new Set([
   'none', 'zero', 'b', 't', 'l', 'r', 'x', 'y', 's', 'e', 'full', 'auto',
+  't-0', 'b-0', 'l-0', 'r-0', 'x-0', 'y-0', 's-0', 'e-0',
   'xs', 'base', 'sm', 'md', 'lg', 'xl',
   '2xl', '3xl', '4xl', '5xl', '6xl', '7xl', '8xl', '9xl',
   'left', 'right', 'center', 'justify',
@@ -84,7 +85,8 @@ function collectSourceFiles(root: string): string[] {
 
 /**
  * Report whether a color-utility suffix is a palette token that must be
- * declared. Numeric widths (`border-2`) and known non-color suffixes pass.
+ * declared. Numeric widths (`border-2`), zero-width side resets
+ * (`border-t-0`) and known non-color suffixes pass.
  */
 function isPaletteToken(suffix: string): boolean {
   if (/^\d+$/.test(suffix)) return false;
@@ -200,7 +202,7 @@ function assertCleanFixturePasses(): void {
     {
       'FixtureClean.tsx':
         'export const Row = () => (\n' +
-        '  <div className="border-t border-stone-200 bg-white/70 text-gray-600 shadow-lg" />\n' +
+        '  <div className="border-t border-stone-200 first:border-t-0 bg-white/70 text-gray-600 shadow-lg" />\n' +
         ');\n',
     },
     (violations) => {
