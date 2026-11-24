@@ -77,7 +77,7 @@ func (h *authHandler) handleCallback(w http.ResponseWriter, r *http.Request) {
 // not match the state query without contacting GitHub.
 func rejectState(w http.ResponseWriter) {
 	session.ClearTx(w)
-	writeJSON(w, http.StatusBadRequest, map[string]string{"error": invalidStateCode})
+	writeError(w, http.StatusBadRequest, invalidStateCode)
 }
 
 // failExchange clears the transaction and redirects to the generic auth error

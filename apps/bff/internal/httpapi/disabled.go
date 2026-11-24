@@ -14,7 +14,7 @@ const (
 
 // handleLoginDisabled answers a gated route with the login_disabled error.
 func handleLoginDisabled(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusForbidden, map[string]string{"error": loginDisabledCode})
+	writeError(w, http.StatusForbidden, loginDisabledCode)
 }
 
 // handleSessionDisabled answers GET /@api/auth/session when login is not

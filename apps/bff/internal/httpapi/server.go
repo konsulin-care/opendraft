@@ -20,6 +20,8 @@ const (
 	rootPath    = "/"
 	contentType = "application/json"
 	errorCode   = "not_found"
+	// errorKey is the JSON field carrying the machine-readable error code.
+	errorKey = "error"
 )
 
 // Deps holds the runtime dependencies the BFF handler needs.
@@ -82,12 +84,12 @@ func New(cfg config.Config, deps Deps) http.Handler {
 		})
 	})
 	api.HandleFunc(apiPrefix, func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": errorCode})
+		writeError(w, http.StatusNotFound, errorCode)
 	})
 	// ServeMux redirects /@api to /@api/; register the bare prefix so unknown
 	// API paths always answer JSON instead of a redirect.
 	api.HandleFunc(strings.TrimSuffix(apiPrefix, "/"), func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": errorCode})
+		writeError(w, http.StatusNotFound, errorCode)
 	})
 
 	mux := http.NewServeMux()
@@ -106,4 +108,9 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", contentType)
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
+}
+
+// writeError writes {"error": code} with the given HTTP status.
+func writeError(w http.ResponseWriter, status int, code string) {
+	writeJSON(w, status, map[string]string{errorKey: code})
 }

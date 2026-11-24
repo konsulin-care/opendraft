@@ -23,12 +23,12 @@ const (
 
 // authHandler serves the GitHub App login and install redirects.
 type authHandler struct {
-	cfg       config.Config
 	github    *github.Client
 	sealer    *session.Sealer
 	now       func() time.Time
 	authorize func(state, challenge string) string
 	install   func(state string) string
+	cfg       config.Config
 }
 
 // newAuthHandler builds the auth handler and binds the GitHub URL builders.
@@ -52,7 +52,7 @@ func newAuthHandler(cfg config.Config, deps Deps) *authHandler {
 func (h *authHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	state, err := newState()
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal"})
+		writeError(w, http.StatusInternalServerError, "internal")
 		return
 	}
 	verifier, challenge := github.NewPKCE()
@@ -64,7 +64,7 @@ func (h *authHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt: h.now().Add(session.TxMaxAge * time.Second),
 	}
 	if err := session.WriteTx(w, h.sealer, tx); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal"})
+		writeError(w, http.StatusInternalServerError, "internal")
 		return
 	}
 
@@ -77,7 +77,7 @@ func (h *authHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 func (h *authHandler) handleInstall(w http.ResponseWriter, r *http.Request) {
 	state, err := newState()
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal"})
+		writeError(w, http.StatusInternalServerError, "internal")
 		return
 	}
 
@@ -87,7 +87,7 @@ func (h *authHandler) handleInstall(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt: h.now().Add(session.TxMaxAge * time.Second),
 	}
 	if err := session.WriteTx(w, h.sealer, tx); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal"})
+		writeError(w, http.StatusInternalServerError, "internal")
 		return
 	}
 

@@ -18,7 +18,7 @@ func requireSameOrigin(publicOrigin string, next http.Handler) http.Handler {
 		}
 
 		if r.Header.Get("Origin") != publicOrigin {
-			writeJSON(w, http.StatusForbidden, map[string]string{"error": forbiddenOriginCode})
+			writeError(w, http.StatusForbidden, forbiddenOriginCode)
 			return
 		}
 
