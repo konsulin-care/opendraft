@@ -8,12 +8,10 @@ import (
 	"github.com/konsulin-care/opendraft/apps/bff/internal/config"
 )
 
-const testPublicOrigin = "https://publish.example"
-
 // originServer builds the BFF handler with the public origin set and static
 // serving disabled.
 func originServer() http.Handler {
-	return New(config.Config{PublicOrigin: testPublicOrigin}, Deps{Version: "1.2.3"})
+	return New(config.Config{PublicOrigin: testPublicOrigin}, Deps{Version: testVersion})
 }
 
 // serveOrigin issues a request with the given method, target and Origin header.
@@ -35,9 +33,9 @@ func TestSameOriginRejectsUnexpectedOrigin(t *testing.T) {
 		origin string
 	}{
 		{http.MethodPost, ""},
-		{http.MethodPost, "https://evil.example"},
-		{http.MethodPut, "https://evil.example"},
-		{http.MethodDelete, "https://evil.example"},
+		{http.MethodPost, testEvilOrigin},
+		{http.MethodPut, testEvilOrigin},
+		{http.MethodDelete, testEvilOrigin},
 		{http.MethodPatch, "https://publish.example.evil.example"},
 	}
 	for _, tc := range tests {
@@ -47,8 +45,8 @@ func TestSameOriginRejectsUnexpectedOrigin(t *testing.T) {
 			continue
 		}
 		body := decodeJSON(t, rec)
-		if body["error"] != "forbidden_origin" {
-			t.Errorf("%s origin %q error = %q, want forbidden_origin", tc.method, tc.origin, body["error"])
+		if body[errorKey] != "forbidden_origin" {
+			t.Errorf("%s origin %q error = %q, want forbidden_origin", tc.method, tc.origin, body[errorKey])
 		}
 	}
 }
@@ -86,8 +84,8 @@ func TestSameOriginAllowsMatchingOriginOnMutation(t *testing.T) {
 		t.Fatalf("POST status = %d, want 404 (reached the API handler)", rec.Code)
 	}
 	body := decodeJSON(t, rec)
-	if body["error"] != "not_found" {
-		t.Errorf("POST error = %q, want not_found", body["error"])
+	if body[errorKey] != "not_found" {
+		t.Errorf("POST error = %q, want not_found", body[errorKey])
 	}
 }
 

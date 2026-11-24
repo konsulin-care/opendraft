@@ -19,10 +19,10 @@ func newSessionFixture(t *testing.T, fake *fakeGitHub, now time.Time) (*authHand
 	t.Helper()
 
 	cfg := config.Config{
-		PublicOrigin:       "https://publish.example",
-		GitHubClientID:     "client-id",
-		GitHubClientSecret: "client-secret",
-		GitHubAppSlug:      "opendraft-app",
+		PublicOrigin:       testPublicOrigin,
+		GitHubClientID:     testClientID,
+		GitHubClientSecret: testClientSecret,
+		GitHubAppSlug:      testAppSlug,
 		GitHubWebURL:       fake.server.URL,
 		GitHubAPIURL:       fake.server.URL,
 	}
@@ -67,10 +67,10 @@ func sessionCookie(t *testing.T, sealer *session.Sealer, sess session.Session, n
 // at now.
 func liveSession(now time.Time) session.Session {
 	return session.Session{
-		Login:            "octocat",
+		Login:            testOwner,
 		ID:               42,
-		Name:             "The Octocat",
-		AccessToken:      "old-access",
+		Name:             testFullName,
+		AccessToken:      testOldAccess,
 		AccessExpiresAt:  now.Add(8 * time.Hour),
 		RefreshToken:     callbackTestRefresh,
 		RefreshExpiresAt: now.Add(180 * 24 * time.Hour),
@@ -103,14 +103,14 @@ func TestSessionEndpointReturnsIdentityWithoutTokens(t *testing.T) {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
 	body := decodeAnyJSON(t, rec)
-	if body["login"] != "octocat" {
-		t.Errorf("login = %v, want octocat", body["login"])
+	if body["login"] != testOwner {
+		t.Errorf("login = %v, want %s", body["login"], testOwner)
 	}
 	if body["id"] != float64(42) {
 		t.Errorf("id = %v, want 42", body["id"])
 	}
-	if body["name"] != "The Octocat" {
-		t.Errorf("name = %v, want The Octocat", body["name"])
+	if body["name"] != testFullName {
+		t.Errorf("name = %v, want %s", body["name"], testFullName)
 	}
 	wantExpiry := now.Add(session.MaxLifetime).Format(time.RFC3339)
 	if body["expiresAt"] != wantExpiry {
@@ -122,7 +122,7 @@ func TestSessionEndpointReturnsIdentityWithoutTokens(t *testing.T) {
 		}
 	}
 	raw := rec.Body.String()
-	for _, secret := range []string{"old-access", callbackTestRefresh} {
+	for _, secret := range []string{testOldAccess, callbackTestRefresh} {
 		if strings.Contains(raw, secret) {
 			t.Errorf("response body leaks %q: %s", secret, raw)
 		}
@@ -140,8 +140,8 @@ func TestSessionEndpointWithoutSessionReturnsUnauthenticated(t *testing.T) {
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401", rec.Code)
 	}
-	if body := decodeJSON(t, rec); body["error"] != unauthenticatedCode {
-		t.Errorf("error = %q, want %q", body["error"], unauthenticatedCode)
+	if body := decodeJSON(t, rec); body[errorKey] != unauthenticatedCode {
+		t.Errorf("error = %q, want %q", body[errorKey], unauthenticatedCode)
 	}
 	if fake.requests != 0 {
 		t.Errorf("GitHub received %d requests, want 0", fake.requests)
@@ -225,8 +225,8 @@ func TestRequireSessionFailedRefreshClearsAndRejects(t *testing.T) {
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401", rec.Code)
 	}
-	if body := decodeJSON(t, rec); body["error"] != unauthenticatedCode {
-		t.Errorf("error = %q, want %q", body["error"], unauthenticatedCode)
+	if body := decodeJSON(t, rec); body[errorKey] != unauthenticatedCode {
+		t.Errorf("error = %q, want %q", body[errorKey], unauthenticatedCode)
 	}
 	cleared := responseCookie(rec, session.CookieName)
 	if cleared == nil || cleared.MaxAge != -1 || cleared.Value != "" {
@@ -262,8 +262,8 @@ func TestRequireSessionExpiredRefreshTokenClearsAndRejects(t *testing.T) {
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401", rec.Code)
 	}
-	if body := decodeJSON(t, rec); body["error"] != unauthenticatedCode {
-		t.Errorf("error = %q, want %q", body["error"], unauthenticatedCode)
+	if body := decodeJSON(t, rec); body[errorKey] != unauthenticatedCode {
+		t.Errorf("error = %q, want %q", body[errorKey], unauthenticatedCode)
 	}
 	cleared := responseCookie(rec, session.CookieName)
 	if cleared == nil || cleared.MaxAge != -1 {

@@ -40,7 +40,7 @@ func decodeJSON(t *testing.T, rec *httptest.ResponseRecorder) map[string]string 
 }
 
 func TestHealthEndpoint(t *testing.T) {
-	handler := newServer(t, "1.2.3")
+	handler := newServer(t, testVersion)
 
 	rec := getStatic(handler, "/@api/health")
 	if rec.Code != http.StatusOK {
@@ -54,13 +54,13 @@ func TestHealthEndpoint(t *testing.T) {
 	if body["status"] != "ok" {
 		t.Errorf("status field = %q, want ok", body["status"])
 	}
-	if body["version"] != "1.2.3" {
-		t.Errorf("version field = %q, want 1.2.3", body["version"])
+	if body["version"] != testVersion {
+		t.Errorf("version field = %q, want %s", body["version"], testVersion)
 	}
 }
 
 func TestUnknownAPIPathReturnsJSONNotFound(t *testing.T) {
-	handler := newServer(t, "1.2.3")
+	handler := newServer(t, testVersion)
 
 	for _, target := range []string{"/@api/unknown", "/@api", "/@api/auth/nope"} {
 		rec := getStatic(handler, target)
@@ -72,8 +72,8 @@ func TestUnknownAPIPathReturnsJSONNotFound(t *testing.T) {
 			t.Errorf("%s Content-Type = %q, want application/json", target, got)
 		}
 		body := decodeJSON(t, rec)
-		if body["error"] != "not_found" {
-			t.Errorf("%s error field = %q, want not_found", target, body["error"])
+		if body[errorKey] != "not_found" {
+			t.Errorf("%s error field = %q, want not_found", target, body[errorKey])
 		}
 		if strings.Contains(rec.Body.String(), indexMarker) {
 			t.Errorf("%s served index.html instead of the API error", target)
@@ -82,7 +82,7 @@ func TestUnknownAPIPathReturnsJSONNotFound(t *testing.T) {
 }
 
 func TestRootServesStaticIndex(t *testing.T) {
-	handler := newServer(t, "1.2.3")
+	handler := newServer(t, testVersion)
 
 	rec := getStatic(handler, "/")
 	if rec.Code != http.StatusOK {
@@ -94,7 +94,7 @@ func TestRootServesStaticIndex(t *testing.T) {
 }
 
 func TestStaticDisabledServesNoIndex(t *testing.T) {
-	handler := New(config.Config{}, Deps{Version: "1.2.3"})
+	handler := New(config.Config{}, Deps{Version: testVersion})
 
 	rec := getStatic(handler, "/")
 	if rec.Code != http.StatusNotFound {

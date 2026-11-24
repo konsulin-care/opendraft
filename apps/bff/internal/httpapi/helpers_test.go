@@ -15,7 +15,10 @@ import (
 )
 
 const (
+	testPublicOrigin      = "https://publish.example"
 	reposTestOrigin       = testPublicOrigin
+	testEvilOrigin        = "https://evil.example"
+	testVersion           = "1.2.3"
 	testClientID          = "client-id"
 	testClientSecret      = "client-secret"
 	testAppSlug           = "opendraft-app"
