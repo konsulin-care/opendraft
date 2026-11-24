@@ -56,6 +56,8 @@ pre-push:
     # Build
     build:
       run: mise run build
+    budget:
+      run: mise run budget
     build-go:
       run: mise run build-go
       dir: apps/bff

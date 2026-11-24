@@ -67,6 +67,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build TS
         run: mise run build
+      - name: Bundle budget
+        run: mise run budget
       - name: Build Go
         run: mise run build-go
         working-directory: apps/bff

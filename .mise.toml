@@ -63,6 +63,12 @@ dir = "apps/web"
 description = "Build the web app and the BFF binary"
 run = "pnpm --filter @opendraft/web build && mise run build-bff"
 
+[tasks.budget]
+description = "Check per-route gzipped JS against apps/web/bundle-budget.json"
+depends = ["build"]
+run = "node --import tsx scripts/bundle-budget.ts"
+dir = "apps/web"
+
 [tasks.build-bff]
 description = "Build the BFF as a static binary"
 run = "CGO_ENABLED=0 go build -trimpath -ldflags \"-s -w -X main.Version=${VERSION:-0.0.0-dev}\" -o bff ."
