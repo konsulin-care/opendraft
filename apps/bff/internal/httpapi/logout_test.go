@@ -14,15 +14,15 @@ import (
 	"github.com/konsulin-care/opendraft/apps/bff/internal/session"
 )
 
-const logoutTestOrigin = "https://publish.example"
+const revokePath = "/applications/" + testClientID + "/token"
 
 // revokeRecorder captures the token revocation request a fake GitHub receives.
 type revokeRecorder struct {
+	body     map[string]string
 	method   string
 	path     string
 	user     string
 	password string
-	body     map[string]string
 	status   int
 	requests int
 }
@@ -46,10 +46,10 @@ func newLogoutServer(t *testing.T, now time.Time, status int) (http.Handler, *se
 	t.Cleanup(fake.Close)
 
 	cfg := config.Config{
-		PublicOrigin:       logoutTestOrigin,
-		GitHubClientID:     "client-id",
-		GitHubClientSecret: "client-secret",
-		GitHubAppSlug:      "opendraft-app",
+		PublicOrigin:       testPublicOrigin,
+		GitHubClientID:     testClientID,
+		GitHubClientSecret: testClientSecret,
+		GitHubAppSlug:      testAppSlug,
 		GitHubWebURL:       fake.URL,
 		GitHubAPIURL:       fake.URL,
 	}
@@ -78,7 +78,7 @@ func newLogoutServer(t *testing.T, now time.Time, status int) (http.Handler, *se
 // logoutRequest builds a same-origin POST to the logout endpoint.
 func logoutRequest(cookie *http.Cookie) *http.Request {
 	req := httptest.NewRequest(http.MethodPost, logoutPath, nil)
-	req.Header.Set("Origin", logoutTestOrigin)
+	req.Header.Set("Origin", testPublicOrigin)
 	if cookie != nil {
 		req.AddCookie(cookie)
 	}
@@ -112,14 +112,14 @@ func TestLogoutRevokesTokenAndClearsSession(t *testing.T) {
 	if got.method != http.MethodDelete {
 		t.Errorf("method = %q, want DELETE", got.method)
 	}
-	if got.path != "/applications/client-id/token" {
-		t.Errorf("path = %q, want /applications/client-id/token", got.path)
+	if got.path != revokePath {
+		t.Errorf("path = %q, want %s", got.path, revokePath)
 	}
-	if got.user != "client-id" || got.password != "client-secret" {
-		t.Errorf("basic auth = %q:%q, want client-id:client-secret", got.user, got.password)
+	if got.user != testClientID || got.password != testClientSecret {
+		t.Errorf("basic auth = %q:%q, want %s:%s", got.user, got.password, testClientID, testClientSecret)
 	}
-	if got.body["access_token"] != "old-access" {
-		t.Errorf("access_token = %q, want old-access", got.body["access_token"])
+	if got.body["access_token"] != testOldAccess {
+		t.Errorf("access_token = %q, want %s", got.body["access_token"], testOldAccess)
 	}
 	assertSessionCleared(t, rec)
 }
@@ -155,7 +155,7 @@ func TestLogoutIgnoresRevocationFailure(t *testing.T) {
 		t.Errorf("revocation requests = %d, want 1", got.requests)
 	}
 	assertSessionCleared(t, rec)
-	if strings.Contains(rec.Body.String(), "old-access") {
+	if strings.Contains(rec.Body.String(), testOldAccess) {
 		t.Errorf("response leaks access token: %s", rec.Body.String())
 	}
 }

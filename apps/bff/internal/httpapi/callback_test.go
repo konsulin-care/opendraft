@@ -40,8 +40,8 @@ func TestCallbackInvalidStateMakesNoGitHubCall(t *testing.T) {
 			if rec.Code != http.StatusBadRequest {
 				t.Fatalf("status = %d, want 400", rec.Code)
 			}
-			if body := decodeJSON(t, rec); body["error"] != invalidStateCode {
-				t.Errorf("error = %q, want %q", body["error"], invalidStateCode)
+			if body := decodeJSON(t, rec); body[errorKey] != invalidStateCode {
+				t.Errorf("error = %q, want %q", body[errorKey], invalidStateCode)
 			}
 			if fake.requests != 0 {
 				t.Errorf("GitHub received %d requests, want 0", fake.requests)
@@ -50,10 +50,10 @@ func TestCallbackInvalidStateMakesNoGitHubCall(t *testing.T) {
 	}
 }
 
-func TestCallbackExchangesCodeAndSetsSession(t *testing.T) {
-	now := time.Unix(authTestNowUnix, 0).UTC()
-	fake := newFakeGitHub(t)
-	rec, sealer := serveCallback(t, fake, now, callbackTestTree)
+// assertCallbackRedirect checks the callback answers a 303 to returnTo without
+// leaking codes or tokens in the Location header.
+func assertCallbackRedirect(t *testing.T, rec *httptest.ResponseRecorder, returnTo string) {
+	t.Helper()
 
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("status = %d, want 303", rec.Code)
@@ -62,8 +62,8 @@ func TestCallbackExchangesCodeAndSetsSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse Location: %v", err)
 	}
-	if location.Path != callbackTestTree {
-		t.Errorf("Location path = %q, want %q", location.Path, callbackTestTree)
+	if location.Path != returnTo {
+		t.Errorf("Location path = %q, want %q", location.Path, returnTo)
 	}
 	rawLocation := rec.Header().Get("Location")
 	for _, leak := range []string{callbackTestCode, callbackTestAccess, callbackTestRefresh, "code=", "token"} {
@@ -71,22 +71,33 @@ func TestCallbackExchangesCodeAndSetsSession(t *testing.T) {
 			t.Errorf("Location %q contains %q", rawLocation, leak)
 		}
 	}
+}
+
+// assertExchangeForm checks the code exchange carried the code, PKCE verifier
+// and callback URL, and the user lookup used the access token.
+func assertExchangeForm(t *testing.T, fake *fakeGitHub) {
+	t.Helper()
 
 	if got := fake.exchangeForm.Get("code"); got != callbackTestCode {
 		t.Errorf("exchange code = %q, want %q", got, callbackTestCode)
 	}
-	if got := fake.exchangeForm.Get("code_verifier"); got != "verifier-xyz" {
-		t.Errorf("code_verifier = %q, want verifier-xyz", got)
+	if got := fake.exchangeForm.Get("code_verifier"); got != callbackTestVerifier {
+		t.Errorf("code_verifier = %q, want %q", got, callbackTestVerifier)
 	}
-	if got := fake.exchangeForm.Get("redirect_uri"); got != "https://publish.example/@api/auth/callback" {
+	if got := fake.exchangeForm.Get("redirect_uri"); got != testPublicOrigin+callbackPath {
 		t.Errorf("redirect_uri = %q", got)
 	}
 	if fake.userAuth != "Bearer "+callbackTestAccess {
 		t.Errorf("user Authorization = %q, want Bearer %s", fake.userAuth, callbackTestAccess)
 	}
+}
 
-	sess := readSession(t, sealer, rec, now)
-	if sess.Login != "octocat" || sess.ID != 42 || sess.Name != "The Octocat" {
+// assertCallbackSession checks the sealed session holds the GitHub identity and
+// exchanged tokens.
+func assertCallbackSession(t *testing.T, sess session.Session, now time.Time) {
+	t.Helper()
+
+	if sess.Login != testOwner || sess.ID != 42 || sess.Name != testFullName {
 		t.Errorf("session identity = %+v", sess)
 	}
 	if sess.AccessToken != callbackTestAccess || sess.RefreshToken != callbackTestRefresh {
@@ -95,6 +106,11 @@ func TestCallbackExchangesCodeAndSetsSession(t *testing.T) {
 	if !sess.IssuedAt.Equal(now) {
 		t.Errorf("IssuedAt = %v, want %v", sess.IssuedAt, now)
 	}
+}
+
+// assertTxCleared checks the transaction cookie was expired.
+func assertTxCleared(t *testing.T, rec *httptest.ResponseRecorder) {
+	t.Helper()
 
 	cleared := responseCookie(rec, session.TxCookieName)
 	if cleared == nil {
@@ -103,6 +119,17 @@ func TestCallbackExchangesCodeAndSetsSession(t *testing.T) {
 	if cleared.MaxAge != -1 {
 		t.Errorf("transaction cookie MaxAge = %d, want -1", cleared.MaxAge)
 	}
+}
+
+func TestCallbackExchangesCodeAndSetsSession(t *testing.T) {
+	now := time.Unix(authTestNowUnix, 0).UTC()
+	fake := newFakeGitHub(t)
+	rec, sealer := serveCallback(t, fake, now, callbackTestTree)
+
+	assertCallbackRedirect(t, rec, callbackTestTree)
+	assertExchangeForm(t, fake)
+	assertCallbackSession(t, readSession(t, sealer, rec, now), now)
+	assertTxCleared(t, rec)
 }
 
 func TestCallbackUnverifiedEmailRedirectsToReturnTo(t *testing.T) {
@@ -124,8 +151,8 @@ func TestCallbackUnverifiedEmailRedirectsToReturnTo(t *testing.T) {
 			t.Errorf("Location path = %q, want %q", location.Path, callbackTestRepo)
 		}
 		query := location.Query()
-		if got := query.Get("auth_error"); got != "unverified_email" {
-			t.Errorf("auth_error = %q, want unverified_email", got)
+		if got := query.Get("auth_error"); got != unverifiedEmail {
+			t.Errorf("auth_error = %q, want %s", got, unverifiedEmail)
 		}
 		if returnTo == callbackTestRepo+"?intent=edit" && query.Get("intent") != "edit" {
 			t.Errorf("existing query lost: %q", location.RawQuery)

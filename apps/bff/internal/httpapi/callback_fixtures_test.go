@@ -14,22 +14,23 @@ import (
 )
 
 const (
-	callbackTestState   = "expected-state"
-	callbackTestRepo    = "/owner/repo"
-	callbackTestTree    = "/owner/repo/tree/main"
-	callbackTestCode    = "code-1"
-	callbackTestAccess  = "ghu_access"
-	callbackTestRefresh = "ghr_refresh"
+	callbackTestState    = "expected-state"
+	callbackTestRepo     = "/owner/repo"
+	callbackTestTree     = "/owner/repo/tree/main"
+	callbackTestCode     = "code-1"
+	callbackTestAccess   = "ghu_access"
+	callbackTestRefresh  = "ghr_refresh"
+	callbackTestVerifier = "verifier-xyz"
 )
 
 type fakeGitHub struct {
 	server        *httptest.Server
 	exchangeForm  url.Values
 	userAuth      string
+	exchangeError string
 	mu            sync.Mutex
 	requests      int
 	failExchange  bool
-	exchangeError string
 	failUser      bool
 }
 
@@ -83,10 +84,10 @@ func newCallbackServer(t *testing.T, fake *fakeGitHub, now time.Time) (http.Hand
 	t.Helper()
 
 	cfg := config.Config{
-		PublicOrigin:       "https://publish.example",
-		GitHubClientID:     "client-id",
-		GitHubClientSecret: "client-secret",
-		GitHubAppSlug:      "opendraft-app",
+		PublicOrigin:       testPublicOrigin,
+		GitHubClientID:     testClientID,
+		GitHubClientSecret: testClientSecret,
+		GitHubAppSlug:      testAppSlug,
 		GitHubWebURL:       fake.server.URL,
 		GitHubAPIURL:       fake.server.URL,
 	}
@@ -159,7 +160,7 @@ func readSession(t *testing.T, sealer *session.Sealer, rec *httptest.ResponseRec
 func callbackTx(now time.Time) session.Tx {
 	return session.Tx{
 		State:     callbackTestState,
-		Verifier:  "verifier-xyz",
+		Verifier:  callbackTestVerifier,
 		ReturnTo:  callbackTestRepo,
 		ExpiresAt: now.Add(5 * time.Minute),
 	}

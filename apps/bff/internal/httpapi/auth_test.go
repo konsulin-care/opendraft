@@ -23,9 +23,9 @@ func newAuthServer(t *testing.T) (http.Handler, *session.Sealer, config.Config) 
 	t.Helper()
 
 	cfg := config.Config{
-		PublicOrigin:   "https://publish.example",
-		GitHubClientID: "client-id",
-		GitHubAppSlug:  "opendraft-app",
+		PublicOrigin:   testPublicOrigin,
+		GitHubClientID: testClientID,
+		GitHubAppSlug:  testAppSlug,
 		GitHubWebURL:   "https://github.example",
 	}
 	key := make([]byte, 32)
@@ -75,13 +75,13 @@ func readTxFromCookie(t *testing.T, sealer *session.Sealer, cookie *http.Cookie)
 	return tx
 }
 
-func TestLoginRedirectsToAuthorizeWithStateAndPKCE(t *testing.T) {
-	handler, sealer, cfg := newAuthServer(t)
+// loginResponse serves target and returns the recorder and parsed Location of a
+// 302 answer.
+func loginResponse(t *testing.T, handler http.Handler, target string) (*httptest.ResponseRecorder, *url.URL) {
+	t.Helper()
 
-	req := httptest.NewRequest(http.MethodGet, "/@api/auth/login?return_to=/owner/repo", nil)
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, target, nil))
 	if rec.Code != http.StatusFound {
 		t.Fatalf("status = %d, want 302", rec.Code)
 	}
@@ -89,14 +89,27 @@ func TestLoginRedirectsToAuthorizeWithStateAndPKCE(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse Location: %v", err)
 	}
+	return rec, location
+}
+
+// assertAuthorizeLocation checks the redirect targets GitHub authorize with the
+// configured callback URL.
+func assertAuthorizeLocation(t *testing.T, location *url.URL, cfg config.Config) {
+	t.Helper()
+
 	if location.Path != "/login/oauth/authorize" {
 		t.Fatalf("path = %q, want /login/oauth/authorize", location.Path)
 	}
 	if got := location.Query().Get("redirect_uri"); got != cfg.CallbackURL() {
 		t.Fatalf("redirect_uri = %q, want %q", got, cfg.CallbackURL())
 	}
+}
 
-	cookie := txCookie(t, rec)
+// assertTxCookieAttributes checks the transaction cookie is scoped, secure and
+// short lived.
+func assertTxCookieAttributes(t *testing.T, cookie *http.Cookie) {
+	t.Helper()
+
 	if cookie.Path != "/" {
 		t.Errorf("Path = %q, want /", cookie.Path)
 	}
@@ -112,8 +125,13 @@ func TestLoginRedirectsToAuthorizeWithStateAndPKCE(t *testing.T) {
 	if cookie.MaxAge != 600 {
 		t.Errorf("MaxAge = %d, want 600", cookie.MaxAge)
 	}
+}
 
-	tx := readTxFromCookie(t, sealer, cookie)
+// assertLoginState checks the stored transaction matches the redirect state and
+// that the challenge is the S256 hash of the stored verifier.
+func assertLoginState(t *testing.T, tx session.Tx, location *url.URL) {
+	t.Helper()
+
 	state := location.Query().Get("state")
 	if state == "" {
 		t.Fatal("state is empty")
@@ -125,8 +143,8 @@ func TestLoginRedirectsToAuthorizeWithStateAndPKCE(t *testing.T) {
 	if tx.State != state {
 		t.Errorf("stored state = %q, want %q", tx.State, state)
 	}
-	if tx.ReturnTo != "/owner/repo" {
-		t.Errorf("ReturnTo = %q, want /owner/repo", tx.ReturnTo)
+	if tx.ReturnTo != callbackTestRepo {
+		t.Errorf("ReturnTo = %q, want %q", tx.ReturnTo, callbackTestRepo)
 	}
 	if tx.Verifier == "" {
 		t.Fatal("stored verifier is empty")
@@ -139,6 +157,16 @@ func TestLoginRedirectsToAuthorizeWithStateAndPKCE(t *testing.T) {
 	if got := location.Query().Get("code_challenge_method"); got != "S256" {
 		t.Errorf("code_challenge_method = %q, want S256", got)
 	}
+}
+
+func TestLoginRedirectsToAuthorizeWithStateAndPKCE(t *testing.T) {
+	handler, sealer, cfg := newAuthServer(t)
+
+	rec, location := loginResponse(t, handler, loginPath+"?return_to="+callbackTestRepo)
+	assertAuthorizeLocation(t, location, cfg)
+	cookie := txCookie(t, rec)
+	assertTxCookieAttributes(t, cookie)
+	assertLoginState(t, readTxFromCookie(t, sealer, cookie), location)
 }
 
 func TestInstallRedirectsWithSameState(t *testing.T) {

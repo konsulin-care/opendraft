@@ -15,11 +15,13 @@ import (
 )
 
 const (
-	reposTestOrigin       = "https://publish.example"
+	reposTestOrigin       = testPublicOrigin
 	testClientID          = "client-id"
 	testClientSecret      = "client-secret"
 	testAppSlug           = "opendraft-app"
 	testOwner             = "octocat"
+	testFullName          = "The Octocat"
+	testOldAccess         = "old-access"
 	testRepo              = "draft"
 	testDefaultBranch     = "main"
 	testInvalidOwner      = "invalid owner"
