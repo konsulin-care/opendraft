@@ -4,10 +4,15 @@ package httpapi
 import (
 	"io"
 	"io/fs"
+	"mime"
 	"net/http"
 	"os"
 	"strings"
 )
+
+func init() {
+	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
+}
 
 const (
 	assetsPrefix    = "/@assets/"

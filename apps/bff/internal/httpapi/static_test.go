@@ -125,6 +125,38 @@ func TestStaticHandlerRootFiles(t *testing.T) {
 	}
 }
 
+func TestStaticHandlerWebManifest(t *testing.T) {
+	handler := NewStaticHandler(newStaticFixture(t))
+
+	rec := getStatic(handler, "/manifest.webmanifest")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if got := rec.Header().Get("Content-Type"); got != "application/manifest+json" {
+		t.Errorf("Content-Type = %q, want application/manifest+json", got)
+	}
+	if got := rec.Header().Get("Cache-Control"); got != cacheRevalidate {
+		t.Errorf("Cache-Control = %q, want %q", got, cacheRevalidate)
+	}
+	assertSecurityHeaders(t, rec)
+}
+
+func TestStaticHandlerServiceWorker(t *testing.T) {
+	handler := NewStaticHandler(newStaticFixture(t))
+
+	rec := getStatic(handler, "/sw.js")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if got := rec.Header().Get("Content-Type"); !strings.Contains(got, "javascript") {
+		t.Errorf("Content-Type = %q, want a JavaScript media type", got)
+	}
+	if got := rec.Header().Get("Cache-Control"); got != cacheRevalidate {
+		t.Errorf("Cache-Control = %q, want %q", got, cacheRevalidate)
+	}
+	assertSecurityHeaders(t, rec)
+}
+
 func TestStaticHandlerMissingRootFile(t *testing.T) {
 	handler := NewStaticHandler(newStaticFixture(t))
 
