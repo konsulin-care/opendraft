@@ -10,8 +10,8 @@ import (
 
 func TestListOwnersMapsInstallations(t *testing.T) {
 	fake := &fakeActions{router: func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/user/installations" {
-			t.Errorf("path = %q, want /user/installations", r.URL.Path)
+		if r.URL.Path != installationsPath {
+			t.Errorf("path = %q, want %s", r.URL.Path, installationsPath)
 		}
 		_, _ = w.Write([]byte(`{"installations":[
 			{"id":7,"repository_selection":"all","account":{"login":"octocat","type":"User","avatar_url":"https://avatars.example/u/7"}},
@@ -21,13 +21,13 @@ func TestListOwnersMapsInstallations(t *testing.T) {
 	server := httptest.NewServer(fake.handler())
 	t.Cleanup(server.Close)
 
-	owners, err := testClient(server.URL, time.Now()).ListOwners(context.Background(), "ghu_token")
+	owners, err := testClient(server.URL, time.Now()).ListOwners(context.Background(), testToken)
 	if err != nil {
 		t.Fatalf("ListOwners: %v", err)
 	}
 	want := []Owner{
-		{Login: "octocat", Type: "User", AvatarURL: "https://avatars.example/u/7", AllRepos: true},
-		{Login: "acme", Type: "Organization", AvatarURL: "https://avatars.example/u/9", AllRepos: false},
+		{Login: testOwner, Type: "User", AvatarURL: "https://avatars.example/u/7", AllRepos: true},
+		{Login: testOrg, Type: "Organization", AvatarURL: "https://avatars.example/u/9", AllRepos: false},
 	}
 	if len(owners) != len(want) {
 		t.Fatalf("owners = %+v, want %+v", owners, want)
@@ -38,7 +38,7 @@ func TestListOwnersMapsInstallations(t *testing.T) {
 		}
 	}
 	calls := fake.snapshot()
-	if len(calls) != 1 || calls[0].auth != "Bearer ghu_token" {
+	if len(calls) != 1 || calls[0].auth != testBearer {
 		t.Fatalf("calls = %+v", calls)
 	}
 }
@@ -50,7 +50,7 @@ func TestListOwnersEmpty(t *testing.T) {
 	server := httptest.NewServer(fake.handler())
 	t.Cleanup(server.Close)
 
-	owners, err := testClient(server.URL, time.Now()).ListOwners(context.Background(), "ghu_token")
+	owners, err := testClient(server.URL, time.Now()).ListOwners(context.Background(), testToken)
 	if err != nil {
 		t.Fatalf("ListOwners: %v", err)
 	}

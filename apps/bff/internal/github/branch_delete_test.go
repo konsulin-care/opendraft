@@ -19,7 +19,7 @@ func TestDeleteBranchSendsAuthenticatedDelete(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	err := testClient(server.URL, time.Now()).DeleteBranch(
-		context.Background(), "ghu_token", "octocat", "draft", "od-ada/paper one")
+		context.Background(), testToken, testOwner, testRepo, testBranchSpaced)
 	if err != nil {
 		t.Fatalf("DeleteBranch: %v", err)
 	}
@@ -31,10 +31,10 @@ func TestDeleteBranchSendsAuthenticatedDelete(t *testing.T) {
 	if call.method != http.MethodDelete {
 		t.Errorf("method = %q, want DELETE", call.method)
 	}
-	if call.path != "/repos/octocat/draft/git/refs/heads/od-ada/paper one" {
+	if call.path != deleteBranchPath {
 		t.Errorf("path = %q", call.path)
 	}
-	if call.auth != "Bearer ghu_token" {
+	if call.auth != testBearer {
 		t.Errorf("Authorization = %q", call.auth)
 	}
 }
@@ -51,7 +51,7 @@ func TestDeleteBranchIdempotentStatuses(t *testing.T) {
 			t.Cleanup(server.Close)
 
 			if err := testClient(server.URL, time.Now()).DeleteBranch(
-				context.Background(), "ghu_token", "octocat", "draft", "od-ada/paper"); err != nil {
+				context.Background(), testToken, testOwner, testRepo, testBranch); err != nil {
 				t.Fatalf("DeleteBranch status %d: %v", status, err)
 			}
 		})
@@ -70,7 +70,7 @@ func TestDeleteBranchErrorMapping(t *testing.T) {
 			t.Cleanup(server.Close)
 
 			err := testClient(server.URL, time.Now()).DeleteBranch(
-				context.Background(), "ghu_token", "octocat", "draft", "od-ada/paper")
+				context.Background(), testToken, testOwner, testRepo, testBranch)
 			if !errors.Is(err, ErrForbidden) {
 				t.Fatalf("err = %v, want ErrForbidden", err)
 			}
@@ -84,7 +84,7 @@ func TestDeleteBranchErrorMapping(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	err := testClient(server.URL, time.Now()).DeleteBranch(
-		context.Background(), "ghu_token", "octocat", "draft", "od-ada/paper")
+		context.Background(), testToken, testOwner, testRepo, testBranch)
 	if !errors.Is(err, ErrUpstream) {
 		t.Fatalf("err = %v, want ErrUpstream", err)
 	}

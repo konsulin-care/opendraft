@@ -57,23 +57,23 @@ func (f *fakeActions) snapshot() []actionCall {
 func TestRepoPermissionsAllRepositories(t *testing.T) {
 	fake := &fakeActions{router: func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/repos/octocat/draft":
+		case settingsPath:
 			_, _ = w.Write([]byte(`{"default_branch":"main","private":false,"permissions":{"push":true}}`))
-		case "/user/installations":
+		case installationsPath:
 			_, _ = w.Write([]byte(`{"installations":[{"id":7,"repository_selection":"all","account":{"login":"OctoCat"}}]}`))
 		default:
-			t.Errorf("unexpected path %q", r.URL.Path)
+			t.Errorf(unexpectedPath, r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}}
 	server := httptest.NewServer(fake.handler())
 	t.Cleanup(server.Close)
 
-	perms, err := testClient(server.URL, time.Now()).RepoPermissions(context.Background(), "ghu_token", "octocat", "octocat", "draft")
+	perms, err := testClient(server.URL, time.Now()).RepoPermissions(context.Background(), testToken, testOwner, testOwner, testRepo)
 	if err != nil {
-		t.Fatalf("RepoPermissions: %v", err)
+		t.Fatalf(repoPermissionsFailed, err)
 	}
-	if !perms.Push || !perms.Installed || perms.DefaultBranch != "main" {
+	if !perms.Push || !perms.Installed || perms.DefaultBranch != testDefaultBranch {
 		t.Fatalf("got %+v", perms)
 	}
 	if perms.Private {
@@ -89,7 +89,7 @@ func TestRepoPermissionsAllRepositories(t *testing.T) {
 	if len(calls) != 2 {
 		t.Fatalf("calls = %d, want 2", len(calls))
 	}
-	if calls[0].auth != "Bearer ghu_token" {
+	if calls[0].auth != testBearer {
 		t.Errorf("Authorization = %q", calls[0].auth)
 	}
 }
@@ -97,26 +97,26 @@ func TestRepoPermissionsAllRepositories(t *testing.T) {
 func TestRepoPermissionsSelectedRepository(t *testing.T) {
 	fake := &fakeActions{router: func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/repos/acme/paper":
+		case acmePaperPath:
 			_, _ = w.Write([]byte(`{"default_branch":"trunk","private":true,"allow_forking":false,"permissions":{"push":false}}`))
-		case "/user/installations":
+		case installationsPath:
 			_, _ = w.Write([]byte(`{"installations":[{"id":9,"repository_selection":"selected","account":{"login":"acme"}},{"id":11,"repository_selection":"all","account":{"login":"viewer"}}]}`))
-		case "/user/installations/9/repositories":
+		case installationReposPath:
 			if r.URL.Query().Get("per_page") != "100" || r.URL.Query().Get("page") != "1" {
 				t.Errorf("query = %q", r.URL.RawQuery)
 			}
 			_, _ = w.Write([]byte(`{"repositories":[{"full_name":"acme/other"},{"full_name":"acme/paper"}]}`))
 		default:
-			t.Errorf("unexpected path %q", r.URL.Path)
+			t.Errorf(unexpectedPath, r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}}
 	server := httptest.NewServer(fake.handler())
 	t.Cleanup(server.Close)
 
-	perms, err := testClient(server.URL, time.Now()).RepoPermissions(context.Background(), "ghu_token", "viewer", "acme", "paper")
+	perms, err := testClient(server.URL, time.Now()).RepoPermissions(context.Background(), testToken, testViewer, testOrg, testPaper)
 	if err != nil {
-		t.Fatalf("RepoPermissions: %v", err)
+		t.Fatalf(repoPermissionsFailed, err)
 	}
 	if perms.Push {
 		t.Error("Push = true, want false")
@@ -138,23 +138,23 @@ func TestRepoPermissionsSelectedRepository(t *testing.T) {
 func TestRepoPermissionsNotInstalled(t *testing.T) {
 	fake := &fakeActions{router: func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/repos/acme/paper":
+		case acmePaperPath:
 			_, _ = w.Write([]byte(`{"default_branch":"main","private":true,"allow_forking":true,"permissions":{"push":true}}`))
-		case "/user/installations":
+		case installationsPath:
 			_, _ = w.Write([]byte(`{"installations":[{"id":9,"repository_selection":"selected","account":{"login":"acme"}},{"id":8,"repository_selection":"all","account":{"login":"other"}}]}`))
-		case "/user/installations/9/repositories":
+		case installationReposPath:
 			_, _ = w.Write([]byte(`{"repositories":[{"full_name":"acme/other"}]}`))
 		default:
-			t.Errorf("unexpected path %q", r.URL.Path)
+			t.Errorf(unexpectedPath, r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}}
 	server := httptest.NewServer(fake.handler())
 	t.Cleanup(server.Close)
 
-	perms, err := testClient(server.URL, time.Now()).RepoPermissions(context.Background(), "ghu_token", "viewer", "acme", "paper")
+	perms, err := testClient(server.URL, time.Now()).RepoPermissions(context.Background(), testToken, testViewer, testOrg, testPaper)
 	if err != nil {
-		t.Fatalf("RepoPermissions: %v", err)
+		t.Fatalf(repoPermissionsFailed, err)
 	}
 	if perms.Installed {
 		t.Error("Installed = true, want false")
@@ -169,7 +169,7 @@ func TestRepoPermissionsNotInstalled(t *testing.T) {
 
 func TestCreatePull(t *testing.T) {
 	fake := &fakeActions{router: func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/repos/octocat/draft/pulls" {
+		if r.URL.Path != pullsPath {
 			t.Errorf("path = %q", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusCreated)
@@ -178,18 +178,18 @@ func TestCreatePull(t *testing.T) {
 	server := httptest.NewServer(fake.handler())
 	t.Cleanup(server.Close)
 
-	number, url, err := testClient(server.URL, time.Now()).CreatePull(context.Background(), "ghu_token", "octocat", "draft", "Init", "opendraft/init", "main", "hello")
+	number, url, err := testClient(server.URL, time.Now()).CreatePull(context.Background(), testToken, testOwner, testRepo, "Init", "opendraft/init", testDefaultBranch, "hello")
 	if err != nil {
 		t.Fatalf("CreatePull: %v", err)
 	}
-	if number != 12 || url != "https://github.example/octocat/draft/pull/12" {
+	if number != 12 || url != pullURL {
 		t.Fatalf("number=%d url=%q", number, url)
 	}
 	calls := fake.snapshot()
 	if len(calls) != 1 || calls[0].method != http.MethodPost {
 		t.Fatalf("calls = %+v", calls)
 	}
-	if calls[0].body["head"] != "opendraft/init" || calls[0].body["base"] != "main" {
+	if calls[0].body["head"] != "opendraft/init" || calls[0].body["base"] != testDefaultBranch {
 		t.Errorf("body = %+v", calls[0].body)
 	}
 	if calls[0].body["maintainer_can_modify"] != true {
@@ -199,7 +199,7 @@ func TestCreatePull(t *testing.T) {
 
 func TestCreateFork(t *testing.T) {
 	fake := &fakeActions{router: func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/repos/octocat/draft/forks" {
+		if r.URL.Path != forksPath {
 			t.Errorf("path = %q", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusAccepted)
@@ -208,11 +208,11 @@ func TestCreateFork(t *testing.T) {
 	server := httptest.NewServer(fake.handler())
 	t.Cleanup(server.Close)
 
-	repo, err := testClient(server.URL, time.Now()).CreateFork(context.Background(), "ghu_token", "octocat", "draft")
+	repo, err := testClient(server.URL, time.Now()).CreateFork(context.Background(), testToken, testOwner, testRepo)
 	if err != nil {
 		t.Fatalf("CreateFork: %v", err)
 	}
-	want := Repo{Owner: "me", Name: "draft", HTMLURL: "https://github.example/me/draft", DefaultBranch: "main"}
+	want := Repo{Owner: "me", Name: testRepo, HTMLURL: "https://github.example/me/draft", DefaultBranch: testDefaultBranch}
 	if repo != want {
 		t.Fatalf("repo = %+v, want %+v", repo, want)
 	}
@@ -242,7 +242,7 @@ func TestRepoActionStatusMapping(t *testing.T) {
 			}))
 			t.Cleanup(server.Close)
 
-			_, _, err := testClient(server.URL, time.Now()).CreatePull(context.Background(), "ghu_token", "o", "r", "t", "h", "b", "")
+			_, _, err := testClient(server.URL, time.Now()).CreatePull(context.Background(), testToken, "o", "r", "t", "h", "b", "")
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("err = %v, want %v", err, tt.want)
 			}

@@ -100,27 +100,37 @@ func (c *Client) RepoPermissions(ctx context.Context, token, viewer, owner, repo
 		Private:       settings.Private,
 		AllowForking:  !settings.Private || settings.AllowForking,
 	}
-	fullName := owner + "/" + repo
-	for _, inst := range list.Installations {
-		if strings.EqualFold(inst.Account.Login, viewer) && inst.RepositorySelection == "all" {
+	if err := c.applyInstallations(ctx, token, viewer, owner, owner+"/"+repo, list.Installations, &result); err != nil {
+		return RepoPermissions{}, err
+	}
+	return result, nil
+}
+
+// applyInstallations fills the installation facts of result from the user's
+// installations, resolving selected-repository installations through the
+// installation repositories endpoint.
+func (c *Client) applyInstallations(ctx context.Context, token, viewer, owner, fullName string, installations []installation, result *RepoPermissions) error {
+	const allRepositories = "all"
+	for _, inst := range installations {
+		if strings.EqualFold(inst.Account.Login, viewer) && inst.RepositorySelection == allRepositories {
 			result.ViewerInstalledAll = true
 		}
 		if !strings.EqualFold(inst.Account.Login, owner) || result.Installed {
 			continue
 		}
-		if inst.RepositorySelection == "all" {
+		if inst.RepositorySelection == allRepositories {
 			result.Installed = true
 			continue
 		}
 		found, err := c.installationCoversRepo(ctx, token, inst.ID, fullName)
 		if err != nil {
-			return RepoPermissions{}, err
+			return err
 		}
 		if found {
 			result.Installed = true
 		}
 	}
-	return result, nil
+	return nil
 }
 
 // installationCoversRepo reports whether the installation lists fullName on one
@@ -238,7 +248,7 @@ func (c *Client) doActionJSON(req *http.Request, out any) error {
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrUpstream, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	switch {
 	case resp.StatusCode >= 200 && resp.StatusCode <= 299:
