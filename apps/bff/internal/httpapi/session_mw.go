@@ -19,9 +19,9 @@ const (
 // never carries any token field.
 type sessionResponse struct {
 	Login     string `json:"login"`
-	ID        int64  `json:"id"`
 	Name      string `json:"name"`
 	ExpiresAt string `json:"expiresAt"`
+	ID        int64  `json:"id"`
 }
 
 // requireSession wraps next with session authentication. It reads the sealed
@@ -88,5 +88,5 @@ func needsRefresh(sess session.Session, now time.Time) bool {
 // unauthenticated error code.
 func rejectSession(w http.ResponseWriter) {
 	session.Clear(w)
-	writeJSON(w, http.StatusUnauthorized, map[string]string{"error": unauthenticatedCode})
+	writeError(w, http.StatusUnauthorized, unauthenticatedCode)
 }

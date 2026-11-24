@@ -96,7 +96,7 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request, fsys fs.FS, name st
 	if err != nil {
 		return false
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	info, err := file.Stat()
 	if err != nil || info.IsDir() {

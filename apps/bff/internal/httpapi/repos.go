@@ -109,8 +109,8 @@ func validateRepoRequest(body createRepoRequest) string {
 // the offending field.
 func writeInvalidRequest(w http.ResponseWriter, field string) {
 	writeJSON(w, http.StatusBadRequest, map[string]string{
-		"error": invalidRequestCode,
-		"field": field,
+		errorKey: invalidRequestCode,
+		"field":  field,
 	})
 }
 
@@ -119,10 +119,10 @@ func writeInvalidRequest(w http.ResponseWriter, field string) {
 func writeRepoError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, github.ErrNameTaken):
-		writeJSON(w, http.StatusConflict, map[string]string{"error": nameTakenCode})
+		writeError(w, http.StatusConflict, nameTakenCode)
 	case errors.Is(err, github.ErrForbidden):
-		writeJSON(w, http.StatusForbidden, map[string]string{"error": forbiddenCode})
+		writeError(w, http.StatusForbidden, forbiddenCode)
 	default:
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": upstreamErrorCode})
+		writeError(w, http.StatusBadGateway, upstreamErrorCode)
 	}
 }

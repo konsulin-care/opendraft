@@ -46,11 +46,11 @@ type branchRefResponse struct {
 
 // pullInfoResponse is the JSON answer of the pull lookup endpoint.
 type pullInfoResponse struct {
-	Number      int    `json:"number"`
 	URL         string `json:"url"`
 	State       string `json:"state"`
 	ReviewState string `json:"reviewState"`
 	HeadSHA     string `json:"headSha"`
+	Number      int    `json:"number"`
 }
 
 // mergeUpstreamBody is the JSON body of the merge-upstream endpoint.
@@ -116,7 +116,7 @@ func (h *suggestionsHandler) handlePullLookup(w http.ResponseWriter, r *http.Req
 			return
 		}
 		if !found {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": errorCode})
+			writeError(w, http.StatusNotFound, errorCode)
 			return
 		}
 		writeJSON(w, http.StatusOK, pullInfoResponse{
@@ -149,7 +149,7 @@ func (h *suggestionsHandler) handleMergeUpstream(w http.ResponseWriter, r *http.
 
 		err := h.github.MergeUpstream(r.Context(), sess.AccessToken, owner, repo, body.Branch)
 		if errors.Is(err, github.ErrConflict) {
-			writeJSON(w, http.StatusConflict, map[string]string{"error": conflictCode})
+			writeError(w, http.StatusConflict, conflictCode)
 			return
 		}
 		if err != nil {

@@ -46,7 +46,7 @@ func (h *logoutHandler) handleLogout(w http.ResponseWriter, r *http.Request) {
 			if err := h.github.RevokeToken(r.Context(), sess.AccessToken); err != nil {
 				h.logger.Warn("logout token revocation failed",
 					slog.String("login", sess.Login),
-					slog.String("error", err.Error()),
+					slog.String(errorKey, err.Error()),
 				)
 			}
 		}
