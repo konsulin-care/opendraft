@@ -154,8 +154,17 @@ async function replaceScopedFiles(
   }
 }
 
+/** Compare repository names the way GitHub does: case-insensitively. */
+function sameRepo(a: string, b: string): boolean {
+  return a.toLowerCase() === b.toLowerCase();
+}
+
 /**
  * Sync the target default branch into the fork, ignoring every failure.
+ *
+ * The draft branch lives on the upstream itself when the source repository is
+ * the upstream repository, so there is no fork to sync and GitHub would reject
+ * the merge-upstream call.
  *
  * @param source - Stored GitHub source of the draft.
  * @param deps - Injected dependencies.
@@ -164,6 +173,13 @@ async function syncBestEffort(
   source: ProjectSourceGitHub,
   deps: RestartDeps,
 ): Promise<void> {
+  if (
+    sameRepo(source.owner, source.upstream.owner) &&
+    sameRepo(source.repo, source.upstream.repo)
+  ) {
+    return;
+  }
+
   try {
     await deps.syncFork(source.owner, source.repo, source.upstream.defaultBranch);
   } catch {

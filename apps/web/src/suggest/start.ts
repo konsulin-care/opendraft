@@ -172,11 +172,18 @@ async function findRemoteBranch(
   return { branch, pull };
 }
 
-/** Sync the target default branch into the fork, ignoring every failure. */
+/**
+ * Sync the target default branch into the fork, ignoring every failure.
+ *
+ * A `branch` plan targets the upstream itself, which has no fork to sync.
+ */
 async function syncBestEffort(
   target: SuggestionTarget,
+  plan: SuggestionPlan,
   deps: StartSuggestionDeps,
 ): Promise<void> {
+  if (plan === 'branch') return;
+
   try {
     await deps.syncFork(target.owner, target.repo, target.defaultBranch);
   } catch {
@@ -259,9 +266,7 @@ export async function startSuggestion(
     );
   }
 
-  if (input.plan === 'fork') {
-    await syncBestEffort(target, deps);
-  }
+  await syncBestEffort(target, input.plan, deps);
   return importDraft(
     {
       input,
