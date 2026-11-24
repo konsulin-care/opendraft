@@ -7,6 +7,14 @@ import (
 	"testing"
 )
 
+const (
+	testPublicOrigin = "https://publish.example.test"
+	testClientID     = "client-id"
+	testClientSecret = "client-secret"
+	testAppSlug      = "opendraft"
+	testLoadError    = "Load returned error: %v"
+)
+
 // fakeEnv builds a getenv function backed by a map.
 func fakeEnv(values map[string]string) func(string) string {
 	return func(name string) string {
@@ -26,22 +34,43 @@ func validSessionKey(fill byte) string {
 // requiredEnv returns an environment with every required variable set.
 func requiredEnv() map[string]string {
 	env := map[string]string{}
-	env["BFF_PUBLIC_ORIGIN"] = "https://publish.example.test"
-	env["BFF_GITHUB_CLIENT_ID"] = "client-id"
-	env["BFF_GITHUB_CLIENT_SECRET"] = "client-secret"
-	env["BFF_GITHUB_APP_SLUG"] = "opendraft"
-	env["BFF_SESSION_KEY"] = validSessionKey(2)
+	env[envPublicOrigin] = testPublicOrigin
+	env[envGitHubClientID] = testClientID
+	env[envGitHubClientSecret] = testClientSecret
+	env[envGitHubAppSlug] = testAppSlug
+	env[envSessionKey] = validSessionKey(2)
 	return env
+}
+
+// assertPartialCredentials asserts that Load rejects env and that the error
+// names every missing variable without naming any configured one.
+func assertPartialCredentials(t *testing.T, env map[string]string, missing, configured []string) {
+	t.Helper()
+	_, err := Load(fakeEnv(env), nil)
+	if err == nil {
+		t.Fatal("Load returned nil error for partial credentials")
+	}
+	message := err.Error()
+	for _, name := range missing {
+		if !strings.Contains(message, name) {
+			t.Errorf("error %q does not name missing variable %s", message, name)
+		}
+	}
+	for _, name := range configured {
+		if strings.Contains(message, name) {
+			t.Errorf("error %q unexpectedly names configured variable %s", message, name)
+		}
+	}
 }
 
 // TestLoadAllowsAnonymousMode asserts that only BFF_PUBLIC_ORIGIN is always
 // required and that an anonymous configuration has no session key.
 func TestLoadAllowsAnonymousMode(t *testing.T) {
 	cfg, err := Load(fakeEnv(map[string]string{
-		"BFF_PUBLIC_ORIGIN": "https://publish.example.test",
+		envPublicOrigin: testPublicOrigin,
 	}), nil)
 	if err != nil {
-		t.Fatalf("Load returned error: %v", err)
+		t.Fatalf(testLoadError, err)
 	}
 	if cfg.LoginEnabled {
 		t.Error("LoginEnabled = true, want false")
@@ -56,46 +85,24 @@ func TestLoadAllowsAnonymousMode(t *testing.T) {
 func TestLoadReportsPartialCredentials(t *testing.T) {
 	t.Run("only client id", func(t *testing.T) {
 		env := map[string]string{
-			"BFF_PUBLIC_ORIGIN": "https://publish.example.test",
+			envPublicOrigin:       testPublicOrigin,
+			envGitHubClientID:     testClientID,
+			envSessionKeyPrevious: validSessionKey(3),
 		}
-		env["BFF_GITHUB_CLIENT_ID"] = "client-id"
-		env["BFF_SESSION_KEY_PREVIOUS"] = validSessionKey(3)
-		_, err := Load(fakeEnv(env), nil)
-		if err == nil {
-			t.Fatal("Load returned nil error for partial credentials")
-		}
-		message := err.Error()
-		for _, name := range []string{"BFF_GITHUB_CLIENT_SECRET", "BFF_GITHUB_APP_SLUG"} {
-			if !strings.Contains(message, name) {
-				t.Errorf("error %q does not name missing variable %s", message, name)
-			}
-		}
-		for _, name := range []string{"BFF_GITHUB_CLIENT_ID", "BFF_PUBLIC_ORIGIN", "BFF_SESSION_KEY"} {
-			if strings.Contains(message, name) {
-				t.Errorf("error %q unexpectedly names configured variable %s", message, name)
-			}
-		}
+		assertPartialCredentials(t, env,
+			[]string{envGitHubClientSecret, envGitHubAppSlug},
+			[]string{envGitHubClientID, envPublicOrigin, envSessionKey})
 	})
 
 	t.Run("secret and slug", func(t *testing.T) {
 		env := map[string]string{
-			"BFF_PUBLIC_ORIGIN": "https://publish.example.test",
+			envPublicOrigin:       testPublicOrigin,
+			envGitHubClientSecret: testClientSecret,
+			envGitHubAppSlug:      testAppSlug,
 		}
-		env["BFF_GITHUB_CLIENT_SECRET"] = "client-secret"
-		env["BFF_GITHUB_APP_SLUG"] = "opendraft"
-		_, err := Load(fakeEnv(env), nil)
-		if err == nil {
-			t.Fatal("Load returned nil error for partial credentials")
-		}
-		message := err.Error()
-		if !strings.Contains(message, "BFF_GITHUB_CLIENT_ID") {
-			t.Errorf("error %q does not name missing variable BFF_GITHUB_CLIENT_ID", message)
-		}
-		for _, name := range []string{"BFF_GITHUB_CLIENT_SECRET", "BFF_GITHUB_APP_SLUG", "BFF_SESSION_KEY"} {
-			if strings.Contains(message, name) {
-				t.Errorf("error %q unexpectedly names variable %s", message, name)
-			}
-		}
+		assertPartialCredentials(t, env,
+			[]string{envGitHubClientID},
+			[]string{envGitHubClientSecret, envGitHubAppSlug, envSessionKey})
 	})
 }
 
@@ -103,18 +110,18 @@ func TestLoadReportsPartialCredentials(t *testing.T) {
 // enable login and require a valid session key.
 func TestLoadRequiresSessionKeyWhenLoginEnabled(t *testing.T) {
 	env := requiredEnv()
-	delete(env, "BFF_SESSION_KEY")
+	delete(env, envSessionKey)
 	_, err := Load(fakeEnv(env), nil)
 	if err == nil {
 		t.Fatal("Load returned nil error without a session key")
 	}
-	if !strings.Contains(err.Error(), "BFF_SESSION_KEY") {
-		t.Errorf("error %q does not name BFF_SESSION_KEY", err)
+	if !strings.Contains(err.Error(), envSessionKey) {
+		t.Errorf("error %q does not name %s", err, envSessionKey)
 	}
 
 	cfg, err := Load(fakeEnv(requiredEnv()), nil)
 	if err != nil {
-		t.Fatalf("Load returned error: %v", err)
+		t.Fatalf(testLoadError, err)
 	}
 	if !cfg.LoginEnabled {
 		t.Error("LoginEnabled = false, want true")
@@ -132,11 +139,11 @@ func TestLoadReadsSecretFiles(t *testing.T) {
 	files["/run/secrets/client-secret"] = "  file-client-secret\n"
 	files["/run/secrets/session-key"] = sessionKey + "\n"
 	env := map[string]string{}
-	env["BFF_PUBLIC_ORIGIN"] = "https://publish.example.test"
-	env["BFF_GITHUB_CLIENT_ID"] = "client-id"
-	env["BFF_GITHUB_CLIENT_SECRET_FILE"] = "/run/secrets/client-secret"
-	env["BFF_GITHUB_APP_SLUG"] = "opendraft"
-	env["BFF_SESSION_KEY_FILE"] = "/run/secrets/session-key"
+	env[envPublicOrigin] = testPublicOrigin
+	env[envGitHubClientID] = testClientID
+	env[envGitHubClientSecretFile] = "/run/secrets/client-secret"
+	env[envGitHubAppSlug] = testAppSlug
+	env[envSessionKeyFile] = "/run/secrets/session-key"
 	readFile := func(path string) ([]byte, error) {
 		value, ok := files[path]
 		if !ok {
@@ -147,7 +154,7 @@ func TestLoadReadsSecretFiles(t *testing.T) {
 
 	cfg, err := Load(fakeEnv(env), readFile)
 	if err != nil {
-		t.Fatalf("Load returned error: %v", err)
+		t.Fatalf(testLoadError, err)
 	}
 	if cfg.GitHubClientSecret != "file-client-secret" {
 		t.Errorf("GitHubClientSecret = %q, want file value", cfg.GitHubClientSecret)
@@ -159,7 +166,7 @@ func TestLoadReadsSecretFiles(t *testing.T) {
 	if string(cfg.SessionKey) != string(decoded) {
 		t.Errorf("SessionKey = %v, want file key", cfg.SessionKey)
 	}
-	if got, want := cfg.CallbackURL(), "https://publish.example.test/@api/auth/callback"; got != want {
+	if got, want := cfg.CallbackURL(), testPublicOrigin+"/@api/auth/callback"; got != want {
 		t.Errorf("CallbackURL() = %q, want %q", got, want)
 	}
 }
@@ -169,8 +176,8 @@ func TestLoadReadsSecretFiles(t *testing.T) {
 func assertInvalidSessionKey(t *testing.T, current, previous, want string) {
 	t.Helper()
 	env := requiredEnv()
-	env["BFF_SESSION_KEY"] = current
-	env["BFF_SESSION_KEY_PREVIOUS"] = previous
+	env[envSessionKey] = current
+	env[envSessionKeyPrevious] = previous
 	_, err := Load(fakeEnv(env), nil)
 	if err == nil {
 		t.Fatal("Load returned nil error for invalid session key")
@@ -185,16 +192,16 @@ func assertInvalidSessionKey(t *testing.T, current, previous, want string) {
 func TestLoadRejectsInvalidSessionKeys(t *testing.T) {
 	shortKey := base64.StdEncoding.EncodeToString([]byte("too-short"))
 	t.Run("current invalid base64", func(t *testing.T) {
-		assertInvalidSessionKey(t, "not base64!", "", "BFF_SESSION_KEY")
+		assertInvalidSessionKey(t, "not base64!", "", envSessionKey)
 	})
 	t.Run("current wrong length", func(t *testing.T) {
-		assertInvalidSessionKey(t, shortKey, "", "BFF_SESSION_KEY")
+		assertInvalidSessionKey(t, shortKey, "", envSessionKey)
 	})
 	t.Run("previous invalid base64", func(t *testing.T) {
-		assertInvalidSessionKey(t, validSessionKey(2), "not base64!", "BFF_SESSION_KEY_PREVIOUS")
+		assertInvalidSessionKey(t, validSessionKey(2), "not base64!", envSessionKeyPrevious)
 	})
 	t.Run("previous wrong length", func(t *testing.T) {
-		assertInvalidSessionKey(t, validSessionKey(2), shortKey, "BFF_SESSION_KEY_PREVIOUS")
+		assertInvalidSessionKey(t, validSessionKey(2), shortKey, envSessionKeyPrevious)
 	})
 }
 
@@ -203,18 +210,18 @@ func TestLoadRejectsInvalidSessionKeys(t *testing.T) {
 func TestLoadAppliesDefaults(t *testing.T) {
 	cfg, err := Load(fakeEnv(requiredEnv()), nil)
 	if err != nil {
-		t.Fatalf("Load returned error: %v", err)
+		t.Fatalf(testLoadError, err)
 	}
-	if cfg.Addr != ":8080" {
-		t.Errorf("Addr = %q, want :8080", cfg.Addr)
+	if cfg.Addr != defaultAddr {
+		t.Errorf("Addr = %q, want %s", cfg.Addr, defaultAddr)
 	}
-	if cfg.StaticDir != "/srv/web" {
-		t.Errorf("StaticDir = %q, want /srv/web", cfg.StaticDir)
+	if cfg.StaticDir != defaultStaticDir {
+		t.Errorf("StaticDir = %q, want %s", cfg.StaticDir, defaultStaticDir)
 	}
-	if cfg.GitHubWebURL != "https://github.com" {
-		t.Errorf("GitHubWebURL = %q, want https://github.com", cfg.GitHubWebURL)
+	if cfg.GitHubWebURL != defaultGitHubWebURL {
+		t.Errorf("GitHubWebURL = %q, want %s", cfg.GitHubWebURL, defaultGitHubWebURL)
 	}
-	if cfg.GitHubAPIURL != "https://api.github.com" {
-		t.Errorf("GitHubAPIURL = %q, want https://api.github.com", cfg.GitHubAPIURL)
+	if cfg.GitHubAPIURL != defaultGitHubAPIURL {
+		t.Errorf("GitHubAPIURL = %q, want %s", cfg.GitHubAPIURL, defaultGitHubAPIURL)
 	}
 }

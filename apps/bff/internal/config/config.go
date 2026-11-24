@@ -26,6 +26,7 @@ const envSessionKeyFile = "BFF_SESSION_KEY_FILE"
 const envSessionKeyPrevious = "BFF_SESSION_KEY_PREVIOUS"
 const envGitHubWebURL = "BFF_GITHUB_WEB_URL"
 const envGitHubAPIURL = "BFF_GITHUB_API_URL"
+const requiredFormat = "%s is required"
 
 // Config holds the validated configuration of the BFF service.
 type Config struct {
@@ -42,19 +43,19 @@ type Config struct {
 	GitHubClientSecret string
 	// GitHubAppSlug is the URL slug of the GitHub App.
 	GitHubAppSlug string
-	// LoginEnabled reports whether the GitHub App credentials are complete and
-	// sign-in is therefore available. When false the BFF runs in anonymous,
-	// read-only mode.
-	LoginEnabled bool
+	// GitHubWebURL is the base URL of the GitHub web frontend.
+	GitHubWebURL string
+	// GitHubAPIURL is the base URL of the GitHub REST API.
+	GitHubAPIURL string
 	// SessionKey is the current 32-byte session encryption key.
 	SessionKey []byte
 	// SessionKeyPrevious is the optional previous 32-byte session key used
 	// during key rotation.
 	SessionKeyPrevious []byte
-	// GitHubWebURL is the base URL of the GitHub web frontend.
-	GitHubWebURL string
-	// GitHubAPIURL is the base URL of the GitHub REST API.
-	GitHubAPIURL string
+	// LoginEnabled reports whether the GitHub App credentials are complete and
+	// sign-in is therefore available. When false the BFF runs in anonymous,
+	// read-only mode.
+	LoginEnabled bool
 }
 
 // CallbackURL returns the public OAuth callback URL of the BFF.
@@ -76,82 +77,127 @@ func Load(getenv func(string) string, readFile func(string) ([]byte, error)) (Co
 	}
 
 	var problems []string
-
-	cfg := Config{}
-	cfg.Addr = defaultWhenEmpty(getenv(envAddr), defaultAddr)
-	cfg.PublicOrigin = strings.TrimSpace(getenv(envPublicOrigin))
-	cfg.StaticDir = defaultWhenEmpty(getenv(envStaticDir), defaultStaticDir)
-	cfg.GitHubClientID = strings.TrimSpace(getenv(envGitHubClientID))
-	cfg.GitHubAppSlug = strings.TrimSpace(getenv(envGitHubAppSlug))
-	cfg.GitHubWebURL = defaultWhenEmpty(getenv(envGitHubWebURL), defaultGitHubWebURL)
-	cfg.GitHubAPIURL = defaultWhenEmpty(getenv(envGitHubAPIURL), defaultGitHubAPIURL)
+	cfg := applyDefaults(getenv)
 
 	if cfg.PublicOrigin == "" {
-		problems = append(problems, fmt.Sprintf("%s is required", envPublicOrigin))
+		problems = append(problems, fmt.Sprintf(requiredFormat, envPublicOrigin))
 	}
 
-	secret, secretProblem := loadSecret(getenv, readFile, envGitHubClientSecret, envGitHubClientSecretFile)
-	if secretProblem != "" {
-		problems = append(problems, secretProblem)
-	}
-	cfg.GitHubClientSecret = secret
-
-	present := []struct {
-		name string
-		set  bool
-	}{
-		{envGitHubClientID, cfg.GitHubClientID != ""},
-		{envGitHubClientSecret, cfg.GitHubClientSecret != ""},
-		{envGitHubAppSlug, cfg.GitHubAppSlug != ""},
-	}
-	configured := 0
-	var missing []string
-	for _, item := range present {
-		if item.set {
-			configured++
-		} else {
-			missing = append(missing, item.name)
-		}
-	}
-	cfg.LoginEnabled = configured == len(present)
-	if configured > 0 && !cfg.LoginEnabled {
-		for _, name := range missing {
-			problems = append(problems, fmt.Sprintf("%s is required", name))
-		}
-	}
-
-	sessionKey, keyProblem := loadSecret(getenv, readFile, envSessionKey, envSessionKeyFile)
-	if keyProblem != "" {
-		problems = append(problems, keyProblem)
-	} else if sessionKey == "" {
-		if cfg.LoginEnabled {
-			problems = append(problems, fmt.Sprintf("%s is required", envSessionKey))
-		}
-	} else {
-		decoded, err := decodeSessionKey(envSessionKey, sessionKey, false)
-		if err != nil {
-			problems = append(problems, err.Error())
-		} else {
-			cfg.SessionKey = decoded
-		}
-	}
-
-	previous, previousProblem := loadSecret(getenv, readFile, envSessionKeyPrevious, "")
-	if previousProblem != "" {
-		problems = append(problems, previousProblem)
-	} else if previous != "" {
-		decoded, err := decodeSessionKey(envSessionKeyPrevious, previous, false)
-		if err != nil {
-			problems = append(problems, err.Error())
-		} else {
-			cfg.SessionKeyPrevious = decoded
-		}
-	}
+	cfg.GitHubClientSecret = loadClientSecret(getenv, readFile, &problems)
+	cfg.LoginEnabled = checkPartialCredentials(credentialFields(cfg), &problems)
+	cfg.SessionKey = loadCurrentSessionKey(getenv, readFile, cfg.LoginEnabled, &problems)
+	cfg.SessionKeyPrevious = loadPreviousSessionKey(getenv, readFile, &problems)
 
 	if len(problems) > 0 {
 		return Config{}, fmt.Errorf("%s", strings.Join(problems, "; "))
 	}
 	return cfg, nil
+}
+
+// applyDefaults builds a Config from environment values, applying the
+// documented defaults for optional settings.
+func applyDefaults(getenv func(string) string) Config {
+	return Config{
+		Addr:           defaultWhenEmpty(getenv(envAddr), defaultAddr),
+		PublicOrigin:   strings.TrimSpace(getenv(envPublicOrigin)),
+		StaticDir:      defaultWhenEmpty(getenv(envStaticDir), defaultStaticDir),
+		GitHubClientID: strings.TrimSpace(getenv(envGitHubClientID)),
+		GitHubAppSlug:  strings.TrimSpace(getenv(envGitHubAppSlug)),
+		GitHubWebURL:   defaultWhenEmpty(getenv(envGitHubWebURL), defaultGitHubWebURL),
+		GitHubAPIURL:   defaultWhenEmpty(getenv(envGitHubAPIURL), defaultGitHubAPIURL),
+	}
+}
+
+// credentialField records whether one GitHub App credential is set.
+type credentialField struct {
+	name string
+	set  bool
+}
+
+// credentialFields lists the GitHub App credential variables and whether each
+// is populated in cfg.
+func credentialFields(cfg Config) []credentialField {
+	return []credentialField{
+		{envGitHubClientID, cfg.GitHubClientID != ""},
+		{envGitHubClientSecret, cfg.GitHubClientSecret != ""},
+		{envGitHubAppSlug, cfg.GitHubAppSlug != ""},
+	}
+}
+
+// checkPartialCredentials reports whether all credentials are present. When
+// only some are set it appends an error for every missing variable and returns
+// false.
+func checkPartialCredentials(fields []credentialField, problems *[]string) bool {
+	configured := 0
+	var missing []string
+	for _, field := range fields {
+		if field.set {
+			configured++
+			continue
+		}
+		missing = append(missing, field.name)
+	}
+	if configured == len(fields) {
+		return true
+	}
+	if configured > 0 {
+		for _, name := range missing {
+			*problems = append(*problems, fmt.Sprintf(requiredFormat, name))
+		}
+	}
+	return false
+}
+
+// loadClientSecret resolves the GitHub App client secret and appends a problem
+// when its secret file cannot be read or is empty.
+func loadClientSecret(getenv func(string) string, readFile func(string) ([]byte, error), problems *[]string) string {
+	secret, problem := loadSecret(getenv, readFile, envGitHubClientSecret, envGitHubClientSecretFile)
+	if problem != "" {
+		*problems = append(*problems, problem)
+	}
+	return secret
+}
+
+// loadCurrentSessionKey resolves and decodes the current session key. When
+// login is enabled an absent key is reported as required.
+func loadCurrentSessionKey(getenv func(string) string, readFile func(string) ([]byte, error), loginEnabled bool, problems *[]string) []byte {
+	key, problem := loadSessionKey(getenv, readFile, envSessionKey, envSessionKeyFile)
+	if problem != "" {
+		*problems = append(*problems, problem)
+		return nil
+	}
+	if len(key) == 0 && loginEnabled {
+		*problems = append(*problems, fmt.Sprintf(requiredFormat, envSessionKey))
+	}
+	return key
+}
+
+// loadPreviousSessionKey resolves and decodes the optional previous session
+// key.
+func loadPreviousSessionKey(getenv func(string) string, readFile func(string) ([]byte, error), problems *[]string) []byte {
+	key, problem := loadSessionKey(getenv, readFile, envSessionKeyPrevious, "")
+	if problem != "" {
+		*problems = append(*problems, problem)
+		return nil
+	}
+	return key
+}
+
+// loadSessionKey resolves a session key from the environment or its secret
+// file and decodes it into its 32-byte form.
+func loadSessionKey(getenv func(string) string, readFile func(string) ([]byte, error), env, fileEnv string) ([]byte, string) {
+	secret, problem := loadSecret(getenv, readFile, env, fileEnv)
+	if problem != "" {
+		return nil, problem
+	}
+	if secret == "" {
+		return nil, ""
+	}
+	decoded, err := decodeSessionKey(env, secret, false)
+	if err != nil {
+		return nil, err.Error()
+	}
+	return decoded, ""
 }
 
 // defaultWhenEmpty returns fallback when value is blank, otherwise the trimmed
