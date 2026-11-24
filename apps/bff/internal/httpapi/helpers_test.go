@@ -32,9 +32,12 @@ const (
 	testPrivateVisibility = "private"
 )
 
+const installationsPath = "/user/installations"
 const testRepoPath = "/repos/" + testOwner + "/" + testRepo
 const testRepoAPIPath = "/@api/repos/" + testOwner + "/" + testRepo
+const testPermissionsAPIPath = testRepoAPIPath + "/permissions"
 const testPullsPath = testRepoPath + "/pulls"
+const testPullsAPIPath = testRepoAPIPath + "/pulls"
 const testReviewsPath = testPullsPath + "/12/reviews"
 const testPullHead = testOwner + ":opendraft/ada/20260101-120000"
 const testPullLookupPrefix = testRepoAPIPath + "/pulls?head="
@@ -50,12 +53,26 @@ const testRefsPath = testRepoPath + "/git/refs/heads/"
 // wantField and makes no GitHub request.
 func assertRejectedRepoAction(t *testing.T, now time.Time, method, path, wantField string) {
 	t.Helper()
+	assertRejectedRepoActionBody(t, now, method, path, nil, wantField)
+}
+
+// assertRejectedRepoActionBody asserts a request with body answers 400
+// invalid_request with wantField and makes no GitHub request.
+func assertRejectedRepoActionBody(t *testing.T, now time.Time, method, path string, body map[string]any, wantField string) {
+	t.Helper()
 
 	fake := &fakeRepoActions{router: func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}}
 	handler, sealer := newRepoActionsServer(t, fake, now)
-	rec := serveRepoAction(t, handler, sealer, now, method, path, nil)
+	rec := serveRepoAction(t, handler, sealer, now, method, path, body)
+	assertRejectedResponse(t, rec, fake, wantField)
+}
+
+// assertRejectedResponse asserts rec is a 400 invalid_request naming wantField
+// and that fake received no GitHub request.
+func assertRejectedResponse(t *testing.T, rec *httptest.ResponseRecorder, fake *fakeRepoActions, wantField string) {
+	t.Helper()
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400: %s", rec.Code, rec.Body.String())

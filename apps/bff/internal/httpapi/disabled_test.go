@@ -43,8 +43,8 @@ func TestDisabledGatedRoutesAnswerLoginDisabled(t *testing.T) {
 			continue
 		}
 		body := decodeJSON(t, rec)
-		if body["error"] != loginDisabledCode {
-			t.Errorf("%s %s error = %q, want %q", tc.method, tc.target, body["error"], loginDisabledCode)
+		if body[errorKey] != loginDisabledCode {
+			t.Errorf("%s %s error = %q, want %q", tc.method, tc.target, body[errorKey], loginDisabledCode)
 		}
 	}
 }
@@ -77,8 +77,8 @@ func TestEnabledRoutesKeepNormalBehaviour(t *testing.T) {
 	if sessionRec.Code != http.StatusUnauthorized {
 		t.Fatalf("session status = %d, want 401", sessionRec.Code)
 	}
-	if body := decodeJSON(t, sessionRec); body["error"] != unauthenticatedCode {
-		t.Errorf("session error = %q, want %q", body["error"], unauthenticatedCode)
+	if body := decodeJSON(t, sessionRec); body[errorKey] != unauthenticatedCode {
+		t.Errorf("session error = %q, want %q", body[errorKey], unauthenticatedCode)
 	}
 
 	loginRec := httptest.NewRecorder()

@@ -13,8 +13,8 @@ import (
 func TestOwnersEndpointListsInstallations(t *testing.T) {
 	now := time.Unix(authTestNowUnix, 0).UTC()
 	fake := &fakeRepoActions{router: func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/user/installations" {
-			t.Errorf("path = %q, want /user/installations", r.URL.Path)
+		if r.URL.Path != installationsPath {
+			t.Errorf("path = %q, want %s", r.URL.Path, installationsPath)
 		}
 		_, _ = w.Write([]byte(`{"installations":[
 			{"id":7,"repository_selection":"all","account":{"login":"octocat","type":"User","avatar_url":"https://avatars.example/u/7"}},
@@ -35,7 +35,7 @@ func TestOwnersEndpointListsInstallations(t *testing.T) {
 	if len(body) != 2 {
 		t.Fatalf("body = %v, want 2 entries", body)
 	}
-	if body[0]["login"] != "octocat" || body[0]["type"] != "User" ||
+	if body[0]["login"] != testOwner || body[0]["type"] != "User" ||
 		body[0]["avatarUrl"] != "https://avatars.example/u/7" || body[0]["allRepos"] != true {
 		t.Errorf("body[0] = %v", body[0])
 	}
@@ -64,7 +64,7 @@ func TestOwnersEndpointRequiresSession(t *testing.T) {
 		t.Fatalf("status = %d, want 401: %s", rec.Code, rec.Body.String())
 	}
 	body := decodeAnyJSON(t, rec)
-	if body["error"] != unauthenticatedCode {
-		t.Errorf("error = %v, want %q", body["error"], unauthenticatedCode)
+	if body[errorKey] != unauthenticatedCode {
+		t.Errorf("error = %v, want %q", body[errorKey], unauthenticatedCode)
 	}
 }

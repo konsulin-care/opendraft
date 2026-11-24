@@ -5,12 +5,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/konsulin-care/opendraft/apps/bff/internal/config"
-	"github.com/konsulin-care/opendraft/apps/bff/internal/github"
 	"github.com/konsulin-care/opendraft/apps/bff/internal/session"
 )
 
@@ -49,35 +48,7 @@ func newRepoActionsServer(t *testing.T, fake *fakeRepoActions, now time.Time) (h
 	t.Helper()
 	server := httptest.NewServer(fake.handler())
 	t.Cleanup(server.Close)
-
-	cfg := config.Config{
-		PublicOrigin:       reposTestOrigin,
-		GitHubClientID:     "client-id",
-		GitHubClientSecret: "client-secret",
-		GitHubAppSlug:      "opendraft-app",
-		GitHubWebURL:       server.URL,
-		GitHubAPIURL:       server.URL,
-	}
-	key := make([]byte, 32)
-	for i := range key {
-		key[i] = byte(i + 1)
-	}
-	sealer, err := session.NewSealer(key, nil)
-	if err != nil {
-		t.Fatalf("NewSealer: %v", err)
-	}
-	deps := Deps{
-		Now: func() time.Time { return now },
-		GitHub: &github.Client{
-			WebURL:       server.URL,
-			APIURL:       server.URL,
-			ClientID:     cfg.GitHubClientID,
-			ClientSecret: cfg.GitHubClientSecret,
-			Now:          func() time.Time { return now },
-		},
-		Sealer: sealer,
-	}
-	return New(cfg, deps), sealer
+	return newGitHubBackedServer(t, server.URL, now)
 }
 
 // serveRepoAction issues an authenticated request with an optional JSON body.
@@ -106,9 +77,9 @@ func TestRepoPermissionsEndpoint(t *testing.T) {
 	now := time.Unix(authTestNowUnix, 0).UTC()
 	fake := &fakeRepoActions{router: func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/repos/octocat/draft":
+		case testRepoPath:
 			_, _ = w.Write([]byte(`{"default_branch":"main","private":false,"permissions":{"push":true}}`))
-		case "/user/installations":
+		case installationsPath:
 			_, _ = w.Write([]byte(`{"installations":[{"id":7,"repository_selection":"all","account":{"login":"octocat"}}]}`))
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -116,13 +87,13 @@ func TestRepoPermissionsEndpoint(t *testing.T) {
 	}}
 	handler, sealer := newRepoActionsServer(t, fake, now)
 
-	rec := serveRepoAction(t, handler, sealer, now, http.MethodGet, "/@api/repos/octocat/draft/permissions", nil)
+	rec := serveRepoAction(t, handler, sealer, now, http.MethodGet, testPermissionsAPIPath, nil)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200: %s", rec.Code, rec.Body.String())
 	}
 	body := decodeAnyJSON(t, rec)
-	if body["push"] != true || body["installed"] != true || body["defaultBranch"] != "main" ||
+	if body["push"] != true || body["installed"] != true || body["defaultBranch"] != testDefaultBranch ||
 		body["private"] != false || body["allowForking"] != true || body["viewerInstalledAll"] != true {
 		t.Fatalf("body = %v", body)
 	}
@@ -134,7 +105,7 @@ func TestRepoPermissionsSelectedRepository(t *testing.T) {
 		switch r.URL.Path {
 		case "/repos/acme/paper":
 			_, _ = w.Write([]byte(`{"default_branch":"trunk","private":true,"allow_forking":true,"permissions":{"push":false}}`))
-		case "/user/installations":
+		case installationsPath:
 			_, _ = w.Write([]byte(`{"installations":[{"id":9,"repository_selection":"selected","account":{"login":"acme"}},{"id":7,"repository_selection":"all","account":{"login":"OctoCat"}}]}`))
 		case "/user/installations/9/repositories":
 			_, _ = w.Write([]byte(`{"repositories":[{"full_name":"acme/paper"}]}`))
@@ -159,7 +130,7 @@ func TestRepoPermissionsSelectedRepository(t *testing.T) {
 func TestCreatePullEndpoint(t *testing.T) {
 	now := time.Unix(authTestNowUnix, 0).UTC()
 	fake := &fakeRepoActions{router: func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/repos/octocat/draft/pulls" {
+		if r.URL.Path != testPullsPath {
 			t.Errorf("path = %q", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusCreated)
@@ -167,11 +138,11 @@ func TestCreatePullEndpoint(t *testing.T) {
 	}}
 	handler, sealer := newRepoActionsServer(t, fake, now)
 
-	rec := serveRepoAction(t, handler, sealer, now, http.MethodPost, "/@api/repos/octocat/draft/pulls", map[string]any{
-		"title": "Initialise OpenDraft",
-		"head":  "opendraft/init",
-		"base":  "main",
-		"body":  "Adds the protocol files",
+	rec := serveRepoAction(t, handler, sealer, now, http.MethodPost, testPullsAPIPath, map[string]any{
+		titleField: "Initialise OpenDraft",
+		headField:  "opendraft/init",
+		baseField:  testDefaultBranch,
+		"body":     "Adds the protocol files",
 	})
 
 	if rec.Code != http.StatusCreated {
@@ -188,39 +159,20 @@ func TestCreatePullEndpoint(t *testing.T) {
 
 func TestCreatePullEndpointRejectsInvalidBodies(t *testing.T) {
 	now := time.Unix(authTestNowUnix, 0).UTC()
-	longTitle := ""
-	for len(longTitle) < 257 {
-		longTitle += "a"
-	}
+	longTitle := strings.Repeat("a", maxTitleLength+1)
 	tests := []struct {
 		name  string
 		body  map[string]any
 		field string
 	}{
-		{name: "empty title", body: map[string]any{"title": "", "head": "h", "base": "main"}, field: titleField},
-		{name: "long title", body: map[string]any{"title": longTitle, "head": "h", "base": "main"}, field: titleField},
-		{name: "invalid head", body: map[string]any{"title": "t", "head": "bad head", "base": "main"}, field: headField},
-		{name: "invalid base", body: map[string]any{"title": "t", "head": "h", "base": "bad base"}, field: baseField},
+		{name: "empty title", body: map[string]any{titleField: "", headField: "h", baseField: testDefaultBranch}, field: titleField},
+		{name: "long title", body: map[string]any{titleField: longTitle, headField: "h", baseField: testDefaultBranch}, field: titleField},
+		{name: "invalid head", body: map[string]any{titleField: "t", headField: "bad head", baseField: testDefaultBranch}, field: headField},
+		{name: "invalid base", body: map[string]any{titleField: "t", headField: "h", baseField: "bad base"}, field: baseField},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fake := &fakeRepoActions{router: func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(http.StatusCreated)
-			}}
-			handler, sealer := newRepoActionsServer(t, fake, now)
-
-			rec := serveRepoAction(t, handler, sealer, now, http.MethodPost, "/@api/repos/octocat/draft/pulls", tt.body)
-
-			if rec.Code != http.StatusBadRequest {
-				t.Fatalf("status = %d, want 400", rec.Code)
-			}
-			body := decodeJSON(t, rec)
-			if body["error"] != invalidRequestCode || body["field"] != tt.field {
-				t.Errorf("body = %v, want field %q", body, tt.field)
-			}
-			if fake.count() != 0 {
-				t.Errorf("GitHub received %d requests, want 0", fake.count())
-			}
+			assertRejectedRepoActionBody(t, now, http.MethodPost, testPullsAPIPath, tt.body, tt.field)
 		})
 	}
 }
@@ -228,7 +180,7 @@ func TestCreatePullEndpointRejectsInvalidBodies(t *testing.T) {
 func TestCreateForkEndpoint(t *testing.T) {
 	now := time.Unix(authTestNowUnix, 0).UTC()
 	fake := &fakeRepoActions{router: func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/repos/octocat/draft/forks" {
+		if r.URL.Path != testRepoPath+"/forks" {
 			t.Errorf("path = %q", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusAccepted)
@@ -236,13 +188,13 @@ func TestCreateForkEndpoint(t *testing.T) {
 	}}
 	handler, sealer := newRepoActionsServer(t, fake, now)
 
-	rec := serveRepoAction(t, handler, sealer, now, http.MethodPost, "/@api/repos/octocat/draft/forks", nil)
+	rec := serveRepoAction(t, handler, sealer, now, http.MethodPost, testRepoAPIPath+"/forks", nil)
 
 	if rec.Code != http.StatusAccepted {
 		t.Fatalf("status = %d, want 202: %s", rec.Code, rec.Body.String())
 	}
 	body := decodeAnyJSON(t, rec)
-	if body["owner"] != "me" || body["repo"] != "draft" || body["defaultBranch"] != "main" {
+	if body["owner"] != "me" || body["repo"] != testRepo || body["defaultBranch"] != testDefaultBranch {
 		t.Fatalf("body = %v", body)
 	}
 }
@@ -253,30 +205,15 @@ func TestRepoActionsRejectInvalidPaths(t *testing.T) {
 		name   string
 		method string
 		path   string
+		field  string
 	}{
-		{name: "invalid owner", method: http.MethodGet, path: "/@api/repos/bad_owner/draft/permissions"},
-		{name: "invalid repo", method: http.MethodGet, path: "/@api/repos/octocat/bad!repo/permissions"},
-		{name: "invalid fork repo", method: http.MethodPost, path: "/@api/repos/octocat/bad!repo/forks"},
+		{name: testInvalidOwner, method: http.MethodGet, path: "/@api/repos/bad_owner/" + testRepo + "/permissions", field: ownerField},
+		{name: "invalid repo", method: http.MethodGet, path: "/@api/repos/" + testOwner + "/bad!repo/permissions", field: repoField},
+		{name: "invalid fork repo", method: http.MethodPost, path: "/@api/repos/" + testOwner + "/bad!repo/forks", field: repoField},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fake := &fakeRepoActions{router: func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(http.StatusOK)
-			}}
-			handler, sealer := newRepoActionsServer(t, fake, now)
-
-			rec := serveRepoAction(t, handler, sealer, now, tt.method, tt.path, nil)
-
-			if rec.Code != http.StatusBadRequest {
-				t.Fatalf("status = %d, want 400: %s", rec.Code, rec.Body.String())
-			}
-			body := decodeJSON(t, rec)
-			if body["error"] != invalidRequestCode {
-				t.Errorf("error = %q, want %q", body["error"], invalidRequestCode)
-			}
-			if fake.count() != 0 {
-				t.Errorf("GitHub received %d requests, want 0", fake.count())
-			}
+			assertRejectedRepoAction(t, now, tt.method, tt.path, tt.field)
 		})
 	}
 }
@@ -287,7 +224,7 @@ func TestRepoActionsRequireSession(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}}
 	handler, _ := newRepoActionsServer(t, fake, now)
-	req := httptest.NewRequest(http.MethodGet, "/@api/repos/octocat/draft/permissions", nil)
+	req := httptest.NewRequest(http.MethodGet, testPermissionsAPIPath, nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusUnauthorized {
