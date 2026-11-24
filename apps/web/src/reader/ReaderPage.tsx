@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { InitDecisions, ProjectDiscovery } from '@opendraft/manuscript';
 import { normalizeManuscriptId } from '@opendraft/manuscript';
+import { ProjectRegistry } from '@opendraft/workspace';
 import type { BffSession, RepoPermissions, SessionState } from '../github/bff-client';
 import { createPullRequest, forkRepo, getRepoPermissions, getSession as fetchSession, getSessionState, logout as signOut } from '../github/bff-client';
 import { ReaderHeader } from './ReaderHeader';
@@ -26,6 +27,8 @@ import { ReaderAction } from './ReaderAction';
 import type { EditIntent } from '../suggest/edit-intent';
 import { useRepoAccess } from './use-repo-access';
 import { useSuggestEdit } from './use-suggest-edit';
+import { PROTOCOL } from '../project/scaffold';
+import { purgePrivateProjects } from '../suggest/purge';
 import type { SuggestEditController } from './use-suggest-edit';
 import type { StartSuggestionInput, StartSuggestionResult } from '../suggest/start';
 
@@ -56,7 +59,6 @@ async function browserConvertDeps(): Promise<ConvertDeps> {
   await import('../github/buffer-polyfill');
   const git = await import('@opendraft/git');
   const http = (await import('../../../../packages/git/node_modules/isomorphic-git/http/web/index.js')).default;
-  const { PROTOCOL } = await import('../project/scaffold');
   return {
     getRepoPermissions: (owner, repo) => getRepoPermissions(owner, repo),
     forkRepo: (owner, repo) => forkRepo(owner, repo),
@@ -91,10 +93,7 @@ const defaultDeps: ReaderPageBaseDeps = {
   getSessionState: () => getSessionState(),
   logout: async () => {
     await signOut();
-    const [{ projectRegistry }, { purgePrivateProjects }] = await Promise.all([
-      import('../hooks/useProjects'), import('../suggest/purge'),
-    ]);
-    await purgePrivateProjects(projectRegistry);
+    await purgePrivateProjects(new ProjectRegistry());
   },
   convert: convertWithGit,
 };

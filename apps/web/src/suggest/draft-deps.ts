@@ -6,9 +6,11 @@
  * editor pages never pay for git until a draft action runs.
  */
 
+import { ProjectRegistry, workspaceManager } from '@opendraft/workspace';
 import type { ProjectRecord, WorkspaceAdapter } from '@opendraft/workspace';
 import type { FsClient } from '../../../../packages/git/node_modules/isomorphic-git/index.js';
 import type { HttpClient } from '../../../../packages/git/node_modules/isomorphic-git/http/web/index.js';
+import { createRepo } from '../github/bff-client';
 import type { BffSession } from '../github/bff-client';
 import type { DraftSectionDeps } from '../hooks/use-draft-section';
 import type { DraftActionContext, DraftSnapshot } from '../hooks/use-draft';
@@ -91,12 +93,8 @@ async function initPublishRepo(
 async function createBrowserPublishDeps(
   session: BffSession,
 ): Promise<PublishProjectDeps> {
-  const [{ workspaceManager }, { projectRegistry }, { createRepo }, git] = await Promise.all([
-    import('@opendraft/workspace'),
-    import('../hooks/useProjects'),
-    import('../github/bff-client'),
-    import('@opendraft/git'),
-  ]);
+  const git = await import('@opendraft/git');
+  const projectRegistry = new ProjectRegistry();
   const http = (
     await import('../../../../packages/git/node_modules/isomorphic-git/http/web/index.js')
   ).default as HttpClient;

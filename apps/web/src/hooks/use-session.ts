@@ -7,8 +7,10 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { ProjectRegistry } from '@opendraft/workspace';
 import type { BffSession, SessionState } from '../github/bff-client';
 import { getSessionState, logout as signOut } from '../github/bff-client';
+import { purgePrivateProjects } from '../suggest/purge';
 
 /** Session operations injectable for tests and alternate shells. */
 export interface UseSessionDeps {
@@ -36,13 +38,9 @@ export interface UseSessionResult {
   logout: () => Promise<void>;
 }
 
-/** Purge private GitHub projects through the shared project registry. */
+/** Purge private GitHub projects through the persistent project registry. */
 async function purgePrivate(): Promise<void> {
-  const [{ projectRegistry }, { purgePrivateProjects }] = await Promise.all([
-    import('./useProjects'),
-    import('../suggest/purge'),
-  ]);
-  await purgePrivateProjects(projectRegistry);
+  await purgePrivateProjects(new ProjectRegistry());
 }
 
 /** Live dependencies backed by the BFF client and the project registry. */
