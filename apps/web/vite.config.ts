@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { visualizer } from 'rollup-plugin-visualizer';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import { vendorChunk, chunkFileName } from './vite.chunks.js';
@@ -30,7 +31,19 @@ export default defineConfig({
       },
     },
   },
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    ...(process.env.ANALYZE === '1'
+      ? [
+          visualizer({
+            filename: 'dist/stats.html',
+            gzipSize: true,
+            template: 'treemap',
+          }),
+        ]
+      : []),
+  ],
   resolve: {
     alias: {
       '@': resolve(__dirname, './src'),

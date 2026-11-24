@@ -21,6 +21,37 @@ async function loadWebConfig(command: 'build' | 'serve') {
   return result?.config;
 }
 
+/** Flatten a Vite config's plugin entries into their names. */
+function pluginNames(config: Awaited<ReturnType<typeof loadWebConfig>>) {
+  return (config?.plugins ?? [])
+    .flat()
+    .map((p) => (p as { name?: string }).name);
+}
+
+/**
+ * Load the build config with ANALYZE set, restoring the prior value afterwards.
+ * @param value - Value to assign to ANALYZE, or undefined to unset it.
+ * @returns The flattened plugin names of the resolved build config.
+ */
+async function buildPluginNamesWithAnalyze(value: string | undefined) {
+  const previous = process.env.ANALYZE;
+  if (value === undefined) {
+    delete process.env.ANALYZE;
+  } else {
+    process.env.ANALYZE = value;
+  }
+  try {
+    const config = await loadWebConfig('build');
+    return pluginNames(config);
+  } finally {
+    if (previous === undefined) {
+      delete process.env.ANALYZE;
+    } else {
+      process.env.ANALYZE = previous;
+    }
+  }
+}
+
 describe('vite.config server', () => {
   it('should bind server to IPv4 localhost for Tailscale compatibility', async () => {
     const config = await loadWebConfig('serve');
@@ -31,10 +62,9 @@ describe('vite.config server', () => {
   it('should include the Tailwind CSS plugin', async () => {
     const config = await loadWebConfig('serve');
 
-    const pluginNames = (config?.plugins ?? [])
-      .flat()
-      .map((p) => (p as { name?: string }).name);
-    expect(pluginNames.some((name) => name?.includes('tailwind'))).toBe(true);
+    expect(pluginNames(config).some((name) => name?.includes('tailwind'))).toBe(
+      true,
+    );
   });
 
   it('should proxy /@api to the local BFF while binding 127.0.0.1', async () => {
@@ -65,7 +95,21 @@ describe('vite.config server', () => {
   });
 });
 
-describe('vite.config build', () => {
+describe('vite.config build plugins', () => {
+  it('should include the visualizer plugin when ANALYZE=1', async () => {
+    const names = await buildPluginNamesWithAnalyze('1');
+
+    expect(names).toContain('visualizer');
+  });
+
+  it('should omit the visualizer plugin without ANALYZE', async () => {
+    const names = await buildPluginNamesWithAnalyze(undefined);
+
+    expect(names).not.toContain('visualizer');
+  });
+});
+
+describe('vite.config build output', () => {
   it('should build assets under the reserved @assets path', async () => {
     const config = await loadWebConfig('build');
 
