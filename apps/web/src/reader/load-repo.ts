@@ -1,11 +1,4 @@
-/**
- * Repository loader for the reader.
- *
- * Resolves a reader route to one pinned commit, preferring the IndexedDB
- * snapshot cache, then the anonymous public GitHub API and — only for a
- * signed-in viewer of a repository the anonymous path cannot see — the
- * authenticated git relay. The result is always a read-only workspace.
- */
+/** Repository loader for the reader, preferring cache, then GitHub, then the relay. */
 
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { MemoryWorkspace, readOnlyWorkspace } from '@opendraft/workspace';
@@ -42,6 +35,8 @@ export interface LoadedRepo {
   isOpenDraft: boolean;
   /** Manuscripts declared in `opendraft.yml`; empty without the file. */
   manuscripts: ManuscriptEntry[];
+  /** Resolve the current commit and return it when it differs from this snapshot. */
+  checkForUpdate?: () => Promise<string | null>;
 }
 
 /** A snapshot returned by the anonymous or relayed load path. */
@@ -76,6 +71,10 @@ export interface LoadRepoDeps {
       options?: SaveSnapshotOptions,
     ) => Promise<void>;
     /* eslint-enable max-params */
+    /** Load the cached latest SHA for a ref, or null without a complete snapshot. */
+    loadLatest?: (owner: string, repo: string, ref: string | undefined) => Promise<string | null>;
+    /** Store the latest SHA pointer for a ref. */
+    saveLatest?: (owner: string, repo: string, ref: string | undefined, sha: string) => Promise<void>;
   };
   /** Current BFF session identity, or null when anonymous. */
   getSession: () => Promise<unknown>;
@@ -124,12 +123,7 @@ export function parseManuscripts(raw: string): ManuscriptEntry[] {
   return entries;
 }
 
-/**
- * Build the read-only workspace plus derived project metadata for a snapshot.
- *
- * @param snapshot - Commit SHA and file contents to expose.
- * @returns The loaded repository description.
- */
+/** Build the read-only workspace plus derived project metadata for a snapshot. */
 async function toLoadedRepo(snapshot: RepoSnapshot): Promise<LoadedRepo> {
   const inner = new MemoryWorkspace();
   for (const [path, content] of snapshot.files) {
@@ -168,29 +162,49 @@ export function loadPublicSnapshotAtCommit(
   return loadGithubPublicSnapshot(owner, repo, ref, fetch, { commit });
 }
 
-/**
- * Load a repository at a route into a read-only workspace.
- *
- * Resolves the ref first so every load pins to one commit, then answers from
- * the snapshot cache when possible. A `NotFoundError` from the anonymous path
- * falls back to the relay clone when a session exists, and is rethrown for an
- * anonymous viewer. Loading progress is reported through `onPhase`.
- *
- * @param route - Parsed reader route with owner, repo and optional ref.
- * @param deps - Injected GitHub, cache, session and relay dependencies.
- * @param onPhase - Optional callback receiving each loading phase in order.
- * @returns The pinned commit, read-only workspace and project metadata.
- */
-export async function loadRepo(
+/** Store the latest-SHA pointer when the cache dependency supports it. */
+async function saveLatestPointer(
+  deps: LoadRepoDeps | LegacyLoadRepoDeps,
+  route: ReaderRoute,
+  sha: string,
+): Promise<void> {
+  if (deps.cache.saveLatest) await deps.cache.saveLatest(route.owner, route.repo, route.ref, sha);
+}
+
+/** Open the cached latest snapshot with a background update check, if possible. */
+async function openLatestSnapshot(
   route: ReaderRoute,
   deps: LoadRepoDeps | LegacyLoadRepoDeps,
-  onPhase: OnLoadPhase = () => {},
+  onPhase: OnLoadPhase,
+): Promise<LoadedRepo | null> {
+  if (!deps.cache.loadLatest) return null;
+
+  const { owner, repo, ref } = route;
+  const latest = await deps.cache.loadLatest(owner, repo, ref);
+  if (latest === null) return null;
+
+  const files = await deps.cache.loadSnapshot(owner, repo, latest);
+  if (files === null) return null;
+
+  onPhase('opening');
+  const loaded = await toLoadedRepo({ sha: latest, files });
+  return {
+    ...loaded,
+    checkForUpdate: async () => {
+      const commit = await deps.resolveCommit(owner, repo, ref);
+      return commit.sha === latest ? null : commit.sha;
+    },
+  };
+}
+
+/** Resolve the ref and load the snapshot from cache, GitHub or the relay. */
+async function loadFromNetwork(
+  route: ReaderRoute,
+  deps: LoadRepoDeps | LegacyLoadRepoDeps,
+  onPhase: OnLoadPhase,
+  loadSnapshotForCommit: LoadRepoDeps['loadPublicSnapshot'],
 ): Promise<LoadedRepo> {
   const { owner, repo, ref } = route;
-  const loadSnapshotForCommit: LoadRepoDeps['loadPublicSnapshot'] =
-    deps.loadPublicSnapshot === loadGithubPublicSnapshot
-      ? loadPublicSnapshotAtCommit
-      : (deps.loadPublicSnapshot as LoadRepoDeps['loadPublicSnapshot']);
   let downloadStarted = false;
 
   try {
@@ -200,6 +214,7 @@ export async function loadRepo(
     const cached = await deps.cache.loadSnapshot(owner, repo, commit.sha);
     if (cached !== null) {
       onPhase('opening');
+      await saveLatestPointer(deps, route, commit.sha);
       return await toLoadedRepo({ sha: commit.sha, files: cached });
     }
 
@@ -208,6 +223,7 @@ export async function loadRepo(
     const snapshot = await loadSnapshotForCommit(owner, repo, ref, commit);
     onPhase('saving');
     await deps.cache.saveSnapshot(owner, repo, snapshot.sha, snapshot.files);
+    await saveLatestPointer(deps, route, snapshot.sha);
     onPhase('preparing');
     return await toLoadedRepo(snapshot);
   } catch (error) {
@@ -220,27 +236,54 @@ export async function loadRepo(
     const snapshot = await deps.cloneViaRelay(owner, repo, ref);
     onPhase('saving');
     await deps.cache.saveSnapshot(owner, repo, snapshot.sha, snapshot.files, { private: true });
+    await saveLatestPointer(deps, route, snapshot.sha);
     onPhase('preparing');
     return await toLoadedRepo(snapshot);
   }
 }
 
 /**
- * Clone a repository through the authenticated git relay.
+ * Load a repository at a route into a read-only workspace.
  *
+ * Resolves the ref first so every load pins to one commit, then answers from
+ * the snapshot cache when possible. A `NotFoundError` from the anonymous path
+ * falls back to the relay clone when a session exists, and is rethrown for an
+ * anonymous viewer. Loading progress is reported through `onPhase`.
+ * @param route - Parsed reader route with owner, repo and optional ref.
+ * @param deps - Injected GitHub, cache, session and relay dependencies.
+ * @param onPhase - Optional callback receiving each loading phase in order.
+ * @param options - Loading options; `fresh` ignores the latest-SHA pointer.
+ * @returns The pinned commit, read-only workspace and project metadata.
+ */
+export async function loadRepo(
+  route: ReaderRoute,
+  deps: LoadRepoDeps | LegacyLoadRepoDeps,
+  onPhase: OnLoadPhase = () => {},
+  options: { fresh?: boolean } = {},
+): Promise<LoadedRepo> {
+  const loadSnapshotForCommit: LoadRepoDeps['loadPublicSnapshot'] =
+    deps.loadPublicSnapshot === loadGithubPublicSnapshot
+      ? loadPublicSnapshotAtCommit
+      : (deps.loadPublicSnapshot as LoadRepoDeps['loadPublicSnapshot']);
+
+  if (!options.fresh) {
+    const opened = await openLatestSnapshot(route, deps, onPhase);
+    if (opened !== null) return opened;
+  }
+
+  return loadFromNetwork(route, deps, onPhase, loadSnapshotForCommit);
+}
+
+/**
+ * Clone a repository through the authenticated git relay.
  * Loads the Buffer polyfill and the git implementation lazily so the
  * anonymous reader path never bundles or executes isomorphic-git.
- *
  * @param owner - Repository owner login.
  * @param repo - Repository name.
  * @param ref - Optional branch or ref to check out.
  * @returns The resolved commit SHA and all working-tree files.
  */
-export async function cloneViaRelay(
-  owner: string,
-  repo: string,
-  ref?: string,
-): Promise<RepoSnapshot> {
+export async function cloneViaRelay(owner: string, repo: string, ref?: string): Promise<RepoSnapshot> {
   await import('../github/buffer-polyfill');
   const { RemoteGit, relayUrl, readWorkingFiles } = await import('@opendraft/git');
   const http = (await import('../../../../packages/git/node_modules/isomorphic-git/http/web/index.js')).default;

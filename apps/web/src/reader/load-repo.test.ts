@@ -26,11 +26,30 @@ function makeDeps(overrides: Partial<LoadRepoDeps> = {}): LoadRepoDeps {
     cache: {
       loadSnapshot: vi.fn(async () => null),
       saveSnapshot: vi.fn(async () => undefined),
+      loadLatest: vi.fn(async () => null),
+      saveLatest: vi.fn(async () => undefined),
     },
     getSession: vi.fn(async () => null),
     cloneViaRelay: vi.fn(async () => ({ sha: 'sha1', files: new Map<string, string>() })),
     ...overrides,
   };
+}
+
+/** Build dependencies with a latest pointer and cached snapshot at `sha`. */
+function latestDeps(
+  cached: Map<string, string>,
+  sha: string,
+  overrides: Partial<LoadRepoDeps> = {},
+): LoadRepoDeps {
+  return makeDeps({
+    cache: {
+      loadSnapshot: vi.fn(async () => cached),
+      saveSnapshot: vi.fn(async () => undefined),
+      loadLatest: vi.fn(async () => sha),
+      saveLatest: vi.fn(async () => undefined),
+    },
+    ...overrides,
+  });
 }
 
 describe('loadRepo phases', () => {
@@ -202,5 +221,72 @@ describe('loadRepo metadata', () => {
 describe('cloneViaRelay', () => {
   it('is exported as a lazy default clone', () => {
     expect(typeof cloneViaRelay).toBe('function');
+  });
+});
+
+describe('loadRepo latest pointer open', () => {
+  it('opens the stored latest snapshot without resolving or downloading', async () => {
+    const cached = filesWithManuscripts([{ id: 'demo', path: 'manuscripts/demo' }]);
+    const deps = latestDeps(cached, 'cached-sha');
+    const onPhase = vi.fn();
+
+    const result = await loadRepo(ROUTE, deps, onPhase);
+
+    expect(onPhase.mock.calls.map(([phase]) => phase)).toEqual(['opening']);
+    expect(deps.resolveCommit).not.toHaveBeenCalled();
+    expect(deps.loadPublicSnapshot).not.toHaveBeenCalled();
+    expect(result.sha).toBe('cached-sha');
+  });
+});
+
+describe('loadRepo latest pointer update check', () => {
+  it('reports the new SHA when the update check sees a different commit', async () => {
+    const cached = filesWithManuscripts([{ id: 'demo', path: 'manuscripts/demo' }]);
+    const deps = latestDeps(cached, 'cached-sha', {
+      resolveCommit: vi.fn(async () => ({ sha: 'new-sha', treeSha: 'tree2' })),
+    });
+
+    const result = await loadRepo(ROUTE, deps);
+
+    await expect(result.checkForUpdate?.()).resolves.toBe('new-sha');
+  });
+
+  it('reports no update when the update check sees the cached commit', async () => {
+    const cached = filesWithManuscripts([{ id: 'demo', path: 'manuscripts/demo' }]);
+    const deps = latestDeps(cached, 'cached-sha', {
+      resolveCommit: vi.fn(async () => ({ sha: 'cached-sha', treeSha: 'tree1' })),
+    });
+
+    const result = await loadRepo(ROUTE, deps);
+
+    await expect(result.checkForUpdate?.()).resolves.toBeNull();
+  });
+});
+
+describe('loadRepo latest pointer fresh', () => {
+  it('ignores the pointer with fresh: true and updates it after loading', async () => {
+    const files = filesWithManuscripts([{ id: 'demo', path: 'manuscripts/demo' }]);
+    const cache = {
+      loadSnapshot: vi.fn(async () => null),
+      saveSnapshot: vi.fn(async () => undefined),
+      loadLatest: vi.fn(async () => 'cached-sha'),
+      saveLatest: vi.fn(async () => undefined),
+    };
+    const deps = makeDeps({
+      resolveCommit: vi.fn(async () => ({ sha: 'new-sha', treeSha: 'tree2' })),
+      loadPublicSnapshot: vi.fn(async () => ({ sha: 'new-sha', files })),
+      cache,
+    });
+
+    const result = await loadRepo(ROUTE, deps, undefined, { fresh: true });
+
+    expect(cache.loadLatest).not.toHaveBeenCalled();
+    expect(result.sha).toBe('new-sha');
+    expect(cache.saveLatest).toHaveBeenCalledWith(
+      'konsulin-care',
+      'citizen-science',
+      undefined,
+      'new-sha',
+    );
   });
 });
