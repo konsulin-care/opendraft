@@ -230,14 +230,33 @@ The suggest-edit endpoints are sign-in only and use the same user access token:
 | Endpoint | Purpose |
 |----------|---------|
 | `GET /@api/repos/{owner}/{repo}/branches?prefix=opendraft/{login}/` | List suggestion branches and their head SHAs. |
-| `GET /@api/repos/{owner}/{repo}/pulls?head={owner}:{branch}` | Find the open pull request for a suggestion branch. |
-| `POST /@api/repos/{owner}/{repo}/merge-upstream` | Best-effort sync a fork branch from the upstream default branch (`{"branch":"..."}` body; `409 conflict` on a merge conflict). |
+| `GET /@api/repos/{owner}/{repo}/pulls?head={owner}:{branch}` | Find the latest pull request for a suggestion branch; the response includes the PR `headSha` used by the cleanup sweep. |
+| `DELETE /@api/repos/{owner}/{repo}/branches/{branch}` | Delete a suggestion branch. Only accepts branch names under the session user's own prefixes (`od-<login>/` and legacy `opendraft/<login>/`, case-insensitive), so the default branch and other users' branches can never be deleted. Idempotent: a `404` or `422` from GitHub is treated as already deleted. Requires only **Contents write**. |
+| `POST /@api/repos/{owner}/{repo}/merge-upstream` | Best-effort sync a fork branch from the upstream default branch (`{"branch":"..."}` body; `409 conflict` on a merge conflict). Skipped when the draft already lives on the upstream itself, because GitHub rejects merge-upstream on a non-fork. |
 
 These endpoints require only **Contents read/write** and **Pull requests
 read/write** (plus the implied Metadata read); no additional permissions are
-needed for suggest edits. Branch names use `opendraft/<login>/<YYYYMMDD-HHmmss>`
-(UTC) on the contributor's fork or on the upstream when the viewer has push
-access.
+needed for suggest edits. Branch names use `od-<login>/<YYYYMMDD-HHmmss>` on
+non-fork drafts and `opendraft/<login>/<YYYYMMDD-HHmmss>` on the contributor's
+fork, with times in UTC.
+
+### Cleaning up old draft branches
+
+Old remote draft branches are removed by a stateless sweep. For the push-target
+repository (`source.owner/source.repo`) it lists the viewer's branches under
+`od-<login>/` (lowercased login) and the legacy `opendraft/<login>/` prefix, and
+for each branch looks up its latest pull request. A branch is deleted only when
+its latest PR is **closed**, or when the PR is **merged** *and* the branch head
+SHA equals the PR's `headSha` (the SHA guard prevents deleting a branch that was
+reused after the merge). Branches with an **open** PR or with **no** PR are kept,
+as is the current `source.branch`. Each sweep inspects at most 20 candidates.
+
+The sweep runs at the end of every "Start a new draft" restart, after the
+local-first steps (commit WIP, fetch, rebase, rename branch, registry update),
+so a failed remote delete never leaves local state inconsistent; and it runs
+once per project when the project opens (not on every window focus). Deletion
+is best-effort.
+
 
 ## 9. Checklist per environment
 
