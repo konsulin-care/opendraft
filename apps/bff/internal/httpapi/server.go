@@ -69,6 +69,7 @@ func New(cfg config.Config, deps Deps) http.Handler {
 		api.HandleFunc("POST "+pullsPath, actions.handlePulls)
 		api.HandleFunc("POST "+forksPath, actions.handleForks)
 		api.HandleFunc("GET "+branchesPath, suggestions.handleBranches)
+		api.HandleFunc("DELETE "+branchDeletePath, suggestions.handleBranchDelete)
 		api.HandleFunc("GET "+pullsPath, suggestions.handlePullLookup)
 		api.HandleFunc("POST "+mergeUpstreamPath, suggestions.handleMergeUpstream)
 		api.HandleFunc("GET "+gitRelayPath, git.handleRelay)
