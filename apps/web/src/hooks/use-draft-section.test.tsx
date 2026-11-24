@@ -3,15 +3,24 @@
  * Draft section tests: the hook exposes the split action, status chip and the
  * send, publish and conflict dialogs as project state changes.
  */
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import type { ProjectRecord } from '@opendraft/workspace';
+import type { ProjectRecord, WorkspaceAdapter } from '@opendraft/workspace';
+import { preflight } from '../publish/preflight';
 import type { BffSession, Owner } from '../github/bff-client';
 import type { SaveConflictChoice, SaveGitHubResult } from '../suggest/save';
 import type { SendSuggestionResult } from '../suggest/submit';
 import type { DraftSectionDeps, UseDraftSectionInput } from './use-draft-section';
 import { useDraftSection } from './use-draft-section';
+
+vi.mock('../publish/preflight', () => ({ preflight: vi.fn() }));
+const mockedPreflight = vi.mocked(preflight);
+
+beforeEach(() => {
+  mockedPreflight.mockReset();
+  mockedPreflight.mockResolvedValue({ ok: true, errors: [], warnings: [] });
+});
 
 const SESSION: BffSession = {
   login: 'octocat',
@@ -115,6 +124,43 @@ describe('useDraftSection action and chip', () => {
     render(<Section {...makeInput(LOCAL, deps)} />);
 
     expect(screen.getByRole('button', { name: 'Publish to GitHub' })).toBeInTheDocument();
+  });
+});
+
+describe('useDraftSection local preflight', () => {
+  it('calls the preflight module with the workspace when no runner is injected', async () => {
+    const deps = makeDeps({
+      load: vi.fn(async () => ({ status: { state: 'local-only' as const }, pendingSaves: 0 })),
+      runPreflight: undefined,
+    });
+    const workspace = {} as WorkspaceAdapter;
+    mockedPreflight.mockResolvedValue({
+      ok: false,
+      errors: [{ level: 'error', location: 'preflight', path: 'index.qmd', message: 'Broken cite' }],
+      warnings: [],
+    });
+    render(
+      <Section {...makeInput(LOCAL, deps)} workspace={workspace} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Publish to GitHub' }));
+
+    expect(
+      await screen.findByText('index.qmd — Broken cite'),
+    ).toBeInTheDocument();
+    expect(mockedPreflight).toHaveBeenCalledWith(workspace);
+  });
+
+  it('uses an injected runner and never calls the preflight module', async () => {
+    const deps = makeDeps({
+      load: vi.fn(async () => ({ status: { state: 'local-only' as const }, pendingSaves: 0 })),
+    });
+    render(<Section {...makeInput(LOCAL, deps)} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Publish to GitHub' }));
+
+    await waitFor(() => expect(deps.runPreflight).toHaveBeenCalled());
+    expect(mockedPreflight).not.toHaveBeenCalled();
   });
 });
 

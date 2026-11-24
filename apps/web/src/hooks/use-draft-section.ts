@@ -12,7 +12,6 @@ import type { PublishDialogDraft, PublishDialogInput } from '../components/publi
 import { PublishRepoForm } from '../components/publish/PublishRepoForm';
 import type { PublishRepoInput } from '../components/publish/PublishRepoForm';
 import { EditPopover } from '../reader/EditPopover';
-import { preflight } from '../publish/preflight';
 import type { PreflightResult } from '../publish/preflight';
 import type { DraftNameStatus } from '../suggest/branches';
 import { useDraft } from './use-draft';
@@ -243,6 +242,7 @@ function useLocalPreflight(
   const run = useCallback(async (): Promise<PreflightResult> => {
     if (runner) return runner(workspace);
     if (!workspace) return { ok: true, errors: [], warnings: [] };
+    const { preflight } = await import('../publish/preflight');
     return preflight(workspace);
   }, [runner, workspace]);
   useEffect(() => {
