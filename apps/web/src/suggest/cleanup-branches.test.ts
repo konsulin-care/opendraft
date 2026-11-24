@@ -33,6 +33,9 @@ function fakeDeps(
   const deleted: FakeDeps['deleted'] = [];
   const heads: string[] = [];
   const prefixes: string[] = [];
+  const listing: Record<string, SuggestionBranch[]> = Object.fromEntries(
+    Object.entries(branches).map(([prefix, entries]) => [prefix, [...entries]]),
+  );
 
   return {
     deleted,
@@ -40,8 +43,11 @@ function fakeDeps(
     prefixes,
     deps: {
       listSuggestionBranches: async (_owner, _repo, prefix) => {
-        prefixes.push(prefix);
-        return branches[prefix] ?? [];
+        const found = listing[prefix] ?? [];
+        if (found.length > 0 && !prefixes.includes(prefix)) {
+          prefixes.push(prefix);
+        }
+        return found;
       },
       findSuggestionPull: async (_owner, _repo, head) => {
         heads.push(head);
@@ -49,6 +55,9 @@ function fakeDeps(
       },
       deleteBranch: async (owner, repo, branch) => {
         deleted.push({ owner, repo, branch });
+        for (const [prefix, entries] of Object.entries(listing)) {
+          listing[prefix] = entries.filter((entry) => entry.name !== branch);
+        }
       },
     },
   };
