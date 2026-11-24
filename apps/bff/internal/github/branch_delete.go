@@ -24,7 +24,7 @@ func (c *Client) DeleteBranch(ctx context.Context, token, owner, repo, branch st
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrUpstream, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	switch {
 	case resp.StatusCode >= 200 && resp.StatusCode <= 299:

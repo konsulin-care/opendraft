@@ -25,8 +25,6 @@ type BranchRef struct {
 
 // PullInfo is the subset of a pull request the suggestion flow reads.
 type PullInfo struct {
-	// Number is the pull request number within the repository.
-	Number int
 	// HTMLURL is the browser URL of the pull request.
 	HTMLURL string
 	// State is "open", "closed" or "merged".
@@ -36,6 +34,8 @@ type PullInfo struct {
 	ReviewState string
 	// HeadSHA is the commit SHA the pull request head branch points at.
 	HeadSHA string
+	// Number is the pull request number within the repository.
+	Number int
 }
 
 // matchingRef mirrors one entry of GET /git/matching-refs/heads/{prefix}.
@@ -48,7 +48,6 @@ type matchingRef struct {
 
 // pullSummary mirrors the subset of a pull request list entry the BFF reads.
 type pullSummary struct {
-	Number   int     `json:"number"`
 	HTMLURL  string  `json:"html_url"`
 	State    string  `json:"state"`
 	MergedAt *string `json:"merged_at"`
@@ -56,15 +55,16 @@ type pullSummary struct {
 		Label string `json:"label"`
 		SHA   string `json:"sha"`
 	} `json:"head"`
+	Number int `json:"number"`
 }
 
 // reviewSummary mirrors the subset of a pull request review the BFF reads.
 type reviewSummary struct {
-	ID    int64  `json:"id"`
 	State string `json:"state"`
 	User  struct {
 		Login string `json:"login"`
 	} `json:"user"`
+	ID int64 `json:"id"`
 }
 
 // mergeUpstreamRequest is the JSON body of a merge-upstream call.
@@ -191,7 +191,7 @@ func (c *Client) MergeUpstream(ctx context.Context, token, owner, repo, branch s
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrUpstream, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	switch {
 	case resp.StatusCode >= 200 && resp.StatusCode <= 299:
