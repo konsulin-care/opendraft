@@ -73,6 +73,15 @@ describe('purgePrivateProjects', () => {
     expect(purged.map((project) => project.id)).toEqual(['private']);
     expect([...records.keys()].sort()).toEqual(['local', 'public']);
   });
+
+  it('also purges private reader snapshots', async () => {
+    const { registry } = makeRegistry([record('private', githubSource(true))]);
+    const purgeSnapshots = vi.fn(async () => {});
+
+    await purgePrivateProjects(registry, purgeSnapshots);
+
+    expect(purgeSnapshots).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('purgeIfSignedOut', () => {

@@ -8,6 +8,7 @@
 
 import type { ProjectRecord } from '@opendraft/workspace';
 import type { SessionState } from '../github/bff-client';
+import { purgePrivateSnapshots } from '../reader/reader-cache';
 
 /** Registry operations needed to purge private projects. */
 export interface PurgeRegistry {
@@ -30,19 +31,24 @@ function isPrivateGitHubProject(record: ProjectRecord): boolean {
 /**
  * Remove every private GitHub-source project from the registry.
  *
- * Local projects and projects cloned from public repositories are kept.
+ * Local projects and projects cloned from public repositories are kept. The
+ * private reader-snapshot cache is purged as well so a logged-out viewer
+ * cannot reopen a relay-cloned repository from IndexedDB.
  *
  * @param registry - Registry used to list and remove projects.
+ * @param purgeSnapshots - Reader snapshot purge, injectable for tests.
  * @returns The removed project records.
  */
 export async function purgePrivateProjects(
   registry: PurgeRegistry,
+  purgeSnapshots: () => Promise<void> = purgePrivateSnapshots,
 ): Promise<ProjectRecord[]> {
   const records = await registry.list();
   const purged = records.filter(isPrivateGitHubProject);
   for (const record of purged) {
     await registry.remove(record.id);
   }
+  await purgeSnapshots();
   return purged;
 }
 

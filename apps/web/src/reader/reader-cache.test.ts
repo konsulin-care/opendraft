@@ -4,6 +4,7 @@ import { IndexedDBWorkspace } from '@opendraft/workspace';
 import {
   COMPLETE_MARKER,
   loadSnapshot,
+  purgePrivateSnapshots,
   readerWorkspaceId,
   saveSnapshot,
 } from './reader-cache';
@@ -51,5 +52,25 @@ describe('saveSnapshot / loadSnapshot', () => {
     await workspace.close();
 
     await expect(loadSnapshot(OWNER, REPO, partialSha)).resolves.toBeNull();
+  });
+});
+
+describe('purgePrivateSnapshots', () => {
+  it('deletes snapshots saved with the private flag', async () => {
+    const privateSha = 'PRIVATE1';
+    await saveSnapshot(OWNER, REPO, privateSha, FILES, { private: true });
+
+    await purgePrivateSnapshots();
+
+    await expect(loadSnapshot(OWNER, REPO, privateSha)).resolves.toBeNull();
+  });
+
+  it('keeps snapshots saved without the private flag', async () => {
+    const publicSha = 'PUBLIC1';
+    await saveSnapshot(OWNER, REPO, publicSha, FILES);
+
+    await purgePrivateSnapshots();
+
+    await expect(loadSnapshot(OWNER, REPO, publicSha)).resolves.not.toBeNull();
   });
 });
