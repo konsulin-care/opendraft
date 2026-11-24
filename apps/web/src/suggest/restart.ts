@@ -89,6 +89,8 @@ export interface RestartDeps {
   syncFork: (owner: string, repo: string, branch: string) => Promise<void>;
   /** Signed-in viewer whose login names the new draft branch. */
   session: BffSession;
+  /** Best-effort sweep of the viewer's stale remote branches. */
+  sweepBranches?: (source: ProjectSourceGitHub) => Promise<unknown>;
 }
 
 /** Result of {@link restartSuggestion} and {@link pullLatest}. */
@@ -232,14 +234,21 @@ export async function restartSuggestion(
   await deps.checkoutToWorkspace(projectId);
 
   const files = scoped(await deps.readWorkingFiles(repo.fs, repo.dir));
-  await deps.registry.setSource(projectId, {
+  const updated: ProjectSourceGitHub = {
     ...source,
     branch,
     pushed: false,
     pullNumber: null,
     syncedSha: sha,
     digest: fileDigest(files),
-  });
+  };
+  await deps.registry.setSource(projectId, updated);
+
+  try {
+    await deps.sweepBranches?.(updated);
+  } catch {
+    // A failed sweep must never leave the restarted draft inconsistent.
+  }
 
   return { projectId, branch, sha };
 }

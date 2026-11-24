@@ -18,12 +18,15 @@ import type {
 } from '../github/bff-client';
 import { createPullRequest, forkRepo } from '../github/bff-client';
 import {
+  deleteSuggestionBranch,
   findSuggestionPull as fetchSuggestionPull,
   listSuggestionBranches as fetchSuggestionBranches,
   syncFork,
 } from '../github/bff-suggest';
 import type { SuggestionBranch, SuggestionPull } from '../github/bff-suggest';
 import { projectRegistry } from '../hooks/useProjects';
+import { sweepBranches } from './cleanup-branches';
+import type { SweepDeps } from './cleanup-branches';
 import { applyDraftName } from './name-draft';
 import { openProjectRepo } from './project-repo';
 import {
@@ -232,11 +235,33 @@ export async function createCheckDeps(): Promise<CheckSuggestionDeps> {
 }
 
 /**
+ * Sweep the signed-in viewer's stale remote draft branches.
+ *
+ * @param source - Repository and current branch of the draft.
+ * @param session - Signed-in viewer whose branch prefixes are swept.
+ * @returns The deleted and kept branch names.
+ */
+export async function sweepOwnBranches(
+  source: ProjectSourceGitHub,
+  session: BffSession,
+): Promise<unknown> {
+  const deps: SweepDeps = {
+    listSuggestionBranches,
+    findSuggestionPull,
+    deleteBranch: deleteSuggestionBranch,
+  };
+  return sweepBranches(source, session.login, deps);
+}
+
+/**
  * Build the dependencies of {@link restartSuggestion} and {@link pullLatest}.
  *
  * @param session - Signed-in viewer whose login names the new branch.
  * @returns Registry, GitHub, git and clock dependencies.
  */
 export async function createRestartDeps(session: BffSession): Promise<RestartDeps> {
-  return createRestartBrowserDeps(session);
+  return {
+    ...(await createRestartBrowserDeps(session)),
+    sweepBranches: (source) => sweepOwnBranches(source, session),
+  };
 }
