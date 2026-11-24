@@ -88,7 +88,7 @@ func (c *Client) CreateRepo(ctx context.Context, token, owner string, ownerIsUse
 	if err != nil {
 		return Repo{}, fmt.Errorf("%w: %v", ErrUpstream, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	switch {
 	case resp.StatusCode >= 200 && resp.StatusCode <= 299:

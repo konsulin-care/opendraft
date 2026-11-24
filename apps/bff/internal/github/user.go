@@ -46,7 +46,7 @@ func (c *Client) RevokeToken(ctx context.Context, accessToken string) error {
 	if err != nil {
 		return fmt.Errorf("github: revoke request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
@@ -71,7 +71,7 @@ func (c *Client) FetchUser(ctx context.Context, accessToken string) (User, error
 	if err != nil {
 		return User{}, fmt.Errorf("github: user request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		return User{}, fmt.Errorf("github: user status %d", resp.StatusCode)
