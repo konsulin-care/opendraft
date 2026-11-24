@@ -14,7 +14,7 @@ export function BlockEditorSkeleton() {
       className="reading-column animate-pulse motion-reduce:animate-none py-6"
     >
       {widths.map((width) => (
-        <div key={width} className={`h-4 rounded bg-neutral-200 ${width} mb-4 last:mb-0`} />
+        <div key={width} className={`h-4 rounded bg-gray-200 ${width} mb-4 last:mb-0`} />
       ))}
     </div>
   );

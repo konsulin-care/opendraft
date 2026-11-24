@@ -33,7 +33,7 @@ export function ReloadPrompt({
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-4 right-4 z-50 flex max-w-sm flex-col gap-3 rounded-lg border border-neutral-700 bg-neutral-900 px-4 py-3 text-sm text-white shadow-lg"
+      className="fixed bottom-4 right-4 z-50 flex max-w-sm flex-col gap-3 rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 text-sm text-white shadow-lg"
     >
       <p>A new version of OpenDraft is available.</p>
       <div className="flex justify-end gap-2">
@@ -44,7 +44,7 @@ export function ReloadPrompt({
             setReloading(true);
             void updateServiceWorker();
           }}
-          className="rounded-md bg-white px-3 py-1 font-medium text-neutral-900 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-md bg-white px-3 py-1 font-medium text-gray-900 disabled:cursor-not-allowed disabled:opacity-60"
         >
           Reload
         </button>
@@ -54,7 +54,7 @@ export function ReloadPrompt({
             setNeedRefresh(false);
             setOfflineReady(false);
           }}
-          className="rounded-md px-3 py-1 font-medium text-neutral-200 hover:bg-neutral-800"
+          className="rounded-md px-3 py-1 font-medium text-gray-200 hover:bg-gray-800"
         >
           Close
         </button>
