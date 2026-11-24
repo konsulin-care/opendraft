@@ -2,9 +2,11 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { visualizer } from 'rollup-plugin-visualizer';
+import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import { vendorChunk, chunkFileName } from './vite.chunks.js';
+import { pwaOptions } from './vite.pwa.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -34,6 +36,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    VitePWA(pwaOptions),
     ...(process.env.ANALYZE === '1'
       ? [
           visualizer({
