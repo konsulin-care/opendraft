@@ -33,6 +33,76 @@ function makeDeps(overrides: Partial<LoadRepoDeps> = {}): LoadRepoDeps {
   };
 }
 
+describe('loadRepo phases', () => {
+  it('reports checking, downloading, saving and preparing on a public cache miss', async () => {
+    const files = filesWithManuscripts([{ id: 'demo', path: 'manuscripts/demo' }]);
+    const deps = makeDeps({ loadPublicSnapshot: vi.fn(async () => ({ sha: 'sha1', files })) });
+    const onPhase = vi.fn();
+
+    await loadRepo(ROUTE, deps, onPhase);
+
+    expect(deps.resolveCommit).toHaveBeenCalledTimes(1);
+    expect(onPhase.mock.calls.map(([phase]) => phase)).toEqual([
+      'checking',
+      'downloading',
+      'saving',
+      'preparing',
+    ]);
+    expect(deps.loadPublicSnapshot).toHaveBeenCalledWith(
+      'konsulin-care',
+      'citizen-science',
+      undefined,
+      { sha: 'sha1', treeSha: 'tree1' },
+    );
+  });
+
+  it('reports checking then opening on a cache hit without downloading', async () => {
+    const cached = filesWithManuscripts([{ id: 'demo', path: 'manuscripts/demo' }]);
+    const deps = makeDeps({
+      cache: {
+        loadSnapshot: vi.fn(async () => cached),
+        saveSnapshot: vi.fn(async () => undefined),
+      },
+    });
+    const onPhase = vi.fn();
+
+    await loadRepo(ROUTE, deps, onPhase);
+
+    expect(onPhase.mock.calls.map(([phase]) => phase)).toEqual(['checking', 'opening']);
+    expect(deps.loadPublicSnapshot).not.toHaveBeenCalled();
+  });
+});
+
+describe('loadRepo relay phases', () => {
+  it('reports downloading, saving and preparing for the private relay fallback', async () => {
+    const files = filesWithManuscripts([{ id: 'demo', path: 'manuscripts/demo' }]);
+    const deps = makeDeps({
+      resolveCommit: vi.fn(async () => {
+        throw new NotFoundError();
+      }),
+      getSession: vi.fn(async () => ({ login: 'octocat' })),
+      cloneViaRelay: vi.fn(async () => ({ sha: 'private-sha', files })),
+    });
+    const onPhase = vi.fn();
+
+    const result = await loadRepo(ROUTE, deps, onPhase);
+
+    expect(onPhase.mock.calls.map(([phase]) => phase)).toEqual([
+      'downloading',
+      'saving',
+      'preparing',
+    ]);
+    expect(deps.cache.saveSnapshot).toHaveBeenCalledWith(
+      'konsulin-care',
+      'citizen-science',
+      'private-sha',
+      files,
+      { private: true },
+    );
+    expect(result.sha).toBe('private-sha');
+  });
+});
+
 describe('loadRepo cache', () => {
   it('returns cached files for the resolved SHA without loading a public snapshot', async () => {
     const cached = filesWithManuscripts([{ id: 'demo', path: 'manuscripts/demo' }]);

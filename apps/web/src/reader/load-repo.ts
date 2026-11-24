@@ -10,9 +10,16 @@
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import { MemoryWorkspace, readOnlyWorkspace } from '@opendraft/workspace';
 import { parse } from 'yaml';
-import { NotFoundError } from './github-public';
-import type { PublicSnapshot } from './github-public';
+import { loadPublicSnapshot as loadGithubPublicSnapshot, NotFoundError } from './github-public';
+import type { PublicSnapshot, ResolvedCommit } from './github-public';
+import type { SaveSnapshotOptions } from './reader-cache';
 import type { ReaderRoute } from './route';
+
+/** A stage reported while a repository is being loaded. */
+export type LoadPhase = 'checking' | 'opening' | 'downloading' | 'saving' | 'preparing';
+
+/** Callback invoked with each loading phase. */
+export type OnLoadPhase = (phase: LoadPhase) => void;
 
 /** Path of the project configuration file inside a repository. */
 const CONFIG_PATH = 'opendraft.yml';
@@ -47,25 +54,46 @@ export interface RepoSnapshot {
 
 /** Injected dependencies of {@link loadRepo}. */
 export interface LoadRepoDeps {
-  /** Resolve a ref (default `HEAD`) to a commit SHA. */
-  resolveCommit: (owner: string, repo: string, ref?: string) => Promise<{ sha: string }>;
+  /** Resolve a ref (default `HEAD`) to a commit SHA and its root tree. */
+  resolveCommit: (owner: string, repo: string, ref?: string) => Promise<ResolvedCommit>;
   /** Load the reader-visible files of a public repository anonymously. */
-  loadPublicSnapshot: (owner: string, repo: string, ref?: string) => Promise<PublicSnapshot>;
+  loadPublicSnapshot: (
+    owner: string,
+    repo: string,
+    ref: string | undefined,
+    commit: ResolvedCommit,
+  ) => Promise<PublicSnapshot>;
   /** Snapshot cache keyed by owner, repo and commit SHA. */
   cache: {
     loadSnapshot: (owner: string, repo: string, sha: string) => Promise<Map<string, string> | null>;
+    // Mirrors reader-cache.saveSnapshot: positional owner/repo/sha/files plus flags.
+    /* eslint-disable max-params */
     saveSnapshot: (
       owner: string,
       repo: string,
       sha: string,
       files: Map<string, string>,
+      options?: SaveSnapshotOptions,
     ) => Promise<void>;
+    /* eslint-enable max-params */
   };
   /** Current BFF session identity, or null when anonymous. */
   getSession: () => Promise<unknown>;
   /** Clone a private repository through the authenticated git relay. */
   cloneViaRelay: (owner: string, repo: string, ref?: string) => Promise<RepoSnapshot>;
 }
+
+/** Loader shape emitted by the default GitHub dependency before T14. */
+type LegacyLoadPublicSnapshot = (
+  owner: string,
+  repo: string,
+  ref?: string,
+) => Promise<PublicSnapshot>;
+
+/** Dependencies accepted for compatibility with the pre-T14 default wiring. */
+type LegacyLoadRepoDeps = Omit<LoadRepoDeps, 'loadPublicSnapshot'> & {
+  loadPublicSnapshot: LegacyLoadPublicSnapshot;
+};
 
 /**
  * Parse the manuscript list out of an `opendraft.yml` document.
@@ -119,39 +147,81 @@ async function toLoadedRepo(snapshot: RepoSnapshot): Promise<LoadedRepo> {
 }
 
 /**
+ * Load a public snapshot at an already resolved commit.
+ *
+ * This adapter is the dependency wired into the reader's default deps; it
+ * avoids a second commit lookup because {@link loadRepo} already resolved the
+ * ref before deciding between the cache and the network.
+ *
+ * @param owner - Repository owner login.
+ * @param repo - Repository name.
+ * @param ref - Ref the route selected; unused once the commit is known.
+ * @param commit - Commit resolved by {@link loadRepo}.
+ * @returns The public snapshot pinned to the given commit.
+ */
+export function loadPublicSnapshotAtCommit(
+  owner: string,
+  repo: string,
+  ref: string | undefined,
+  commit: ResolvedCommit,
+): Promise<PublicSnapshot> {
+  return loadGithubPublicSnapshot(owner, repo, ref, fetch, { commit });
+}
+
+/**
  * Load a repository at a route into a read-only workspace.
  *
  * Resolves the ref first so every load pins to one commit, then answers from
  * the snapshot cache when possible. A `NotFoundError` from the anonymous path
  * falls back to the relay clone when a session exists, and is rethrown for an
- * anonymous viewer.
+ * anonymous viewer. Loading progress is reported through `onPhase`.
  *
  * @param route - Parsed reader route with owner, repo and optional ref.
  * @param deps - Injected GitHub, cache, session and relay dependencies.
+ * @param onPhase - Optional callback receiving each loading phase in order.
  * @returns The pinned commit, read-only workspace and project metadata.
  */
-export async function loadRepo(route: ReaderRoute, deps: LoadRepoDeps): Promise<LoadedRepo> {
+export async function loadRepo(
+  route: ReaderRoute,
+  deps: LoadRepoDeps | LegacyLoadRepoDeps,
+  onPhase: OnLoadPhase = () => {},
+): Promise<LoadedRepo> {
   const { owner, repo, ref } = route;
+  const loadSnapshotForCommit: LoadRepoDeps['loadPublicSnapshot'] =
+    deps.loadPublicSnapshot === loadGithubPublicSnapshot
+      ? loadPublicSnapshotAtCommit
+      : (deps.loadPublicSnapshot as LoadRepoDeps['loadPublicSnapshot']);
+  let downloadStarted = false;
 
   try {
     const commit = await deps.resolveCommit(owner, repo, ref);
+    onPhase('checking');
 
     const cached = await deps.cache.loadSnapshot(owner, repo, commit.sha);
     if (cached !== null) {
-      return toLoadedRepo({ sha: commit.sha, files: cached });
+      onPhase('opening');
+      return await toLoadedRepo({ sha: commit.sha, files: cached });
     }
 
-    const snapshot = await deps.loadPublicSnapshot(owner, repo, ref);
+    downloadStarted = true;
+    onPhase('downloading');
+    const snapshot = await loadSnapshotForCommit(owner, repo, ref, commit);
+    onPhase('saving');
     await deps.cache.saveSnapshot(owner, repo, snapshot.sha, snapshot.files);
-    return toLoadedRepo(snapshot);
+    onPhase('preparing');
+    return await toLoadedRepo(snapshot);
   } catch (error) {
     if (!(error instanceof NotFoundError)) throw error;
 
     const session = await deps.getSession();
     if (!session) throw error;
 
+    if (!downloadStarted) onPhase('downloading');
     const snapshot = await deps.cloneViaRelay(owner, repo, ref);
-    return toLoadedRepo(snapshot);
+    onPhase('saving');
+    await deps.cache.saveSnapshot(owner, repo, snapshot.sha, snapshot.files, { private: true });
+    onPhase('preparing');
+    return await toLoadedRepo(snapshot);
   }
 }
 
