@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/konsulin-care/opendraft/apps/bff/internal/github"
 	"github.com/konsulin-care/opendraft/apps/bff/internal/session"
@@ -100,6 +101,10 @@ func (h *suggestionsHandler) handlePullLookup(w http.ResponseWriter, r *http.Req
 	h.auth.requireSession(func(w http.ResponseWriter, r *http.Request, sess session.Session) {
 		head := r.URL.Query().Get(headField)
 		if !headBasePattern.MatchString(head) {
+			writeInvalidRequest(w, headField)
+			return
+		}
+		if !strings.Contains(head, ":") {
 			writeInvalidRequest(w, headField)
 			return
 		}

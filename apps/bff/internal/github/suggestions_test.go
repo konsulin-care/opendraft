@@ -74,35 +74,35 @@ func TestLatestPullStates(t *testing.T) {
 	}{
 		{
 			name:    "open",
-			body:    `[{"number":12,"html_url":"https://github.example/octocat/draft/pull/12","state":"open","merged_at":null}]`,
+			body:    `[{"number":12,"html_url":"https://github.example/octocat/draft/pull/12","state":"open","merged_at":null,"head":{"label":"octocat:opendraft/ada/20260101-120000"}}]`,
 			reviews: `[]`,
 			found:   true,
 			want:    PullInfo{Number: 12, HTMLURL: "https://github.example/octocat/draft/pull/12", State: "open", ReviewState: "none"},
 		},
 		{
 			name:    "closed",
-			body:    `[{"number":13,"html_url":"https://github.example/octocat/draft/pull/13","state":"closed","merged_at":null}]`,
+			body:    `[{"number":13,"html_url":"https://github.example/octocat/draft/pull/13","state":"closed","merged_at":null,"head":{"label":"octocat:opendraft/ada/20260101-120000"}}]`,
 			reviews: `[]`,
 			found:   true,
 			want:    PullInfo{Number: 13, HTMLURL: "https://github.example/octocat/draft/pull/13", State: "closed", ReviewState: "none"},
 		},
 		{
 			name:    "merged",
-			body:    `[{"number":14,"html_url":"https://github.example/octocat/draft/pull/14","state":"closed","merged_at":"2026-01-01T12:00:00Z"}]`,
+			body:    `[{"number":14,"html_url":"https://github.example/octocat/draft/pull/14","state":"closed","merged_at":"2026-01-01T12:00:00Z","head":{"label":"octocat:opendraft/ada/20260101-120000"}}]`,
 			reviews: `[]`,
 			found:   true,
 			want:    PullInfo{Number: 14, HTMLURL: "https://github.example/octocat/draft/pull/14", State: "merged", ReviewState: "none"},
 		},
 		{
 			name:    "changes requested",
-			body:    `[{"number":12,"html_url":"https://github.example/octocat/draft/pull/12","state":"open","merged_at":null}]`,
+			body:    `[{"number":12,"html_url":"https://github.example/octocat/draft/pull/12","state":"open","merged_at":null,"head":{"label":"octocat:opendraft/ada/20260101-120000"}}]`,
 			reviews: `[{"id":1,"state":"APPROVED","user":{"login":"ada"}},{"id":2,"state":"CHANGES_REQUESTED","user":{"login":"grace"}}]`,
 			found:   true,
 			want:    PullInfo{Number: 12, HTMLURL: "https://github.example/octocat/draft/pull/12", State: "open", ReviewState: "changes_requested"},
 		},
 		{
 			name:    "approved after earlier change request",
-			body:    `[{"number":12,"html_url":"https://github.example/octocat/draft/pull/12","state":"open","merged_at":null}]`,
+			body:    `[{"number":12,"html_url":"https://github.example/octocat/draft/pull/12","state":"open","merged_at":null,"head":{"label":"octocat:opendraft/ada/20260101-120000"}}]`,
 			reviews: `[{"id":1,"state":"CHANGES_REQUESTED","user":{"login":"grace"}},{"id":2,"state":"APPROVED","user":{"login":"ada"}},{"id":3,"state":"APPROVED","user":{"login":"grace"}}]`,
 			found:   true,
 			want:    PullInfo{Number: 12, HTMLURL: "https://github.example/octocat/draft/pull/12", State: "open", ReviewState: "approved"},
@@ -113,6 +113,20 @@ func TestLatestPullStates(t *testing.T) {
 			reviews: `[]`,
 			found:   false,
 			want:    PullInfo{},
+		},
+		{
+			name:    "pull request from another head",
+			body:    `[{"number":6,"html_url":"https://github.example/octocat/draft/pull/6","state":"closed","merged_at":"2026-01-01T12:00:00Z","head":{"label":"octocat:add-abstract"}}]`,
+			reviews: `[]`,
+			found:   false,
+			want:    PullInfo{},
+		},
+		{
+			name:    "head label matches ignoring case",
+			body:    `[{"number":12,"html_url":"https://github.example/octocat/draft/pull/12","state":"open","merged_at":null,"head":{"label":"Octocat:Opendraft/Ada/20260101-120000"}}]`,
+			reviews: `[]`,
+			found:   true,
+			want:    PullInfo{Number: 12, HTMLURL: "https://github.example/octocat/draft/pull/12", State: "open", ReviewState: "none"},
 		},
 	}
 	for _, tt := range tests {

@@ -109,7 +109,7 @@ func TestPullLookupEndpoint(t *testing.T) {
 			if head := r.URL.Query().Get("head"); head != "octocat:opendraft/ada/20260101-120000" {
 				t.Errorf("head = %q", head)
 			}
-			_, _ = w.Write([]byte(`[{"number":12,"html_url":"https://github.example/octocat/draft/pull/12","state":"open","merged_at":null}]`))
+			_, _ = w.Write([]byte(`[{"number":12,"html_url":"https://github.example/octocat/draft/pull/12","state":"open","merged_at":null,"head":{"label":"octocat:opendraft/ada/20260101-120000"}}]`))
 		case "/repos/octocat/draft/pulls/12/reviews":
 			_, _ = w.Write([]byte(`[]`))
 		default:
@@ -157,7 +157,7 @@ func TestPullLookupEndpointReviewStates(t *testing.T) {
 			fake := &fakeRepoActions{router: func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
 				case "/repos/octocat/draft/pulls":
-					_, _ = w.Write([]byte(`[{"number":12,"html_url":"https://github.example/octocat/draft/pull/12","state":"open","merged_at":null}]`))
+					_, _ = w.Write([]byte(`[{"number":12,"html_url":"https://github.example/octocat/draft/pull/12","state":"open","merged_at":null,"head":{"label":"octocat:opendraft/ada/20260101-120000"}}]`))
 				case "/repos/octocat/draft/pulls/12/reviews":
 					_, _ = w.Write([]byte(tt.reviews))
 				default:
@@ -198,25 +198,28 @@ func TestPullLookupEndpointNotFound(t *testing.T) {
 	}
 }
 
-// TestPullLookupEndpointRejectsInvalidHead checks an invalid head is rejected
-// before any GitHub call.
+// TestPullLookupEndpointRejectsInvalidHead checks an invalid or unqualified head
+// is rejected before any GitHub call: GitHub ignores an unqualified head filter.
 func TestPullLookupEndpointRejectsInvalidHead(t *testing.T) {
 	now := time.Unix(authTestNowUnix, 0).UTC()
-	fake := &fakeRepoActions{router: func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }}
-	handler, sealer := newRepoActionsServer(t, fake, now)
+	for _, head := range []string{"bad%20head", "od-lamurian/add-abstract"} {
+		t.Run(head, func(t *testing.T) {
+			fake := &fakeRepoActions{router: func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }}
+			handler, sealer := newRepoActionsServer(t, fake, now)
+			rec := serveRepoAction(t, handler, sealer, now, http.MethodGet,
+				"/@api/repos/octocat/draft/pulls?head="+head, nil)
 
-	rec := serveRepoAction(t, handler, sealer, now, http.MethodGet,
-		"/@api/repos/octocat/draft/pulls?head=bad%20head", nil)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400: %s", rec.Code, rec.Body.String())
-	}
-	body := decodeJSON(t, rec)
-	if body["error"] != invalidRequestCode || body["field"] != headField {
-		t.Errorf("body = %v, want field %q", body, headField)
-	}
-	if fake.count() != 0 {
-		t.Errorf("GitHub received %d requests, want 0", fake.count())
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want 400: %s", rec.Code, rec.Body.String())
+			}
+			body := decodeJSON(t, rec)
+			if body["error"] != invalidRequestCode || body["field"] != headField {
+				t.Errorf("body = %v, want field %q", body, headField)
+			}
+			if fake.count() != 0 {
+				t.Errorf("GitHub received %d requests, want 0", fake.count())
+			}
+		})
 	}
 }
 

@@ -50,6 +50,9 @@ type pullSummary struct {
 	HTMLURL  string  `json:"html_url"`
 	State    string  `json:"state"`
 	MergedAt *string `json:"merged_at"`
+	Head     struct {
+		Label string `json:"label"`
+	} `json:"head"`
 }
 
 // reviewSummary mirrors the subset of a pull request review the BFF reads.
@@ -88,7 +91,10 @@ func (c *Client) MatchingBranches(ctx context.Context, token, owner, repo, prefi
 
 // LatestPull returns the newest pull request whose head matches head (of the
 // form owner:branch) across all states. It reports found false when GitHub
-// returns no pull request. A set merged_at makes the state "merged".
+// returns no pull request, and also when the newest pull request of the
+// repository comes from another head: GitHub ignores an unqualified head
+// filter, so the response is verified against head.label. A set merged_at
+// makes the state "merged".
 func (c *Client) LatestPull(ctx context.Context, token, owner, repo, head string) (PullInfo, bool, error) {
 	query := url.Values{}
 	query.Set("head", head)
@@ -107,6 +113,9 @@ func (c *Client) LatestPull(ctx context.Context, token, owner, repo, head string
 		return PullInfo{}, false, nil
 	}
 	newest := pulls[0]
+	if !strings.EqualFold(newest.Head.Label, head) {
+		return PullInfo{}, false, nil
+	}
 	state := newest.State
 	if newest.MergedAt != nil {
 		state = "merged"
