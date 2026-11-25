@@ -1,0 +1,32 @@
+/* ── Wide tables ── */
+/* prosemirror-tables ships `.ProseMirror table { table-layout: fixed; width:
+   100%; overflow: hidden }`, which squeezes columns to one word per line.
+   Per WCAG 1.4.10 Reflow a data table may scroll inside its own container, so
+   each table gets a horizontally scrollable wrapper whose height is capped at
+   70vh (leaving room for a sticky header row). The selectors below out-specify
+   the prosemirror-tables rule. */
+
+.milkdown .milkdown-table-block .table-wrapper,
+.list-table-scroll {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 70vh;
+}
+
+.milkdown .ProseMirror .milkdown-table-block table,
+.milkdown .ProseMirror .list-table-preview {
+  table-layout: auto;
+  width: max-content;
+  min-width: 100%;
+  overflow: visible;
+}
+
+.milkdown .ProseMirror .milkdown-table-block :is(th, td),
+.milkdown .ProseMirror .list-table-preview :is(th, td) {
+  min-width: 8rem;
+}
+
+.milkdown .ProseMirror .milkdown-table-block :is(th, td) > *,
+.milkdown .ProseMirror .list-table-preview :is(th, td) > * {
+  max-width: 40ch;
+}
