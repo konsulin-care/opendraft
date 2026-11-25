@@ -3,9 +3,8 @@
  *
  * Derives per-author byline segments (affiliation superscripts numbered
  * by first appearance, symbol flags, ORCID, on-behalf-of phrasing), the
- * numbered affiliation list, footnotes limited to symbols in use, the
- * collaborator groups and the per-author CRediT contributions summary in
- * human-readable role labels.
+ * numbered affiliation list, footnotes limited to symbols in use and the
+ * collaborator groups.
  */
 import { isGroupAuthor } from '@opendraft/schema';
 import type { MetadataAuthor } from './use-manuscript-metadata';
@@ -35,6 +34,7 @@ export interface BylineAuthor {
   orcid?: string;
   email?: string;
   roles: string[];
+  affiliations: BylineAffiliation[];
   onBehalfOf?: string;
   group: boolean;
   members: string[];
@@ -54,27 +54,7 @@ export interface BylineModel {
   affiliations: BylineAffiliation[];
   footnotes: string[];
   collaborators: CollaboratorGroup[];
-  contributions: string[];
-  hasContributions: boolean;
 }
-
-/** The 14 NISO CRediT roles as slug/label pairs in canonical order. */
-const CREDIT_ROLES: ReadonlyArray<readonly [string, string]> = [
-  ['conceptualization', 'Conceptualization'],
-  ['data-curation', 'Data curation'],
-  ['formal-analysis', 'Formal analysis'],
-  ['funding-acquisition', 'Funding acquisition'],
-  ['investigation', 'Investigation'],
-  ['methodology', 'Methodology'],
-  ['project-administration', 'Project administration'],
-  ['resources', 'Resources'],
-  ['software', 'Software'],
-  ['supervision', 'Supervision'],
-  ['validation', 'Validation'],
-  ['visualization', 'Visualization'],
-  ['writing-original-draft', 'Writing – original draft'],
-  ['writing-review-editing', 'Writing – review & editing'],
-];
 
 /** Coerce a parsed YAML value to a plain record. */
 function asRecord(value: unknown): Record<string, unknown> {
@@ -115,28 +95,10 @@ export function initials(given: string, family: string): string {
   return `${letters.join('.')}.`;
 }
 
-/** One author's CRediT roles as human-readable labels in canonical order. */
-function roleLabels(author: MetadataAuthor): string[] {
-  const roles = Array.isArray(author.roles) ? author.roles : [];
-  return CREDIT_ROLES
-    .filter(([slug]) => roles.includes(slug))
-    .map(([, label]) => label);
-}
-
-/** CRediT contributions summary: one line per author, in author order. */
-function buildContributions(authors: MetadataAuthor[]): string[] {
-  const lines: string[] = [];
-  for (const author of authors) {
-    const labels = roleLabels(author);
-    if (labels.length > 0) lines.push(`${authorDisplayName(author)}: ${labels.join(', ')}`);
-  }
-  return lines;
-}
-
 /** Dedupe-and-number state for affiliations, in first-appearance order. */
 interface AffiliationNumbering {
   order: BylineAffiliation[];
-  numbered: (key: string, label: string, id?: string) => string;
+  numbered: (key: string, label: string, id?: string) => BylineAffiliation;
 }
 
 /** Create the affiliation numbering state shared across all authors. */
@@ -145,14 +107,14 @@ function createNumbering(): AffiliationNumbering {
   const seen = new Map<string, number>();
   return {
     order,
-    numbered: (key: string, label: string, id = key): string => {
+    numbered: (key: string, label: string, id = key): BylineAffiliation => {
       let number = seen.get(key);
       if (number === undefined) {
         number = order.length + 1;
         seen.set(key, number);
         order.push({ id, number, name: label });
       }
-      return String(number);
+      return { id, number, name: label };
     },
   };
 }
@@ -189,22 +151,21 @@ function createContext(
   return { registry, numbering: createNumbering(), groupNames: collectGroupNames(authors) };
 }
 
-/** Resolve one author's affiliation superscript numbers. */
-function affiliationNumbers(author: MetadataAuthor, ctx: BuildContext): string {
-  return (Array.isArray(author.affiliations) ? author.affiliations : [])
-    .map((entry) => {
-      const record = asRecord(entry);
-      if (typeof record.ref === 'string') {
-        const target = ctx.registry.get(record.ref);
-        return ctx.numbering.numbered(`ref:${record.ref}`, target?.name ?? record.ref, record.ref);
-      }
-      if (typeof record.name === 'string') {
-        return ctx.numbering.numbered(`inline:${record.name}`, record.name);
-      }
-      return null;
-    })
-    .filter((value): value is string => value !== null)
-    .join(',');
+/** Resolve one author's affiliations in superscript order with global numbers. */
+function authorAffiliations(author: MetadataAuthor, ctx: BuildContext): BylineAffiliation[] {
+  const result: BylineAffiliation[] = [];
+  for (const entry of Array.isArray(author.affiliations) ? author.affiliations : []) {
+    const record = asRecord(entry);
+    if (typeof record.ref === 'string') {
+      const target = ctx.registry.get(record.ref);
+      result.push(
+        ctx.numbering.numbered(`ref:${record.ref}`, target?.name ?? record.ref, record.ref),
+      );
+    } else if (typeof record.name === 'string') {
+      result.push(ctx.numbering.numbered(`inline:${record.name}`, record.name));
+    }
+  }
+  return result;
 }
 
 /** Build the byline segment of one author. */
@@ -220,16 +181,18 @@ function buildEntry(
   const roles = Array.isArray(author.roles) ? author.roles.filter(
     (role): role is string => typeof role === 'string',
   ) : [];
+  const affiliations = authorAffiliations(author, ctx);
   return {
     key: typeof author.id === 'string' ? author.id : `author-${index}`,
     name: authorDisplayName(author),
-    superscript: affiliationNumbers(author, ctx),
+    superscript: affiliations.map((affiliation) => affiliation.number).join(','),
     corresponding: author.corresponding === true,
     equal: author['equal-contributor'] === true,
     deceased: author.deceased === true,
     orcid: typeof author.orcid === 'string' ? author.orcid : undefined,
     email: typeof author.email === 'string' ? author.email : undefined,
     roles,
+    affiliations,
     onBehalfOf: typeof behalf === 'string' && ctx.groupNames.has(behalf)
       ? `on behalf of ${ctx.groupNames.get(behalf)}`
       : undefined,
@@ -278,9 +241,5 @@ export function buildByline(
         count: entry.members.length,
         members: entry.members,
       })),
-    contributions: buildContributions(authors),
-    hasContributions: authors.some(
-      (author) => Array.isArray(author.roles) && author.roles.length > 0,
-    ),
   };
 }
