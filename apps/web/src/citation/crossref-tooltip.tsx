@@ -24,8 +24,14 @@ export interface CrossrefTooltipProps {
   anchorEl: HTMLElement | null;
 }
 
-/** Render the tooltip body for a known or broken label. */
-function TooltipBody({
+/**
+ * Render the shared detail body for a known or broken cross-reference
+ * label. The hover tooltip and the touch sheet both use it.
+ *
+ * @param props - The label data to describe.
+ * @returns The details markup.
+ */
+export function CrossrefDetails({
   id,
   kind,
   caption,
@@ -95,7 +101,7 @@ export function CrossrefTooltip(props: CrossrefTooltipProps) {
       role="tooltip"
       style={{ position: 'fixed' }}
     >
-      <TooltipBody id={id} kind={kind} caption={caption} broken={broken} />
+      <CrossrefDetails id={id} kind={kind} caption={caption} broken={broken} />
     </div>
   );
 }
