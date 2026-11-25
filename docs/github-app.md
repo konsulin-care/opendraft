@@ -105,8 +105,8 @@ Request the minimum set required for normal operation. Do **not** grant account
 
 Leave every other permission at **No access**, including all organization and
 user permissions (members, emails, administration, etc.). The app never asks
-for installation tokens at runtime: private-key-backed installation tokens are
-not used, and no private key is generated yet (see section 5).
+for installation tokens at runtime: the optional private key (see section 5) is
+only used to mint short-lived app JWTs for repo-level installation lookups.
 
 ## 3. Client secret
 
@@ -155,23 +155,51 @@ The BFF opens cookies with the current key and falls back to
 5. After the maximum session lifetime (7 days) plus clock skew, clear
    `BFF_SESSION_KEY_PREVIOUS` and restart.
 
-## 5. Private key (deferred)
+## 5. App private key (optional)
 
-Do **not** generate an app private key yet. OpenDraft intentionally does not
-store one: runtime operations use GitHub App **user access tokens**, so no
-installation token and no private key are required. Keep this deferred until a
-feature explicitly needs installation tokens (for example app-initiated work
-without a signed-in user).
+OpenDraft can optionally use a GitHub App private key to check whether the app
+is installed on a specific repository. It is **not** used for installation
+tokens: runtime operations still use GitHub App **user access tokens**.
 
-When that day comes, the procedure will be:
+### Why it exists
 
-1. Generate a private key on the GitHub App settings page and download the PEM.
-2. Store it as a deployment secret referenced by a future
-   `BFF_GITHUB_PRIVATE_KEY_FILE` (never in the repository or image).
-3. Load it server-side only, use it to mint short-lived installation tokens, and
-   never expose it to the browser.
-4. Rotate by generating a new key on GitHub, deploying it, then deleting the old
-   key once no process uses it.
+The BFF reports `installed` from `GET /user/installations` with the signed-in
+user's token. That endpoint only lists installations the user has explicit
+access to, so an outside contributor who opens a draft in an organization they
+do not belong to sees "The owners haven't enabled OpenDraft on this
+repository" even though the app is installed there.
+
+With a private key the BFF mints an RS256 app JWT and calls
+`GET /repos/{owner}/{repo}/installation`: `200` means installed, `404` means not
+installed. The JWT's `iss` is the app's **client ID** (`BFF_GITHUB_CLIENT_ID`),
+so no separate App ID is needed. `/user/installations` is still read (across
+pages) for `viewerInstalledAll`. Without a key the BFF keeps the user-token-only
+behaviour.
+
+### Generate and store the key
+
+1. Open the GitHub App settings, go to **Credentials > Key pairs > New key** and
+   download the generated `.pem` (PKCS#1, `BEGIN RSA PRIVATE KEY`).
+2. Store it in the BFF deployment as `BFF_GITHUB_APP_PRIVATE_KEY`, the raw PEM
+   including the `BEGIN`/`END` lines. In Coolify add the variable with
+   **Value type: Multiline** and **Interpolation: Literal**, so the newlines and
+   `$` characters survive. Literal `\n` escapes are also accepted.
+3. Never commit the key, bake it into an image, or expose it to the browser.
+   GitHub stores only the public half.
+
+Without a key the BFF keeps today's behaviour: repo installation checks rely on
+`/user/installations` with the user's token.
+
+### Key rotation
+
+GitHub allows up to 25 keys per app. Rotate without downtime:
+
+1. On the GitHub App settings page, generate a **new** key. Both keys are now
+   valid.
+2. Update `BFF_GITHUB_APP_PRIVATE_KEY` to the new PEM and redeploy/restart the
+   BFF.
+3. Confirm repo installation checks still work for outside contributors.
+4. Delete the old key on GitHub.
 
 ## 6. Wiring the apps into the BFF
 
@@ -183,6 +211,7 @@ Set the deployment environment from the app's settings page.
 | `BFF_GITHUB_CLIENT_ID` | The app's client ID |
 | `BFF_GITHUB_CLIENT_SECRET_FILE` | Path to the mounted client secret |
 | `BFF_GITHUB_APP_SLUG` | The app slug, e.g. `opendraft` / `opendraft-dev` |
+| `BFF_GITHUB_APP_PRIVATE_KEY` | Optional raw PEM app private key (Multiline + Literal in Coolify); omit to keep user-token-only installation checks |
 | `BFF_SESSION_KEY_FILE` | Path to the mounted 32-byte session key |
 | `BFF_SESSION_KEY_PREVIOUS` | Optional previous key during rotation |
 
@@ -277,4 +306,4 @@ is best-effort.
 - [ ] Client secret generated and stored as a deployment secret.
 - [ ] Session key generated with `openssl rand -base64 32` and stored as a
       deployment secret.
-- [ ] No private key generated (deferred until a feature needs it).
+- [ ] Optional app private key generated, stored as `BFF_GITHUB_APP_PRIVATE_KEY` (Multiline + Literal), and never committed.
