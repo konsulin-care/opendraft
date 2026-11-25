@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 )
 
 // repoSettings is the subset of GitHub's repository JSON used by the
@@ -77,10 +76,12 @@ type forkRequest struct {
 
 // RepoPermissions reports whether the token can push to the repository, whether
 // the GitHub App is installed on it, its default branch and its fork/private
-// settings. Installation is true when a user installation belongs to the same
-// owner and either covers all repositories or lists the repository on one of
-// the first ten pages. ViewerInstalledAll is true when an installation belongs
-// to viewer with repository_selection "all".
+// settings. With an app private key configured, Installed comes from
+// GET /repos/{owner}/{repo}/installation and the user installation list is used
+// only for ViewerInstalledAll. Without a key, Installed is true when a user
+// installation belongs to the same owner and either covers all repositories or
+// lists the repository on one of the first ten pages. ViewerInstalledAll is true
+// when an installation belongs to viewer with repository_selection "all".
 func (c *Client) RepoPermissions(ctx context.Context, token, viewer, owner, repo string) (RepoPermissions, error) {
 	settingsURL := c.APIURL + "/repos/" + url.PathEscape(owner) + "/" + url.PathEscape(repo)
 	var settings repoSettings
@@ -88,9 +89,8 @@ func (c *Client) RepoPermissions(ctx context.Context, token, viewer, owner, repo
 		return RepoPermissions{}, err
 	}
 
-	installationsURL := c.APIURL + "/user/installations"
-	var list installationList
-	if err := c.getActionJSON(ctx, token, installationsURL, &list); err != nil {
+	installations, err := c.userInstallations(ctx, token)
+	if err != nil {
 		return RepoPermissions{}, err
 	}
 
@@ -100,60 +100,19 @@ func (c *Client) RepoPermissions(ctx context.Context, token, viewer, owner, repo
 		Private:       settings.Private,
 		AllowForking:  !settings.Private || settings.AllowForking,
 	}
-	if err := c.applyInstallations(ctx, token, viewer, owner, owner+"/"+repo, list.Installations, &result); err != nil {
+	if c.AppKey != nil {
+		installed, err := c.RepoInstalled(ctx, owner, repo)
+		if err != nil {
+			return RepoPermissions{}, err
+		}
+		result.Installed = installed
+		applyViewerInstallation(installations, viewer, &result)
+		return result, nil
+	}
+	if err := c.applyInstallations(ctx, token, viewer, owner, owner+"/"+repo, installations, &result); err != nil {
 		return RepoPermissions{}, err
 	}
 	return result, nil
-}
-
-// applyInstallations fills the installation facts of result from the user's
-// installations, resolving selected-repository installations through the
-// installation repositories endpoint.
-func (c *Client) applyInstallations(ctx context.Context, token, viewer, owner, fullName string, installations []installation, result *RepoPermissions) error {
-	const allRepositories = "all"
-	for _, inst := range installations {
-		if strings.EqualFold(inst.Account.Login, viewer) && inst.RepositorySelection == allRepositories {
-			result.ViewerInstalledAll = true
-		}
-		if !strings.EqualFold(inst.Account.Login, owner) || result.Installed {
-			continue
-		}
-		if inst.RepositorySelection == allRepositories {
-			result.Installed = true
-			continue
-		}
-		found, err := c.installationCoversRepo(ctx, token, inst.ID, fullName)
-		if err != nil {
-			return err
-		}
-		if found {
-			result.Installed = true
-		}
-	}
-	return nil
-}
-
-// installationCoversRepo reports whether the installation lists fullName on one
-// of the first ten repository pages.
-func (c *Client) installationCoversRepo(ctx context.Context, token string, id int64, fullName string) (bool, error) {
-	const maxPages = 10
-	const perPage = 100
-	for page := 1; page <= maxPages; page++ {
-		target := fmt.Sprintf("%s/user/installations/%d/repositories?per_page=%d&page=%d", c.APIURL, id, perPage, page)
-		var repos installationRepos
-		if err := c.getActionJSON(ctx, token, target, &repos); err != nil {
-			return false, err
-		}
-		for _, entry := range repos.Repositories {
-			if strings.EqualFold(entry.FullName, fullName) {
-				return true, nil
-			}
-		}
-		if len(repos.Repositories) < perPage {
-			return false, nil
-		}
-	}
-	return false, nil
 }
 
 // CreatePull opens a pull request and returns its number and HTML URL.
