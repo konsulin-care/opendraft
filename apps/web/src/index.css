@@ -2,6 +2,7 @@
 @import "@milkdown/crepe/theme/classic.css";
 @import "./scrollbar.css";
 @import "./table-scroll.css";
+@import "./code-preview.css";
 
 /* ── Palette: monochrome + error red ── */
 .milkdown {

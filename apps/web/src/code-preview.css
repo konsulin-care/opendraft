@@ -1,0 +1,9 @@
+/* ── Preview-only code blocks ── */
+/* Crepe hides the source of a block with a rendered preview by adding
+   `hidden` to `.codemirror-host`. The mode is decided when the block mounts,
+   so a fresh empty list-table can hide its source mid-typing once the first
+   row renders. Keep the source visible while it holds focus; blurring hides
+   it again. */
+.milkdown .milkdown-code-block .codemirror-host.hidden:focus-within {
+  display: block;
+}

@@ -5,6 +5,7 @@ import { codeBlockConfig } from '@milkdown/kit/component/code-block';
 import { editorViewCtx, remarkPluginsCtx, remarkStringifyOptionsCtx, type Editor } from '@milkdown/kit/core';
 import { listenerCtx } from '@milkdown/kit/plugin/listener';
 import { $prose, getMarkdown } from '@milkdown/kit/utils';
+import type { Ctx } from '@milkdown/kit/ctx';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
 import type { CrossrefLabel } from '@opendraft/manuscript';
 import { createCitationPlugin } from '../citation/plugin';
@@ -84,6 +85,51 @@ function createBaseCrepe(root: HTMLElement, defaultValue: string): Crepe {
 }
 
 /**
+ * Configure the editor at ConfigReady: serializer handler, remark plugins
+ * and code-block preview rendering.
+ *
+ * @param ctx - Milkdown editor context.
+ */
+function configureEditor(ctx: Ctx): void {
+  ctx.update(remarkStringifyOptionsCtx, (options) => ({
+    ...options,
+    bullet: '-' as const,
+    // Custom `code` handler emits fence info verbatim (Quarto
+    // headers like `{r label, echo=FALSE}` get mangled by the
+    // stock handler's unsafe rules) and prints `quarto-div` fenced
+    // div source byte-for-byte. Spread so Milkdown's
+    // text/strong/emphasis customizations survive; its defaults
+    // carry no code entry.
+    handlers: { ...options.handlers, code: quartoCodeHandler },
+  }));
+  // Register remark plugins here, at ConfigReady: the editor reduces
+  // remarkPluginsCtx into the processor exactly once at SchemaReady,
+  // so registering after create() (wireEditor) never reaches the
+  // serializer. Each entry must be {plugin, options}.
+  ctx.update(remarkPluginsCtx, (ps) => [
+    // First: collapse fenced divs before other plugins touch the
+    // nodes they span, and read the div text from source lines.
+    fencedDivRemarkPlugin,
+    { plugin: citationRemarkPlugin, options: {} },
+    quartoRemarkPlugin,
+    quartoInlineCodePlugin,
+    ...ps,
+  ] as unknown as typeof ps);
+  // Render the table a `.list-table` div describes below its editable
+  // source. Chaining order with Crepe's LaTeX preview is irrelevant:
+  // each handler delegates languages it does not own to the previous
+  // one.
+  ctx.update(codeBlockConfig.key, (prev) => ({
+    ...prev,
+    // Blocks with a rendered preview (list tables, LaTeX math) start
+    // preview-only; code-preview.css keeps the source visible while it
+    // holds focus so typing is never obscured by the preview.
+    previewOnlyByDefault: true,
+    renderPreview: withListTablePreview(prev.renderPreview),
+  }));
+}
+
+/**
  * Create the Crepe instance for a manuscript block file: features, the
  * citation plugin, and serializer options (visual edits serialize lists
  * with '-' bullets instead of the remark default '*'; config callbacks
@@ -105,40 +151,7 @@ export function createCrepeConfig(options: CrepeConfigOptions): Crepe {
   crepe.addFeature((editor) => {
     editor.use(fencedDivInputRule);
   });
-  crepe.editor.config((ctx) => {
-    ctx.update(remarkStringifyOptionsCtx, (options) => ({
-      ...options,
-      bullet: '-' as const,
-      // Custom `code` handler emits fence info verbatim (Quarto
-      // headers like `{r label, echo=FALSE}` get mangled by the
-      // stock handler's unsafe rules) and prints `quarto-div` fenced
-      // div source byte-for-byte. Spread so Milkdown's
-      // text/strong/emphasis customizations survive; its defaults
-      // carry no code entry.
-      handlers: { ...options.handlers, code: quartoCodeHandler },
-    }));
-    // Register remark plugins here, at ConfigReady: the editor reduces
-    // remarkPluginsCtx into the processor exactly once at SchemaReady,
-    // so registering after create() (wireEditor) never reaches the
-    // serializer. Each entry must be {plugin, options}.
-    ctx.update(remarkPluginsCtx, (ps) => [
-      // First: collapse fenced divs before other plugins touch the
-      // nodes they span, and read the div text from source lines.
-      fencedDivRemarkPlugin,
-      { plugin: citationRemarkPlugin, options: {} },
-      quartoRemarkPlugin,
-      quartoInlineCodePlugin,
-      ...ps,
-    ] as unknown as typeof ps);
-    // Render the table a `.list-table` div describes below its editable
-    // source. Chaining order with Crepe's LaTeX preview is irrelevant:
-    // each handler delegates languages it does not own to the previous
-    // one.
-    ctx.update(codeBlockConfig.key, (prev) => ({
-      ...prev,
-      renderPreview: withListTablePreview(prev.renderPreview),
-    }));
-  });
+  crepe.editor.config(configureEditor);
   return crepe;
 }
 
