@@ -3,6 +3,7 @@ import {
   Check,
   CircleAlert,
   LoaderCircle,
+  SquareArrowUpRightExit,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode, RefObject } from 'react';
@@ -38,11 +39,7 @@ interface SaveIndicatorProps {
   status: SaveStatus;
 }
 
-/**
- * Autosave state with icon and label, announced politely to screen readers.
- *
- * @param props - See {@link SaveIndicatorProps}.
- */
+/** Autosave state with icon and label, announced politely to screen readers. */
 function SaveIndicator({ status }: SaveIndicatorProps) {
   const { label, Icon, iconClass } = SAVE_STATE[status];
   return (
@@ -59,11 +56,7 @@ interface HeaderActionsProps {
   action?: ReactNode;
 }
 
-/**
- * Right-hand header controls: the main action slot and the overflow menu.
- *
- * @param props - See {@link HeaderActionsProps}.
- */
+/** Right-hand header controls: the main action slot and the overflow menu. */
 function HeaderActions({ action }: HeaderActionsProps) {
   return (
     <div className="flex items-center gap-1">
@@ -83,11 +76,7 @@ interface DrawerToggleProps {
   toggleButtonRef?: RefObject<HTMLButtonElement | null>;
 }
 
-/**
- * Drawer toggle shown as the header's leading control.
- *
- * @param props - See {@link DrawerToggleProps}.
- */
+/** Drawer toggle shown as the header's leading control. */
 function DrawerToggle({ sidebarOpen, onToggle, toggleButtonRef }: DrawerToggleProps) {
   return (
     <button
@@ -121,12 +110,7 @@ interface HeaderTitleProps {
   onSelectAll?: () => void;
 }
 
-/**
- * Header title column: the inline-editable manuscript title next to the
- * manuscript switcher.
- *
- * @param props - See {@link HeaderTitleProps}.
- */
+/** Header title column: the inline-editable title next to the switcher. */
 function HeaderTitle({
   title,
   manuscripts,
@@ -158,6 +142,46 @@ function HeaderTitle({
       )}
     </span>
   );
+}
+
+/** Props for {@link RepoSubtitle}. */
+interface RepoSubtitleProps {
+  /** Plain-language location label. */
+  prefix: string;
+  /** Repository in `owner/repo` form. */
+  repo?: string;
+  /** GitHub URL of the repository. */
+  href?: string;
+}
+
+/** Subtitle with a plain prefix and an optional linked repo and external icon. */
+function RepoSubtitle({ prefix, repo, href }: RepoSubtitleProps) {
+  return (
+    <span className="flex min-w-0 items-center gap-1">
+      <span>{prefix}</span>
+      {repo !== undefined && href !== undefined && (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex min-w-0 items-center gap-0.5 text-black underline decoration-dashed underline-offset-2"
+        >
+          <span className="truncate">{repo}</span>
+          <SquareArrowUpRightExit className="size-3 shrink-0" aria-hidden="true" />
+        </a>
+      )}
+    </span>
+  );
+}
+
+/** Account menu node for the header's trailing slot. */
+function HeaderUserMenu(props: {
+  session: BffSession | null;
+  returnTo: string;
+  onLogout: () => void;
+  loginEnabled: boolean;
+}) {
+  return <UserMenu {...props} />;
 }
 
 /** Props for {@link AppHeader}. */
@@ -207,48 +231,6 @@ export interface AppHeaderProps {
 }
 
 /**
- * Editor header built on the shared two-line shell: the drawer toggle, the
- * inline-editable manuscript title with its switcher, the project's
- * read-only repo subtitle, autosave state, the main action slot and the
- * account menu.
- *
- * @param props - See {@link AppHeaderProps}.
- * @returns The editor header.
- */
-/**
- * Drawer toggle node for the header's leading slot.
- *
- * @param sidebarOpen - Whether the drawer is open.
- * @param onToggle - Called when the toggle is activated.
- * @param toggleButtonRef - Receives the button element for focus return.
- * @returns The leading drawer toggle.
- */
-function leadingNode(
-  sidebarOpen: boolean,
-  onToggle: (() => void) | undefined,
-  toggleButtonRef?: RefObject<HTMLButtonElement | null>,
-) {
-  return (
-    <DrawerToggle sidebarOpen={sidebarOpen} onToggle={onToggle} toggleButtonRef={toggleButtonRef} />
-  );
-}
-
-/**
- * Account menu node for the header's trailing slot.
- *
- * @param props - Session, return path, sign-out handler and login flag.
- * @returns The account menu.
- */
-function accountNode(props: {
-  session: BffSession | null;
-  returnTo: string;
-  onLogout: () => void;
-  loginEnabled: boolean;
-}) {
-  return <UserMenu {...props} />;
-}
-
-/**
  * Editor header built on the shared two-line shell: drawer toggle, editable
  * manuscript title with its switcher, read-only repo subtitle, autosave
  * state, main action and account menu.
@@ -278,7 +260,13 @@ export function AppHeader({
   return (
     <div data-testid="app-header">
       <HeaderShell
-        leading={leadingNode(sidebarOpen, onToggleSidebar, toggleButtonRef)}
+        leading={
+          <DrawerToggle
+            sidebarOpen={sidebarOpen}
+            onToggle={onToggleSidebar}
+            toggleButtonRef={toggleButtonRef}
+          />
+        }
         title={
           <HeaderTitle
             title={manuscriptName ?? manuscriptDir}
@@ -289,10 +277,10 @@ export function AppHeader({
             onSelectAll={onSelectAllManuscripts}
           />
         }
-        subtitle={source ? repoSubtitle(source) : undefined}
+        subtitle={source ? <RepoSubtitle {...repoSubtitle(source)} /> : undefined}
         extra={<SaveIndicator status={saveStatus} />}
         action={<HeaderActions action={action} />}
-        userMenu={accountNode({ session, returnTo, onLogout, loginEnabled })}
+        userMenu={<HeaderUserMenu session={session} returnTo={returnTo} onLogout={onLogout} loginEnabled={loginEnabled} />}
       />
     </div>
   );

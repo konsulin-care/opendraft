@@ -110,9 +110,16 @@ describe('AppHeader title and subtitle', () => {
 
   it('describes forks with their upstream repository', () => {
     renderHeader({ source: FORK_SOURCE });
-    expect(screen.getByText('Forked from upstream/paper')).toBeDefined();
+    expect(screen.getByText('Forked from')).toBeDefined();
+    const link = screen.getByRole('link', { name: /upstream\/paper/ });
+    expect(link.getAttribute('href')).toBe('https://github.com/upstream/paper');
+    expect(link.getAttribute('target')).toBe('_blank');
+    expect(link.getAttribute('rel')).toBe('noopener noreferrer');
   });
 
+});
+
+describe('AppHeader manuscript switcher', () => {
   it('offers the manuscript switcher when several manuscripts exist', () => {
     const onSelectManuscript = vi.fn();
     renderHeader({
