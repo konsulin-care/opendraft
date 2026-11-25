@@ -70,3 +70,37 @@ describe('BottomSheet dismissal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('BottomSheet portal', () => {
+  it('mounts the dialog as a direct child of document.body', () => {
+    const { container } = render(
+      <BottomSheet title="Author details" onClose={vi.fn()}>
+        <p>Body content</p>
+      </BottomSheet>,
+    );
+    const dialog = screen.getByTestId('bottom-sheet');
+    expect(dialog.parentElement).toBe(document.body);
+    expect(container.contains(dialog)).toBe(false);
+  });
+
+  it('mounts the dialog outside a nested wrapper element', () => {
+    render(
+      <div data-testid="nested-wrapper">
+        <BottomSheet title="Author details" onClose={vi.fn()}>
+          <p>Body content</p>
+        </BottomSheet>
+      </div>,
+    );
+    const dialog = screen.getByTestId('bottom-sheet');
+    expect(screen.getByTestId('nested-wrapper').contains(dialog)).toBe(false);
+    expect(dialog.parentElement).toBe(document.body);
+  });
+
+  it('calls onClose once from the close button on the portaled dialog', () => {
+    const { onClose } = renderSheet();
+    const dialog = screen.getByTestId('bottom-sheet');
+    expect(dialog.parentElement).toBe(document.body);
+    fireEvent.click(screen.getByTestId('bottom-sheet-close'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});

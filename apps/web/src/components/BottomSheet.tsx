@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from 'react';
 import type { ReactNode, MouseEvent, SyntheticEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { PRIMARY_BUTTON } from './button-styles';
 
@@ -105,6 +106,10 @@ function SheetAction({ action }: { action?: BottomSheetAction }) {
  * Bottom-anchored modal sheet for touch interactions. Renders a native
  * `<dialog>` with a scrollable body and an optional full-width action.
  *
+ * The dialog is portaled into `document.body` so that no ancestor
+ * container (padding, gutter or `transform`) can constrain its fixed
+ * positioning.
+ *
  * @param props - Title, body, optional action and close callback.
  * @returns The sheet markup.
  */
@@ -132,7 +137,7 @@ export function BottomSheet({ title, children, action, onClose }: BottomSheetPro
     onClose();
   };
 
-  return (
+  return createPortal(
     <dialog
       ref={dialogRef}
       data-testid="bottom-sheet"
@@ -146,6 +151,7 @@ export function BottomSheet({ title, children, action, onClose }: BottomSheetPro
         <div className="overflow-y-auto px-4 py-3">{children}</div>
         <SheetAction action={action} />
       </div>
-    </dialog>
+    </dialog>,
+    document.body,
   );
 }
