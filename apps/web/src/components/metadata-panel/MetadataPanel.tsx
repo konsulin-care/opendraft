@@ -6,7 +6,9 @@ import { useManuscriptMetadata, type MetadataAuthor, type UseManuscriptMetadataR
 import { NARROW_QUERY, useMediaQuery } from '../../hooks/use-media-query';
 import { ArticleView } from './ArticleView';
 import { AuthorsDialog } from './AuthorsDialog';
-import { OverlayLayer, PinnedBar, usePanelLayout } from './panel-layout';
+import { OverlayLayer, usePanelLayout } from './panel-layout';
+import { PinnedBar } from './pinned-bar';
+import { authorShortName } from './author-short-name';
 import { ValidationBadge, issueFocusTarget, publishIssues } from './ValidationBadge';
 
 /** localStorage key prefix for the per-project collapsed state. */
@@ -242,7 +244,7 @@ export function MetadataPanel({
   const narrow = useMediaQuery(NARROW_QUERY);
   const [expanded, setExpanded, setSessionExpanded] = useExpandedState(projectKey, title, loaded);
   const issues = useMemo(() => publishIssues({ title, authors, affiliations, abstract, frontmatter }), [title, authors, affiliations, abstract, frontmatter]);
-  const byline = useMemo(() => authors.map(authorBylineName).filter(Boolean).join(', '), [authors]);
+  const byline = useMemo(() => authors.map(authorShortName).filter(Boolean).join(', '), [authors]);
   const issueFocus = useIssueFocus(expanded, setExpanded);
   const openIssues = useCallback(() => setExpanded(true), [setExpanded]);
   const panelRef = useRef<HTMLElement | null>(null);
@@ -259,7 +261,7 @@ export function MetadataPanel({
   const sheet = expanded && narrow;
   const content = (
     <OverlayLayer overlay={layout.overlay} scrollerRef={overlayRef}>
-      <PinnedBar title={title} folderId={manuscriptFolderId(manuscriptRoot)} byline={narrow ? `${authors.length} authors` : byline}
+      <PinnedBar title={title} folderId={manuscriptFolderId(manuscriptRoot)} byline={narrow ? `${authors.length} ${authors.length === 1 ? 'author' : 'authors'}` : byline}
         expanded={layout.panelExpanded} collapseProgress={layout.progress} narrow={narrow} onToggle={layout.toggle}
         badge={<ValidationBadge issues={issues} onSelect={issueFocus.select} onOpen={openIssues} />} />
       <PanelBody meta={meta} expanded={expanded} bodyRef={bodyRef}
