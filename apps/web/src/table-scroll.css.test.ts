@@ -21,6 +21,15 @@ const cellRule = css.match(
 const childRule = css.match(
   /\.milkdown \.ProseMirror \.milkdown-table-block :is\(th, td\) > \*,\s*\.milkdown \.ProseMirror \.list-table-preview :is\(th, td\) > \*\s*\{[^}]*\}/,
 );
+const crepeHeaderCellRule = css.match(
+  /\.milkdown \.ProseMirror \.milkdown-table-block tr\[data-is-header\] > th\s*\{[^}]*\}/,
+);
+const listTheadRule = css.match(
+  /\.milkdown \.ProseMirror \.list-table-preview thead\s*\{[^}]*\}/,
+);
+const listTheadCellRule = css.match(
+  /\.milkdown \.ProseMirror \.list-table-preview thead th\s*\{[^}]*\}/,
+);
 
 let styleEl: HTMLStyleElement | null = null;
 let fixture: HTMLDivElement | null = null;
@@ -135,6 +144,50 @@ describe('table-scroll.css — cell sizing', () => {
     for (const child of children) {
       expect(child).not.toBeNull();
     }
+  });
+});
+
+describe('table-scroll.css — sticky headers', () => {
+  it('pins Crepe header cells above body cells with a solid themed background', () => {
+    expect(crepeHeaderCellRule).not.toBeNull();
+    const rule = crepeHeaderCellRule?.[0] ?? '';
+    expect(rule).toMatch(/position:\s*sticky/);
+    expect(rule).toMatch(/top:\s*0/);
+    expect(rule).toMatch(/z-index:\s*2/);
+    expect(rule).toMatch(/background:\s*var\(--crepe-color-background\)/);
+  });
+
+  it('pins the list-table thead and gives its cells a solid themed background', () => {
+    expect(listTheadRule).not.toBeNull();
+    const theadRule = listTheadRule?.[0] ?? '';
+    expect(theadRule).toMatch(/position:\s*sticky/);
+    expect(theadRule).toMatch(/top:\s*0/);
+    expect(theadRule).toMatch(/z-index:\s*2/);
+
+    expect(listTheadCellRule).not.toBeNull();
+    expect(listTheadCellRule?.[0]).toMatch(/background:\s*var\(--crepe-color-background\)/);
+  });
+});
+
+describe('table-scroll.css — edge shadows', () => {
+  it('layers local cover gradients and scroll shadow gradients on the wrappers', () => {
+    expect(wrapperRule).not.toBeNull();
+    const rule = wrapperRule?.[0] ?? '';
+    expect(rule).toMatch(/background:/);
+    expect(rule).toMatch(/linear-gradient/);
+    expect(rule).toMatch(/radial-gradient/);
+    expect(rule).toMatch(/local/);
+    expect(rule).toMatch(/scroll/);
+    expect(rule).toMatch(/var\(--crepe-color-background\)/);
+    expect(rule).toMatch(/color-mix\(in srgb, var\(--color-black\) 20%, transparent\)/);
+  });
+
+  it('avoids raw colors in the edge-shadow background', () => {
+    const rule = wrapperRule?.[0] ?? '';
+    const background = rule.slice(rule.indexOf('background:'));
+    expect(background).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+    expect(background).not.toMatch(/\brgba?\(/);
+    expect(background).not.toMatch(/\bhsla?\(/);
   });
 });
 
