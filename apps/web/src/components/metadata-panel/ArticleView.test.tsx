@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-/** Article view tests: byline, footnotes, collaborators, contributions, details, auto-grow. */
+/** Article view tests: byline, footnotes, collaborators, details, auto-grow. */
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within, type RenderResult } from '@testing-library/react';
+import { fireEvent, render, screen, type RenderResult } from '@testing-library/react';
 import { ArticleView, type ArticleViewProps } from './ArticleView';
 import type { MetadataAuthor } from './use-manuscript-metadata';
 /** Affiliation registry used by the default fixture. */
@@ -111,13 +111,16 @@ describe('ArticleView footnotes and collaborators', () => {
     expect(list.textContent).toContain('Suharto');
   });
 });
-describe('ArticleView contributions', () => {
-  it('renders no Author contributions when no author has roles', () => {
+describe('ArticleView contributions removal', () => {
+  it('styles the title textarea like the reader title', () => {
     renderView();
-    expect(screen.queryByTestId('author-contributions')).toBeNull();
-    expect(screen.queryByText(/Author contributions/)).toBeNull();
+    const title = screen.getByTestId('metadata-panel-title-input');
+    expect(title.className).toContain('text-3xl');
+    expect(title.className).toContain('font-semibold');
+    expect(title.className).toContain('leading-tight');
+    expect(title.className).not.toContain('text-lg');
   });
-  it('renders per-author contribution lines by full name when roles exist', () => {
+  it('renders no contributions section or label even when authors have CRediT roles', () => {
     renderView({
       authors: [
         { id: 'john', name: { given: 'John' }, roles: ['conceptualization'] },
@@ -125,22 +128,8 @@ describe('ArticleView contributions', () => {
       ],
       affiliations: [],
     });
-    const lines = within(screen.getByTestId('author-contributions'))
-      .getAllByRole('listitem')
-      .map((item) => item.textContent);
-    expect(lines).toEqual(['John: Conceptualization', 'Jane Doe: Data curation, Formal analysis']);
-  });
-  it('renders the contributions section read-only directly after Keywords', () => {
-    renderView({
-      authors: [
-        { id: 'smith', name: { given: 'Alice Marie', family: 'Smith' }, roles: ['conceptualization'] },
-      ],
-      affiliations: [],
-    });
-    const keywordsSection = screen.getByTestId('keyword-input').closest('section');
-    const contributions = screen.getByTestId('author-contributions');
-    expect(keywordsSection?.nextElementSibling).toBe(contributions);
-    expect(contributions.querySelector('button, input, textarea, select')).toBeNull();
+    expect(screen.queryByTestId('author-contributions')).toBeNull();
+    expect(screen.queryByText(/Contributions/)).toBeNull();
   });
 });
 describe('ArticleView publication details', () => {
@@ -154,7 +143,7 @@ describe('ArticleView publication details', () => {
   });
 });
 describe('ArticleView section labels', () => {
-  it('renders Abstract, Keywords, Contributions and Publication details via one small-caps label', () => {
+  it('renders Abstract, Keywords and Publication details via one small-caps label', () => {
     renderView({
       authors: [
         { id: 'smith', name: { given: 'Alice Marie', family: 'Smith' }, roles: ['writing-original-draft'] },
@@ -164,7 +153,7 @@ describe('ArticleView section labels', () => {
     fireEvent.click(screen.getByRole('button', { name: /Publication details/ }));
     const labels = screen.getAllByTestId('section-label');
     expect(labels.map((el) => el.textContent)).toEqual(
-      expect.arrayContaining(['Abstract', 'Keywords', 'Contributions', 'Publication details']),
+      expect.arrayContaining(['Abstract', 'Keywords', 'Publication details']),
     );
     for (const label of labels) {
       expect(label.className).toContain('font-variant-caps:all-small-caps');
