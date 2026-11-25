@@ -7,6 +7,7 @@ import { MemoryWorkspace } from '@opendraft/workspace';
 import type { ProjectRecord, ProjectSource, ProjectSourceGitHub } from '@opendraft/workspace';
 import type { BffSession, RepoPermissions } from '../github/bff-client';
 import { fileDigest } from './file-diff';
+import { ForkPendingError } from './fork-ready';
 import { startSuggestion } from './start';
 import type { StartSuggestionDeps } from './start';
 
@@ -62,6 +63,7 @@ function makeDeps(
     registry,
     getWorkspace: vi.fn(async () => workspace),
     forkRepo: vi.fn(async () => ({ owner: 'octocat', repo: 'draft', defaultBranch: 'main' })),
+    waitForFork: vi.fn(async () => {}),
     syncFork: vi.fn(async () => undefined),
     listSuggestionBranches: vi.fn(async () => []),
     findSuggestionPull: vi.fn(async () => null),
@@ -166,33 +168,20 @@ describe('startSuggestion remote resume', () => {
     const { deps } = makeDeps(registry, {
       listSuggestionBranches: vi.fn(async (_owner: string, _repo: string, prefix: string) =>
         prefix === 'od-octocat/'
-          ? [
-              { name: 'od-other/their-draft', sha: 'other' },
-              { name: 'od-octocat2/not-mine', sha: 'near' },
-              { name: own, sha: 'own' },
-            ]
+          ? [{ name: 'od-other/their-draft', sha: 'other' }, { name: 'od-octocat2/not-mine', sha: 'near' }, { name: own, sha: 'own' }]
           : [{ name: 'opendraft/octocat/20250102-030405', sha: 'legacy' }],
       ),
-      findSuggestionPull: vi.fn(async () => ({
-        number: 17, url: 'https://github.com/octocat/draft/pull/17', state: 'open' as const,
-      })),
-      prepareRepo: vi.fn(async (_project: ProjectRecord, branch: string) => ({
-        sha: 'remote-sha', branch, files,
-      })),
+      findSuggestionPull: vi.fn(async () => ({ number: 17, url: 'https://github.com/octocat/draft/pull/17', state: 'open' as const })),
+      prepareRepo: vi.fn(async (_project: ProjectRecord, branch: string) => ({ sha: 'remote-sha', branch, files })),
     });
-
     const result = await startSuggestion(startInput(), deps);
-
     expect(result.resumed).toBe('remote');
     expect(deps.findSuggestionPull).toHaveBeenCalledWith('octocat', 'draft', `octocat:${own}`);
     const [project, branch, createBranch] = vi.mocked(deps.prepareRepo).mock.calls[0];
     expect(project.source).toMatchObject({ branch: own, pushed: true, pullNumber: 17 });
     expect([branch, createBranch]).toEqual([own, false]);
-    expectSource(records, result.projectId, {
-      kind: 'github', owner: 'octocat', repo: 'draft', branch: own,
-      upstream: UPSTREAM, pushed: true, syncedSha: 'remote-sha', pullNumber: 17,
-      private: false,
-    }, fileDigest(files));
+    expectSource(records, result.projectId, { kind: 'github', owner: 'octocat', repo: 'draft', branch: own,
+      upstream: UPSTREAM, pushed: true, syncedSha: 'remote-sha', pullNumber: 17, private: false }, fileDigest(files));
   });
 });
 
@@ -211,6 +200,68 @@ describe('startSuggestion legacy resume', () => {
 
     expect(result.resumed).toBe('remote');
     expect(deps.prepareRepo).toHaveBeenCalledWith(expect.anything(), legacy, false, SESSION);
+  });
+});
+
+describe('startSuggestion fork readiness', () => {
+  it('waits for the fork default branch before syncing and importing', async () => {
+    const { registry } = makeRegistry();
+    const waitForFork = vi.fn(async () => {});
+    const syncFork = vi.fn(async () => undefined);
+    const { deps } = makeDeps(registry, {
+      forkRepo: vi.fn(async () => ({ owner: 'octocat', repo: 'draft', defaultBranch: 'trunk' })),
+      waitForFork,
+      syncFork,
+    });
+
+    await startSuggestion(
+      { ...startInput('fork'), upstream: { owner: 'konsulin-care', repo: 'draft' } },
+      deps,
+    );
+
+    expect(waitForFork).toHaveBeenCalledWith({
+      owner: 'octocat',
+      repo: 'draft',
+      defaultBranch: 'trunk',
+    });
+    expect(waitForFork.mock.invocationCallOrder[0]).toBeLessThan(
+      syncFork.mock.invocationCallOrder[0],
+    );
+    expect(waitForFork.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(deps.prepareRepo).mock.invocationCallOrder[0],
+    );
+  });
+});
+
+describe('startSuggestion fork failures', () => {
+  it('never waits for a fork on the branch plan', async () => {
+    const { registry } = makeRegistry();
+    const waitForFork = vi.fn(async () => {});
+    const { deps } = makeDeps(registry, { waitForFork });
+
+    await startSuggestion(startInput('branch'), deps);
+
+    expect(waitForFork).not.toHaveBeenCalled();
+    expect(deps.forkRepo).not.toHaveBeenCalled();
+  });
+
+  it('propagates ForkPendingError and imports nothing', async () => {
+    const { registry, records } = makeRegistry();
+    const pending = new ForkPendingError();
+    const { deps } = makeDeps(registry, {
+      waitForFork: vi.fn(async () => {
+        throw pending;
+      }),
+    });
+
+    const error = await startSuggestion(startInput('fork'), deps).catch(
+      (err: unknown) => err,
+    );
+
+    expect(error).toBe(pending);
+    expect(deps.syncFork).not.toHaveBeenCalled();
+    expect(deps.prepareRepo).not.toHaveBeenCalled();
+    expect(records.size).toBe(0);
   });
 });
 

@@ -58,6 +58,8 @@ export interface StartSuggestionDeps extends ImportIntoProjectDeps {
   };
   /** Fork a repository into the viewer's account. */
   forkRepo: (owner: string, repo: string) => Promise<ForkResult>;
+  /** Wait until GitHub has finished creating a fork; absent for tests. */
+  waitForFork?: (target: SuggestionTarget) => Promise<void>;
   /** Merge the upstream default branch into a target branch. */
   syncFork: (owner: string, repo: string, branch: string) => Promise<void>;
   /** List branches whose name starts with a prefix. */
@@ -120,11 +122,13 @@ async function resolveTarget(
   }
 
   const fork = await deps.forkRepo(input.upstream.owner, input.upstream.repo);
-  return {
+  const target: SuggestionTarget = {
     owner: fork.owner,
     repo: fork.repo,
     defaultBranch: fork.defaultBranch,
   };
+  await deps.waitForFork?.(target);
+  return target;
 }
 
 /**
