@@ -7,8 +7,8 @@ export interface HeaderShellProps {
   leading?: ReactNode;
   /** Line one of the title column; may itself be an editable field. */
   title: ReactNode;
-  /** Line two, plain read-only text describing the project. */
-  subtitle?: string;
+  /** Line two, read-only content describing the project. */
+  subtitle?: ReactNode;
   /** Status content shown next to the title column. */
   extra?: ReactNode;
   /** Main action, usually the primary button. */
