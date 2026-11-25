@@ -9,7 +9,7 @@ const AFFILIATIONS = [
   { id: 'ui', name: 'University of Indonesia' },
   { id: 'rscm', name: 'RS Pondok Indah Cempaka Putih' },
 ];
-/** Two person authors with shared affiliation, symbol flags, contact. */
+/** Two person authors with shared affiliation, symbol flags, contact and roles. */
 const AUTHORS: MetadataAuthor[] = [
   {
     id: 'smith',
@@ -17,6 +17,7 @@ const AUTHORS: MetadataAuthor[] = [
     email: 'alice@example.edu',
     orcid: '0000-0002-1825-0097',
     corresponding: true,
+    roles: ['conceptualization'],
     affiliations: [{ ref: 'ui' }, { ref: 'rscm' }],
   },
   {
@@ -46,12 +47,16 @@ describe('ArticleView byline', () => {
     expect(screen.getByTestId('byline-superscript-1').textContent).toBe('2†');
     expect(screen.getByTestId('byline-orcid-0')).toBeDefined();
   });
-  it('shows a tooltip with email and ORCID when a byline name is focused', () => {
+  it('shows a tooltip with email, ORCID link, affiliations and roles when focused', () => {
     renderView();
     fireEvent.focus(screen.getByTestId('byline-author-0'));
     const tooltip = screen.getByTestId('byline-tooltip');
     expect(tooltip.textContent).toContain('alice@example.edu');
-    expect(tooltip.textContent).toContain('0000-0002-1825-0097');
+    const orcidLink = tooltip.querySelector('a[href="https://orcid.org/0000-0002-1825-0097"]');
+    expect(orcidLink).not.toBeNull();
+    expect(tooltip.textContent).toContain('1. University of Indonesia');
+    expect(tooltip.textContent).toContain('2. RS Pondok Indah Cempaka Putih');
+    expect(tooltip.textContent).toContain('Roles: Conceptualization');
     fireEvent.blur(screen.getByTestId('byline-author-0'));
     expect(screen.queryByTestId('byline-tooltip')).toBeNull();
   });
@@ -71,22 +76,16 @@ describe('ArticleView byline', () => {
   });
 });
 describe('ArticleView footnotes and collaborators', () => {
-  it('lists numbered affiliations once under the byline, footnotes with symbols only', () => {
+  it('renders no numbered affiliation list but keeps superscripts and footnotes', () => {
     renderView();
-    const list = screen.getByTestId('affiliation-list').textContent ?? '';
-    expect(list).toContain('1. University of Indonesia');
-    expect(list).toContain('2. RS Pondok Indah Cempaka Putih');
+    expect(screen.queryByTestId('affiliation-list')).toBeNull();
+    expect(screen.getByTestId('byline-superscript-0').textContent).toBe('1,2*');
+    expect(screen.getByTestId('byline-superscript-1').textContent).toBe('2†');
     const notes = screen.getByTestId('byline-footnotes').textContent ?? '';
     expect(notes).toContain('* Corresponding author');
     expect(notes).toContain('† Equal contribution');
     expect(notes).not.toContain('‡');
     expect(notes).not.toContain('University of Indonesia');
-  });
-  it('renders each affiliation name exactly once for two authors', () => {
-    renderView();
-    const text = screen.getByTestId('metadata-article-view').textContent ?? '';
-    expect(text.split('University of Indonesia')).toHaveLength(2);
-    expect(text.split('RS Pondok Indah Cempaka Putih')).toHaveLength(2);
   });
   it('collapses the collaborator list behind a toggle', () => {
     renderView({

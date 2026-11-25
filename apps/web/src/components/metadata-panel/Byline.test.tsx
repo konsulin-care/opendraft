@@ -22,6 +22,23 @@ const TWO_AUTHORS: MetadataAuthor[] = [
   { id: 'doe', name: { given: 'Jane', family: 'Doe' } },
 ];
 
+/** Affiliation registry used by the tooltip fixture. */
+const AFFILIATIONS = [
+  { id: 'ui', name: 'University of Indonesia' },
+];
+
+/** Author with email, ORCID, one affiliation and one role. */
+const DETAILED_AUTHOR: MetadataAuthor[] = [
+  {
+    id: 'smith',
+    name: { given: 'Alice', family: 'Smith' },
+    email: 'alice@example.edu',
+    orcid: '0000-0002-1825-0097',
+    roles: ['conceptualization'],
+    affiliations: [{ ref: 'ui' }],
+  },
+];
+
 /** Render the byline for two authors with drag/open spies. */
 function renderTwo(onOpenName = vi.fn(), setAuthors = vi.fn()): {
   onOpenName: ReturnType<typeof vi.fn>;
@@ -63,6 +80,37 @@ describe('Byline press-to-drag', () => {
     renderTwo();
     expect(screen.queryByTestId('drag-handle')).toBeNull();
     expect(document.querySelector('[data-drag-handle]')).toBeNull();
+  });
+});
+
+describe('Byline author tooltip', () => {
+  /** Render the byline of the detailed author. */
+  function renderDetailed(): void {
+    render(
+      <Byline
+        model={buildByline(DETAILED_AUTHOR, AFFILIATIONS)}
+        authors={DETAILED_AUTHOR}
+        setAuthors={() => {}}
+        onOpenName={() => {}}
+      />,
+    );
+  }
+
+  it('renders no numbered affiliation list', () => {
+    renderDetailed();
+    expect(screen.queryByTestId('affiliation-list')).toBeNull();
+  });
+
+  it('shows the shared author details in the hover tooltip', () => {
+    renderDetailed();
+    fireEvent.mouseEnter(screen.getByTestId('byline-author-0'));
+    const tooltip = screen.getByTestId('byline-tooltip');
+    expect(screen.getByRole('tooltip').getAttribute('id')).toBe('byline-tooltip-0');
+    expect(tooltip.textContent).toContain('alice@example.edu');
+    expect(tooltip.textContent).toContain('1. University of Indonesia');
+    expect(tooltip.textContent).toContain('Roles: Conceptualization');
+    fireEvent.mouseLeave(screen.getByTestId('byline-author-0'));
+    expect(screen.queryByTestId('byline-tooltip')).toBeNull();
   });
 });
 

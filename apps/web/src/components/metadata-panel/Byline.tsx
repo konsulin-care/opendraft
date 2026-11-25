@@ -1,8 +1,7 @@
 /**
  * Byline row of the article view: author name buttons with affiliation
- * superscripts, symbol flags, ORCID markers and hover/focus tooltip,
- * the numbered affiliation list, symbol-only footnotes and the
- * add-author button.
+ * superscripts, symbol flags, ORCID markers and the shared hover/focus
+ * author tooltip, symbol-only footnotes and the add-author button.
  *
  * The add-author button is a pulsing black CTA while the manuscript has
  * no authors and reverts to the muted default style once at least one
@@ -12,6 +11,7 @@
  */
 import { useState, type ReactNode } from 'react';
 import { Info, Plus } from 'lucide-react';
+import { AuthorTooltip } from './AuthorDetails';
 import type { BylineModel } from './byline-model';
 import type { MetadataAuthor } from './use-manuscript-metadata';
 import { usePressDrag } from './use-press-drag';
@@ -36,22 +36,6 @@ const ADD_MUTED = 'ml-2 min-h-11 rounded text-muted hover:bg-hover';
 
 /** Classes of the pulsing black add-author CTA shown when there are no authors. */
 const ADD_CTA = 'ml-2 min-h-11 rounded bg-black px-2 text-white animate-pulse hover:opacity-90';
-
-/** Read-only tooltip shown on hover and focus of a byline name. */
-function AuthorTooltip({ author, index }: { author: BylineModel['authors'][number]; index: number }): ReactNode {
-  return (
-    <span
-      role="tooltip"
-      id={`byline-tooltip-${index}`}
-      data-testid="byline-tooltip"
-      className="absolute left-0 top-full z-20 mt-1 w-64 rounded border bg-white p-2 text-sm shadow"
-    >
-      {author.email && <span className="block" data-testid="byline-tooltip-email">{author.email}</span>}
-      {author.orcid && <span className="block" data-testid="byline-tooltip-orcid">{author.orcid}</span>}
-      {author.roles.length > 0 && <span className="block text-muted">Roles: {author.roles.join(', ')}</span>}
-    </span>
-  );
-}
 
 /** One byline segment: name button, superscripts, ORCID marker, tooltip. */
 function BylineName(
@@ -91,13 +75,17 @@ function BylineName(
           <Info aria-label={`ORCID ${author.orcid}`} data-testid={`byline-orcid-${index}`} className={ICON} />
         )}
       </button>
-      {open && <AuthorTooltip author={author} index={index} />}
+      {open && (
+        <span data-testid="byline-tooltip">
+          <AuthorTooltip author={author} id={`byline-tooltip-${index}`} />
+        </span>
+      )}
     </span>
   );
 }
 
 /**
- * The byline row, numbered affiliations and footnotes of one model.
+ * The byline row and symbol footnotes of one model.
  *
  * @param props - See {@link BylineProps}.
  * @returns The rendered byline block.
@@ -140,11 +128,6 @@ export function Byline({ model, authors, setAuthors, onOpenName }: BylineProps):
         <Plus aria-hidden className="inline size-3.5" />
         Add author
       </button>
-      <div className="mt-1 text-muted" data-testid="affiliation-list">
-        {model.affiliations.map((entry) => (
-          <div key={entry.id}>{entry.number}. {entry.name}</div>
-        ))}
-      </div>
       <div className="mt-1 text-muted" data-testid="byline-footnotes">
         {model.footnotes.map((line) => <div key={line}>{line}</div>)}
       </div>
