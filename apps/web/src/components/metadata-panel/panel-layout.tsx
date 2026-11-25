@@ -34,7 +34,7 @@ export function OverlayLayer({ overlay, scrollerRef, children }: OverlayLayerPro
     <div
       ref={scrollerRef}
       data-testid={overlay ? 'metadata-panel-overlay' : undefined}
-      className={overlay ? 'h-full overflow-y-auto' : 'contents'}
+      className={overlay ? 'h-full overflow-y-auto overscroll-contain' : 'contents'}
     >
       {children}
     </div>

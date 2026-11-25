@@ -35,10 +35,13 @@ export interface OverlayCollapseApi {
  * Drive the panel's collapse progress from the overlay scroller. Scroll
  * events are throttled through requestAnimationFrame, folded into a
  * 0..1 progress against the expanded body height and written to the
- * panel's `--collapse-progress` CSS variable. When the body is fully
- * scrolled out (progress reaches 1) the `onScrolledOut` callback fires
- * exactly once per activation; the overlay's current offset re-seeds
- * progress every time the overlay takes over again.
+ * panel's `--collapse-progress` CSS variable. The overlay can never
+ * scroll the whole expanded body out (its maximum offset is body plus
+ * bar minus viewport), so reaching the scroller's own scroll end also
+ * counts as fully scrolled out. In that case progress is forced to 1
+ * and the `onScrolledOut` callback fires exactly once per activation;
+ * the overlay's current offset re-seeds progress every time the overlay
+ * takes over again.
  *
  * @param options - See {@link OverlayCollapseOptions}.
  * @returns The current overlay-driven collapse progress.
@@ -56,9 +59,19 @@ export function useOverlayCollapse(options: OverlayCollapseOptions): OverlayColl
     const scroller = overlayRef.current;
     const panel = panelRef.current;
     if (!enabled || !scroller || !panel) return undefined;
+    /**
+     * Report whether the scroller sits at its own scroll end. The guards
+     * matter: a scroller without layout metrics (jsdom reports
+     * scrollHeight = clientHeight = 0) must never look scrolled out.
+     */
+    const atScrollEnd = (scrollTop: number): boolean =>
+      scroller.scrollHeight > scroller.clientHeight
+      && scrollTop > 0
+      && scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1;
     /** Fold a scroll offset into progress state, the CSS variable and the callback. */
     const apply = (scrollTop: number, force = false): void => {
-      const next = computeCollapseProgress(scrollTop, heightRef.current());
+      const natural = computeCollapseProgress(scrollTop, heightRef.current());
+      const next = atScrollEnd(scrollTop) ? 1 : natural;
       if (!force && next === progressRef.current) return;
       progressRef.current = next;
       setProgress(next);

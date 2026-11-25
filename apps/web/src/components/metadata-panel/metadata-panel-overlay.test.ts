@@ -186,13 +186,36 @@ describe('MetadataPanel overlay scroll collapse', () => {
     const title = screen.getByTestId('metadata-panel-bar-title');
     const byline = screen.getByTestId('metadata-panel-byline');
     expect(title.textContent).toBe('Deep Dive');
-    expect(byline.textContent).toContain('Alice Smith');
+    expect(byline.textContent).toContain('Smith A.');
     // Title and byline share one wrapper whose opacity is bound to the
     // panel progress variable; jsdom mangles var() on read, so assert
     // the raw value React wrote instead of the parsed one.
     expect(title.parentElement).toBe(byline.parentElement);
     expect(rawOpacityWrites).toContain('var(--collapse-progress, 0)');
     expect(screen.getByTestId('metadata-panel-toggle').getAttribute('aria-expanded')).toBe('true');
+    scroller.remove();
+  });
+});
+
+describe('MetadataPanel overlay scroll end', () => {
+  it('collapses at the overlay scroll end before the full body height', async () => {
+    const { scroller } = await mountPanel();
+    const overlay = await activateOverlay();
+    // The overlay scroll never chains into the editor scroller.
+    expect(overlay.className.split(' ')).toContain('overscroll-contain');
+    // Max scrollTop of a 600px scroller in a 300px viewport is 300, far
+    // below the 900px body height, yet it is the overlay's scroll end.
+    Object.defineProperty(overlay, 'scrollHeight', { configurable: true, value: 600 });
+    Object.defineProperty(overlay, 'clientHeight', { configurable: true, value: 300 });
+    setScrollTop(overlay, 300);
+    expect(screen.queryByTestId('metadata-panel-overlay')).toBeNull();
+    expect(screen.getByTestId('metadata-panel-toggle').getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getByTestId('metadata-panel-bar-title').textContent).toBe('Deep Dive');
+    expect(screen.getByTestId('metadata-panel-byline').textContent).toContain('Smith A.');
+    // Collapsed bar text is fully opaque.
+    expect(rawOpacityWrites).toContain('1');
+    // Session-only: nothing was persisted.
+    expect(localStorage.getItem(metadataPanelStorageKey(PROJECT))).toBeNull();
     scroller.remove();
   });
 
@@ -206,7 +229,9 @@ describe('MetadataPanel overlay scroll collapse', () => {
     expect(screen.getByTestId('metadata-panel-bar-title').textContent).toBe('Deep Dive');
     scroller.remove();
   });
+});
 
+describe('MetadataPanel overlay scroll-out persistence', () => {
   it('does not persist the scroll-out collapse, so a remount starts expanded', async () => {
     const { scroller, unmount } = await mountPanel();
     const overlay = await activateOverlay();
