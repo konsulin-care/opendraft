@@ -20,6 +20,7 @@ import { fencedDivInputRule } from '../list-table/fenced-div-input-rule';
 import { buildListTableMenu } from '../list-table/list-table-slash-item';
 import { createTestApi, focusBlockEditor, fulfillPendingFocus, registerBlockEditor, type EditorTestApi } from '../caret-mode-switch';
 import type { DebouncedSaver } from './editor/autosave';
+import { previewClickToEdit } from './preview-click-to-edit';
 
 /** Code blocks: translucent active line (selection shows through) and a
  *  distinct selection background, via @theme tokens in index.css. */
@@ -150,6 +151,9 @@ export function createCrepeConfig(options: CrepeConfigOptions): Crepe {
   });
   crepe.addFeature((editor) => {
     editor.use(fencedDivInputRule);
+  });
+  crepe.addFeature((editor) => {
+    editor.use(previewClickToEdit);
   });
   crepe.editor.config(configureEditor);
   return crepe;
