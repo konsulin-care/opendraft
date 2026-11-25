@@ -41,6 +41,9 @@ jobs:
     needs: validate
     if: needs.validate.outputs.valid == 'true'
     runs-on: ubuntu-latest
+    # The Production environment holds COOLIFY_APP_UUID; COOLIFY_URL and
+    # COOLIFY_TOKEN come from the organization secrets.
+    environment: Production
     permissions:
       contents: read
       packages: write
