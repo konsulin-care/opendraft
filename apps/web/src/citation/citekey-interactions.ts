@@ -7,7 +7,25 @@ import { handleCitekeyClick } from './citekey-click';
 import { CitekeyTooltip } from './citekey-tooltip';
 import { CrossrefTooltip } from './crossref-tooltip';
 import type { CrossrefTooltipProps } from './crossref-tooltip';
+import { showReferenceSheet } from './reference-sheet';
+import { showCrossrefSheet } from './crossref-sheet';
 import { citationPluginKey, getCitationState } from './plugin';
+import { createPointerKindTracker } from '../hooks/pointer-kind';
+import type { PointerKindEvent } from '../hooks/pointer-kind';
+
+/** Classifies the input device of the latest pointer interaction. */
+const pointerKind = createPointerKindTracker();
+
+/**
+ * Record the pointer type of a `pointerdown` event.
+ *
+ * Touch versus mouse is decided per interaction so hybrid devices work.
+ *
+ * @param event - The pointer event carrying `pointerType`.
+ */
+export function handlePointerDown(event: PointerKindEvent): void {
+  pointerKind.record(event);
+}
 
 
 /** Active tooltip state. */
@@ -15,27 +33,63 @@ let tooltipRoot: ReturnType<typeof createRoot> | null = null;
 let tooltipContainer: HTMLElement | null = null;
 
 /**
- * Handle click on citekey links.
+ * Handle click on citekey and cross-reference links.
+ *
+ * Mouse clicks on a citekey open its DOI/URL. Touch taps open a bottom
+ * sheet instead: the reference sheet for citekeys and the
+ * cross-reference sheet for cross-ref links.
  *
  * @param view - The editor view.
- * @param event - The mouse event.
+ * @param event - The click event.
  * @returns True if the event was handled.
  */
 export function handleClickEvent(view: EditorView, event: Event): boolean {
   const target = (event as MouseEvent).target as HTMLElement;
-  if (!target.classList.contains('citekey-link')) return false;
+  const touch = pointerKind.isTouch();
 
-  const citekey = target.getAttribute('data-citekey');
-  if (!citekey) return false;
+  if (target.classList.contains('citekey-link')) {
+    const citekey = target.getAttribute('data-citekey');
+    if (!citekey) return false;
+    const ref = findRefByCitekey(view, citekey);
+    if (!ref) return false;
+    if (touch) {
+      event.preventDefault();
+      showReferenceSheet(ref);
+    } else {
+      handleCitekeyClick(ref);
+    }
+    return true;
+  }
 
-  const citationState = getCitationState(citationPluginKey.getState(view.state));
-  if (!citationState?.items) return false;
+  if (!touch) return false;
 
-  const ref = citationState.items.find((r) => r.citeKey === citekey);
-  if (!ref) return false;
+  if (target.classList.contains('crossref-link')) {
+    const id = target.getAttribute('data-crossref');
+    const kind = target.getAttribute('data-crossref-kind') as CrossrefKind | null;
+    if (!id || !kind) return false;
+    event.preventDefault();
+    showCrossrefSheet({
+      id,
+      kind,
+      caption: target.getAttribute('data-crossref-caption') ?? '',
+      file: target.getAttribute('data-crossref-file') ?? undefined,
+    });
+    return true;
+  }
 
-  handleCitekeyClick(ref);
-  return true;
+  if (target.classList.contains('crossref-broken')) {
+    const id = target.getAttribute('data-crossref');
+    if (!id) return false;
+    event.preventDefault();
+    showCrossrefSheet({
+      id,
+      kind: id.slice(0, id.indexOf('-')) as CrossrefKind,
+      broken: true,
+    });
+    return true;
+  }
+
+  return false;
 }
 
 /** Look up reference by citekey from editor state. */
@@ -46,6 +100,8 @@ function findRefByCitekey(view: EditorView, citekey: string): Reference | null {
 
 /** Handle mouseover for tooltip via event delegation. */
 export function handleMouseOver(view: EditorView, event: MouseEvent) {
+  if (pointerKind.isTouch()) return;
+
   const target = event.target as HTMLElement;
 
   if (target.classList.contains('citekey-link')) {

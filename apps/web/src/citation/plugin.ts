@@ -16,7 +16,7 @@ import React from "react";
 import { CitationDropdown } from "./dropdown";
 import { appendReference } from "./file-write";
 import { buildCitekeyDecorations } from "./citekey-decoration";
-import { handleClickEvent, handleMouseOver, handleMouseOut, hideTooltip } from "./citekey-interactions";
+import { handleClickEvent, handleMouseOver, handleMouseOut, handlePointerDown, hideTooltip } from "./citekey-interactions";
 
 /** PluginKey for the citation plugin. */
 export const citationPluginKey = new PluginKey("citation");
@@ -133,14 +133,17 @@ function rebuildDecorations(
 function setupDOMHandlers(view: EditorView) {
   const { dom } = view;
   const onClick = (e: Event) => handleClickEvent(view, e);
+  const onPointerDown = (e: PointerEvent) => handlePointerDown(e);
   const onMouseOver = (e: MouseEvent) => handleMouseOver(view, e);
   const onMouseOut = (e: MouseEvent) => handleMouseOut(view, e);
   dom.addEventListener("click", onClick);
+  dom.addEventListener("pointerdown", onPointerDown);
   dom.addEventListener("mouseover", onMouseOver);
   dom.addEventListener("mouseout", onMouseOut);
   return {
     destroy() {
       dom.removeEventListener("click", onClick);
+      dom.removeEventListener("pointerdown", onPointerDown);
       dom.removeEventListener("mouseover", onMouseOver);
       dom.removeEventListener("mouseout", onMouseOut);
     },
