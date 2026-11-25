@@ -113,6 +113,16 @@ describe('renderListTable — colgroup', () => {
   });
 });
 
+describe('renderListTable — scroll container', () => {
+  it('wraps the table in a list-table-scroll div and leaves the table markup unchanged', () => {
+    const html = renderListTable(table());
+    const tableStart = html.indexOf('<table class="list-table-preview">');
+    const tableEnd = html.indexOf('</table>') + '</table>'.length;
+    const inner = html.slice(tableStart, tableEnd);
+    expect(html).toBe(`<div class="list-table-scroll">${inner}</div>`);
+  });
+});
+
 describe('renderListTable — caption', () => {
   it('renders a caption element containing the id label and the caption content', () => {
     const caption: MdNode[] = [{ type: 'text', value: 'A & B' }];

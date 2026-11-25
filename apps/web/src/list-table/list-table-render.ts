@@ -138,8 +138,11 @@ function renderRows(
  * attributes, columns carry their alignment, and a `<colgroup>` is
  * emitted when `tbl-colwidths` are declared.
  *
+ * The table is wrapped in a `div.list-table-scroll` so wide tables scroll
+ * horizontally inside their own container instead of squeezing columns.
+ *
  * @param table - The parsed list-table model.
- * @returns The table's HTML markup.
+ * @returns The wrapped table markup.
  */
 export function renderListTable(table: ListTable): string {
   const headerRows = Math.max(0, Math.min(table.headerRows, table.rows.length));
@@ -151,5 +154,5 @@ export function renderListTable(table: ListTable): string {
   const bodyResult = renderRows(body, 'td', table.aligns, headerResult.active);
   const bodyHtml = body.length > 0 ? `<tbody>${bodyResult.html}</tbody>` : '';
 
-  return `<table class="list-table-preview">${renderCaption(table)}${renderColgroup(table.colwidths)}${head}${bodyHtml}</table>`;
+  return `<div class="list-table-scroll"><table class="list-table-preview">${renderCaption(table)}${renderColgroup(table.colwidths)}${head}${bodyHtml}</table></div>`;
 }
