@@ -50,9 +50,11 @@ describe('ReaderHeader basics', () => {
 
     expect(screen.getByText('Alpha study')).toBeInTheDocument();
     expect(screen.getByTestId('manuscript-switcher')).toBeInTheDocument();
-    expect(
-      screen.getByText('Published at konsulin-care/citizen-science'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Published at')).toBeInTheDocument();
+    const repoLink = screen.getByRole('link', { name: /konsulin-care\/citizen-science/ });
+    expect(repoLink).toHaveAttribute('href', 'https://github.com/konsulin-care/citizen-science');
+    expect(repoLink).toHaveAttribute('target', '_blank');
+    expect(repoLink).toHaveAttribute('rel', 'noopener noreferrer');
   });
 });
 

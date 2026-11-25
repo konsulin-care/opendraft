@@ -98,7 +98,10 @@ describe('ReaderPage OpenDraft repository', () => {
     expect(screen.queryByTestId('manuscript-view')).toBeNull();
     const header = screen.getByTestId('header-shell');
     expect(within(header).getByText('All manuscripts')).toBeInTheDocument();
-    expect(within(header).getByText('Published at konsulin-care/citizen-science')).toBeInTheDocument();
+    expect(within(header).getByText('Published at')).toBeInTheDocument();
+    expect(
+      within(header).getByRole('link', { name: /konsulin-care\/citizen-science/ }),
+    ).toHaveAttribute('href', 'https://github.com/konsulin-care/citizen-science');
     expect(within(header).getByTestId('manuscript-switcher')).toBeInTheDocument();
     expect(within(header).getByRole('button', { name: 'Suggest edits' })).toBeInTheDocument();
     expect(within(screen.getByRole('main')).queryByText('Suggest edits')).toBeNull();
@@ -135,8 +138,7 @@ describe('ReaderPage edit intent', () => {
     await waitFor(() => { expect(window.location.search).not.toContain('intent=edit'); });
     expect(start).toHaveBeenCalledTimes(1);
     expect(replace).toHaveBeenCalled();
-    replace.mockRestore();
-    window.history.replaceState({}, '', '/');
+    replace.mockRestore(); window.history.replaceState({}, '', '/');
   });
 });
 describe('ReaderPage single manuscript', () => {

@@ -12,6 +12,7 @@ import type { BffSession } from '../github/bff-client';
 import { HeaderShell } from '../components/header/HeaderShell';
 import { ManuscriptSwitcher } from '../components/header/ManuscriptSwitcher';
 import type { ManuscriptSwitcherOption } from '../components/header/ManuscriptSwitcher';
+import { RepoSubtitle } from '../components/header/RepoSubtitle';
 import { UserMenu } from '../components/header/UserMenu';
 
 /** Props for {@link ReaderHeader}. */
@@ -60,6 +61,7 @@ export function ReaderHeader({
   action,
 }: ReaderHeaderProps) {
   const heading = title ?? 'All manuscripts';
+  const repo = readerRepoName(returnTo);
 
   return (
     <HeaderShell
@@ -81,7 +83,7 @@ export function ReaderHeader({
           ) : null}
         </span>
       }
-      subtitle={`Published at ${readerRepoName(returnTo)}`}
+      subtitle={<PublishedSubtitle repo={repo} />}
       action={action}
       userMenu={
         <UserMenu
@@ -92,6 +94,19 @@ export function ReaderHeader({
         />
       }
     />
+  );
+}
+
+/**
+ * Render the `Published at` subtitle for an optional repository slug.
+ *
+ * @param props - The repository slug, or an empty string for a local project.
+ * @returns A plain prefix for local projects, otherwise a linked repository.
+ */
+function PublishedSubtitle({ repo }: { repo: string }) {
+  if (repo === '') return <RepoSubtitle prefix="Published at" />;
+  return (
+    <RepoSubtitle prefix="Published at" repo={repo} href={`https://github.com/${repo}`} />
   );
 }
 
