@@ -97,6 +97,22 @@ jobs:
       - name: govulncheck
         run: mise run govulncheck
 
+  docker:
+    name: Docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - run: mise install
+      - name: Build image
+        run: mise run docker-build
+      - name: Trivy image scan
+        run: mise run trivy-image
+      - name: Trivy filesystem scan
+        run: mise run trivy-fs
+      - name: Trivy config scan
+        run: mise run trivy-config
+
   complexity:
     name: Complexity
     runs-on: ubuntu-latest
