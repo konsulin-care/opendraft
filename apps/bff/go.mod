@@ -1,3 +1,3 @@
-module github.com/opendraft/bff
+module github.com/konsulin-care/opendraft/apps/bff
 
-go 1.22.0
+go 1.27

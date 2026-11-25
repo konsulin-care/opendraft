@@ -1,11 +1,20 @@
-import { useRef } from 'react';
+import { lazy, Suspense, useRef } from 'react';
 import type { WorkspaceAdapter } from '@opendraft/workspace';
-import { BlockEditor } from '../block-editor/BlockEditor';
+import { BlockEditorSkeleton } from '../block-editor/BlockEditorSkeleton';
+import { ReadOnlyContext } from '../block-editor/read-only-context';
 import { useEditorCommands } from '../hooks/useEditorCommands';
 import { useFocusScrollGuard } from '../hooks/useFocusScrollGuard';
+import { ReaderMetadata } from '../reader/ReaderMetadata';
 import { EditorToolbars } from './EditorToolbars';
-import { MetadataPanel } from './metadata-panel/MetadataPanel';
 import { ReadingColumn } from './ReadingColumn';
+
+// React.lazy requires a default export; both components are named exports.
+const BlockEditor = lazy(() =>
+  import('../block-editor/BlockEditor').then((m) => ({ default: m.BlockEditor })),
+);
+const MetadataPanel = lazy(() =>
+  import('./metadata-panel/MetadataPanel').then((m) => ({ default: m.MetadataPanel })),
+);
 
 /** Props for {@link ManuscriptView}. */
 export interface ManuscriptViewProps {
@@ -15,6 +24,8 @@ export interface ManuscriptViewProps {
   dir: string;
   /** Project key scoping the persisted block-editor state. */
   projectKey: string;
+  /** Render the reader view: no toolbars, read-only blocks and metadata. */
+  readOnly?: boolean;
 }
 
 /**
@@ -26,30 +37,50 @@ export interface ManuscriptViewProps {
  * that overflow-auto scrollport, so the title block and the blocks share
  * one display configuration, all guarded against focus-scroll jumps.
  *
+ * In read-only mode the editor toolbars are omitted, the editable metadata
+ * panel is replaced by the presentational reader metadata and the block
+ * editor is wrapped in {@link ReadOnlyContext} so no add-block controls
+ * render.
+ *
  * @param props - See {@link ManuscriptViewProps}.
  * @returns The manuscript-view surface: toolbars first, then one scroll container.
  */
-export function ManuscriptView({ workspace, dir, projectKey }: ManuscriptViewProps) {
+export function ManuscriptView({
+  workspace,
+  dir,
+  projectKey,
+  readOnly = false,
+}: ManuscriptViewProps) {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   useFocusScrollGuard(scrollContainerRef);
   // Formatting commands target the most recently focused block editor.
   const commands = useEditorCommands('wysiwyg', () => null);
   return (
     <div className="manuscript-editor" data-testid="manuscript-view">
-      <EditorToolbars commands={commands} />
+      {!readOnly && <EditorToolbars commands={commands} />}
       <div
         ref={scrollContainerRef}
         tabIndex={-1}
         style={{ flex: 1, minHeight: 0, overflow: 'auto' }}
       >
         <ReadingColumn>
-          <MetadataPanel
-            workspace={workspace}
-            manuscriptRoot={dir}
-            projectKey={projectKey}
-            editorFocusRef={scrollContainerRef}
-          />
-          <BlockEditor ws={workspace} dir={dir} projectKey={projectKey} />
+          {readOnly ? (
+            <ReaderMetadata workspace={workspace} manuscriptRoot={dir} />
+          ) : (
+            <Suspense fallback={null}>
+              <MetadataPanel
+                workspace={workspace}
+                manuscriptRoot={dir}
+                projectKey={projectKey}
+                editorFocusRef={scrollContainerRef}
+              />
+            </Suspense>
+          )}
+          <ReadOnlyContext.Provider value={readOnly}>
+            <Suspense fallback={<BlockEditorSkeleton />}>
+              <BlockEditor ws={workspace} dir={dir} projectKey={projectKey} />
+            </Suspense>
+          </ReadOnlyContext.Provider>
         </ReadingColumn>
       </div>
     </div>

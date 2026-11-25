@@ -275,9 +275,7 @@ describe('index.css responsive layout (source scan)', () => {
 describe('Responsive header actions (source scan)', () => {
   const read = (name: string) => readFileSync(resolve(__dirname, name), 'utf-8');
 
-  it('keeps the Commit button hidden below md, in the overflow menu instead', () => {
-    expect(read('AppHeader.tsx')).toMatch(/bg-black text-white hover:bg-gray-900[^\n]*hidden md:inline-flex/);
-    expect(read('AppHeader.tsx')).toMatch(/className=\{COMMIT_BUTTON\}/);
+  it('keeps header actions in a small-screen overflow menu', () => {
     expect(read('HeaderOverflowMenu.tsx')).toMatch(/className="relative md:hidden"/);
   });
   it('renders no mode switch anywhere in the header sources', () => {
@@ -290,10 +288,5 @@ describe('Crepe selection toolbar stays enabled (source scan)', () => {
 
   it('crepe-config.ts does not disable Crepe.Feature.Toolbar', () => {
     expect(crepeConfigSource).not.toMatch(/Crepe\.Feature\.Toolbar[^\n]*false/);
-  });
-
-  it('App.tsx passes the formattingToolbar preference to ManuscriptEditor', () => {
-    const appSource = readFileSync(resolve(__dirname, '../App.tsx'), 'utf8');
-    expect(appSource).toMatch(/formattingToolbar=\{formattingToolbar\}/);
   });
 });

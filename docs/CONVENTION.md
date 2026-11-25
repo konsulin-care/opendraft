@@ -58,6 +58,77 @@ Any additional files (datasets, figures, supplementary materials) are allowed. T
 
 ---
 
+## Project Initialization and Discovery
+
+Project initialization discovers existing manuscripts in `manuscripts/` instead
+of assuming a fresh project. Discovery is read-only; it never edits user files.
+The shared implementation lives in `@opendraft/manuscript` and is used by both
+`opendraft init` and the web conversion flow.
+
+### Configuration State
+
+- **missing:** no `opendraft.yml`. Scan the immediate subfolders of `manuscripts/`
+  (files directly under `manuscripts/`, such as `references.bib`, are not
+  candidates) and classify each folder.
+- **valid:** `opendraft.yml` parses and passes `validateOpendraft`. Report folders
+  under `manuscripts/*/` that the config does not list as **unlisted** and add
+  them only on confirmation.
+- **invalid:** `opendraft.yml` fails to parse or validate. Stop and report the
+  errors; never rewrite the file.
+
+### Candidate Classification
+
+Each candidate folder is classified as `valid`, `repairable` or `rejected`.
+
+**Rejected** when any of the following holds:
+
+- `missing-article` — the folder has no `article.qmd`.
+- `invalid-id` — the folder name fails `MANUSCRIPT_ID_PATTERN`
+  (`^[a-z0-9]+(-[a-z0-9]+)*$`). A `suggestedId` from `normalizeManuscriptId(name)`
+  is reported, but the folder is never renamed.
+- `missing-include` — an `{{< include X >}}` shortcode in `article.qmd` targets a
+  file that does not exist relative to the folder.
+
+**Repairable** when any of `_author.yml`, `_abstract.yml`, `_frontmatter.yml` is
+missing. Those files are created from the shared starter templates and listed in
+`missingFiles`.
+
+**Valid** otherwise. Layout is `block` when `blocks/_*.qmd` exists, otherwise
+`legacy`. Extra files and folders (for example `supplementaries/`, `data`) are
+ignored.
+
+### Warnings
+
+Warnings are reported but the candidate is still registered; user files are
+never edited. Two warnings exist:
+
+- `bibliography-mismatch` — `article.qmd` front matter `bibliography` is not
+  `../references.bib`.
+- `metadata-files-mismatch` — `article.qmd` front matter `metadata-files` does
+  not list all three metadata files.
+
+### Plans
+
+Plans only create files. The single permitted update is `opendraft.yml` when it
+already exists and is valid: entries are appended while the protocol block and
+all existing entries are preserved. `manuscripts/references.bib` is created only
+when absent. When no registrable candidate exists, the supplied project name is
+normalized to a manuscript id and `manuscripts/<id>/` is scaffolded.
+
+### CLI Flags
+
+`opendraft init` accepts:
+
+- `--manuscript <id>` — register only the named candidate (repeatable).
+- `--yes` — accept defaults non-interactively (register all registrable
+  candidates, create `manuscripts/references.bib`, add no unlisted folders).
+- `--dry-run` — print the plan without writing anything.
+
+In non-interactive mode without `--yes`, the command exits with code `2` when a
+confirmation would be required, so scripts can detect that input is needed.
+
+---
+
 ## Manuscript Identifiers
 
 Identifiers must match the pattern `^[a-z0-9]+(-[a-z0-9]+)*$`:

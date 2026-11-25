@@ -1,0 +1,12 @@
+{
+  "routes": {
+    "reader": {
+      "entries": ["index.html", "src/reader/ReaderPage.tsx"],
+      "maxGzipKb": 1200
+    },
+    "editor": {
+      "entries": ["index.html", "src/App.tsx"],
+      "maxGzipKb": 1000
+    }
+  }
+}

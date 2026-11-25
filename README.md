@@ -19,11 +19,14 @@ corepack enable && corepack prepare pnpm@latest --activate
 pnpm install
 
 # 4. Validate protocol artifacts
-pnpm run validate:ttl
+mise run validate-ttl
 
-# 5. Run conformance tests
-pnpm test
+# 5. Run all test suites
+mise run test
 ```
+
+To run OpenDraft locally (built app plus BFF, or Vite hot reload), see
+[Run locally](CONTRIBUTING.md#run-locally) in CONTRIBUTING.md.
 
 ## Architecture
 

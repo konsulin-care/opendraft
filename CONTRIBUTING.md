@@ -10,6 +10,29 @@ mise install
 mise run init
 ```
 
+## Run locally
+
+Copy the example environment file and adjust it as needed:
+
+```bash
+cp .env.example .env
+```
+
+For the full built application (web app plus the BFF on port 5173):
+
+```bash
+mise run serve
+```
+
+For hot-reload development, run the BFF and Vite in separate terminals:
+
+```bash
+mise run dev-bff   # BFF on :8080, proxied by Vite
+mise run dev       # Vite on :5173
+```
+
+The three GitHub App variables — `BFF_GITHUB_CLIENT_ID`, `BFF_GITHUB_CLIENT_SECRET` (or `BFF_GITHUB_CLIENT_SECRET_FILE`), and `BFF_GITHUB_APP_SLUG` — are optional. Leave all three empty in `.env` to serve the app read-only without sign-in. Set either all three (login enabled) or none (anonymous read-only); a partial set fails at startup and names the missing variables.
+
 ## Available Hooks
 
 ### Pre-commit (runs on every commit)
@@ -17,13 +40,14 @@ mise run init
 | Check | What it does |
 |-------|--------------|
 | typescript | Type-checks TypeScript files |
+| typescript-web | Type-checks the web app TypeScript |
 | eslint | Lints and auto-fixes JS/TS files |
 | go-fmt | Formats Go code |
 | go-vet | Runs Go static analysis |
 | go-mod-tidy | Tidies Go module files |
 | validate-ttl | Validates RDF/Turtle files parse correctly |
-| markdownlint | Lints Markdown files |
 | yaml-lint | Lints YAML files |
+| validate-project | Validates `opendraft.yml` and manuscript structure |
 | large-files | Checks files are under 300 lines (`.go`, `.ts`, `.tsx`) |
 
 ### Pre-push (runs before push)
@@ -77,13 +101,26 @@ mise run lint-fix        # Run ESLint with auto-fix
 mise run lint-go         # Run golangci-lint
 mise run fmt-go          # Check Go formatting
 mise run typecheck       # Run TypeScript type checker
-mise run build           # Build (placeholder)
+mise run typecheck-web   # Run TypeScript type checker for apps/web
+mise run serve           # Build the web app and serve it with the local BFF on :5173
+mise run dev             # Vite hot-reload dev server on :5173 (proxies /@api to the BFF)
+mise run dev-bff         # Run the BFF for Vite dev mode on :8080
+mise run build           # Build the web app and the BFF binary
+mise run build-bff       # Build the BFF as a static binary
+mise run docker-build    # Build the OpenDraft Docker image
 mise run build-go        # Build Go code
 mise run validate-ttl    # Validate RDF/Turtle files
+mise run validate-shacl  # Validate protocol fixtures against SHACL shapes
+mise run validate-project # Validate opendraft.yml and manuscript structure
 mise run verify-protocol # Verify protocol artifacts against the committed manifest (CI + pre-push)
 mise run update-protocol-manifest  # Regenerate protocol manifest and pin project template
+mise run build-cli       # Bundle the CLI into packages/cli/dist
+mise run smoke-cli       # Smoke-test the packaged CLI tarball
+mise run cli             # Run the OpenDraft CLI from source
+mise run publish         # Bump, publish the CLI, and roll back on failure
 mise run test            # Run all test suites (RDF, SHACL, Go, TypeScript)
 mise run audit           # Run npm security audit
+mise run govulncheck     # Run govulncheck on Go code
 mise run complexity-ts   # Check TypeScript complexity
 mise run check-large-files  # Check for files > 300 lines
 mise run coverage-ts     # Run TypeScript tests with coverage
@@ -96,10 +133,11 @@ GitHub Actions runs on PRs to `master` with 8 parallel jobs:
 
 | Job | What it checks |
 |-----|----------------|
-| lint | ESLint, golangci-lint, TTL validation, markdown/yaml lint |
+| lint | ESLint, golangci-lint, TTL validation, YAML lint, large-file check |
 | test | All test suites (RDF, SHACL, Go, TypeScript, protocol verification) |
 | verify-protocol | Protocol artifacts against the committed manifest (full git history) |
 | build | TypeScript build, Go build |
+| cli | Smoke-tests the packed CLI tarball |
 | security | npm audit, govulncheck |
 | complexity | TypeScript complexity, Go complexity |
 | coverage | Test coverage for TS and Go |

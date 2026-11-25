@@ -4,9 +4,13 @@ import {
   SHARED_BIB_PATH,
   scaffoldProject as scaffoldWorkspace,
 } from '@opendraft/manuscript';
+import type { ProtocolBlock } from '@opendraft/manuscript';
 import protocolManifest from '../../../../protocol/protocol.manifest.json' with { type: 'json' };
 
 export { OPENDRAFT_CONFIG_PATH, SHARED_BIB_PATH };
+
+/** Protocol block bound from `protocol/protocol.manifest.json`. */
+export const PROTOCOL: ProtocolBlock = protocolManifest.protocol;
 
 /** Options for scaffolding a new project workspace. */
 export interface ScaffoldOptions {

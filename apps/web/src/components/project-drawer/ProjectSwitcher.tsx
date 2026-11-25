@@ -3,6 +3,7 @@ import type { ProjectRecord } from '@opendraft/workspace';
 import { ChevronDown } from 'lucide-react';
 import { useOverflowMarquee } from '../../hooks/use-overflow-marquee';
 import { NewProjectDialog } from './NewProjectDialog';
+import { useProjectDrawer } from './ProjectDrawer';
 import { SwitcherDropdown } from './project-switcher-panels';
 
 /** Props for {@link ProjectSwitcher}. */
@@ -15,6 +16,8 @@ export interface ProjectSwitcherProps {
   switchTo: (id: string) => void;
   /** Register and scaffold a new project. */
   create: (name: string, manuscriptId: string) => void;
+  /** Rename the active project; falls back to the drawer context when omitted. */
+  onRenameProject?: (name: string) => void | Promise<void>;
 }
 
 /** Sort projects by most recently opened, first. */
@@ -133,8 +136,11 @@ export function ProjectSwitcher({
   active,
   switchTo,
   create,
+  onRenameProject,
 }: ProjectSwitcherProps) {
   const state = useSwitcherState(active, switchTo);
+  const drawer = useProjectDrawer();
+  const rename = onRenameProject ?? drawer.onRenameProject;
 
   return (
     <div className="relative min-w-0 flex-1">
@@ -149,6 +155,7 @@ export function ProjectSwitcher({
           active={active}
           onSelect={state.choose}
           onNew={() => state.setCreating(true)}
+          onRenameProject={rename}
         />
       )}
       {state.creating && (

@@ -2,7 +2,7 @@
 
 **Status:** Accepted  
 **Date:** 2024-12-01  
-**Updated:** 2026-08-31
+**Updated:** 2026-11-21
 
 ## Context
 
@@ -21,14 +21,27 @@ Use **mise** as the single source of truth for tool versions and quality tasks.
 
 **Pinned tools:**
 
-- node: lts
-- pnpm: 11.13.0
+- node: lts, currently Node 26; container images pin the major tag
+  (`node:26-slim`) so a new Node major cannot change the build silently
+- pnpm: 12.21.0
 - go: 1.27
-- lefthook: 2.1.12
-- golangci-lint: 2.13.2
-- govulncheck: 1.7.0
-- markdownlint-cli2: 0.23.2
+- lefthook: 2.1.15
+- golangci-lint: 2.15.0
+- govulncheck: 1.10.0
 - yamllint: 1.38.0
+
+**Package manager inside container builds:**
+
+Node.js ships no Corepack from version 25 onward, so container images can no
+longer run `corepack enable`. The build installs pnpm explicitly at the pinned
+version through the `PNPM_VERSION` build argument of the container `Dockerfile`
+(default `12.21.0`), and the root `package.json` declares the same version in
+its `packageManager` field, so mise, local runs, the container build and any
+Corepack-based consumer all agree on one pnpm version. Bumping pnpm therefore
+means updating `.mise.toml`, the `packageManager` field and the `Dockerfile`
+default together. Because pnpm 12 records the managed version in
+`pnpm-lock.yaml` under `packageManagerDependencies`, that lockfile update ships
+with the same change; without it `pnpm install --frozen-lockfile` fails.
 
 **Quality tasks defined in `.mise.toml`:**
 
@@ -39,8 +52,13 @@ Use **mise** as the single source of truth for tool versions and quality tasks.
 | `fmt-go` | Check Go formatting |
 | `typecheck` | TypeScript type checking |
 | `test` | All test suites (RDF, SHACL, Go, TypeScript) |
-| `build` | Build (placeholder) |
+| `build` | Build the web app and the static BFF binary |
+| `build-bff` | Build the BFF as a static Go binary |
 | `build-go` | Build Go code |
+| `serve` | Build, then serve the web app and BFF locally on :5173 |
+| `dev` | Run Vite on :5173, proxying `/@api` to the BFF |
+| `dev-bff` | Run the BFF for Vite dev mode on :8080 |
+| `docker-build` | Build the OpenDraft Docker image |
 | `validate-ttl` | Validate RDF/Turtle files |
 | `audit` | npm security audit |
 | `complexity-ts` | TypeScript complexity check |
@@ -72,7 +90,7 @@ Checks are distributed across three layers based on cost and blocking behavior. 
 
 | Layer | Purpose | Checks | Blocking |
 |-------|---------|--------|----------|
-| **pre-commit** | Fast feedback on common issues | TypeScript type-check, ESLint (with --fix), Go fmt, Go vet, Go mod tidy, TTL validation, Markdown lint, YAML lint, Large file check | Yes |
+| **pre-commit** | Fast feedback on common issues | TypeScript type-check, ESLint (with --fix), Go fmt, Go vet, Go mod tidy, TTL validation, YAML lint, Large file check | Yes |
 | **pre-push** | Validate readiness for review | Full test suite, Build validation, govulncheck, Complexity analysis (TS + Go) | Yes |
 | **CI** | Comprehensive analysis + broader checks | All pre-commit/pre-push checks + npm audit, coverage | Yes (PR merge) |
 
@@ -102,7 +120,7 @@ CI provides the final gate with 7 parallel jobs:
 
 | Job | What it checks |
 |-----|----------------|
-| lint | ESLint, golangci-lint, TTL validation, markdown/yaml lint, large files |
+| lint | ESLint, golangci-lint, TTL validation, YAML lint, large files |
 | test | All test suites (RDF, SHACL, Go, TypeScript) |
 | build | TypeScript build, Go build |
 | security | npm audit, govulncheck |

@@ -24,7 +24,6 @@ interface CitekeyTooltipProps {
 export function CitekeyTooltip({ reference, anchorEl }: CitekeyTooltipProps) {
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [apaText, setApaText] = useState('');
-
   useEffect(() => {
     setApaText(reference ? formatAPA(reference) : '');
   }, [reference]);
@@ -36,6 +35,7 @@ export function CitekeyTooltip({ reference, anchorEl }: CitekeyTooltipProps) {
     /** Compute and apply position to the tooltip element. */
     async function update() {
       const { x, y } = await computePosition(anchorEl!, el!, {
+        strategy: 'fixed',
         placement: 'bottom',
         middleware: [offset(8), flip(), shift({ padding: 8 })],
       });

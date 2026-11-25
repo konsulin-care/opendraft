@@ -23,6 +23,23 @@ function process(data: unknown) { /* ... */ }
 // Max 300 lines per file
 ```
 
+### BFF Responsibilities
+
+The BFF is a **narrow sign-in-only git transport relay, no git logic**, and it
+is limited to:
+
+- Authentication (GitHub App user access tokens only)
+- Sealed-cookie session management
+- Repository creation
+- Permission checks
+- Pull requests
+- Forks
+- Sign-in-only git transport relay (`/@api/git/{owner}/{repo}.git/...`)
+- Static hosting of the web app (one image, same-origin, `/@api` and `/@assets` namespace)
+
+Do not add generic GitHub proxying, git logic, manuscript storage, or upstream
+body relaying.
+
 ## PWA Patterns
 
 - Use IndexedDB for all persistent storage.

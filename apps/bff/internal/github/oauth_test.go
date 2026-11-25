@@ -1,0 +1,258 @@
+package github
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
+	"testing"
+	"time"
+)
+
+func testClient(webURL string, now time.Time) *Client {
+	return &Client{
+		WebURL:       webURL,
+		APIURL:       webURL,
+		ClientID:     testClientID,
+		ClientSecret: testClientSecret,
+		HTTP:         http.DefaultClient,
+		Now:          func() time.Time { return now },
+	}
+}
+
+type tokenRequest struct {
+	form   url.Values
+	method string
+	path   string
+	accept string
+}
+
+func newTokenServer(t *testing.T, response string) (*httptest.Server, *tokenRequest) {
+	t.Helper()
+	got := &tokenRequest{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got.method = r.Method
+		got.path = r.URL.Path
+		got.accept = r.Header.Get("Accept")
+		if err := r.ParseForm(); err != nil {
+			t.Errorf("ParseForm: %v", err)
+		}
+		got.form = r.PostForm
+		w.Header().Set("Content-Type", testContentType)
+		_, _ = w.Write([]byte(response))
+	}))
+	t.Cleanup(server.Close)
+	return server, got
+}
+
+func assertString(t *testing.T, label, got, want string) {
+	t.Helper()
+	if got != want {
+		t.Fatalf("%s = %q, want %q", label, got, want)
+	}
+}
+
+func assertFormFields(t *testing.T, form url.Values, want map[string]string) {
+	t.Helper()
+	for key, value := range want {
+		if form.Get(key) != value {
+			t.Fatalf("%s = %q, want %q", key, form.Get(key), value)
+		}
+	}
+}
+
+func assertNoFormField(t *testing.T, form url.Values, key string) {
+	t.Helper()
+	if _, ok := form[key]; ok {
+		t.Fatalf("%s unexpectedly sent", key)
+	}
+}
+
+type tokenExpectation struct {
+	access        string
+	refresh       string
+	accessExpiry  time.Duration
+	refreshExpiry time.Duration
+}
+
+func assertTokens(t *testing.T, tokens Tokens, now time.Time, want tokenExpectation) {
+	t.Helper()
+	if tokens.AccessToken != want.access {
+		t.Fatalf("AccessToken = %q", tokens.AccessToken)
+	}
+	if tokens.RefreshToken != want.refresh {
+		t.Fatalf("RefreshToken = %q", tokens.RefreshToken)
+	}
+	if got, wantTime := tokens.AccessExpiresAt, now.Add(want.accessExpiry); !got.Equal(wantTime) {
+		t.Fatalf("AccessExpiresAt = %v, want %v", got, wantTime)
+	}
+	if got, wantTime := tokens.RefreshExpiresAt, now.Add(want.refreshExpiry); !got.Equal(wantTime) {
+		t.Fatalf("RefreshExpiresAt = %v, want %v", got, wantTime)
+	}
+}
+
+func TestNewPKCEChallengeIsS256OfVerifier(t *testing.T) {
+	verifier, challenge := NewPKCE()
+
+	if verifier == "" || challenge == "" {
+		t.Fatal("NewPKCE returned an empty value")
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(verifier)
+	if err != nil {
+		t.Fatalf("verifier is not unpadded base64url: %v", err)
+	}
+	if len(raw) != 32 {
+		t.Fatalf("verifier decoded to %d bytes, want 32", len(raw))
+	}
+	sum := sha256.Sum256([]byte(verifier))
+	want := base64.RawURLEncoding.EncodeToString(sum[:])
+	if challenge != want {
+		t.Fatalf("challenge = %q, want %q", challenge, want)
+	}
+}
+
+func TestAuthorizeURLContainsParametersWithoutSecret(t *testing.T) {
+	client := testClient(testGitHubURL, time.Now())
+	got := client.AuthorizeURL("https://app.example/@api/auth/callback", "state-xyz", "challenge-abc")
+
+	parsed, err := url.Parse(got)
+	if err != nil {
+		t.Fatalf("parse authorize URL: %v", err)
+	}
+	if parsed.Path != "/login/oauth/authorize" {
+		t.Fatalf("path = %q, want /login/oauth/authorize", parsed.Path)
+	}
+	query := parsed.Query()
+	want := map[string]string{
+		oauthClientIDKey:        testClientID,
+		"redirect_uri":          "https://app.example/@api/auth/callback",
+		"state":                 "state-xyz",
+		"code_challenge":        "challenge-abc",
+		"code_challenge_method": "S256",
+	}
+	for key, value := range want {
+		if query.Get(key) != value {
+			t.Fatalf("%s = %q, want %q", key, query.Get(key), value)
+		}
+	}
+	if strings.Contains(got, client.ClientSecret) {
+		t.Fatal("authorize URL contains the client secret")
+	}
+}
+
+func TestInstallURL(t *testing.T) {
+	client := testClient(testGitHubURL, time.Now())
+	got := client.InstallURL("opendraft-app", "state-123")
+
+	want := testGitHubURL + "/apps/opendraft-app/installations/new?state=state-123"
+	if got != want {
+		t.Fatalf("InstallURL = %q, want %q", got, want)
+	}
+}
+
+func TestExchangeCodePostsFieldsAndDerivesExpiry(t *testing.T) {
+	now := time.Date(2024, 5, 1, 12, 0, 0, 0, time.UTC)
+	server, req := newTokenServer(t, `{
+		"access_token":"ghu_new_access",
+		"expires_in":28800,
+		"refresh_token":"ghr_new_refresh",
+		"refresh_token_expires_in":15897600,
+		"token_type":"bearer"
+	}`)
+
+	client := testClient(server.URL, now)
+	tokens, err := client.ExchangeCode(context.Background(), "code-1", "verifier-1", testRedirectURI)
+	if err != nil {
+		t.Fatalf("ExchangeCode: %v", err)
+	}
+
+	assertString(t, "method", req.method, http.MethodPost)
+	assertString(t, "path", req.path, "/login/oauth/access_token")
+	assertString(t, "Accept", req.accept, testContentType)
+	assertFormFields(t, req.form, map[string]string{
+		oauthClientIDKey: testClientID,
+		"client_secret":  testClientSecret,
+		"code":           "code-1",
+		"redirect_uri":   testRedirectURI,
+		"code_verifier":  "verifier-1",
+	})
+	assertNoFormField(t, req.form, "grant_type")
+	assertTokens(t, tokens, now, tokenExpectation{
+		access:        "ghu_new_access",
+		refresh:       "ghr_new_refresh",
+		accessExpiry:  28800 * time.Second,
+		refreshExpiry: 15897600 * time.Second,
+	})
+}
+
+func TestExchangeCodeTreatsErrorFieldAsFailure(t *testing.T) {
+	now := time.Date(2024, 5, 1, 12, 0, 0, 0, time.UTC)
+	server, _ := newTokenServer(t, `{"error":"bad_verification_code","error_description":"The code passed is incorrect or expired."}`)
+
+	client := testClient(server.URL, now)
+	if _, err := client.ExchangeCode(context.Background(), "bad", "verifier", testRedirectURI); err == nil {
+		t.Fatal("ExchangeCode returned nil error for an error response")
+	}
+}
+
+func TestExchangeCodeReportsUnverifiedEmail(t *testing.T) {
+	now := time.Date(2024, 5, 1, 12, 0, 0, 0, time.UTC)
+	server, _ := newTokenServer(t, `{"error":"unverified_user_email","error_description":"Email not verified"}`)
+
+	client := testClient(server.URL, now)
+	_, err := client.ExchangeCode(context.Background(), "code", "verifier", testRedirectURI)
+	if !errors.Is(err, ErrUnverifiedEmail) {
+		t.Fatalf("ExchangeCode error = %v, want ErrUnverifiedEmail", err)
+	}
+	if !errors.Is(err, ErrOAuth) {
+		t.Fatalf("ExchangeCode error = %v, want wrapped ErrOAuth", err)
+	}
+}
+
+func TestRefreshPostsGrantTypeAndReturnsTokens(t *testing.T) {
+	now := time.Date(2024, 5, 1, 12, 0, 0, 0, time.UTC)
+	server, req := newTokenServer(t, `{
+		"access_token":"ghu_refreshed",
+		"expires_in":28800,
+		"refresh_token":"ghr_refreshed",
+		"refresh_token_expires_in":15897600,
+		"token_type":"bearer"
+	}`)
+
+	client := testClient(server.URL, now)
+	tokens, err := client.Refresh(context.Background(), "ghr_old")
+	if err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+
+	assertFormFields(t, req.form, map[string]string{
+		oauthClientIDKey: testClientID,
+		"client_secret":  testClientSecret,
+		"grant_type":     "refresh_token",
+		"refresh_token":  "ghr_old",
+	})
+	assertTokens(t, tokens, now, tokenExpectation{
+		access:        "ghu_refreshed",
+		refresh:       "ghr_refreshed",
+		accessExpiry:  28800 * time.Second,
+		refreshExpiry: 15897600 * time.Second,
+	})
+}
+
+func TestRefreshTreatsErrorFieldAsFailure(t *testing.T) {
+	now := time.Date(2024, 5, 1, 12, 0, 0, 0, time.UTC)
+	server, _ := newTokenServer(t, `{"error":"bad_refresh_token","error_description":"The refresh token passed is incorrect or expired."}`)
+
+	client := testClient(server.URL, now)
+	_, err := client.Refresh(context.Background(), "ghr_bad")
+	if err == nil {
+		t.Fatal("Refresh returned nil error for an error response")
+	}
+	if !errors.Is(err, ErrOAuth) {
+		t.Fatalf("Refresh error = %v, want ErrOAuth", err)
+	}
+}

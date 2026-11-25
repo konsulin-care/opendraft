@@ -9,7 +9,7 @@ const USAGE = [
   'usage: opendraft <command> [arguments]',
   'commands:',
   '  validate [dir] [--json] [--offline] [--release]  Validate config, metadata and assemblies',
-  '  init [dir] --manuscript <id>  Scaffold a new project',
+  '  init [dir] [--manuscript <id>] [--yes] [--dry-run]  Initialize or sync a project',
   '  manuscript              Manage manuscripts',
   '  block                   Manage blocks',
   '  protocol upgrade [dir]  Pin the protocol to the bundled latest revision',

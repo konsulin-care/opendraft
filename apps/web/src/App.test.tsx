@@ -35,7 +35,6 @@ describe('App', () => {
     const { unmount } = render(<App />);
     await waitFor(() => expect(screen.getByTestId('manuscript-view')).toBeDefined(), { timeout: 10000 });
 
-    // One registry record, and its od-ws-<id> database holds the scaffold.
     const records = await projectRegistry.list();
     expect(records).toHaveLength(1);
     expect(records[0].name).toBe('Untitled project');
@@ -50,25 +49,21 @@ describe('App', () => {
       workspaceManager.release(records[0].id);
     }
 
-    // Fresh boot opens the manuscript directory: its treeitem is selected.
     fireEvent.click(screen.getByRole('button', { name: 'OpenDraft' }));
     await waitFor(() => expect(within(screen.getByTestId('project-drawer')).getByRole('treeitem', { name: 'untitled-project' }).getAttribute('aria-selected')).toBe('true'));
     fireEvent.click(screen.getByRole('button', { name: 'OpenDraft' }));
 
-    // Opening another file is remembered; a remount reopens it.
     await projectRegistry.setLastPath(records[0].id, 'manuscripts/references.bib');
     unmount();
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
 
-    // The remount reopens the last file: its treeitem is selected.
     fireEvent.click(screen.getByRole('button', { name: 'OpenDraft' }));
     const drawer = screen.getByTestId('project-drawer');
     await waitFor(() => expect(within(drawer).getAllByRole('treeitem', { name: 'references.bib' }).some(isSelected)).toBe(true));
   });
 });
 
-/** Drawer pins the project selector, lists every workspace file, and opens files on click. */
 async function expectDrawerTreeOpensFiles(): Promise<void> {
   render(<App />);
   await waitFor(() => expect(screen.getByTestId('manuscript-view')).toBeDefined(), { timeout: 10000 });
@@ -76,10 +71,8 @@ async function expectDrawerTreeOpensFiles(): Promise<void> {
   fireEvent.click(screen.getByRole('button', { name: 'OpenDraft' }));
   const drawer = screen.getByTestId('project-drawer');
 
-  // Pinned header: the project selector.
   expect(within(drawer).getByRole('button', { name: 'Untitled project' })).toBeDefined();
 
-  // Body: a treeitem for every workspace file, basenames as-is.
   const records = await projectRegistry.list();
   const ws = await workspaceManager.get(records[0].id);
   let paths: string[];
@@ -95,13 +88,12 @@ async function expectDrawerTreeOpensFiles(): Promise<void> {
     expect(within(drawer).getAllByRole('treeitem', { name }).length).toBeGreaterThan(0);
   }
 
-  // Clicking a file opens its path and selects its treeitem.
   fireEvent.click(within(drawer).getByRole('treeitem', { name: 'article.qmd' }));
   await waitFor(() => expect(within(drawer).getByRole('treeitem', { name: 'article.qmd' }).getAttribute('aria-selected')).toBe('true'));
   await waitFor(async () => {
     expect(await projectRegistry.getLastPath(records[0].id)).toBe('manuscripts/untitled-project/article.qmd');
   });
-  expect(screen.getByTestId('manuscript-editor')).toBeDefined();
+  await screen.findByTestId('manuscript-editor');
 }
 
 describe('App project drawer', () => {
@@ -116,11 +108,9 @@ describe('App project drawer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'OpenDraft' }));
     const drawer = screen.getByTestId('project-drawer');
 
-    // Open a file first so the folder is not already the active path.
     fireEvent.click(within(drawer).getByRole('treeitem', { name: 'article.qmd' }));
     await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined());
 
-    // Clicking the folder label opens the directory; the chevron only collapses.
     fireEvent.click(within(drawer).getByRole('treeitem', { name: 'untitled-project' }));
     await waitFor(() => expect(screen.getByTestId('manuscript-view')).toBeDefined());
     await waitFor(async () => {
@@ -129,7 +119,6 @@ describe('App project drawer', () => {
   });
 });
 
-/** Renaming the manuscript title moves the files and updates the tree and config. */
 async function expectManuscriptRenameMovesFiles(): Promise<void> {
   render(<App />);
   await waitFor(() => expect(screen.getByTestId('manuscript-view')).toBeDefined(), { timeout: 10000 });
@@ -161,18 +150,17 @@ async function expectManuscriptRenameMovesFiles(): Promise<void> {
 }
 
 describe('App header', () => {
-  it('shows the icon header with the manuscript title over the project name', async () => {
+  it('shows the icon header with the manuscript title and repo subtitle', async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('app-header')).toBeDefined());
     const logo = screen.getByRole('button', { name: 'OpenDraft' });
     expect(logo.getAttribute('title')).toBe('OpenDraft');
     expect(screen.queryByText('OpenDraft')).toBeNull();
-    // The header shows the manuscript dir name (no display name stored
-    // yet) over the active project name.
     const header = screen.getByTestId('app-header');
     const title = within(header).getByTestId('manuscript-title') as HTMLInputElement;
     expect(title.value).toBe('untitled-project');
-    expect(within(header).getByDisplayValue('Untitled project')).toBeDefined();
+    expect(within(header).getByText('Only on this device')).toBeDefined();
+    expect(within(header).queryByTestId('project-name')).toBeNull();
   });
 
   it('shows no mode switch in the header', async () => {
@@ -182,42 +170,50 @@ describe('App header', () => {
     expect(screen.queryByRole('button', { name: 'Visual mode is only available for manuscript block files' })).toBeNull();
   });
 
+  /** The editor header owns the draft action and chip; the banner is gone. */
+  it('renders the draft action and status chip in the header without a suggestion banner', async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByTestId('app-header')).toBeDefined());
+    const header = screen.getByTestId('app-header');
+    await waitFor(() => expect(within(header).getByRole('button', { name: 'Publish to GitHub' })).toBeDefined());
+    expect(within(header).getByRole('button', { name: 'Draft' })).toBeDefined();
+    expect(screen.queryByTestId('suggestion-banner')).toBeNull();
+  });
+
   it('renaming the manuscript title moves the files and updates the tree and config', async () => {
     await expectManuscriptRenameMovesFiles();
   });
 });
 
 describe('App mode and commit', () => {
-  it('renders no Formatting toolbar button next to Commit in the header', async () => {
+  it('renders no Formatting toolbar button and no Commit button in the header', async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('app-header')).toBeDefined());
     const header = screen.getByTestId('app-header');
     expect(within(header).queryByRole('button', { name: 'Formatting toolbar' })).toBeNull();
-    expect(within(header).getByRole('button', { name: 'Commit' })).toBeDefined();
+    expect(within(header).queryByRole('button', { name: 'Commit' })).toBeNull();
+    expect(within(header).getByRole('button', { name: 'Account' })).toBeDefined();
   });
 
   it('leaves the formatting toolbar rendered after Ctrl/Cmd+\\', async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('manuscript-view')).toBeDefined(), { timeout: 10000 });
-    // Open a source file: its formatting toolbar comes from the app shell.
     fireEvent.click(screen.getByRole('button', { name: 'OpenDraft' }));
     const drawer = screen.getByTestId('project-drawer');
     fireEvent.click(within(drawer).getAllByRole('treeitem', { name: 'article.qmd' })[0]);
     await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
 
     fireEvent.keyDown(window, { key: '\\', ctrlKey: true });
-    // Wait past the 150 ms toolbar collapse window: the toolbar must survive.
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 250));
     });
     expect(screen.getByRole('toolbar')).not.toBeNull();
   });
 
-  it('opens the commit dialog from the header Commit button', async () => {
+  it('does not render the removed commit dialog', async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('app-header')).toBeDefined());
-    fireEvent.click(screen.getByRole('button', { name: 'Commit' }));
-    expect(screen.getByText('Commit Changes')).toBeDefined();
+    expect(screen.queryByText('Commit Changes')).toBeNull();
   });
 });
 
@@ -225,7 +221,6 @@ describe('App save status', () => {
   it('shows Saving then Saved after an edit triggers an autosave', async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('manuscript-view')).toBeDefined(), { timeout: 10000 });
-    // The manuscript view has no CodeMirror surface: open a source file first.
     fireEvent.click(screen.getByRole('button', { name: 'OpenDraft' }));
     fireEvent.click(within(screen.getByTestId('project-drawer')).getAllByRole('treeitem', { name: 'references.bib' })[0]);
     await waitFor(() => expect(screen.getByTestId('manuscript-editor')).toBeDefined(), { timeout: 10000 });
@@ -241,7 +236,6 @@ describe('App save status', () => {
   });
 });
 
-/** After a block mutation, `opendraft:files-changed` re-lists the files into the tree. */
 async function expectFilesChangedReListsTree(): Promise<void> {
   render(<App />);
   await waitFor(() => expect(screen.getByTestId('manuscript-view')).toBeDefined(), { timeout: 10000 });
@@ -249,7 +243,6 @@ async function expectFilesChangedReListsTree(): Promise<void> {
   const drawer = screen.getByTestId('project-drawer');
   expect(within(drawer).queryByRole('treeitem', { name: '_methods.qmd' })).toBeNull();
 
-  // A block mutation landed a new block file on disk.
   const [record] = await projectRegistry.list();
   const ws = await workspaceManager.get(record.id);
   try {
@@ -257,7 +250,6 @@ async function expectFilesChangedReListsTree(): Promise<void> {
   } finally {
     workspaceManager.release(record.id);
   }
-  // T17 announces the mutation; the shell must re-list for the tree.
   act(() => window.dispatchEvent(new CustomEvent('opendraft:files-changed')));
 
   await waitFor(() => expect(within(drawer).getByRole('treeitem', { name: '_methods.qmd' })).toBeDefined(), { timeout: 5000 });
@@ -273,7 +265,6 @@ describe('App folder routing', () => {
   it("shows the folder notice for a non-manuscript folder and routes to 'manuscripts'", async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('manuscript-view')).toBeDefined(), { timeout: 10000 });
-    // A folder outside the manuscripts root lands on disk.
     const [record] = await projectRegistry.list();
     const ws = await workspaceManager.get(record.id);
     try {
@@ -282,14 +273,12 @@ describe('App folder routing', () => {
       workspaceManager.release(record.id);
     }
     act(() => { window.dispatchEvent(new CustomEvent('opendraft:files-changed')); });
-    // Open the folder from the drawer; it shows the notice with the manuscripts action.
     fireEvent.click(screen.getByRole('button', { name: 'OpenDraft' }));
     const drawer = screen.getByTestId('project-drawer');
     await waitFor(() => expect(within(drawer).getByRole('treeitem', { name: 'notes' })).toBeDefined());
     fireEvent.click(within(drawer).getByRole('treeitem', { name: 'notes' }));
     await waitFor(() => expect(screen.getByText("Folders can't be opened here")).toBeDefined());
     expect(screen.getByRole('button', { name: 'Go to manuscripts' })).toBeDefined();
-    // The action opens the 'manuscripts' folder.
     fireEvent.click(screen.getByRole('button', { name: 'Go to manuscripts' }));
     await waitFor(async () => {
       expect(await projectRegistry.getLastPath(record.id)).toBe('manuscripts');

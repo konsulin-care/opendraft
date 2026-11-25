@@ -1,8 +1,12 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { visualizer } from 'rollup-plugin-visualizer';
+import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
+import { vendorChunk, chunkFileName } from './vite.chunks.js';
+import { pwaOptions } from './vite.pwa.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -12,8 +16,37 @@ export default defineConfig({
   server: {
     host: '127.0.0.1',
     allowedHosts: ['.ts.net'],
+    proxy: {
+      '/@api': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: false,
+      },
+    },
   },
-  plugins: [react(), tailwindcss()],
+  build: {
+    assetsDir: '@assets',
+    manifest: true,
+    rollupOptions: {
+      output: {
+        manualChunks: vendorChunk,
+        chunkFileNames: chunkFileName,
+      },
+    },
+  },
+  plugins: [
+    react(),
+    tailwindcss(),
+    VitePWA(pwaOptions),
+    ...(process.env.ANALYZE === '1'
+      ? [
+          visualizer({
+            filename: 'dist/stats.html',
+            gzipSize: true,
+            template: 'treemap',
+          }),
+        ]
+      : []),
+  ],
   resolve: {
     alias: {
       '@': resolve(__dirname, './src'),

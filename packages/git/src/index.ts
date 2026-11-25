@@ -92,4 +92,24 @@ export class GitOperations {
 }
 
 export { MemoryFS } from './memory-fs.js';
+export { openProjectFs, deleteProjectFs } from './indexeddb-fs.js';
+export { commitFilesOnBranch, readWorkingFiles } from './branch-commit.js';
+export { ensureBranch } from './ensure-branch.js';
+export type { CommitFilesOnBranchOptions } from './branch-commit.js';
 export { preCommitAssembly } from './commit.js';
+export { RemoteGit, relayUrl } from './remote.js';
+export type { CloneResult, RemoteGitOptions } from './remote.js';
+export { LocalRepo } from './local-repo.js';
+export { rebaseOnto } from './rebase.js';
+export type {
+  RebaseOntoOptions,
+  RebaseOntoResult,
+  RebaseResolution,
+} from './rebase.js';
+export type {
+  CloneShallowOptions,
+  CloneShallowResult,
+  FetchOptions,
+  LocalRepoAuthor,
+  PushOptions,
+} from './local-repo.js';
