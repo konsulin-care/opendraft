@@ -62,6 +62,7 @@ function crossrefAttrs(key: string, label: CrossrefLabel | undefined): Record<st
       'data-crossref': label.id,
       'data-crossref-kind': label.kind,
       'data-crossref-caption': label.caption,
+      'data-crossref-file': label.file,
     };
   }
 

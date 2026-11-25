@@ -116,6 +116,7 @@ describe('buildCitekeyDecorations known cross-references', () => {
       'data-crossref': 'fig-x',
       'data-crossref-kind': 'fig',
       'data-crossref-caption': 'Plot of the results.',
+      'data-crossref-file': 'body.qmd',
     });
   });
 
@@ -127,6 +128,7 @@ describe('buildCitekeyDecorations known cross-references', () => {
     expect(found[0].spec).toMatchObject({
       class: 'crossref-link',
       'data-crossref': 'sec-a',
+      'data-crossref-file': 'intro.qmd',
     });
     expect(found[0].to).toBe(1 + '@Sec-a'.length);
   });
