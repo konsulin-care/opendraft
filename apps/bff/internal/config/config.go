@@ -3,6 +3,7 @@
 package config
 
 import (
+	"crypto/rsa"
 	"encoding/base64"
 	"fmt"
 	"strings"
@@ -21,6 +22,7 @@ const envGitHubClientID = "BFF_GITHUB_CLIENT_ID"
 const envGitHubClientSecret = "BFF_GITHUB_CLIENT_SECRET"
 const envGitHubClientSecretFile = "BFF_GITHUB_CLIENT_SECRET_FILE"
 const envGitHubAppSlug = "BFF_GITHUB_APP_SLUG"
+const envGitHubAppPrivateKey = "BFF_GITHUB_APP_PRIVATE_KEY"
 const envSessionKey = "BFF_SESSION_KEY"
 const envSessionKeyFile = "BFF_SESSION_KEY_FILE"
 const envSessionKeyPrevious = "BFF_SESSION_KEY_PREVIOUS"
@@ -43,6 +45,9 @@ type Config struct {
 	GitHubClientSecret string
 	// GitHubAppSlug is the URL slug of the GitHub App.
 	GitHubAppSlug string
+	// GitHubAppPrivateKey is the optional RSA private key of the GitHub App.
+	// When set it enables repo-level installation checks via an app JWT.
+	GitHubAppPrivateKey *rsa.PrivateKey
 	// GitHubWebURL is the base URL of the GitHub web frontend.
 	GitHubWebURL string
 	// GitHubAPIURL is the base URL of the GitHub REST API.
@@ -84,6 +89,7 @@ func Load(getenv func(string) string, readFile func(string) ([]byte, error)) (Co
 	}
 
 	cfg.GitHubClientSecret = loadClientSecret(getenv, readFile, &problems)
+	cfg.GitHubAppPrivateKey = loadAppPrivateKey(getenv, &problems)
 	cfg.LoginEnabled = checkPartialCredentials(credentialFields(cfg), &problems)
 	cfg.SessionKey = loadCurrentSessionKey(getenv, readFile, cfg.LoginEnabled, &problems)
 	cfg.SessionKeyPrevious = loadPreviousSessionKey(getenv, readFile, &problems)

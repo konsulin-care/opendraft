@@ -3,10 +3,8 @@
  *
  * An article-styled editor surface: borderless title, byline with
  * affiliation superscripts, symbols and hover/focus tooltip, numbered
- * affiliation list with footnotes, collaborators toggle, abstract,
- * CRediT contributions summary (one read-only line per author, only
- * when roles exist) and the publication details section collapsed by
- * default.
+ * affiliation list with footnotes, collaborators toggle, abstract and
+ * the publication details section collapsed by default.
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { MetadataAuthor } from './use-manuscript-metadata';
@@ -81,7 +79,7 @@ function TitleField(
           onEnter();
         }
       }}
-      className="min-h-11 w-full resize-none text-lg outline-none"
+      className="min-h-11 w-full resize-none text-3xl font-semibold leading-tight outline-none"
     />
   );
 }
@@ -152,14 +150,6 @@ export function ArticleView({
         <SectionLabel>Keywords</SectionLabel>
         <KeywordInput keywords={keywords} onChange={setKeywords} />
       </section>
-      {model.hasContributions && (
-        <section data-testid="author-contributions" className="mt-3">
-          <SectionLabel>Contributions</SectionLabel>
-          <ul className="text-sm text-muted">
-            {model.contributions.map((line) => <li key={line}>{line}</li>)}
-          </ul>
-        </section>
-      )}
       <PublicationDetails frontmatter={frontmatter} setField={setFrontmatterField} />
       {dialogIndex !== null && (
         <AuthorsDialog authors={authors} setAuthors={setAuthors} affiliations={affiliations}

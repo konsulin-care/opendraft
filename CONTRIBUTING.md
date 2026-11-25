@@ -33,6 +33,8 @@ mise run dev       # Vite on :5173
 
 The three GitHub App variables — `BFF_GITHUB_CLIENT_ID`, `BFF_GITHUB_CLIENT_SECRET` (or `BFF_GITHUB_CLIENT_SECRET_FILE`), and `BFF_GITHUB_APP_SLUG` — are optional. Leave all three empty in `.env` to serve the app read-only without sign-in. Set either all three (login enabled) or none (anonymous read-only); a partial set fails at startup and names the missing variables.
 
+An optional fourth variable, `BFF_GITHUB_APP_PRIVATE_KEY`, takes the raw PEM app private key. It lets the BFF check repo-level installation with an app JWT, so outside contributors see installed apps on organizations they do not belong to. Leave it empty for the user-token-only behaviour. Generate it under GitHub App settings > Credentials > Key pairs > New key, paste it as a Multiline value with Literal interpolation in Coolify, rotate by adding a new key and deleting the old one, and never commit it. See [docs/github-app.md](docs/github-app.md) section 5.
+
 ## Available Hooks
 
 ### Pre-commit (runs on every commit)

@@ -227,7 +227,7 @@ export function BlockBody({ ws, dir, short, file, title, collapsed, onWordCount,
   });
 
   return (
-    <div ref={hostRef} data-testid="block-body-host">
+    <div ref={hostRef} data-testid="block-body-host" data-block-file={fileName}>
       {mounted && fileText !== null && (
         <div ref={rootRef} data-testid="block-body-editor" />
       )}

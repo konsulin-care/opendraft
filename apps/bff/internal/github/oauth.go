@@ -6,6 +6,7 @@ package github
 import (
 	"context"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -46,6 +47,11 @@ type Client struct {
 	ClientID string
 	// ClientSecret is the OAuth client secret of the GitHub App.
 	ClientSecret string
+	// AppKey is the optional GitHub App private key. Nil disables
+	// app-authenticated calls.
+	AppKey *rsa.PrivateKey
+	// appToken caches the minted app JWT until it nears expiry.
+	appToken appTokenCache
 }
 
 // accessTokenResponse mirrors GitHub's JSON answer to an OAuth token request.

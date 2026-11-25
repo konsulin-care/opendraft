@@ -33,24 +33,30 @@ function githubSource(
 
 describe('repoSubtitle', () => {
   it('labels a local project as only on this device', () => {
-    expect(repoSubtitle({ kind: 'local' })).toBe('Only on this device');
+    expect(repoSubtitle({ kind: 'local' })).toEqual({ prefix: 'Only on this device' });
   });
 
   it('labels an own repository as published at owner/repo', () => {
-    expect(repoSubtitle(githubSource('konsulin', 'opendraft', 'konsulin', 'opendraft'))).toBe(
-      'Published at konsulin/opendraft',
-    );
+    expect(repoSubtitle(githubSource('konsulin', 'opendraft', 'konsulin', 'opendraft'))).toEqual({
+      prefix: 'Published at',
+      repo: 'konsulin/opendraft',
+      href: 'https://github.com/konsulin/opendraft',
+    });
   });
 
   it('matches the owner case-insensitively', () => {
-    expect(repoSubtitle(githubSource('Konsulin', 'opendraft', 'konsulin', 'opendraft'))).toBe(
-      'Published at Konsulin/opendraft',
-    );
+    expect(repoSubtitle(githubSource('Konsulin', 'opendraft', 'konsulin', 'opendraft'))).toEqual({
+      prefix: 'Published at',
+      repo: 'Konsulin/opendraft',
+      href: 'https://github.com/Konsulin/opendraft',
+    });
   });
 
   it('labels a fork with the upstream owner and repository', () => {
-    expect(repoSubtitle(githubSource('octocat', 'opendraft', 'konsulin', 'opendraft'))).toBe(
-      'Forked from konsulin/opendraft',
-    );
+    expect(repoSubtitle(githubSource('octocat', 'opendraft', 'konsulin', 'opendraft'))).toEqual({
+      prefix: 'Forked from',
+      repo: 'konsulin/opendraft',
+      href: 'https://github.com/konsulin/opendraft',
+    });
   });
 });

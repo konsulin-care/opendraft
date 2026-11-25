@@ -27,6 +27,7 @@ import type { SuggestionBranch, SuggestionPull } from '../github/bff-suggest';
 import { projectRegistry } from '../hooks/useProjects';
 import { sweepBranches } from './cleanup-branches';
 import type { SweepDeps } from './cleanup-branches';
+import { createWaitForFork } from './fork-ready-deps';
 import { applyDraftName } from './name-draft';
 import { openProjectRepo } from './project-repo';
 import {
@@ -166,6 +167,7 @@ export async function createStartDeps(): Promise<StartSuggestionDeps> {
     registry: projectStore(),
     getWorkspace,
     forkRepo: forkRepository,
+    waitForFork: createWaitForFork(),
     syncFork: (owner, repo, branch) => syncFork(owner, repo, branch),
     listSuggestionBranches,
     findSuggestionPull,

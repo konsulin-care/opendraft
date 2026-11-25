@@ -1,8 +1,8 @@
 // @vitest-environment node
 /**
  * Byline model tests: affiliation superscripts by first appearance,
- * symbol footnotes only for symbols in use, collaborators, contributions
- * and initials derivation.
+ * per-author affiliation lists, symbol footnotes only for symbols in use,
+ * collaborators and initials derivation.
  */
 import { describe, expect, it } from 'vitest';
 import { buildByline, initials } from './byline-model';
@@ -181,63 +181,35 @@ describe('buildByline explicit author type', () => {
   });
 });
 
-describe('buildByline contributions', () => {
-  it('summarizes each author by full name in author order', () => {
-    const model = buildByline(
-      [
-        { id: 'john', name: { given: 'John' }, roles: ['conceptualization'] },
-        {
-          id: 'jane',
-          name: { given: 'Jane', family: 'Doe' },
-          roles: ['data-curation', 'formal-analysis'],
-        },
-      ],
-      REGISTRY,
-    );
-    expect(model.hasContributions).toBe(true);
-    expect(model.contributions).toEqual([
-      'John: Conceptualization',
-      'Jane Doe: Data curation, Formal analysis',
+describe('buildByline author affiliations', () => {
+  it('carries each author affiliations in superscript order with global numbers', () => {
+    const model = buildByline(AUTHORS, REGISTRY);
+    expect(model.authors[0].affiliations).toEqual([
+      { id: 'ui', number: 1, name: 'University of Indonesia' },
+      { id: 'rscm', number: 2, name: 'RS Pondok Indah Cempaka Putih' },
+    ]);
+    expect(model.authors[3].affiliations).toEqual([
+      { id: 'eijkman', number: 3, name: 'Eijkman Institute for Molecular Biology' },
     ]);
   });
 
-  it('orders role labels in canonical CRediT order', () => {
-    const model = buildByline(
-      [
-        {
-          id: 'smith',
-          name: { given: 'Alice Marie', family: 'Smith' },
-          roles: ['supervision', 'conceptualization'],
-        },
-      ],
-      REGISTRY,
-    );
-    expect(model.contributions).toEqual([
-      'Alice Marie Smith: Conceptualization, Supervision',
+  it('reuses an earlier global number for a shared affiliation', () => {
+    const model = buildByline(AUTHORS, REGISTRY);
+    expect(model.authors[1].affiliations).toEqual([
+      { id: 'rscm', number: 2, name: 'RS Pondok Indah Cempaka Putih' },
     ]);
-  });
-});
-
-describe('buildByline contributions edge cases', () => {
-  it('uses the group literal name and skips authors without roles', () => {
-    const model = buildByline(
-      [
-        { id: 'dwg', name: { literal: 'OpenDraft Team' } },
-        { id: 'lee', name: { given: 'Budi', family: 'Lee' }, roles: ['software'] },
-      ],
-      REGISTRY,
+    expect(model.authors[2].affiliations).toEqual([
+      { id: 'ui', number: 1, name: 'University of Indonesia' },
+    ]);
+    expect(model.authors[1].superscript).toBe(
+      String(model.authors[1].affiliations[0].number),
     );
-    expect(model.hasContributions).toBe(true);
-    expect(model.contributions).toEqual(['Budi Lee: Software']);
   });
 
-  it('emits no lines and flags no contributions when no author has roles', () => {
-    const model = buildByline(
-      [{ id: 'plain', name: { given: 'Ada', family: 'Lovelace' } }],
-      REGISTRY,
-    );
-    expect(model.hasContributions).toBe(false);
-    expect(model.contributions).toEqual([]);
+  it('has no contributions or hasContributions properties', () => {
+    const model = buildByline(AUTHORS, REGISTRY);
+    expect(model).not.toHaveProperty('contributions');
+    expect(model).not.toHaveProperty('hasContributions');
   });
 });
 

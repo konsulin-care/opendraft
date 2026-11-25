@@ -112,6 +112,7 @@ func newHandler(cfg config.Config, logger *slog.Logger) http.Handler {
 				APIURL:       cfg.GitHubAPIURL,
 				ClientID:     cfg.GitHubClientID,
 				ClientSecret: cfg.GitHubClientSecret,
+				AppKey:       cfg.GitHubAppPrivateKey,
 				HTTP:         &http.Client{Timeout: githubHTTPTimeout},
 				Now:          time.Now,
 			}

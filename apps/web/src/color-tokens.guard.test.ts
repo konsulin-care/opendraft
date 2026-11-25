@@ -95,9 +95,23 @@ function isPaletteToken(suffix: string): boolean {
 }
 
 /**
+ * Remove quoted module specifiers from import/export/require statements,
+ * preserving line structure. A specifier such as
+ * './preview-click-to-edit' contains 'to-edit', which the utility scan would
+ * otherwise report as a Tailwind `to-` gradient utility.
+ */
+function stripModuleSpecifiers(source: string): string {
+  return source.replace(
+    /(\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)(['"])([^'"\n]+)\2/g,
+    (_match, lead: string, quote: string) => `${lead}${quote}${quote}`,
+  );
+}
+
+/**
  * Find color token violations in one comment-stripped source. Import
- * specifier paths such as `./caret-sync` are skipped: the prefix there is a
- * module name, not a Tailwind utility.
+ * specifier paths are stripped before the scan: the prefix in a module path
+ * such as `./preview-click-to-edit` is a file name segment, not a Tailwind
+ * utility.
  */
 function findViolations(
   source: string,
@@ -105,7 +119,7 @@ function findViolations(
   file: string,
 ): Violation[] {
   const violations: Violation[] = [];
-  const lines = source.split('\n');
+  const lines = stripModuleSpecifiers(source).split('\n');
   lines.forEach((line, i) => {
     const at = (detail: string, kind: Violation['kind']): void => {
       violations.push({ file, line: i + 1, kind, detail });
@@ -114,8 +128,6 @@ function findViolations(
     if (RAW_RGB.test(line)) at(`raw rgb() color: ${line.trim()}`, 'raw-color');
     for (const m of line.matchAll(COLOR_UTILITY)) {
       const prefix = m[1];
-      const before = line.slice(0, m.index ?? 0);
-      if (/(?:^|\s|\W)\.\.?\//.test(before.slice(-3))) continue; // import path
       const token = m[0].slice(prefix.length + 1).split('/')[0];
       if (!isPaletteToken(token) || declared.has(token)) continue;
       at(`undeclared palette token: ${prefix}-${token}`, 'undeclared-token');
@@ -196,6 +208,25 @@ function assertUtilityFixtureFails(): void {
   );
 }
 
+/**
+ * Assert the scan passes a fixture whose module specifier contains a
+ * `to-` segment: an import path such as './preview-click-to-edit' is not a
+ * Tailwind `to-` gradient utility, even when the match starts mid-specifier.
+ */
+function assertImportPathFixturePasses(): void {
+  withFixtureTree(
+    {
+      'FixtureImport.ts':
+        "import { previewClickToEdit } from './preview-click-to-edit';\n" +
+        "import { other } from \"../click-to-edit/preview\";\n" +
+        'export const uses = [previewClickToEdit, other];\n',
+    },
+    (violations) => {
+      expect(violations).toEqual([]);
+    },
+  );
+}
+
 /** Assert the scan passes a fixture file that only uses declared tokens. */
 function assertCleanFixturePasses(): void {
   withFixtureTree(
@@ -242,5 +273,9 @@ describe('color token guard — fixture violations', () => {
 
   it('accepts a fixture file that only uses declared tokens', () => {
     assertCleanFixturePasses();
+  });
+
+  it('accepts module specifiers containing a to- or from- segment', () => {
+    assertImportPathFixturePasses();
   });
 });

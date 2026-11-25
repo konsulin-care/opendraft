@@ -63,8 +63,7 @@ describe('ReaderMetadata', () => {
     expect(screen.getByTestId('reader-byline-superscript-0')).toHaveTextContent('1');
     expect(screen.getByTestId('reader-byline-superscript-1')).toHaveTextContent('1');
     expect(screen.queryByTestId('reader-byline-superscript-2')).toBeNull();
-    expect(screen.getByTestId('reader-affiliation-list'))
-      .toHaveTextContent('1. University of London');
+    expect(screen.queryByTestId('reader-affiliation-list')).toBeNull();
     expect(screen.getByText('A study of the deep sea.')).toBeInTheDocument();
     expect(screen.getByText('ocean')).toBeInTheDocument();
     expect(screen.getByText('marine biology')).toBeInTheDocument();
@@ -82,7 +81,7 @@ describe('ReaderMetadata', () => {
     expect(paragraphs).toContain('First bold paragraph.');
     expect(paragraphs).toContain('Second paragraph.');
   });
-  it('renders no input, textarea, button or contenteditable element', async () => {
+  it('renders no input, textarea or contenteditable element', async () => {
     const container = await renderMetadata({
       [`${ROOT}/_frontmatter.yml`]: 'title: "Deep Dive"\nkeywords: [ocean]\n',
       [`${ROOT}/_author.yml`]: 'authors:\n  - name: Ada Lovelace\n',
@@ -90,7 +89,7 @@ describe('ReaderMetadata', () => {
     });
 
     await screen.findByRole('heading', { name: 'Deep Dive' });
-    expect(container.querySelectorAll('input, textarea, button, [contenteditable]'))
+    expect(container.querySelectorAll('input, textarea, [contenteditable]'))
       .toHaveLength(0);
     expect(container.querySelectorAll('[contenteditable="true"], [contenteditable=""]'))
       .toHaveLength(0);

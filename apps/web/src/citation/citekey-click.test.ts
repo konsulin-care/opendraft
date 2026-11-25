@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { handleCitekeyClick } from './citekey-click';
+import { handleCitekeyClick, referenceLink } from './citekey-click';
 import type { Reference } from '@opendraft/references';
 
 describe('handleCitekeyClick', () => {
@@ -30,5 +30,22 @@ describe('handleCitekeyClick', () => {
     const ref: Reference = { citeKey: 'test', entryType: 'article', fields: {} };
     handleCitekeyClick(ref);
     expect(openSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('referenceLink', () => {
+  it('returns the doi.org URL when a DOI exists', () => {
+    const ref: Reference = { citeKey: 'test', entryType: 'article', fields: { doi: '10.1000/test' } };
+    expect(referenceLink(ref)).toBe('https://doi.org/10.1000/test');
+  });
+
+  it('returns the url field when only a URL exists', () => {
+    const ref: Reference = { citeKey: 'test', entryType: 'misc', fields: { url: 'https://example.com' } };
+    expect(referenceLink(ref)).toBe('https://example.com');
+  });
+
+  it('returns null when neither exists', () => {
+    const ref: Reference = { citeKey: 'test', entryType: 'article', fields: {} };
+    expect(referenceLink(ref)).toBeNull();
   });
 });

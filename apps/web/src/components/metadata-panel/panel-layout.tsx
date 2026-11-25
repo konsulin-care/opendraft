@@ -1,89 +1,14 @@
 /**
- * Layout pieces of the metadata panel: the sticky pinned bar shown on
- * top of the expanded body. The bar stays sticky inside the editor
- * scroll container while the expanded body scrolls away 1:1; the bar
- * title/byline fade in through the panel's `--collapse-progress` CSS
- * variable.
+ * Layout pieces of the metadata panel: the overlay layer plus the
+ * hooks that drive the scroll collapse, the overlay detection and the
+ * chevron/Escape controls. The pinned bar itself lives in
+ * `pinned-bar.tsx`.
  */
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode, RefObject } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
 import type { ScrollCollapseApi } from './scroll-collapse';
 import { useScrollCollapse } from './scroll-collapse';
 import { useOverlayCollapse } from './overlay-collapse';
-
-/** Props for {@link PinnedBar}. */
-export interface PinnedBarProps {
-  /** Manuscript title shown in the bar while collapsed. */
-  title: string;
-  /** Manuscript folder id shown in muted text when the title is empty. */
-  folderId: string;
-  /** Byline shown in the bar while collapsed. */
-  byline: string;
-  /** Effective expanded state (false also while scroll-collapsed). */
-  expanded: boolean;
-  /** Collapse progress in the 0..1 range driving the text fade-in. */
-  collapseProgress: number;
-  /** Whether the viewport is below the 640px breakpoint. */
-  narrow: boolean;
-  /** Optional element rendered between the title block and the toggle. */
-  badge?: ReactNode;
-  /** Chevron toggle handler. */
-  onToggle: () => void;
-}
-
-/**
- * Pinned bar: title, byline and chevron toggle, closed off by the 1px
- * hairline separator below it. The bar and the separator share one
- * sticky container so the hairline stays pinned under the bar for the
- * whole scroll range; the bar text fades in with the panel's
- * `--collapse-progress` CSS variable. An empty title falls back to the
- * manuscript folder id in muted text instead of a placeholder label.
- *
- * @param props - See {@link PinnedBarProps}.
- * @returns The sticky wrapper containing the bar and separator.
- */
-export function PinnedBar({
-  title, folderId, byline, expanded, collapseProgress, narrow, badge, onToggle,
-}: PinnedBarProps): ReactNode {
-  // While explicitly collapsed the text is fully opaque; while expanded
-  // it fades in with the collapse progress written by the scroll hook.
-  const textStyle = { opacity: expanded ? 'var(--collapse-progress, 0)' : 1 };
-  const showText = !expanded || collapseProgress > 0;
-  return (
-    <div className="sticky top-0 z-10 bg-white">
-      <div
-        className="flex items-center gap-2 py-2"
-        data-testid="metadata-panel-bar"
-      >
-        <div className="min-w-0 flex-1">
-          {showText && (
-            <div style={textStyle}>
-              <div data-testid="metadata-panel-bar-title" className={narrow ? 'line-clamp-2' : 'truncate'}>
-                {title || <span className="text-muted">{folderId}</span>}
-              </div>
-              {byline && (
-                <div className="truncate text-sm text-muted" data-testid="metadata-panel-byline">{byline}</div>
-              )}
-            </div>
-          )}
-        </div>
-        {badge}
-        <button
-          type="button"
-          data-testid="metadata-panel-toggle"
-          aria-expanded={expanded}
-          aria-label={expanded ? 'Collapse manuscript metadata' : 'Expand manuscript metadata'}
-          onClick={onToggle}
-          className="flex min-h-11 min-w-11 items-center justify-center rounded hover:bg-hover"
-        >
-          {expanded ? <ChevronUp aria-hidden /> : <ChevronDown aria-hidden />}
-        </button>
-      </div>
-      <div data-testid="metadata-panel-separator" className="h-px bg-secondary" />
-    </div>
-  );
-}
 
 /** Props for {@link OverlayLayer}. */
 export interface OverlayLayerProps {
@@ -109,7 +34,7 @@ export function OverlayLayer({ overlay, scrollerRef, children }: OverlayLayerPro
     <div
       ref={scrollerRef}
       data-testid={overlay ? 'metadata-panel-overlay' : undefined}
-      className={overlay ? 'h-full overflow-y-auto' : 'contents'}
+      className={overlay ? 'h-full overflow-y-auto overscroll-contain' : 'contents'}
     >
       {children}
     </div>
@@ -214,6 +139,47 @@ export interface PanelLayoutOptions {
   onOverlayScrollOut: () => void;
 }
 
+/** Options for {@link usePanelToggle}. */
+export interface PanelToggleOptions {
+  /** Explicitly expanded state (chevron or persisted preference). */
+  expanded: boolean;
+  /** Persisting expand/collapse setter. */
+  setExpanded: (next: boolean) => void;
+  /** True when the current collapse was caused by scrolling. */
+  collapsedByScroll: boolean;
+  /** Scroll-collapse controls reset by the reopen. */
+  collapse: ScrollCollapseApi;
+  /** Editor scroll container returned to the top on reopen. */
+  scrollRef: RefObject<HTMLElement | null>;
+}
+
+/**
+ * Build the panel chevron toggle. A collapsed panel reopens in one
+ * click (editor back to the top, collapse state reset, explicit expand
+ * persisted); a scroll collapse inside an expanded panel only returns
+ * the editor to the top; otherwise the explicit collapse is persisted.
+ *
+ * @param options - See {@link PanelToggleOptions}.
+ * @returns The chevron click handler.
+ */
+export function usePanelToggle(options: PanelToggleOptions): () => void {
+  const { expanded, setExpanded, collapsedByScroll, collapse, scrollRef } = options;
+  return useCallback(() => {
+    if (!expanded) {
+      if (scrollRef.current) scrollRef.current.scrollTop = 0;
+      collapse.expand();
+      setExpanded(true);
+      return;
+    }
+    if (collapsedByScroll) {
+      if (scrollRef.current) scrollRef.current.scrollTop = 0;
+      collapse.expand();
+      return;
+    }
+    setExpanded(false);
+  }, [collapse, collapsedByScroll, expanded, scrollRef, setExpanded]);
+}
+
 /** Controls returned by {@link usePanelLayout}. */
 export interface PanelLayoutApi {
   /** True while the panel covers the editor area as an overlay. */
@@ -253,22 +219,19 @@ export function usePanelLayout(options: PanelLayoutOptions): PanelLayoutApi {
   const base = !narrow && loaded && Boolean(manuscriptRoot);
   const tall = usePanelOverlay({ bodyRef, scrollRef, enabled: expanded && base });
   const overlay = tall && expanded;
-  const collapse = useScrollCollapse({ scrollRef, panelRef, enabled: base && !overlay, expandedHeight });
+  // Only track the editor scroll while the panel is explicitly expanded:
+  // scrolling a collapsed panel must never enter the scroll-collapsed mode.
+  const collapse = useScrollCollapse({
+    scrollRef, panelRef, enabled: base && !overlay && expanded, expandedHeight,
+  });
   useOverlayPin(overlay, collapse, scrollRef);
   const overlayCollapse = useOverlayCollapse({
     overlayRef, panelRef, enabled: overlay, expandedHeight, onScrolledOut: onOverlayScrollOut,
   });
   const collapsedByScroll = collapse.state.mode === 'scroll';
-  const toggle = useCallback(() => {
-    if (collapsedByScroll) {
-      // Scroll collapse: the chevron re-expands by returning the editor
-      // to the top; nothing is persisted.
-      if (scrollRef.current) scrollRef.current.scrollTop = 0;
-      collapse.expand();
-      return;
-    }
-    setExpanded(!expanded);
-  }, [collapse, collapsedByScroll, expanded, scrollRef, setExpanded]);
+  const toggle = usePanelToggle({
+    expanded, setExpanded, collapsedByScroll, collapse, scrollRef,
+  });
   const onKeyDown = useCallback((event: ReactKeyboardEvent<HTMLElement>) => {
     if (event.key !== 'Escape') return;
     setExpanded(false);

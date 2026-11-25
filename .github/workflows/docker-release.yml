@@ -41,6 +41,9 @@ jobs:
     needs: validate
     if: needs.validate.outputs.valid == 'true'
     runs-on: ubuntu-latest
+    # The Production environment holds COOLIFY_APP_UUID; COOLIFY_URL and
+    # COOLIFY_TOKEN come from the organization secrets.
+    environment: Production
     permissions:
       contents: read
       packages: write
@@ -72,3 +75,60 @@ jobs:
           sbom: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Trigger Coolify redeploy
+        # Coolify pulls the freshly pushed image on deploy; a plain
+        # application restart would reuse the running container instead.
+        shell: bash
+        env:
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          COOLIFY_APP_UUID: ${{ secrets.COOLIFY_APP_UUID }}
+          MAX_ATTEMPTS: "30"
+          POLL_INTERVAL: "10"
+        run: |
+          set -euo pipefail
+
+          api() {
+            curl --fail-with-body --silent --show-error \
+              --header "Authorization: Bearer ${COOLIFY_TOKEN}" \
+              --header "Accept: application/json" \
+              "$@"
+          }
+
+          echo "Triggering Coolify deployment for application ${COOLIFY_APP_UUID}..."
+          deploy_response=$(api --request POST \
+            "${COOLIFY_URL}/api/v1/deploy?uuid=${COOLIFY_APP_UUID}")
+
+          deployment_uuid=$(printf '%s' "$deploy_response" | jq -r '
+            .deployment_uuid // .deployments[0].deployment_uuid // empty')
+
+          if [ -z "$deployment_uuid" ]; then
+            echo "::error::Coolify returned no deployment UUID: ${deploy_response}"
+            exit 1
+          fi
+          echo "Deployment queued: ${deployment_uuid}"
+
+          attempt=1
+          while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
+            sleep "$POLL_INTERVAL"
+            status_response=$(api "${COOLIFY_URL}/api/v1/deployments/${deployment_uuid}")
+            status=$(printf '%s' "$status_response" | jq -r '.status // empty')
+            echo "Attempt ${attempt}/${MAX_ATTEMPTS}: status=${status}"
+
+            case "$status" in
+              finished)
+                echo "::notice::Coolify deployment ${deployment_uuid} succeeded."
+                exit 0
+                ;;
+              failed | cancelled)
+                echo "::error::Coolify deployment ${deployment_uuid} ended as '${status}'."
+                printf '%s' "$status_response" | jq -r '.logs // empty' || true
+                exit 1
+                ;;
+            esac
+
+            attempt=$((attempt + 1))
+          done
+
+          echo "::error::Coolify deployment ${deployment_uuid} did not finish in time."
+          exit 1

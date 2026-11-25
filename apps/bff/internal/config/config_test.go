@@ -1,7 +1,11 @@
 package config
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/base64"
+	"encoding/pem"
 	"errors"
 	"strings"
 	"testing"
@@ -203,6 +207,57 @@ func TestLoadRejectsInvalidSessionKeys(t *testing.T) {
 	t.Run("previous wrong length", func(t *testing.T) {
 		assertInvalidSessionKey(t, validSessionKey(2), shortKey, envSessionKeyPrevious)
 	})
+}
+
+// testPrivateKeyPEM generates a fresh RSA private key in PKCS#1 PEM form.
+func testPrivateKeyPEM(t *testing.T) string {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("cannot generate test key: %v", err)
+	}
+	block := &pem.Block{Type: blockTypePKCS1, Bytes: x509.MarshalPKCS1PrivateKey(key)}
+	return string(pem.EncodeToMemory(block))
+}
+
+// TestLoadSetsAppPrivateKey asserts that a valid PEM key is parsed into the
+// optional Config field.
+func TestLoadSetsAppPrivateKey(t *testing.T) {
+	env := requiredEnv()
+	env[envGitHubAppPrivateKey] = testPrivateKeyPEM(t)
+	cfg, err := Load(fakeEnv(env), nil)
+	if err != nil {
+		t.Fatalf(testLoadError, err)
+	}
+	if cfg.GitHubAppPrivateKey == nil {
+		t.Fatal("GitHubAppPrivateKey = nil, want parsed key")
+	}
+}
+
+// TestLoadLeavesAppPrivateKeyUnset asserts that the key stays optional and
+// does not affect the login variable set.
+func TestLoadLeavesAppPrivateKeyUnset(t *testing.T) {
+	cfg, err := Load(fakeEnv(requiredEnv()), nil)
+	if err != nil {
+		t.Fatalf(testLoadError, err)
+	}
+	if cfg.GitHubAppPrivateKey != nil {
+		t.Error("GitHubAppPrivateKey != nil, want nil")
+	}
+}
+
+// TestLoadRejectsInvalidAppPrivateKey asserts that a malformed key is reported
+// with the variable name.
+func TestLoadRejectsInvalidAppPrivateKey(t *testing.T) {
+	env := requiredEnv()
+	env[envGitHubAppPrivateKey] = "not a pem key"
+	_, err := Load(fakeEnv(env), nil)
+	if err == nil {
+		t.Fatal("Load returned nil error for invalid app private key")
+	}
+	if !strings.Contains(err.Error(), envGitHubAppPrivateKey) {
+		t.Errorf("error %q does not name %s", err, envGitHubAppPrivateKey)
+	}
 }
 
 // TestLoadAppliesDefaults asserts the optional settings fall back to their

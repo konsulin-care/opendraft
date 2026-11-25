@@ -1,12 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { computePosition, flip, shift, offset } from '@floating-ui/dom';
-import { isCrossrefKey } from '@opendraft/manuscript';
 import type { Reference } from '@opendraft/references';
-import { InlineMarkdown } from '../components/inline-markdown';
-import { formatAPA } from './apa-format';
-
-/** Warning shown when a citation key collides with a Quarto cross-reference prefix. */
-const CROSSREF_RESERVED_WARNING = 'Prefix reserved for Quarto cross-references';
+import { ReferenceDetails } from './reference-details';
 
 interface CitekeyTooltipProps {
   reference: Reference | null;
@@ -23,14 +18,10 @@ interface CitekeyTooltipProps {
  */
 export function CitekeyTooltip({ reference, anchorEl }: CitekeyTooltipProps) {
   const tooltipRef = useRef<HTMLDivElement>(null);
-  const [apaText, setApaText] = useState('');
-  useEffect(() => {
-    setApaText(reference ? formatAPA(reference) : '');
-  }, [reference]);
 
   useEffect(() => {
     const el = tooltipRef.current;
-    if (!anchorEl || !el || !apaText) return;
+    if (!anchorEl || !el || !reference) return;
 
     /** Compute and apply position to the tooltip element. */
     async function update() {
@@ -51,9 +42,9 @@ export function CitekeyTooltip({ reference, anchorEl }: CitekeyTooltipProps) {
       window.removeEventListener('scroll', update, { capture: true });
       window.removeEventListener('resize', update);
     };
-  }, [reference, anchorEl, apaText]);
+  }, [reference, anchorEl]);
 
-  if (!reference || !apaText || !anchorEl) return null;
+  if (!reference || !anchorEl) return null;
 
   return (
     <div
@@ -62,12 +53,7 @@ export function CitekeyTooltip({ reference, anchorEl }: CitekeyTooltipProps) {
       role="tooltip"
       style={{ position: 'fixed' }}
     >
-      <InlineMarkdown source={apaText} inline />
-      {isCrossrefKey(reference.citeKey) && (
-        <div className="citation-crossref-warning">
-          {CROSSREF_RESERVED_WARNING}
-        </div>
-      )}
+      <ReferenceDetails reference={reference} />
     </div>
   );
 }

@@ -103,12 +103,42 @@ describe('useOverlayCollapse', () => {
   });
 
   it('derives progress from the overlay scroll and writes the CSS variable', () => {
-    const { env, result } = renderOverlay();
+    const { env, onScrolledOut, result } = renderOverlay();
     setScrollTop(env.overlay, 100);
     setScrollTop(env.overlay, 200);
     flushFrames();
     expect(result.current.progress).toBe(0.5);
     expect(env.panel.style.getPropertyValue(COLLAPSE_PROGRESS_VAR)).toBe('0.5');
+    // A zero-metric scroller (jsdom) must never be mistaken for a scroll end.
+    expect(onScrolledOut).not.toHaveBeenCalled();
+  });
+
+  it('fires onScrolledOut and reports progress 1 at the overlay scroll end', () => {
+    const { env, onScrolledOut, result } = renderOverlay();
+    // The overlay can only scroll to `body + bar - viewport`, so the body
+    // height is never reachable; the scroll end must count as scrolled out.
+    Object.defineProperty(env.overlay, 'scrollHeight', { configurable: true, value: 1000 });
+    Object.defineProperty(env.overlay, 'clientHeight', { configurable: true, value: 300 });
+    setScrollTop(env.overlay, 700);
+    flushFrames();
+    expect(result.current.progress).toBe(1);
+    expect(env.panel.style.getPropertyValue(COLLAPSE_PROGRESS_VAR)).toBe('1');
+    expect(onScrolledOut).toHaveBeenCalledTimes(1);
+    fireEvent.scroll(env.overlay);
+    flushFrames();
+    expect(onScrolledOut).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('useOverlayCollapse scroll-end guards', () => {
+  it('does not treat a zero-metric scroller as scrolled out at the top', () => {
+    const { env, onScrolledOut, result } = renderOverlay();
+    Object.defineProperty(env.overlay, 'scrollHeight', { configurable: true, value: 0 });
+    Object.defineProperty(env.overlay, 'clientHeight', { configurable: true, value: 0 });
+    setScrollTop(env.overlay, 300);
+    flushFrames();
+    expect(result.current.progress).toBe(0.75);
+    expect(onScrolledOut).not.toHaveBeenCalled();
   });
 
   it('fires onScrolledOut once when the scroll fully hides the expanded body', () => {
@@ -121,7 +151,9 @@ describe('useOverlayCollapse', () => {
     flushFrames();
     expect(onScrolledOut).toHaveBeenCalledTimes(1);
   });
+});
 
+describe('useOverlayCollapse activation', () => {
   it('ignores overlay scrolling while disabled', () => {
     const { env, onScrolledOut, result } = renderOverlay(false);
     setScrollTop(env.overlay, HEIGHT);

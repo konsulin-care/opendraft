@@ -58,11 +58,11 @@ describe('manuscriptRootFromPath', () => {
 });
 
 describe('MetadataPanel collapsed bar', () => {
-  it('shows the title and given-then-family byline names', async () => {
+  it('shows the title and short Vancouver byline names', async () => {
     localStorage.setItem(metadataPanelStorageKey(PROJECT), 'collapsed');
     await renderPanel();
     expect(screen.getByTestId('metadata-panel-bar-title').textContent).toBe('Deep Dive');
-    expect(screen.getByTestId('metadata-panel-byline').textContent).toContain('Alice Marie Smith, Budi Lee');
+    expect(screen.getByTestId('metadata-panel-byline').textContent).toContain('Smith A. M., Lee B.');
   });
   it('shows "N authors" below the 640px breakpoint', async () => {
     stubNarrowViewport(true);
@@ -90,7 +90,7 @@ describe('MetadataPanel collapse/expand body', () => {
     localStorage.setItem(metadataPanelStorageKey(PROJECT), 'collapsed');
     await renderPanel();
     expect(screen.getByTestId('metadata-panel-bar-title').textContent).toBe('Deep Dive');
-    expect(screen.getByTestId('metadata-panel-byline').textContent).toContain('Alice Marie Smith, Budi Lee');
+    expect(screen.getByTestId('metadata-panel-byline').textContent).toContain('Smith A. M., Lee B.');
     const body = screen.getByTestId('metadata-panel-body');
     expect(body.className).toContain('grid-rows-[0fr]');
     expect(body.getAttribute('aria-hidden')).toBe('true');

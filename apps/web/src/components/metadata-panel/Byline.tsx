@@ -1,17 +1,21 @@
 /**
  * Byline row of the article view: author name buttons with affiliation
- * superscripts, symbol flags, ORCID markers and hover/focus tooltip,
- * the numbered affiliation list, symbol-only footnotes and the
- * add-author button.
+ * superscripts, symbol flags, ORCID markers and the shared hover/focus
+ * author tooltip, symbol-only footnotes and the add-author button.
  *
  * The add-author button is a pulsing black CTA while the manuscript has
  * no authors and reverts to the muted default style once at least one
- * author exists. Name chips open the author form on click; pressing and
- * holding a chip for the hold threshold then dropping on another chip
- * reorders the authors — no drag handle is rendered.
+ * author exists. Name chips open the author form on mouse click and the
+ * author sheet on touch tap; pressing and holding a chip for the hold
+ * threshold then dropping on another chip reorders the authors — no drag
+ * handle is rendered. Hover/focus tooltips are suppressed after a touch.
  */
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Info, Plus } from 'lucide-react';
+import { createPointerKindTracker } from '../../hooks/pointer-kind';
+import type { PointerKindEvent } from '../../hooks/pointer-kind';
+import { AuthorSheet } from './AuthorSheet';
+import { AuthorTooltip } from './AuthorDetails';
 import type { BylineModel } from './byline-model';
 import type { MetadataAuthor } from './use-manuscript-metadata';
 import { usePressDrag } from './use-press-drag';
@@ -37,19 +41,88 @@ const ADD_MUTED = 'ml-2 min-h-11 rounded text-muted hover:bg-hover';
 /** Classes of the pulsing black add-author CTA shown when there are no authors. */
 const ADD_CTA = 'ml-2 min-h-11 rounded bg-black px-2 text-white animate-pulse hover:opacity-90';
 
-/** Read-only tooltip shown on hover and focus of a byline name. */
-function AuthorTooltip({ author, index }: { author: BylineModel['authors'][number]; index: number }): ReactNode {
+/** State and handlers of one byline name button. */
+interface BylineTap {
+  /** Whether the hover/focus tooltip is visible. */
+  tooltipOpen: boolean;
+  /** Whether the touch author sheet is visible. */
+  sheetOpen: boolean;
+  /** Record the pointer type of the interaction. */
+  onPointerDown: (event: PointerKindEvent) => void;
+  /** Open the sheet on touch or the author form on mouse. */
+  onClick: () => void;
+  /** Show the tooltip for non-touch focus. */
+  onFocus: () => void;
+  /** Hide the tooltip on blur. */
+  onBlur: () => void;
+  /** Show the tooltip for non-touch hover. */
+  onMouseEnter: () => void;
+  /** Hide the tooltip on mouse leave. */
+  onMouseLeave: () => void;
+  /** Close the touch author sheet. */
+  closeSheet: () => void;
+}
+
+/** Track pointer kind and sheet/tooltip visibility for one byline name. */
+function useBylineTap(
+  index: number,
+  onOpen: (index: number) => void,
+  filterClick: () => boolean,
+): BylineTap {
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const pointerKind = useRef(createPointerKindTracker()).current;
+  const showTooltip = (): void => { if (!pointerKind.isTouch()) setTooltipOpen(true); };
+  return {
+    tooltipOpen,
+    sheetOpen,
+    onPointerDown: (event) => pointerKind.record(event),
+    onClick: () => {
+      if (!filterClick()) return;
+      if (pointerKind.isTouch()) setSheetOpen(true);
+      else onOpen(index);
+    },
+    onFocus: showTooltip,
+    onBlur: () => setTooltipOpen(false),
+    onMouseEnter: showTooltip,
+    onMouseLeave: () => setTooltipOpen(false),
+    closeSheet: () => setSheetOpen(false),
+  };
+}
+
+/** Props for {@link BylineButton}. */
+interface BylineButtonProps {
+  author: BylineModel['authors'][number];
+  index: number;
+  dragging: boolean;
+  symbols: string;
+  tap: BylineTap;
+}
+
+/** The name button of one byline segment with superscripts and ORCID marker. */
+function BylineButton({ author, index, dragging, symbols, tap }: BylineButtonProps): ReactNode {
   return (
-    <span
-      role="tooltip"
-      id={`byline-tooltip-${index}`}
-      data-testid="byline-tooltip"
-      className="absolute left-0 top-full z-20 mt-1 w-64 rounded border bg-white p-2 text-sm shadow"
+    <button
+      type="button"
+      data-testid={`byline-author-${index}`}
+      data-press-index={index}
+      data-dragging={dragging || undefined}
+      aria-describedby={tap.tooltipOpen ? `byline-tooltip-${index}` : undefined}
+      onPointerDown={tap.onPointerDown}
+      onClick={tap.onClick}
+      onFocus={tap.onFocus}
+      onBlur={tap.onBlur}
+      onMouseEnter={tap.onMouseEnter}
+      onMouseLeave={tap.onMouseLeave}
+      className={`min-h-11 touch-none rounded px-0.5 hover:bg-hover${dragging ? ' opacity-50' : ''}`}
     >
-      {author.email && <span className="block" data-testid="byline-tooltip-email">{author.email}</span>}
-      {author.orcid && <span className="block" data-testid="byline-tooltip-orcid">{author.orcid}</span>}
-      {author.roles.length > 0 && <span className="block text-muted">Roles: {author.roles.join(', ')}</span>}
-    </span>
+      {author.name}
+      {author.onBehalfOf && <span> {author.onBehalfOf}</span>}
+      <sup data-testid={`byline-superscript-${index}`}>{author.superscript}{symbols}</sup>
+      {author.orcid && (
+        <Info aria-label={`ORCID ${author.orcid}`} data-testid={`byline-orcid-${index}`} className={ICON} />
+      )}
+    </button>
   );
 }
 
@@ -63,41 +136,34 @@ function BylineName(
     filterClick: () => boolean;
   },
 ): ReactNode {
-  const [open, setOpen] = useState(false);
+  const tap = useBylineTap(index, onOpen, filterClick);
   const symbols = (author.corresponding ? '*' : '')
     + (author.equal ? '†' : '')
     + (author.deceased ? '‡' : '');
   return (
     <span className="relative inline-block">
-      <button
-        type="button"
-        data-testid={`byline-author-${index}`}
-        data-press-index={index}
-        data-dragging={dragging || undefined}
-        aria-describedby={open ? `byline-tooltip-${index}` : undefined}
-        onClick={() => {
-          if (filterClick()) onOpen(index);
-        }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
-        className={`min-h-11 touch-none rounded px-0.5 hover:bg-hover${dragging ? ' opacity-50' : ''}`}
-      >
-        {author.name}
-        {author.onBehalfOf && <span> {author.onBehalfOf}</span>}
-        <sup data-testid={`byline-superscript-${index}`}>{author.superscript}{symbols}</sup>
-        {author.orcid && (
-          <Info aria-label={`ORCID ${author.orcid}`} data-testid={`byline-orcid-${index}`} className={ICON} />
-        )}
-      </button>
-      {open && <AuthorTooltip author={author} index={index} />}
+      <BylineButton author={author} index={index} dragging={dragging} symbols={symbols} tap={tap} />
+      {tap.tooltipOpen && (
+        <span data-testid="byline-tooltip">
+          <AuthorTooltip author={author} id={`byline-tooltip-${index}`} />
+        </span>
+      )}
+      {tap.sheetOpen && (
+        <AuthorSheet
+          author={author}
+          onClose={tap.closeSheet}
+          onEdit={() => {
+            tap.closeSheet();
+            onOpen(index);
+          }}
+        />
+      )}
     </span>
   );
 }
 
 /**
- * The byline row, numbered affiliations and footnotes of one model.
+ * The byline row and symbol footnotes of one model.
  *
  * @param props - See {@link BylineProps}.
  * @returns The rendered byline block.
@@ -140,11 +206,6 @@ export function Byline({ model, authors, setAuthors, onOpenName }: BylineProps):
         <Plus aria-hidden className="inline size-3.5" />
         Add author
       </button>
-      <div className="mt-1 text-muted" data-testid="affiliation-list">
-        {model.affiliations.map((entry) => (
-          <div key={entry.id}>{entry.number}. {entry.name}</div>
-        ))}
-      </div>
       <div className="mt-1 text-muted" data-testid="byline-footnotes">
         {model.footnotes.map((line) => <div key={line}>{line}</div>)}
       </div>
