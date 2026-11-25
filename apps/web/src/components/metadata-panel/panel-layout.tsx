@@ -139,6 +139,47 @@ export interface PanelLayoutOptions {
   onOverlayScrollOut: () => void;
 }
 
+/** Options for {@link usePanelToggle}. */
+export interface PanelToggleOptions {
+  /** Explicitly expanded state (chevron or persisted preference). */
+  expanded: boolean;
+  /** Persisting expand/collapse setter. */
+  setExpanded: (next: boolean) => void;
+  /** True when the current collapse was caused by scrolling. */
+  collapsedByScroll: boolean;
+  /** Scroll-collapse controls reset by the reopen. */
+  collapse: ScrollCollapseApi;
+  /** Editor scroll container returned to the top on reopen. */
+  scrollRef: RefObject<HTMLElement | null>;
+}
+
+/**
+ * Build the panel chevron toggle. A collapsed panel reopens in one
+ * click (editor back to the top, collapse state reset, explicit expand
+ * persisted); a scroll collapse inside an expanded panel only returns
+ * the editor to the top; otherwise the explicit collapse is persisted.
+ *
+ * @param options - See {@link PanelToggleOptions}.
+ * @returns The chevron click handler.
+ */
+export function usePanelToggle(options: PanelToggleOptions): () => void {
+  const { expanded, setExpanded, collapsedByScroll, collapse, scrollRef } = options;
+  return useCallback(() => {
+    if (!expanded) {
+      if (scrollRef.current) scrollRef.current.scrollTop = 0;
+      collapse.expand();
+      setExpanded(true);
+      return;
+    }
+    if (collapsedByScroll) {
+      if (scrollRef.current) scrollRef.current.scrollTop = 0;
+      collapse.expand();
+      return;
+    }
+    setExpanded(false);
+  }, [collapse, collapsedByScroll, expanded, scrollRef, setExpanded]);
+}
+
 /** Controls returned by {@link usePanelLayout}. */
 export interface PanelLayoutApi {
   /** True while the panel covers the editor area as an overlay. */
@@ -178,22 +219,19 @@ export function usePanelLayout(options: PanelLayoutOptions): PanelLayoutApi {
   const base = !narrow && loaded && Boolean(manuscriptRoot);
   const tall = usePanelOverlay({ bodyRef, scrollRef, enabled: expanded && base });
   const overlay = tall && expanded;
-  const collapse = useScrollCollapse({ scrollRef, panelRef, enabled: base && !overlay, expandedHeight });
+  // Only track the editor scroll while the panel is explicitly expanded:
+  // scrolling a collapsed panel must never enter the scroll-collapsed mode.
+  const collapse = useScrollCollapse({
+    scrollRef, panelRef, enabled: base && !overlay && expanded, expandedHeight,
+  });
   useOverlayPin(overlay, collapse, scrollRef);
   const overlayCollapse = useOverlayCollapse({
     overlayRef, panelRef, enabled: overlay, expandedHeight, onScrolledOut: onOverlayScrollOut,
   });
   const collapsedByScroll = collapse.state.mode === 'scroll';
-  const toggle = useCallback(() => {
-    if (collapsedByScroll) {
-      // Scroll collapse: the chevron re-expands by returning the editor
-      // to the top; nothing is persisted.
-      if (scrollRef.current) scrollRef.current.scrollTop = 0;
-      collapse.expand();
-      return;
-    }
-    setExpanded(!expanded);
-  }, [collapse, collapsedByScroll, expanded, scrollRef, setExpanded]);
+  const toggle = usePanelToggle({
+    expanded, setExpanded, collapsedByScroll, collapse, scrollRef,
+  });
   const onKeyDown = useCallback((event: ReactKeyboardEvent<HTMLElement>) => {
     if (event.key !== 'Escape') return;
     setExpanded(false);
