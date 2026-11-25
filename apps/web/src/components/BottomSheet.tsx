@@ -144,9 +144,9 @@ export function BottomSheet({ title, children, action, onClose }: BottomSheetPro
       aria-labelledby={headingId}
       onCancel={handleCancel}
       onClick={handleBackdrop}
-      className="m-0 mt-auto max-h-[70vh] w-full rounded-t-2xl bg-white p-0 text-gray-900 backdrop:bg-black/40"
+      className="bottom-sheet m-0 mt-auto max-h-[70vh] w-full rounded-t-2xl bg-white p-0 text-gray-900 backdrop:bg-black/40"
     >
-      <div className="flex max-h-[70vh] flex-col">
+      <div className="flex max-h-[calc(70vh-env(safe-area-inset-bottom))] flex-col">
         <SheetHeader headingId={headingId} title={title} onClose={handleCloseButton} />
         <div className="overflow-y-auto px-4 py-3">{children}</div>
         <SheetAction action={action} />

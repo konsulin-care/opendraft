@@ -104,3 +104,22 @@ describe('BottomSheet portal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('BottomSheet full-width layout', () => {
+  it('marks the dialog with the bottom-sheet layout class', () => {
+    renderSheet();
+    expect(screen.getByTestId('bottom-sheet').classList.contains('bottom-sheet')).toBe(true);
+  });
+
+  it('caps the scroll wrapper at 70vh minus the safe-area inset', () => {
+    renderSheet();
+    const wrapper = screen.getByTestId('bottom-sheet').firstElementChild as HTMLElement;
+    expect(wrapper.className).toContain('max-h-[calc(70vh-env(safe-area-inset-bottom))]');
+  });
+
+  it('renders the footer action inside the sheet dialog', () => {
+    renderSheet({ label: 'Open link', onClick: vi.fn() });
+    const dialog = screen.getByTestId('bottom-sheet');
+    expect(dialog.contains(screen.getByTestId('bottom-sheet-action'))).toBe(true);
+  });
+});
