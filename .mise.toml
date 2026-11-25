@@ -6,6 +6,7 @@ lefthook = "2.2.3"
 golangci-lint = "2.15.0"
 "go:golang.org/x/vuln/cmd/govulncheck" = "1.10.0"
 yamllint = "1.38.0"
+trivy = "0.76.2"
 
 [tasks.init]
 description = "Install dependencies and set up git hooks"
@@ -83,6 +84,19 @@ dir = "apps/bff"
 [tasks.docker-build]
 description = "Build the OpenDraft Docker image"
 run = "docker build -t opendraft ."
+
+[tasks.trivy-fs]
+description = "Scan filesystem for vulnerable dependencies and secrets with Trivy"
+run = "trivy fs --scanners vuln,secret --severity HIGH,CRITICAL --ignore-unfixed --skip-dirs node_modules --exit-code 1 ."
+
+[tasks.trivy-config]
+description = "Scan Dockerfile and IaC config for misconfigurations with Trivy"
+run = "trivy config --severity HIGH,CRITICAL --exit-code 1 ."
+
+[tasks.trivy-image]
+description = "Scan the built Docker image for vulnerabilities with Trivy"
+depends = ["docker-build"]
+run = "trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 opendraft"
 
 [tasks.lint-go]
 description = "Run golangci-lint on Go code"
