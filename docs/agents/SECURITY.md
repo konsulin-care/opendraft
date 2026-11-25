@@ -173,6 +173,23 @@ Browser                        BFF                        GitHub
 Tokens only travel between the BFF and GitHub. The browser holds only the
 opaque sealed session cookie.
 
+## Container and Dependency Scanning
+
+Trivy (pinned in `.mise.toml`) gates PRs on `HIGH` and `CRITICAL` findings in
+three scopes. Each scan is a Mise task, so CI and local runs use the same
+command:
+
+| Task | Scope |
+|------|-------|
+| `mise run trivy-fs` | Dependency vulnerabilities and secrets in the working tree |
+| `mise run trivy-config` | Dockerfile and IaC misconfigurations |
+| `mise run trivy-image` | OS and library vulnerabilities in the built image (depends on `docker-build`) |
+
+All three exit non-zero on findings and print a summary table in the log; no
+report is uploaded. `trivy-fs` and `trivy-image` pass `--ignore-unfixed` so a
+CVE without an available fix never blocks a PR. Run them before pushing when a
+change touches dependencies, the `Dockerfile`, or container base images.
+
 ## References
 
 - [apps/convention.md](../../apps/convention.md)

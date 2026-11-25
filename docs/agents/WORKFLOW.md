@@ -28,7 +28,7 @@ Subject under 75 characters. Body explains what and why.
 5. Open PR to master.
 6. PR title matches commit convention.
 7. PR description links related issues.
-8. CI passes (7 parallel jobs).
+8. CI passes (9 parallel jobs).
 9. Squash merge into master.
 
 ## Git Hooks
@@ -63,7 +63,7 @@ Use `--no-verify` to skip hooks. Bypassed hooks still run in CI.
 
 ## CI/CD Pipeline
 
-GitHub Actions workflow in `.github/workflows/ci.yml` runs 8 parallel jobs on PRs to `master`:
+GitHub Actions workflow in `.github/workflows/ci.yml` runs 9 parallel jobs on PRs to `master`:
 
 | Job | Checks |
 |-----|--------|
@@ -72,10 +72,26 @@ GitHub Actions workflow in `.github/workflows/ci.yml` runs 8 parallel jobs on PR
 | verify-protocol | Protocol artifacts against the committed manifest (uses full git history) |
 | build | TypeScript build, Go build |
 | security | npm audit, govulncheck |
+| docker | Docker image build, Trivy image/filesystem/config scans |
 | complexity | TypeScript complexity, Go complexity |
 | coverage | Test coverage for TS and Go |
 
 All jobs use Mise tasks as the single source of truth, ensuring identical checks between local hooks and CI.
+
+### Container and Supply-Chain Scans
+
+The `docker` job builds the root `Dockerfile` and then scans with Trivy. The same
+three scans run locally:
+
+| Task | Scope |
+|------|-------|
+| `mise run trivy-fs` | Dependency vulnerabilities and secrets in the working tree |
+| `mise run trivy-config` | Dockerfile and IaC misconfigurations |
+| `mise run trivy-image` | OS and library vulnerabilities in the built image (depends on `docker-build`) |
+
+Every scan fails the job on `HIGH` or `CRITICAL` findings and prints a summary
+table in the log. `trivy-fs` and `trivy-image` pass `--ignore-unfixed`, so
+findings without an available fix do not block a PR.
 
 Image publishing lives in a separate workflow, `.github/workflows/docker-release.yml`. It runs on GitHub Releases, not on PRs, so it is not part of the table above. See [Release and Image Publishing](#release-and-image-publishing).
 
