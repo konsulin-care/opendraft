@@ -27,6 +27,18 @@ const realNewline = "\n"
 // so callers can detect a malformed key with errors.Is.
 var ErrAppPrivateKey = errors.New("invalid app private key")
 
+// loadAppPrivateKey resolves the optional GitHub App private key from the
+// environment. It returns nil when the variable is absent and appends a
+// problem naming the variable when the value cannot be parsed.
+func loadAppPrivateKey(getenv func(string) string, problems *[]string) *rsa.PrivateKey {
+	key, err := ParseAppPrivateKey(getenv(envGitHubAppPrivateKey))
+	if err != nil {
+		*problems = append(*problems, fmt.Sprintf("%s: %v", envGitHubAppPrivateKey, err))
+		return nil
+	}
+	return key
+}
+
 // ParseAppPrivateKey decodes a PEM-encoded RSA private key for the GitHub App.
 // The value is trimmed first; an empty value yields (nil, nil) so callers can
 // treat the key as optional. When the value has no real newline but contains
