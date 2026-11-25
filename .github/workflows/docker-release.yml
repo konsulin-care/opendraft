@@ -97,7 +97,7 @@ jobs:
 
           echo "Triggering Coolify deployment for application ${COOLIFY_APP_UUID}..."
           deploy_response=$(api --request POST \
-            "${COOLIFY_URL}/api/v1/deploy?uuid=${COOLIFY_APP_UUID}")
+            "${COOLIFY_URL}/deploy?uuid=${COOLIFY_APP_UUID}")
 
           deployment_uuid=$(printf '%s' "$deploy_response" | jq -r '
             .deployment_uuid // .deployments[0].deployment_uuid // empty')
@@ -111,7 +111,7 @@ jobs:
           attempt=1
           while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
             sleep "$POLL_INTERVAL"
-            status_response=$(api "${COOLIFY_URL}/api/v1/deployments/${deployment_uuid}")
+            status_response=$(api "${COOLIFY_URL}/deployments/${deployment_uuid}")
             status=$(printf '%s' "$status_response" | jq -r '.status // empty')
             echo "Attempt ${attempt}/${MAX_ATTEMPTS}: status=${status}"
 
