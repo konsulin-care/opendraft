@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
-import { useOutsideClose } from '../HeaderOverflowMenu';
+import { useOutsideClose } from './use-outside-close';
 
 /** One manuscript offered by {@link ManuscriptSwitcher}. */
 export interface ManuscriptSwitcherOption {
