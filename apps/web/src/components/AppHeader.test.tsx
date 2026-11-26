@@ -81,11 +81,13 @@ describe('AppHeader save status', () => {
 });
 
 describe('AppHeader title and subtitle', () => {
-  it('keeps the manuscript title inline-editable', () => {
+  it('opens the details panel and renames the manuscript title', () => {
     const onRenameManuscript = vi.fn();
     renderHeader({ manuscriptName: 'My Thesis', onRenameManuscript });
 
-    const title = screen.getByTestId('manuscript-title') as HTMLInputElement;
+    fireEvent.click(screen.getByRole('button', { name: 'My Thesis' }));
+    const panel = screen.getByRole('region', { name: 'Manuscript details' });
+    const title = within(panel).getByTestId('manuscript-title') as HTMLInputElement;
     expect(title.value).toBe('My Thesis');
     fireEvent.change(title, { target: { value: 'My Thesis edited' } });
     fireEvent.keyDown(title, { key: 'Enter' });
@@ -94,16 +96,23 @@ describe('AppHeader title and subtitle', () => {
 
   it('falls back to the manuscript dir name when no display name is set', () => {
     renderHeader({ manuscriptDir: 'my-thesis' });
+    fireEvent.click(screen.getByRole('button', { name: 'my-thesis' }));
     const title = screen.getByTestId('manuscript-title') as HTMLInputElement;
     expect(title.value).toBe('my-thesis');
   });
 
-  it('renders the repo subtitle as read-only text with no project-name input', () => {
+  it('renders the repo subtitle as read-only text with no inline title input', () => {
     renderHeader({ source: LOCAL_SOURCE });
 
-    expect(screen.getByText('Only on this device')).toBeDefined();
-    expect(screen.queryByTestId('project-name')).toBeNull();
-    expect(screen.queryByRole('textbox', { name: 'Project name' })).toBeNull();
+    const header = screen.getByTestId('app-header');
+    expect(within(header).getByText('Only on this device')).toBeDefined();
+    expect(within(header).queryByTestId('project-name')).toBeNull();
+    expect(within(header).queryByRole('textbox', { name: 'Project name' })).toBeNull();
+    expect(within(header).queryByRole('textbox')).toBeNull();
+    expect(within(header).queryByRole('button', { name: 'More actions' })).toBeNull();
+    expect(within(header).getByRole('status').textContent).toBe('Saved');
+
+    fireEvent.click(within(header).getByRole('button', { name: 'intro' }));
     const title = screen.getByTestId('manuscript-title') as HTMLInputElement;
     expect(title.getAttribute('aria-label')).toBe('Manuscript name');
   });
@@ -146,6 +155,7 @@ describe('AppHeader legacy project rename', () => {
     expect(screen.queryByRole('textbox', { name: 'Project name' })).toBeNull();
     expect(screen.getByText('Only on this device')).toBeDefined();
 
+    fireEvent.click(screen.getByRole('button', { name: 'intro' }));
     const title = screen.getByTestId('manuscript-title') as HTMLInputElement;
     expect(title.value).toBe('intro');
     fireEvent.change(title, { target: { value: 'Intro v2' } });
@@ -194,21 +204,5 @@ describe('AppHeader action slot and account', () => {
   it('hides the account menu when login is disabled', () => {
     renderHeader({ loginEnabled: false });
     expect(screen.queryByRole('button', { name: 'Account' })).toBeNull();
-  });
-});
-
-describe('AppHeader overflow menu', () => {
-  it('has no Commit changes item', () => {
-    renderHeader();
-    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
-    expect(screen.queryByText('Commit changes')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Commit changes' })).toBeNull();
-  });
-
-  it('renders supplied overflow entries', () => {
-    renderHeader();
-    // Default header has no replacement entries; the trigger still exists.
-    const trigger = screen.getByRole('button', { name: 'More actions' });
-    expect(within(trigger.closest('div') as HTMLElement).queryByText('Commit changes')).toBeNull();
   });
 });

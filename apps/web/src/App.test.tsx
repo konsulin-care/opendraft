@@ -133,6 +133,7 @@ async function expectManuscriptRenameMovesFiles(): Promise<void> {
       expect(await projectRegistry.getLastPath(record.id)).toBe('manuscripts/untitled-project/article.qmd');
     });
 
+    fireEvent.click(within(screen.getByTestId('app-header')).getByRole('button', { name: 'untitled-project' }));
     const title = within(screen.getByTestId('app-header')).getByTestId('manuscript-title');
     fireEvent.change(title, { target: { value: 'My Thesis' } });
     fireEvent.keyDown(title, { key: 'Enter' });
@@ -157,9 +158,11 @@ describe('App header', () => {
     expect(logo.getAttribute('title')).toBe('OpenDraft');
     expect(screen.queryByText('OpenDraft')).toBeNull();
     const header = screen.getByTestId('app-header');
+    expect(within(header).getByText('Only on this device')).toBeDefined();
+    expect(within(header).queryByTestId('project-name')).toBeNull();
+    fireEvent.click(within(header).getByRole('button', { name: 'untitled-project' }));
     const title = within(header).getByTestId('manuscript-title') as HTMLInputElement;
     expect(title.value).toBe('untitled-project');
-    expect(within(header).getByText('Only on this device')).toBeDefined();
     expect(within(header).queryByTestId('project-name')).toBeNull();
   });
 
@@ -170,13 +173,15 @@ describe('App header', () => {
     expect(screen.queryByRole('button', { name: 'Visual mode is only available for manuscript block files' })).toBeNull();
   });
 
-  /** The editor header owns the draft action and chip; the banner is gone. */
-  it('renders the draft action and status chip in the header without a suggestion banner', async () => {
+  /** The editor header owns the draft action and status; the banner is gone. */
+  it('renders the draft action and panel status in the header without a suggestion banner', async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('app-header')).toBeDefined());
     const header = screen.getByTestId('app-header');
     await waitFor(() => expect(within(header).getByRole('button', { name: 'Publish to GitHub' })).toBeDefined());
-    expect(within(header).getByRole('button', { name: 'Draft' })).toBeDefined();
+    fireEvent.click(within(header).getByRole('button', { name: 'untitled-project' }));
+    const panel = within(header).getByRole('region', { name: 'Manuscript details' });
+    expect(within(panel).getByText('Saved · Draft')).toBeDefined();
     expect(screen.queryByTestId('suggestion-banner')).toBeNull();
   });
 

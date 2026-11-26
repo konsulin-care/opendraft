@@ -8,6 +8,7 @@ import type { SaveStatus } from './components/AppHeader';
 import type { ManuscriptSwitcherOption } from './components/header/ManuscriptSwitcher';
 import { EditorArea } from './components/EditorArea';
 import { useDraftSection } from './hooks/use-draft-section';
+import type { HeaderStatus } from './hooks/draft-header-status';
 import { createDraftSectionDeps } from './suggest/draft-deps';
 import { ProjectDrawer, useDrawerState } from './components/project-drawer/ProjectDrawer';
 import { ProjectSwitcher } from './components/project-drawer/ProjectSwitcher';
@@ -129,6 +130,7 @@ interface HeaderSectionProps {
   activePath: string;
   switchTo: (id: string) => Promise<void>;
   saveStatus: SaveStatus;
+  status: HeaderStatus | null;
   manuscripts: readonly ManuscriptSwitcherOption[];
   onSelectManuscript: (id: string) => void;
   onSelectAllManuscripts: () => void;
@@ -142,7 +144,7 @@ interface HeaderSectionProps {
 
 function HeaderSection({
   active, source, dirName, workspace, openFile, activePath, switchTo,
-  saveStatus, manuscripts, onSelectManuscript, onSelectAllManuscripts,
+  saveStatus, status, manuscripts, onSelectManuscript, onSelectAllManuscripts,
   session, loginEnabled, onLogout, returnTo, action, drawer,
 }: HeaderSectionProps) {
   return (
@@ -154,6 +156,7 @@ function HeaderSection({
       onSelectAllManuscripts={onSelectAllManuscripts}
       onRenameManuscript={createOpenManuscriptRenamer(active, dirName, { workspace, registry: projectRegistry, openFile, activePath, refresh: () => { if (active) switchTo(active.id); } })}
       saveStatus={saveStatus}
+      status={status ?? undefined}
       action={action}
       session={session} loginEnabled={loginEnabled} onLogout={onLogout} returnTo={returnTo}
       sidebarOpen={drawer.open} onToggleSidebar={drawer.toggle} toggleButtonRef={drawer.toggleRef}
@@ -246,7 +249,7 @@ export function App() {
       <HeaderSection
         active={active} source={active?.source} dirName={dirName}
         workspace={workspace} openFile={openFile} activePath={activePath}
-        switchTo={switchTo} saveStatus={saveStatus} manuscripts={manuscripts}
+        switchTo={switchTo} saveStatus={saveStatus} status={draft.status} manuscripts={manuscripts}
         onSelectManuscript={(id) => { void openFile(`manuscripts/${id}`); }}
         onSelectAllManuscripts={() => { void openFile('manuscripts'); }}
         session={session} loginEnabled={loginEnabled} onLogout={logout}
