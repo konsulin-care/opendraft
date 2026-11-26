@@ -22,12 +22,7 @@ const FORK_SOURCE: ProjectSource = {
   pullNumber: null,
 };
 
-const SESSION: BffSession = {
-  login: 'octocat',
-  id: 583231,
-  name: 'The Octocat',
-  expiresAt: '2099-01-01T00:00:00Z',
-};
+const SESSION: BffSession = { login: 'octocat', id: 583231, name: 'The Octocat', expiresAt: '2099-01-01T00:00:00Z' };
 
 const MANUSCRIPTS = [
   { id: 'intro', title: 'Intro' },
@@ -132,8 +127,9 @@ describe('AppHeader title and subtitle', () => {
 });
 
 describe('AppHeader desktop title', () => {
-  it('renders the details trigger on mobile and an inline name field from md up', () => {
-    renderHeader({ manuscriptName: 'My Thesis' });
+  it('renders the details trigger on mobile and the desktop title row', () => {
+    const onRenameManuscript = vi.fn();
+    renderHeader({ manuscriptName: 'My Thesis', onRenameManuscript });
     const header = screen.getByTestId('app-header');
     const inline = within(header).getByTestId('manuscript-title-inline') as HTMLInputElement;
     expect(inline.value).toBe('My Thesis');
@@ -143,11 +139,6 @@ describe('AppHeader desktop title', () => {
     const trigger = within(header).getByRole('button', { name: 'My Thesis' });
     expect(hasAncestorClass(trigger, 'md:hidden')).toBe(true);
     expect(hasAncestorClass(trigger, 'md:flex')).toBe(false);
-  });
-  it('renames the manuscript from the desktop inline field', () => {
-    const onRenameManuscript = vi.fn();
-    renderHeader({ manuscriptName: 'My Thesis', onRenameManuscript });
-    const inline = screen.getByTestId('manuscript-title-inline') as HTMLInputElement;
     fireEvent.change(inline, { target: { value: 'My Thesis edited' } });
     fireEvent.keyDown(inline, { key: 'Enter' });
     expect(onRenameManuscript).toHaveBeenCalledWith('My Thesis edited');
@@ -212,9 +203,21 @@ describe('AppHeader details panel disclosure', () => {
     expect(screen.getByRole('region', { name: 'Manuscript details' })).toBeDefined();
     rerender(<AppHeader {...BASE_PROPS} sidebarOpen />);
     expect(screen.queryByRole('region', { name: 'Manuscript details' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'intro' }).getAttribute('aria-expanded')).toBe(
-      'false',
-    );
+    const trigger = screen.getByRole('button', { name: 'intro' });
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  });
+});
+describe('AppHeader draft state chip', () => {
+  it('shows the draft chip before the action slot', () => {
+    renderHeader({ action: <button type="button">Submit</button>, status: { draftLabel: 'Draft', attention: false } });
+    const chip = screen.getByTestId('draft-state');
+    const action = screen.getByRole('button', { name: 'Submit' });
+    expect(chip.textContent).toBe('Draft');
+    expect(chip.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+  it('renders no chip without a draft label', () => {
+    renderHeader({ status: { draftLabel: '', attention: false } });
+    expect(screen.queryByTestId('draft-state')).toBeNull();
   });
 });
 
@@ -232,7 +235,6 @@ describe('AppHeader manuscript picker', () => {
     expect(onSelectManuscript).toHaveBeenCalledWith('methods');
     expect(screen.queryByRole('dialog', { name: 'Select manuscript' })).toBeNull();
   });
-
   it('reopens the details panel when the picker is closed without a pick', () => {
     renderHeader({ manuscripts: MANUSCRIPTS, manuscriptId: 'intro', onSelectManuscript: vi.fn() });
     fireEvent.click(screen.getByRole('button', { name: 'intro' }));
@@ -262,7 +264,6 @@ describe('AppHeader legacy project rename', () => {
     expect(onRename).not.toHaveBeenCalled();
   });
 });
-
 describe('AppHeader layout', () => {
   it('carries the APP_BAR_HEIGHT class on the shared header shell', () => {
     renderHeader();
@@ -287,7 +288,6 @@ describe('AppHeader action slot and account', () => {
     const avatar = screen.getByRole('img', { name: '@octocat' });
     expect(avatar.getAttribute('src')).toBe('https://avatars.githubusercontent.com/u/583231?s=64');
   });
-
   it('renders no Commit button', () => {
     renderHeader();
     expect(screen.queryByRole('button', { name: 'Commit' })).toBeNull();

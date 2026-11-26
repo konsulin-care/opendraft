@@ -5,6 +5,7 @@ import type { BffSession } from '../github/bff-client';
 import type { HeaderStatus } from '../hooks/draft-header-status';
 import { PROJECT_DRAWER_ID } from './project-drawer/ProjectDrawer';
 import { DetailsPanel } from './header/DetailsPanel';
+import { DraftStateChip } from './header/DraftStateChip';
 import { HeaderShell } from './header/HeaderShell';
 import { InlineEditField } from './InlineEditField';
 import { ManuscriptPicker } from './header/ManuscriptPicker';
@@ -256,7 +257,12 @@ function AppHeaderShell(props: AppHeaderShellProps) {
         />
       }
       subtitle={props.source ? <RepoSubtitle {...repoSubtitle(props.source)} /> : undefined}
-      action={props.action}
+      action={
+        <div className="flex min-w-0 items-center gap-1.5">
+          {props.status?.draftLabel ? <DraftStateChip label={props.status.draftLabel} /> : null}
+          {props.action}
+        </div>
+      }
       userMenu={
         <UserMenu
           session={props.session ?? null}
