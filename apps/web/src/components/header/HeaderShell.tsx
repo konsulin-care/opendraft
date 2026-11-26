@@ -27,8 +27,11 @@ export interface HeaderShellProps {
  * Shared two-line header used by the reader and the editor.
  *
  * The main row places the leading slot next to a flexible title column: the
- * title on line one and a plain, ellipsis-truncated subtitle on line two.
- * Status content, the main action and the account menu follow on the right.
+ * title on line one and a plain subtitle on line two. The subtitle is clipped
+ * by its own inner text span rather than by this wrapper, so a dashed link
+ * underline is never cut off, and the column grows instead of clipping when
+ * both lines need more than one bar row. Status content, the main action and
+ * the account menu follow on the right.
  * An optional panel slot is rendered inside the header after that row; the
  * header is relatively positioned so the panel can anchor to it. Supplying a
  * panel hides the subtitle below `md`, leaving the reader header unchanged.
@@ -50,8 +53,8 @@ export function HeaderShell({
 }: HeaderShellProps) {
   const subtitleClassName =
     panel !== undefined
-      ? 'hidden w-full truncate text-xs font-normal text-gray-700 md:block'
-      : 'block w-full truncate text-xs font-normal text-gray-700';
+      ? 'hidden w-full min-w-0 text-xs font-normal leading-5 text-gray-700 md:block'
+      : 'block w-full min-w-0 text-xs font-normal leading-5 text-gray-700';
 
   return (
     <header
@@ -61,7 +64,7 @@ export function HeaderShell({
       <div className="flex min-h-0 flex-1 items-center gap-1.5 sm:gap-2">
         {leading}
         <div
-          className="flex h-9 min-w-[7rem] flex-1 flex-col items-start justify-center text-left"
+          className="flex min-h-9 min-w-[7rem] flex-1 flex-col items-start justify-center text-left"
           data-testid="header-title-column"
         >
           <div className="min-w-0 max-w-full">{title}</div>

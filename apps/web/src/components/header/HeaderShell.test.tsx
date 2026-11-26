@@ -36,13 +36,6 @@ describe('HeaderShell slots', () => {
     expect(within(header).queryByRole('textbox')).toBeNull();
   });
 
-  it('truncates the subtitle with an ellipsis', () => {
-    render(<HeaderShell title="Title" subtitle="Forked from owner/repository" />);
-
-    const subtitle = screen.getByText('Forked from owner/repository');
-    expect(subtitle.className).toMatch(/\btruncate\b/);
-  });
-
   it('keeps the app bar height and the existing header border styles', () => {
     render(<HeaderShell title="Title" subtitle="Only on this device" />);
 
@@ -53,6 +46,31 @@ describe('HeaderShell slots', () => {
     expect(header.className).toMatch(/\bborder-b\b/);
     expect(header.className).toMatch(/\bborder-gray-200\b/);
     expect(header.className).toMatch(/\bbg-white\b/);
+  });
+});
+
+describe('HeaderShell subtitle clipping', () => {
+  it('leaves the subtitle unclipped so the dashed link underline is not cut off', () => {
+    render(<HeaderShell title="Title" subtitle="Forked from owner/repository" />);
+
+    const subtitle = screen.getByText('Forked from owner/repository');
+    expect(subtitle.className).not.toMatch(/\btruncate\b/);
+    expect(subtitle.className.split(/\s+/)).toContain('leading-5');
+    expect(subtitle.className.split(/\s+/)).toContain('min-w-0');
+  });
+
+  it('leaves the subtitle unclipped when a panel is supplied too', () => {
+    render(
+      <HeaderShell
+        title="Title"
+        subtitle="Forked from owner/repository"
+        panel={<div data-testid="panel-slot" />}
+      />,
+    );
+
+    const subtitle = screen.getByText('Forked from owner/repository');
+    expect(subtitle.className).not.toMatch(/\btruncate\b/);
+    expect(subtitle.className.split(/\s+/)).toContain('leading-5');
   });
 });
 
@@ -103,5 +121,13 @@ describe('HeaderShell spacing', () => {
     }
     const titleColumn = screen.getByTestId('header-title-column');
     expect(titleColumn.className.split(/\s+/)).toContain('min-w-[7rem]');
+  });
+
+  it('gives the title column room for two lines instead of a fixed height', () => {
+    render(<HeaderShell title="Title" subtitle="Only on this device" />);
+
+    const classes = screen.getByTestId('header-title-column').className.split(/\s+/);
+    expect(classes).toContain('min-h-9');
+    expect(classes).not.toContain('h-9');
   });
 });
