@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 /**
  * ReaderHeader tests: the header links its book mark back to the editor, shows
- * the selected manuscript with its switcher and the published repository, and
- * places the main action before the account menu.
+ * the selected manuscript with its switcher and the published repository,
+ * places the main action before the account menu, and follows the shared md
+ * contract (compact trigger plus details panel below md).
  */
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import type { BffSession } from '../github/bff-client';
 import { ReaderHeader } from './ReaderHeader';
@@ -25,6 +26,22 @@ const MANUSCRIPTS = [
   { id: 'alpha', title: 'Alpha study' },
   { id: 'beta', title: 'Beta study' },
 ];
+
+/** Render the reader header with a selected manuscript and spies. */
+function renderHeader(overrides: Partial<Parameters<typeof ReaderHeader>[0]> = {}) {
+  return render(
+    <ReaderHeader
+      session={SESSION}
+      returnTo={RETURN_TO}
+      onLogout={vi.fn()}
+      title="Alpha study"
+      manuscripts={MANUSCRIPTS}
+      selectedId="alpha"
+      onSelect={vi.fn()}
+      {...overrides}
+    />,
+  );
+}
 
 describe('ReaderHeader basics', () => {
   it('renders no OpenDraft text and links the book icon to the editor', () => {
@@ -48,13 +65,48 @@ describe('ReaderHeader basics', () => {
       />,
     );
 
-    expect(screen.getByText('Alpha study')).toBeInTheDocument();
+    expect(screen.getAllByText('Alpha study').length).toBeGreaterThan(0);
     expect(screen.getByTestId('manuscript-switcher')).toBeInTheDocument();
-    expect(screen.getByText('Published at')).toBeInTheDocument();
     const repoLink = screen.getByRole('link', { name: /konsulin-care\/citizen-science/ });
     expect(repoLink).toHaveAttribute('href', 'https://github.com/konsulin-care/citizen-science');
     expect(repoLink).toHaveAttribute('target', '_blank');
     expect(repoLink).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+});
+
+describe('ReaderHeader responsive contract', () => {
+  it('keeps the compact title trigger visible below md only', () => {
+    renderHeader();
+
+    const compact = screen.getByTestId('header-compact-title');
+    expect(compact).toHaveClass('md:hidden');
+    expect(within(compact).getByRole('button', { name: /Alpha study/ })).toBeDefined();
+  });
+
+  it('shows the wide title with its switcher from md and hides the subtitle below md', () => {
+    renderHeader();
+
+    const wide = screen.getByTestId('header-wide-title');
+    expect(wide).toHaveClass('hidden', 'md:flex');
+    expect(within(wide).getByTestId('manuscript-switcher')).toBeDefined();
+
+    const subtitle = screen.getByText('Published at').parentElement;
+    expect(subtitle).toHaveClass('hidden', 'md:block');
+  });
+
+  it('opens the reader details panel from the trigger and closes it on Escape', () => {
+    renderHeader();
+    const trigger = within(screen.getByTestId('header-compact-title')).getByRole('button', {
+      name: /Alpha study/,
+    });
+
+    expect(screen.queryByRole('region', { name: 'Published details' })).toBeNull();
+    fireEvent.click(trigger);
+    expect(screen.getByRole('region', { name: 'Published details' })).toBeDefined();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('region', { name: 'Published details' })).toBeNull();
+    expect(document.activeElement).toBe(trigger);
   });
 });
 
