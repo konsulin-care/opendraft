@@ -268,7 +268,7 @@ export function PublishDialog(props: PublishDialogProps) {
   const [nameTouched, setNameTouched] = useState(false);
   const { running, result } = usePreflight(shown, props.workspace, props.runPreflight);
   const { status, checking } = useNameCheck(shown, draft, name, props.checkName);
-  const label = variant === 'send' ? 'Send for review' : 'Send update';
+  const label = variant === 'send' ? 'Submit' : 'Send update';
   const nameBlocked = !draft.pushed && (status?.kind === 'taken' || status?.kind === 'blocked');
   const canSubmit = submitEnabled({ running, checking, result, nameBlocked, variant, change });
   const input = { change: change.trim(), note: note.trim(), draftName: name.trim() };

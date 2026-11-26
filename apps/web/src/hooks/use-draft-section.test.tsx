@@ -209,7 +209,7 @@ describe('useDraftSection dialogs', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send for review' }));
 
     expect(
-      await screen.findByRole('dialog', { name: 'Send for review' }),
+      await screen.findByRole('dialog', { name: 'Submit' }),
     ).toBeInTheDocument();
     expect(screen.getByText('What did you change?')).toBeInTheDocument();
   });
@@ -258,11 +258,11 @@ describe('useDraftSection send dialog', () => {
     render(<Section {...makeInput(DRAFT, deps)} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Send for review' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Send for review' });
+    const dialog = await screen.findByRole('dialog', { name: 'Submit' });
     fireEvent.change(screen.getByLabelText('What did you change?'), {
       target: { value: 'Fix the abstract' },
     });
-    const submit = within(dialog).getByRole('button', { name: 'Send for review' });
+    const submit = within(dialog).getByRole('button', { name: 'Submit' });
     await waitFor(() => expect(submit).toBeEnabled());
     fireEvent.click(submit);
 
