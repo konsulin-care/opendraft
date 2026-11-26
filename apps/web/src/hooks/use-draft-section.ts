@@ -87,7 +87,6 @@ function hasAccess(context: SectionContext): boolean {
   }
   return true;
 }
-
 function runAction(context: SectionContext, label: string): void {
   if (label === 'View on GitHub') {
     const url = context.draft.status?.url;
@@ -113,6 +112,7 @@ function actionNode(context: SectionContext | null): ReactNode {
     label: view.primary,
     items: view.menu,
     busy,
+    kind: view.kind,
     onPrimary: () => runAction(context, view.primary),
     onMenu,
   });

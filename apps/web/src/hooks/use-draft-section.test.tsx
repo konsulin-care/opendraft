@@ -117,6 +117,12 @@ describe('useDraftSection action and chip', () => {
     );
   });
 
+  it('shows the Send icon on the unsent draft action', () => {
+    const { container } = render(<Section {...makeInput(DRAFT, makeDeps())} />);
+
+    expect(container.querySelector('.lucide-send')).toBeInTheDocument();
+  });
+
   it('labels the action for a local project with Publish to GitHub', () => {
     const deps = makeDeps({
       load: vi.fn(async () => ({ status: { state: 'local-only' as const }, pendingSaves: 0 })),

@@ -8,8 +8,9 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, LoaderCircle } from 'lucide-react';
-import { useOutsideClose } from '../HeaderOverflowMenu';
+import { ChevronDown, FilePlus, LoaderCircle, Send, Upload } from 'lucide-react';
+import type { DraftActionKind } from '../../suggest/draft-view';
+import { useOutsideClose } from '../header/use-outside-close';
 
 /** One entry in the chevron menu. */
 export interface DraftActionMenuItem {
@@ -44,12 +45,14 @@ export interface DraftActionProps {
   disabled?: boolean;
   /** Accessible name of the chevron button. */
   menuLabel?: string;
+  /** Kind of the main action, used to pick its icon. */
+  kind?: DraftActionKind;
 }
 
 const MAIN_BUTTON =
-  'inline-flex min-h-9 items-center gap-2 rounded-l-md bg-black px-3 py-1 text-sm font-medium text-white hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-50';
+  'inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-l-md bg-black px-3 py-1 text-sm font-medium text-white hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-50';
 const CHEVRON_BUTTON =
-  'inline-flex min-h-9 items-center justify-center rounded-r-md border-l border-gray-700 bg-black px-2 py-1 text-white hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-50';
+  'inline-flex min-h-9 shrink-0 items-center justify-center rounded-r-md border-l border-gray-700 bg-black px-2 py-1 text-white hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-50';
 const MENU_PANEL =
   'absolute right-0 top-full z-30 mt-1 w-56 rounded-md border border-gray-200 bg-white py-1 shadow-lg';
 const MENU_ITEM =
@@ -128,12 +131,29 @@ function ActionMenu({ items, onChoose }: ActionMenuProps) {
   );
 }
 
+/** Props for {@link ActionIcon}. */
+interface ActionIconProps {
+  kind: DraftActionKind;
+}
+
+/**
+ * Icon shown for the main action when it is not busy.
+ *
+ * @param props - See {@link ActionIconProps}.
+ * @returns Send for submit and update, FilePlus for new, Upload for publish.
+ */
+function ActionIcon({ kind }: ActionIconProps) {
+  const Icon = kind === 'new' ? FilePlus : kind === 'publish' ? Upload : Send;
+  return <Icon className="h-4 w-4" aria-hidden="true" data-testid="draft-action-icon" />;
+}
+
 /** Props for {@link PrimaryButton}. */
 interface PrimaryButtonProps {
   label: string;
   progress: string;
   busy: boolean;
   blocked: boolean;
+  kind: DraftActionKind;
   onPrimary: () => void;
 }
 
@@ -142,13 +162,16 @@ interface PrimaryButtonProps {
  *
  * @param props - See {@link PrimaryButtonProps}.
  */
-function PrimaryButton({ label, progress, busy, blocked, onPrimary }: PrimaryButtonProps) {
+function PrimaryButton({ label, progress, busy, blocked, kind, onPrimary }: PrimaryButtonProps) {
+  const name = busy ? progress : label;
   return (
     <button
       type="button"
       onClick={onPrimary}
       disabled={blocked}
       aria-busy={busy}
+      aria-label={name}
+      title={name}
       className={MAIN_BUTTON}
     >
       {busy ? (
@@ -157,8 +180,10 @@ function PrimaryButton({ label, progress, busy, blocked, onPrimary }: PrimaryBut
           aria-hidden="true"
           data-testid="draft-action-spinner"
         />
-      ) : null}
-      <span>{busy ? progress : label}</span>
+      ) : (
+        <ActionIcon kind={kind} />
+      )}
+      <span className="hidden min-[400px]:inline">{name}</span>
     </button>
   );
 }
@@ -214,6 +239,7 @@ export function DraftAction({
   progressLabel,
   disabled = false,
   menuLabel = 'More actions',
+  kind = 'submit',
 }: DraftActionProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -222,7 +248,6 @@ export function DraftAction({
   const progress = busyLabel ?? progressLabel ?? label;
   useOutsideClose(menuOpen, menuRef, closeMenu);
   useEscapeClose(menuOpen, closeMenu);
-
   /** Run a secondary action and close the menu. */
   const choose = (item: DraftActionItem): void => {
     if (itemDisabled(item)) return;
@@ -237,6 +262,7 @@ export function DraftAction({
         progress={progress}
         busy={busy}
         blocked={blocked}
+        kind={kind}
         onPrimary={onPrimary}
       />
       {items.length > 0 ? (
