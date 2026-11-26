@@ -20,11 +20,11 @@ const originalMatchMedia = Object.getOwnPropertyDescriptor(window, 'matchMedia')
  * Stub `window.matchMedia` so only the narrow-viewport query matches
  * when requested.
  *
- * @param narrow - Whether the 639px query should match.
+ * @param narrow - Whether the 767px (below md) query should match.
  */
 function stubViewport(narrow: boolean): void {
   Object.defineProperty(window, 'matchMedia', { configurable: true, writable: true,
-    value: (query: string) => ({ matches: narrow && query.includes('639'), media: query,
+    value: (query: string) => ({ matches: narrow && query.includes('767'), media: query,
       addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {}, onchange: null, dispatchEvent: () => false }) });
 }
 

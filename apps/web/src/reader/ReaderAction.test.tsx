@@ -80,6 +80,34 @@ describe('ReaderAction label', () => {
   });
 });
 
+describe('ReaderAction icons', () => {
+  it('shows a Pencil icon on the Edit action', () => {
+    const { container } = render(<ReaderAction {...props({ access: PUSH_INSTALLED })} />);
+
+    const button = screen.getByRole('button', { name: 'Edit' });
+    expect(button.querySelector('[data-testid="reader-action-icon"]')).not.toBeNull();
+    expect(container.querySelector('.lucide-pencil')).not.toBeNull();
+  });
+
+  it('shows GitPullRequestCreate for Suggest edits and Upload for Convert to OpenDraft', () => {
+    const { unmount } = render(<ReaderAction {...props({ access: READ_ONLY })} />);
+    expect(document.querySelector('.lucide-git-pull-request-create')).not.toBeNull();
+    unmount();
+
+    render(<ReaderAction {...props({ kind: 'non-compliant' })} />);
+    expect(document.querySelector('.lucide-upload')).not.toBeNull();
+  });
+
+  it('hides its visible label below 400px while keeping the accessible name', () => {
+    render(<ReaderAction {...props({ access: READ_ONLY })} />);
+
+    const button = screen.getByRole('button', { name: 'Suggest edits' });
+    expect(button).toHaveAttribute('aria-label', 'Suggest edits');
+    expect(button).toHaveAttribute('title', 'Suggest edits');
+    expect(screen.getByText('Suggest edits')).toHaveClass('hidden', 'min-[400px]:inline');
+  });
+});
+
 describe('ReaderAction busy states', () => {
   it('is disabled with a spinner while checking and keeps its label', () => {
     render(<ReaderAction {...props({ status: 'checking' })} />);

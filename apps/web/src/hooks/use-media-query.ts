@@ -1,22 +1,20 @@
 /**
- * Shared media-query hook for the responsive manuscript metadata UI.
+ * Shared media-query hook for the responsive manuscript UI.
  *
- * Tracks one CSS media query and re-renders when it changes. The
- * metadata panel, the authors dialog and the publication details grid
- * share the 640px (narrow/mobile) and 1024px (wide) breakpoints.
+ * Tracks one CSS media query and re-renders when it changes. The metadata
+ * panel, the authors dialog, the publication details grid and the header
+ * panels share the boundaries from components/breakpoints.ts: narrow is up to
+ * 767px (below the Tailwind `md` breakpoint) and wide starts at 1024px.
  */
 import { useEffect, useState } from 'react';
+import { NARROW_QUERY, WIDE_QUERY } from '../components/breakpoints';
 
-/** Media query matching viewports below the 640px breakpoint. */
-export const NARROW_QUERY = '(max-width: 639px)';
-
-/** Media query matching viewports at or above the 1024px breakpoint. */
-export const WIDE_QUERY = '(min-width: 1024px)';
+export { NARROW_QUERY, WIDE_QUERY };
 
 /**
  * Track whether a CSS media query currently matches the viewport.
  *
- * @param query - Media query string, e.g. '(max-width: 639px)'.
+ * @param query - Media query string, e.g. NARROW_QUERY.
  * @returns True while the query matches; false otherwise, including
  * when `window.matchMedia` is unavailable (SSR).
  */

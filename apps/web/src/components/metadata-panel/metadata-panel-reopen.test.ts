@@ -65,7 +65,7 @@ function stubNarrowViewport(narrow: boolean): void {
     configurable: true,
     writable: true,
     value: (query: string) => ({
-      matches: narrow && query.includes('639'),
+      matches: narrow && query.includes('767'),
       media: query,
       addEventListener: () => {},
       removeEventListener: () => {},

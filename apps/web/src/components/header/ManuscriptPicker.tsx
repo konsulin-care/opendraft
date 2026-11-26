@@ -27,6 +27,8 @@ export interface ManuscriptPickerProps {
   currentId?: string;
   /** Called with the id of the chosen manuscript. */
   onPick: (id: string) => void;
+  /** When given, adds an "All manuscripts" row that calls this handler. */
+  onSelectAll?: () => void;
   /** Called when the picker is dismissed without a pick. */
   onClose: () => void;
 }
@@ -67,6 +69,40 @@ function ManuscriptRow({ manuscript, isCurrent, onPick, buttonRef }: ManuscriptR
   );
 }
 
+/** Props for the trailing all-manuscripts entry. */
+interface AllManuscriptsRowProps {
+  /** Called when the reader asks for every manuscript at once. */
+  onSelectAll: () => void;
+  /** Called after the handler ran, so the picker closes. */
+  onClose: () => void;
+}
+
+/**
+ * Row clearing the manuscript selection, shown under the manuscript list.
+ *
+ * @param props - See {@link AllManuscriptsRowProps}.
+ * @returns The list item holding the entry.
+ */
+function AllManuscriptsRow({ onSelectAll, onClose }: AllManuscriptsRowProps) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => {
+          onSelectAll();
+          onClose();
+        }}
+        className={ROW_CLASS}
+      >
+        <span className={ICON_COLUMN} aria-hidden="true" />
+        <span className={TEXT_COLUMN}>
+          <span className={TITLE_CLASS}>All manuscripts</span>
+        </span>
+      </button>
+    </li>
+  );
+}
+
 /**
  * Dialog listing manuscripts with the current one marked and focused.
  *
@@ -77,7 +113,7 @@ function ManuscriptRow({ manuscript, isCurrent, onPick, buttonRef }: ManuscriptR
  * @returns The picker surface.
  */
 export function ManuscriptPicker(props: ManuscriptPickerProps) {
-  const { manuscripts, currentId, onPick, onClose } = props;
+  const { manuscripts, currentId, onPick, onSelectAll, onClose } = props;
   const rowRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const currentIndex = manuscripts.findIndex((manuscript) => manuscript.id === currentId);
   const focusIndex = currentIndex === -1 ? 0 : currentIndex;
@@ -111,6 +147,7 @@ export function ManuscriptPicker(props: ManuscriptPickerProps) {
             }}
           />
         ))}
+        {onSelectAll !== undefined && <AllManuscriptsRow onSelectAll={onSelectAll} onClose={onClose} />}
       </ul>
     </Surface>
   );

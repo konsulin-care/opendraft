@@ -37,11 +37,7 @@ const BASE_PROPS: AppHeaderProps = {
   onToggleSidebar: vi.fn(),
 };
 
-/**
- * Render the header with optional prop overrides.
- *
- * @param overrides - Props to replace on top of {@link BASE_PROPS}.
- */
+/** Render the header with optional prop overrides on top of {@link BASE_PROPS}. */
 function renderHeader(overrides: Partial<AppHeaderProps> = {}) {
   return render(<AppHeader {...BASE_PROPS} {...overrides} />);
 }
@@ -106,8 +102,9 @@ describe('AppHeader title and subtitle', () => {
   it('falls back to the manuscript dir name when no display name is set', () => {
     renderHeader({ manuscriptDir: 'my-thesis' });
     fireEvent.click(screen.getByRole('button', { name: 'my-thesis' }));
-    const title = screen.getByTestId('manuscript-title') as HTMLInputElement;
-    expect(title.value).toBe('my-thesis');
+    const panel = screen.getByRole('region', { name: 'Manuscript details' });
+    expect(within(panel).queryByTestId('manuscript-title')).toBeNull();
+    expect(within(panel).getByText('my-thesis')).toBeDefined();
   });
   it('hides the repo subtitle below md while the panel is closed', () => {
     renderHeader({ source: LOCAL_SOURCE });

@@ -141,3 +141,12 @@ describe('TitleTrigger status region', () => {
     expect(screen.queryByText('Draft sent')).toBeNull();
   });
 });
+
+describe('TitleTrigger without a save status', () => {
+  it('renders no status live region', () => {
+    renderTrigger({ saveStatus: undefined });
+
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(triggerButton()).toHaveAttribute('aria-expanded', 'false');
+  });
+});

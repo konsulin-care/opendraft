@@ -8,8 +8,13 @@
  * {@link EditPopover} under the button.
  */
 
-import { LoaderCircle } from 'lucide-react';
+import { GitPullRequestCreate, LoaderCircle, Pencil, Upload } from 'lucide-react';
 import type { RepoPermissions } from '../github/bff-client';
+import {
+  HEADER_ACTION_BUTTON,
+  HEADER_ACTION_ICON,
+  HeaderActionLabel,
+} from '../components/header/header-action';
 import type { EditIntent } from '../suggest/edit-intent';
 import { EditPopover } from './EditPopover';
 import type { ReaderRoute } from './route';
@@ -55,8 +60,7 @@ interface ActionPopoverProps {
   onClose: () => void;
 }
 
-const BUTTON =
-  'inline-flex items-center gap-2 rounded-md bg-black px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60';
+const BUTTON = HEADER_ACTION_BUTTON;
 const WRAPPER = 'relative inline-flex';
 
 /**
@@ -117,11 +121,28 @@ function actionState(input: ActionStateInput): ActionState {
 function Spinner() {
   return (
     <LoaderCircle
-      className="h-4 w-4 animate-spin"
+      className={`${HEADER_ACTION_ICON} animate-spin`}
       aria-hidden="true"
       data-testid="reader-action-spinner"
     />
   );
+}
+
+/** Props for {@link ActionIcon}. */
+interface ActionIconProps {
+  /** Label the button currently carries. */
+  label: string;
+}
+
+/**
+ * Icon shown for the current action while it is idle.
+ *
+ * @param props - See {@link ActionIconProps}.
+ * @returns Pencil for Edit, GitPullRequestCreate for Suggest edits, Upload for convert.
+ */
+function ActionIcon({ label }: ActionIconProps) {
+  const Icon = label === 'Edit' ? Pencil : label === 'Suggest edits' ? GitPullRequestCreate : Upload;
+  return <Icon className={HEADER_ACTION_ICON} aria-hidden="true" data-testid="reader-action-icon" />;
 }
 
 /** Render the popover for a non-error intent, if it has a known variant. */
@@ -185,6 +206,39 @@ function runAction(
   else onTrigger();
 }
 
+/** Props for {@link ActionButton}. */
+interface ActionButtonProps {
+  /** Visible and accessible action name. */
+  label: string;
+  /** Whether access is being checked or a copy prepared. */
+  busy: boolean;
+  /** Runs the action unless the button is busy. */
+  onClick: () => void;
+}
+
+/**
+ * Main action button: icon first, label only from 400px up.
+ *
+ * @param props - See {@link ActionButtonProps}.
+ * @returns The action button.
+ */
+function ActionButton({ label, busy, onClick }: ActionButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      aria-busy={busy}
+      aria-label={label}
+      title={label}
+      className={BUTTON}
+    >
+      {busy ? <Spinner /> : <ActionIcon label={label} />}
+      <HeaderActionLabel label={label} />
+    </button>
+  );
+}
+
 /**
  * Render the reader's main action button and its explanation popover.
  *
@@ -217,16 +271,7 @@ export function ReaderAction({
 
   return (
     <div className={WRAPPER}>
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={busy}
-        aria-busy={busy}
-        className={BUTTON}
-      >
-        {busy ? <Spinner /> : null}
-        <span>{label}</span>
-      </button>
+      <ActionButton label={label} busy={busy} onClick={handleClick} />
       {show ? (
         <ActionPopover
           purpose={purpose}

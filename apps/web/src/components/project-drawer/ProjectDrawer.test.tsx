@@ -153,9 +153,16 @@ describe('project drawer responsiveness', () => {
     render(<Harness />);
     openDrawer();
     await waitFor(() => expect(screen.getByRole('dialog')).toBeDefined());
-
     fireEvent.click(screen.getByTestId('project-drawer-backdrop'));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('renders no backdrop at 700px', async () => {
+    setViewport(700);
+    render(<Harness />);
+    openDrawer();
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeDefined());
+    expect(screen.queryByTestId('project-drawer-backdrop')).toBeNull();
   });
 });
 
@@ -189,12 +196,7 @@ describe('project drawer persistence', () => {
 const DELETE_PROJECT = { id: 'proj-1', name: 'Paper' };
 
 /** Drawer harness carrying the delete footer the app composes in. */
-function DeleteFooterHarness({
-  onConfirm,
-}: {
-  /** Stands in for the registry remove action. */
-  onConfirm: (id: string) => void;
-}) {
+function DeleteFooterHarness({ onConfirm }: { onConfirm: (id: string) => void }) {
   return (
     <ProjectDrawer
       open
