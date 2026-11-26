@@ -1,4 +1,4 @@
-/** Header draft section: split action, status chip and workflow dialogs. */
+/** Header draft section: split action and workflow dialogs. */
 import { Fragment, createElement, useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { ProjectRecord, WorkspaceAdapter } from '@opendraft/workspace';
@@ -6,7 +6,6 @@ import type { BffSession, Owner } from '../github/bff-client';
 import { ConflictDialog } from '../components/draft/ConflictDialog';
 import { DraftAction } from '../components/draft/DraftAction';
 import type { DraftActionItem } from '../components/draft/DraftAction';
-import { StatusChip } from '../components/draft/StatusChip';
 import { PublishDialog } from '../components/publish/PublishDialog';
 import type { PublishDialogDraft, PublishDialogInput } from '../components/publish/PublishDialog';
 import { PublishRepoForm } from '../components/publish/PublishRepoForm';
@@ -48,8 +47,6 @@ export interface UseDraftSectionInput {
 export interface DraftSection {
   /** Split action button for the draft workflow. */
   action: ReactNode;
-  /** Status chip shown next to the draft name. */
-  extra: ReactNode;
   /** Header status for the title trigger and details panel, or null before boot. */
   status: HeaderStatus | null;
   /** Modal dialogs and gate popovers, or null when nothing is open. */
@@ -116,24 +113,6 @@ function actionNode(context: SectionContext | null): ReactNode {
     kind: view.kind,
     onPrimary: () => runAction(context, view.primary),
     onMenu,
-  });
-}
-function chipNode(context: SectionContext | null): ReactNode {
-  if (context === null) return null;
-  const { project, draft } = context;
-  if (project.source.kind !== 'github') {
-    return h(StatusChip, {
-      label: draft.view.chip,
-      notice: draft.error ?? draft.notice,
-    });
-  }
-  return h(StatusChip, {
-    label: draft.view.chip,
-    owner: project.source.owner,
-    repo: project.source.repo,
-    draftName: project.source.branch,
-    pullRequestUrl: draft.status?.url,
-    notice: draft.error ?? draft.notice,
   });
 }
 function dialogDraft(project: ProjectRecord, session: BffSession | null): PublishDialogDraft {
@@ -265,10 +244,10 @@ function useLocalPreflight(
   return { running, result };
 }
 /**
- * Build the header action, status chip and workflow dialogs for a project.
+ * Build the header action, status and workflow dialogs for a project.
  *
  * @param input - Active project, workspace, session, owners and draft deps.
- * @returns The action node, status chip node and dialogs node.
+ * @returns The action node, header status and dialogs node.
  */
 export function useDraftSection({ project, workspace, session, owners, deps }: UseDraftSectionInput): DraftSection {
   const draft = useDraft(project, deps);
@@ -282,7 +261,6 @@ export function useDraftSection({ project, workspace, session, owners, deps }: U
   const closeGate = useCallback(() => setGate(null), []);
   return {
     action: actionNode(context),
-    extra: chipNode(context),
     status: context === null ? null : headerStatus({
       source: context.project.source,
       draftLabel: context.draft.view.chip,

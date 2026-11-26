@@ -253,7 +253,7 @@ export function App() {
         onSelectManuscript={(id) => { void openFile(`manuscripts/${id}`); }}
         onSelectAllManuscripts={() => { void openFile('manuscripts'); }}
         session={session} loginEnabled={loginEnabled} onLogout={logout}
-        returnTo={returnTo} action={<>{draft.extra}{draft.action}</>} drawer={drawer}
+        returnTo={returnTo} action={draft.action} drawer={drawer}
       />
       <EditorArea
         workspace={workspace} activePath={activePath} isDir={isDir}
