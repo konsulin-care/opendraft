@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { FormattingToolbar } from './FormattingToolbar';
 import { TOOLBAR_ITEMS } from './toolbar-items';
@@ -275,12 +275,16 @@ describe('index.css responsive layout (source scan)', () => {
 describe('Responsive header actions (source scan)', () => {
   const read = (name: string) => readFileSync(resolve(__dirname, name), 'utf-8');
 
-  it('keeps header actions in a small-screen overflow menu', () => {
-    expect(read('HeaderOverflowMenu.tsx')).toMatch(/className="relative md:hidden"/);
+  it('removes the dead mobile overflow menu', () => {
+    expect(existsSync(resolve(__dirname, 'HeaderOverflowMenu.tsx'))).toBe(false);
+    expect(read('AppHeader.tsx')).not.toContain('HeaderOverflowMenu');
+  });
+  it('closes the switcher and account menus via the standalone outside-press hook', () => {
+    expect(read('header/ManuscriptSwitcher.tsx')).toContain("from './use-outside-close'");
+    expect(read('header/UserMenu.tsx')).toContain("from './use-outside-close'");
   });
   it('renders no mode switch anywhere in the header sources', () => {
     expect(read('AppHeader.tsx')).not.toContain('ModeSwitch');
-    expect(read('HeaderOverflowMenu.tsx')).not.toContain('onSelectMode');
   });
 });
 describe('Crepe selection toolbar stays enabled (source scan)', () => {

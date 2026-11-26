@@ -67,9 +67,8 @@ describe('PublishDialog send variant', () => {
     expect(
       screen.getByLabelText('Anything reviewers should know? (optional)'),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Send for review' }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Submit' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Submit' })).toBeInTheDocument();
   });
 });
 
@@ -78,6 +77,7 @@ describe('PublishDialog update variant', () => {
     renderDialog({ variant: 'update' });
 
     expect(screen.getByLabelText("What's new? (optional)")).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Send update' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send update' })).toBeInTheDocument();
     expect(screen.queryByLabelText('What did you change?')).toBeNull();
   });
@@ -127,18 +127,14 @@ describe('PublishDialog draft name', () => {
     expect(
       screen.getByText('Saved on GitHub as od-ada/fix-intro'),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Send for review' }),
-    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled();
   });
 
   it('keeps an empty required change field disabled', async () => {
     renderDialog({ variant: 'send' });
 
     await waitFor(() =>
-      expect(
-        screen.getByRole('button', { name: 'Send for review' }),
-      ).toBeDisabled(),
+      expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled(),
     );
   });
 });

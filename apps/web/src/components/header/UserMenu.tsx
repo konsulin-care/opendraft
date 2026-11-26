@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { BffSession } from '../../github/bff-client';
 import { installUrl, loginUrl } from '../../github/bff-client';
-import { useOutsideClose } from '../HeaderOverflowMenu';
+import { useOutsideClose } from './use-outside-close';
 
 /** Props for {@link UserMenu}. */
 export interface UserMenuProps {

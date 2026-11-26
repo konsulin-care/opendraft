@@ -70,3 +70,56 @@ describe('BottomSheet dismissal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('BottomSheet portal', () => {
+  it('mounts the dialog as a direct child of document.body', () => {
+    const { container } = render(
+      <BottomSheet title="Author details" onClose={vi.fn()}>
+        <p>Body content</p>
+      </BottomSheet>,
+    );
+    const dialog = screen.getByTestId('bottom-sheet');
+    expect(dialog.parentElement).toBe(document.body);
+    expect(container.contains(dialog)).toBe(false);
+  });
+
+  it('mounts the dialog outside a nested wrapper element', () => {
+    render(
+      <div data-testid="nested-wrapper">
+        <BottomSheet title="Author details" onClose={vi.fn()}>
+          <p>Body content</p>
+        </BottomSheet>
+      </div>,
+    );
+    const dialog = screen.getByTestId('bottom-sheet');
+    expect(screen.getByTestId('nested-wrapper').contains(dialog)).toBe(false);
+    expect(dialog.parentElement).toBe(document.body);
+  });
+
+  it('calls onClose once from the close button on the portaled dialog', () => {
+    const { onClose } = renderSheet();
+    const dialog = screen.getByTestId('bottom-sheet');
+    expect(dialog.parentElement).toBe(document.body);
+    fireEvent.click(screen.getByTestId('bottom-sheet-close'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('BottomSheet full-width layout', () => {
+  it('marks the dialog with the bottom-sheet layout class', () => {
+    renderSheet();
+    expect(screen.getByTestId('bottom-sheet').classList.contains('bottom-sheet')).toBe(true);
+  });
+
+  it('caps the scroll wrapper at 70vh minus the safe-area inset', () => {
+    renderSheet();
+    const wrapper = screen.getByTestId('bottom-sheet').firstElementChild as HTMLElement;
+    expect(wrapper.className).toContain('max-h-[calc(70vh-env(safe-area-inset-bottom))]');
+  });
+
+  it('renders the footer action inside the sheet dialog', () => {
+    renderSheet({ label: 'Open link', onClick: vi.fn() });
+    const dialog = screen.getByTestId('bottom-sheet');
+    expect(dialog.contains(screen.getByTestId('bottom-sheet-action'))).toBe(true);
+  });
+});

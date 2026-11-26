@@ -19,6 +19,9 @@ export interface DraftViewInput {
   pendingSaves: number;
 }
 
+/** Kind of the main draft action, used to pick its icon. */
+export type DraftActionKind = 'submit' | 'update' | 'new' | 'publish';
+
 /** Presentation of the draft header split button and status chip. */
 export interface DraftView {
   /** Label of the main action button. */
@@ -27,6 +30,8 @@ export interface DraftView {
   menu: string[];
   /** Status chip shown next to the draft name. */
   chip: string;
+  /** Kind of the main action, used to pick its icon. */
+  kind: DraftActionKind;
 }
 
 /** Action and menu derived from one suggestion state. */
@@ -35,21 +40,26 @@ interface DraftActions {
   primary: string;
   /** Entries of the split-button menu. */
   menu: string[];
+  /** Kind of the main action. */
+  kind: DraftActionKind;
 }
 
-const SEND_FOR_REVIEW: DraftActions = {
-  primary: 'Send for review',
+const SUBMIT: DraftActions = {
+  primary: 'Submit',
   menu: ['Save to GitHub', 'Rename draft'],
+  kind: 'submit',
 };
 
 const SEND_UPDATE: DraftActions = {
   primary: 'Send update',
   menu: ['Save to GitHub', 'View on GitHub'],
+  kind: 'update',
 };
 
 const START_NEW: DraftActions = {
   primary: 'Start a new draft',
   menu: ['View on GitHub'],
+  kind: 'new',
 };
 
 /**
@@ -59,7 +69,7 @@ const START_NEW: DraftActions = {
  * @returns The primary label and the menu entries.
  */
 function actionsFor(state: SuggestionState): DraftActions {
-  if (state === 'local-only' || state === 'draft') return SEND_FOR_REVIEW;
+  if (state === 'local-only' || state === 'draft') return SUBMIT;
   if (state === 'open' || state === 'revision-needed' || state === 'remote-moved') {
     return SEND_UPDATE;
   }
@@ -108,11 +118,11 @@ function withPendingSaves(chip: string, pendingSaves: number): string {
 export function draftView({ source, state, pendingSaves }: DraftViewInput): DraftView {
   const chip = withPendingSaves(chipFor(state), pendingSaves);
   if (source.kind === 'local') {
-    return { primary: 'Publish to GitHub', menu: [], chip };
+    return { primary: 'Publish to GitHub', menu: [], chip, kind: 'publish' };
   }
 
-  const { primary, menu } = actionsFor(state);
-  return { primary, menu: [...menu], chip };
+  const { primary, menu, kind } = actionsFor(state);
+  return { primary, menu: [...menu], chip, kind };
 }
 
 export default draftView;

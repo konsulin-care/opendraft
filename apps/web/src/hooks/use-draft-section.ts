@@ -1,4 +1,4 @@
-/** Header draft section: split action, status chip and workflow dialogs. */
+/** Header draft section: split action and workflow dialogs. */
 import { Fragment, createElement, useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { ProjectRecord, WorkspaceAdapter } from '@opendraft/workspace';
@@ -6,7 +6,6 @@ import type { BffSession, Owner } from '../github/bff-client';
 import { ConflictDialog } from '../components/draft/ConflictDialog';
 import { DraftAction } from '../components/draft/DraftAction';
 import type { DraftActionItem } from '../components/draft/DraftAction';
-import { StatusChip } from '../components/draft/StatusChip';
 import { PublishDialog } from '../components/publish/PublishDialog';
 import type { PublishDialogDraft, PublishDialogInput } from '../components/publish/PublishDialog';
 import { PublishRepoForm } from '../components/publish/PublishRepoForm';
@@ -16,6 +15,8 @@ import type { PreflightResult } from '../publish/preflight';
 import type { DraftNameStatus } from '../suggest/branches';
 import { useDraft } from './use-draft';
 import type { UseDraftDeps, UseDraftResult } from './use-draft';
+import { headerStatus } from './draft-header-status';
+import type { HeaderStatus } from './draft-header-status';
 
 type DialogMode = 'send' | 'update' | 'publish';
 type Gate = 'sign-in' | 'install';
@@ -29,7 +30,6 @@ export interface DraftSectionDeps extends UseDraftDeps {
   /** Injected draft-name check for the send dialog. */
   checkName?: (name: string) => Promise<DraftNameStatus>;
 }
-
 /** Input of `useDraftSection`. */
 export interface UseDraftSectionInput {
   /** Active project, or null before boot completes. */
@@ -43,13 +43,12 @@ export interface UseDraftSectionInput {
   /** Draft workflow dependencies, plus optional UI hooks. */
   deps: DraftSectionDeps;
 }
-
 /** Nodes handed to the shared header and dialog layer. */
 export interface DraftSection {
   /** Split action button for the draft workflow. */
   action: ReactNode;
-  /** Status chip shown next to the draft name. */
-  extra: ReactNode;
+  /** Header status for the title trigger and details panel, or null before boot. */
+  status: HeaderStatus | null;
   /** Modal dialogs and gate popovers, or null when nothing is open. */
   dialogs: ReactNode;
 }
@@ -87,7 +86,6 @@ function hasAccess(context: SectionContext): boolean {
   }
   return true;
 }
-
 function runAction(context: SectionContext, label: string): void {
   if (label === 'View on GitHub') {
     const url = context.draft.status?.url;
@@ -99,11 +97,10 @@ function runAction(context: SectionContext, label: string): void {
   else if (label === 'Start a new draft') void context.draft.startNew();
   else if (label === 'Publish to GitHub') context.openDialog('publish');
   else if (label === 'Send update') context.openDialog('update');
-  else if (label === 'Send for review' || label === 'Rename draft') {
+  else if (label === 'Submit' || label === 'Rename draft') {
     context.openDialog('send');
   }
 }
-
 function actionNode(context: SectionContext | null): ReactNode {
   if (context === null) return null;
   const { view, busy } = context.draft;
@@ -113,30 +110,11 @@ function actionNode(context: SectionContext | null): ReactNode {
     label: view.primary,
     items: view.menu,
     busy,
+    kind: view.kind,
     onPrimary: () => runAction(context, view.primary),
     onMenu,
   });
 }
-
-function chipNode(context: SectionContext | null): ReactNode {
-  if (context === null) return null;
-  const { project, draft } = context;
-  if (project.source.kind !== 'github') {
-    return h(StatusChip, {
-      label: draft.view.chip,
-      notice: draft.error ?? draft.notice,
-    });
-  }
-  return h(StatusChip, {
-    label: draft.view.chip,
-    owner: project.source.owner,
-    repo: project.source.repo,
-    draftName: project.source.branch,
-    pullRequestUrl: draft.status?.url,
-    notice: draft.error ?? draft.notice,
-  });
-}
-
 function dialogDraft(project: ProjectRecord, session: BffSession | null): PublishDialogDraft {
   const source = project.source;
   if (source.kind !== 'github') {
@@ -150,7 +128,6 @@ function dialogDraft(project: ProjectRecord, session: BffSession | null): Publis
     pushed: source.pushed,
   };
 }
-
 async function submitDialog(
   mode: 'send' | 'update',
   draft: UseDraftResult,
@@ -159,7 +136,6 @@ async function submitDialog(
   if (mode === 'send') await draft.send({ name: input.draftName, note: input.note, title: input.change });
   else await draft.update({ message: input.note });
 }
-
 function sendDialog(context: SectionContext, mode: 'send' | 'update', close: () => void) {
   const { deps, workspace } = context;
   const runner = deps.runPreflight;
@@ -173,7 +149,6 @@ function sendDialog(context: SectionContext, mode: 'send' | 'update', close: () 
     onClose: close,
   });
 }
-
 function publishForm(context: SectionContext, props: Pick<DialogNodesProps, 'running' | 'result' | 'closeDialog'>) {
   const { running, result, closeDialog } = props;
   const publish = async (input: PublishRepoInput): Promise<void> => {
@@ -194,7 +169,6 @@ function publishForm(context: SectionContext, props: Pick<DialogNodesProps, 'run
     onPublish: publish,
   });
 }
-
 function publishDialog(context: SectionContext, props: Pick<DialogNodesProps, 'running' | 'result' | 'closeDialog'>) {
   const close = props.closeDialog;
   const panel = h(
@@ -206,7 +180,6 @@ function publishDialog(context: SectionContext, props: Pick<DialogNodesProps, 'r
   );
   return h('div', { role: 'dialog', 'aria-label': 'Publish to GitHub', className: MODAL }, panel);
 }
-
 function gatePopover(gate: Gate, context: SectionContext, close: () => void) {
   const source = context.project.source;
   const route = source.kind === 'github'
@@ -214,7 +187,6 @@ function gatePopover(gate: Gate, context: SectionContext, close: () => void) {
     : { owner: '', repo: '' };
   return h(EditPopover, { variant: gate, route, onClose: close });
 }
-
 function dialogNodes(props: DialogNodesProps): ReactNode {
   const { context, mode, gate, running, result, closeDialog, closeGate } = props;
   const source = context.project.source;
@@ -231,7 +203,6 @@ function dialogNodes(props: DialogNodesProps): ReactNode {
   if (gate !== null) children.push(gatePopover(gate, context, closeGate));
   return children.length === 0 ? null : h(Fragment, null, ...children);
 }
-
 function useLocalPreflight(
   enabled: boolean,
   workspace: WorkspaceAdapter | null,
@@ -272,12 +243,11 @@ function useLocalPreflight(
   }, [enabled, run]);
   return { running, result };
 }
-
 /**
- * Build the header action, status chip and workflow dialogs for a project.
+ * Build the header action, status and workflow dialogs for a project.
  *
  * @param input - Active project, workspace, session, owners and draft deps.
- * @returns The action node, status chip node and dialogs node.
+ * @returns The action node, header status and dialogs node.
  */
 export function useDraftSection({ project, workspace, session, owners, deps }: UseDraftSectionInput): DraftSection {
   const draft = useDraft(project, deps);
@@ -291,7 +261,13 @@ export function useDraftSection({ project, workspace, session, owners, deps }: U
   const closeGate = useCallback(() => setGate(null), []);
   return {
     action: actionNode(context),
-    extra: chipNode(context),
+    status: context === null ? null : headerStatus({
+      source: context.project.source,
+      draftLabel: context.draft.view.chip,
+      status: context.draft.status,
+      error: context.draft.error,
+      notice: context.draft.notice,
+    }),
     dialogs: context === null ? null : dialogNodes({
       context, mode, gate, running: local.running, result: local.result, closeDialog, closeGate,
     }),

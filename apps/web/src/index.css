@@ -626,6 +626,20 @@ textarea {
   }
 }
 
+/* ── Touch bottom sheet ── */
+/* A modal <dialog> inherits `max-width: calc(100% - 6px - 2em)` from the user
+   agent stylesheet, which leaves the sheet short of the right edge on phones
+   while the UA `inset-inline: 0` keeps it flush left. Pin it to the viewport
+   instead, and keep the footer action clear of the bottom gesture bar. */
+.bottom-sheet {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  width: 100%;
+  max-width: none;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 /* ── Citekey inline decorations (subtle pill) ── */
 .citekey-link {
   color: var(--color-blue-600);

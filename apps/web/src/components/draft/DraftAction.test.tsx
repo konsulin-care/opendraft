@@ -37,6 +37,16 @@ describe('DraftAction split button', () => {
     expect(onPrimary).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the full label as name and title with the text hidden below 400px', () => {
+    render(<DraftAction {...props({ label: 'Submit' })} />);
+
+    const main = screen.getByRole('button', { name: 'Submit' });
+    expect(main).toHaveClass('whitespace-nowrap', 'shrink-0');
+    expect(main).toHaveAttribute('title', 'Submit');
+    expect(screen.getByRole('button', { name: 'More actions' })).toHaveClass('shrink-0');
+    expect(screen.getByText('Submit')).toHaveClass('hidden', 'min-[400px]:inline');
+  });
+
   it('opens the chevron menu and reports the chosen item', () => {
     const onMenu = vi.fn();
     render(<DraftAction {...props({ onMenu })} />);
@@ -47,6 +57,19 @@ describe('DraftAction split button', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Send for review' }));
     expect(onMenu).toHaveBeenCalledWith('Send for review');
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+});
+
+describe('DraftAction icon', () => {
+  it.each([
+    ['submit', 'lucide-send'],
+    ['update', 'lucide-send'],
+    ['new', 'lucide-file-plus'],
+    ['publish', 'lucide-upload'],
+  ] as const)('shows the %s icon', (kind, icon) => {
+    const { container } = render(<DraftAction {...props({ kind })} />);
+
+    expect(container.querySelector(`.${icon}`)).toBeInTheDocument();
   });
 });
 

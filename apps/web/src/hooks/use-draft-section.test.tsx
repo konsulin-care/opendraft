@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * Draft section tests: the hook exposes the split action, status chip and the
+ * Draft section tests: the hook exposes the split action, header status and the
  * send, publish and conflict dialogs as project state changes.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -101,20 +101,32 @@ function Section(input: UseDraftSectionInput) {
   return (
     <div>
       {section.action}
-      {section.extra}
+      {section.status !== null ? (
+        <span data-testid="draft-label">{section.status.draftLabel}</span>
+      ) : null}
+      {section.status?.notice ? (
+        <span data-testid="draft-notice">{section.status.notice}</span>
+      ) : null}
       {section.dialogs}
     </div>
   );
 }
 
-describe('useDraftSection action and chip', () => {
-  it('labels the action for an unsent draft and shows a status chip', async () => {
+describe('useDraftSection action and status', () => {
+  it('labels the action for an unsent draft and exposes the draft status', async () => {
     render(<Section {...makeInput(DRAFT, makeDeps())} />);
 
-    expect(screen.getByRole('button', { name: 'Send for review' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Submit' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Draft' })).not.toBeInTheDocument();
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Draft' })).toBeInTheDocument(),
+      expect(screen.getByTestId('draft-label')).toHaveTextContent('Draft'),
     );
+  });
+
+  it('shows the Send icon on the unsent draft action', () => {
+    const { container } = render(<Section {...makeInput(DRAFT, makeDeps())} />);
+
+    expect(container.querySelector('.lucide-send')).toBeInTheDocument();
   });
 
   it('labels the action for a local project with Publish to GitHub', () => {
@@ -164,8 +176,8 @@ describe('useDraftSection local preflight', () => {
   });
 });
 
-describe('useDraftSection status chip', () => {
-  it('shows the draft error text in the status chip when an action fails', async () => {
+describe('useDraftSection status', () => {
+  it('carries the draft error in the status when an action fails', async () => {
     const deps = makeDeps({
       save: vi.fn(async () => {
         throw new Error('Could not save');
@@ -174,31 +186,31 @@ describe('useDraftSection status chip', () => {
     render(<Section {...makeInput(DRAFT, deps)} />);
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Draft' })).toBeInTheDocument(),
+      expect(screen.getByTestId('draft-label')).toHaveTextContent('Draft'),
     );
     fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Save to GitHub' }));
 
-    expect(
-      await screen.findByRole('button', { name: 'Could not save' }),
-    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('draft-notice')).toHaveTextContent('Could not save'),
+    );
   });
 
-  it('shows the regular notice in the status chip when there is no draft error', async () => {
+  it('carries the regular notice in the status when there is no draft error', async () => {
     const deps = makeDeps({
       save: vi.fn(async (): Promise<SaveGitHubResult> => ({ kind: 'saved' as const, sha: 'next-sha' })),
     });
     render(<Section {...makeInput(DRAFT, deps)} />);
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Draft' })).toBeInTheDocument(),
+      expect(screen.getByTestId('draft-label')).toHaveTextContent('Draft'),
     );
     fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Save to GitHub' }));
 
-    expect(
-      await screen.findByRole('button', { name: 'Saved to GitHub' }),
-    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('draft-notice')).toHaveTextContent('Saved to GitHub'),
+    );
   });
 });
 
@@ -206,10 +218,10 @@ describe('useDraftSection dialogs', () => {
   it('opens the send dialog from the primary action of a draft', async () => {
     render(<Section {...makeInput(DRAFT, makeDeps())} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Send for review' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
 
     expect(
-      await screen.findByRole('dialog', { name: 'Send for review' }),
+      await screen.findByRole('dialog', { name: 'Submit' }),
     ).toBeInTheDocument();
     expect(screen.getByText('What did you change?')).toBeInTheDocument();
   });
@@ -257,12 +269,12 @@ describe('useDraftSection send dialog', () => {
     const deps = makeDeps();
     render(<Section {...makeInput(DRAFT, deps)} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Send for review' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Send for review' });
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Submit' });
     fireEvent.change(screen.getByLabelText('What did you change?'), {
       target: { value: 'Fix the abstract' },
     });
-    const submit = within(dialog).getByRole('button', { name: 'Send for review' });
+    const submit = within(dialog).getByRole('button', { name: 'Submit' });
     await waitFor(() => expect(submit).toBeEnabled());
     fireEvent.click(submit);
 

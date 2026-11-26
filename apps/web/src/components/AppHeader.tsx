@@ -1,70 +1,34 @@
-import {
-  BookOpenText,
-  Check,
-  CircleAlert,
-  LoaderCircle,
-  SquareArrowUpRightExit,
-} from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 import type { ReactNode, RefObject } from 'react';
+import { BookOpenText } from 'lucide-react';
 import type { ProjectSource } from '@opendraft/workspace';
 import type { BffSession } from '../github/bff-client';
+import type { HeaderStatus } from '../hooks/draft-header-status';
 import { PROJECT_DRAWER_ID } from './project-drawer/ProjectDrawer';
-import { HeaderOverflowMenu } from './HeaderOverflowMenu';
+import { DetailsPanel } from './header/DetailsPanel';
+import { DraftStateChip } from './header/DraftStateChip';
 import { HeaderShell } from './header/HeaderShell';
+import { InlineEditField } from './InlineEditField';
+import { ManuscriptPicker } from './header/ManuscriptPicker';
 import { ManuscriptSwitcher } from './header/ManuscriptSwitcher';
 import type { ManuscriptSwitcherOption } from './header/ManuscriptSwitcher';
+import { RepoSubtitle } from './header/RepoSubtitle';
 import { repoSubtitle } from './header/repo-subtitle';
+import { TitleTrigger } from './header/TitleTrigger';
+import { useHeaderOverlays } from './header/use-header-overlays';
+import type { HeaderOverlays } from './header/use-header-overlays';
 import { UserMenu } from './header/UserMenu';
-import { InlineEditField } from './InlineEditField';
 
 /** Autosave state shown in the header. */
 export type SaveStatus = 'saved' | 'saving' | 'error';
 
-const SAVE_STATE: Record<SaveStatus, { label: string; Icon: LucideIcon; iconClass: string }> = {
-  saving: { label: 'Saving', Icon: LoaderCircle, iconClass: 'animate-spin text-gray-500' },
-  saved: { label: 'Saved', Icon: Check, iconClass: 'text-green-700' },
-  error: { label: 'Save failed', Icon: CircleAlert, iconClass: 'text-red-700' },
-};
+/** Id of the manuscript details panel controlled by the title trigger. */
+const DETAILS_PANEL_ID = 'details-panel';
 
 const ICON_BUTTON =
   'inline-flex items-center justify-center rounded-md p-2 text-gray-600 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-500';
 
 /** Inert sign-out handler for headers rendered without a session shell. */
 const NOOP_LOGOUT = (): void => {};
-
-/** Props for {@link SaveIndicator}. */
-interface SaveIndicatorProps {
-  /** Current autosave state. */
-  status: SaveStatus;
-}
-
-/** Autosave state with icon and label, announced politely to screen readers. */
-function SaveIndicator({ status }: SaveIndicatorProps) {
-  const { label, Icon, iconClass } = SAVE_STATE[status];
-  return (
-    <span role="status" aria-live="polite" className="flex shrink-0 items-center gap-1 text-xs text-gray-600">
-      <Icon className={`h-3.5 w-3.5 ${iconClass}`} aria-hidden="true" />
-      {label}
-    </span>
-  );
-}
-
-/** Props for {@link HeaderActions}. */
-interface HeaderActionsProps {
-  /** Main action shown before the mobile overflow menu. */
-  action?: ReactNode;
-}
-
-/** Right-hand header controls: the main action slot and the overflow menu. */
-function HeaderActions({ action }: HeaderActionsProps) {
-  return (
-    <div className="flex items-center gap-1">
-      {action}
-      <HeaderOverflowMenu />
-    </div>
-  );
-}
 
 /** Props for {@link DrawerToggle}. */
 interface DrawerToggleProps {
@@ -98,90 +62,80 @@ function DrawerToggle({ sidebarOpen, onToggle, toggleButtonRef }: DrawerTogglePr
 interface HeaderTitleProps {
   /** Display name of the open manuscript, falling back to the dir name. */
   title?: string;
-  /** Manuscripts offered by the switcher. */
+  /** Whether the details panel is open. */
+  open: boolean;
+  /** Called when the title trigger is activated. */
+  onToggle: () => void;
+  /** Receives the trigger element so closing can return focus to it. */
+  triggerRef: RefObject<HTMLButtonElement | null>;
+  /** Current autosave state. */
+  saveStatus: SaveStatus;
+  /** Draft status supplying the notice and attention dot. */
+  status?: HeaderStatus;
+  /** Called with the trimmed name when the desktop field saves. */
+  onRename?: (value: string) => void | Promise<void>;
+  /** Manuscripts offered by the desktop switcher. */
   manuscripts?: readonly ManuscriptSwitcherOption[];
   /** Id of the manuscript currently open. */
   currentId?: string;
-  /** Called with the trimmed title when the user renames the manuscript. */
-  onRenameManuscript?: (name: string) => void | Promise<void>;
-  /** Called with the id of the manuscript chosen in the switcher. */
+  /** Called with the id chosen in the desktop switcher. */
   onSelect?: (id: string) => void;
-  /** Adds an "All manuscripts" entry to the switcher when given. */
-  onSelectAll?: () => void;
 }
 
-/** Header title column: the inline-editable title next to the switcher. */
+/**
+ * Header title slot in two CSS-switched variants: the details trigger below
+ * `md`, and an inline-editable name with the manuscript switcher from `md` up.
+ * Both variants live in the DOM; only one is visible per breakpoint.
+ *
+ * @param props - See {@link HeaderTitleProps}.
+ * @returns The mobile trigger and the desktop inline title.
+ */
 function HeaderTitle({
   title,
+  open,
+  onToggle,
+  triggerRef,
+  saveStatus,
+  status,
+  onRename,
   manuscripts,
   currentId,
-  onRenameManuscript,
   onSelect,
-  onSelectAll,
 }: HeaderTitleProps) {
+  const canSwitch = (manuscripts?.length ?? 0) >= 2 && onSelect !== undefined;
   return (
-    <span
-      data-testid="header-title"
-      className="flex min-w-0 items-center gap-1 text-left"
-    >
-      {title !== undefined && (
-        <InlineEditField
-          value={title}
-          label="Manuscript name"
-          testId="manuscript-title"
-          onSave={onRenameManuscript}
+    <>
+      <span className="flex min-w-0 items-center gap-1 md:hidden">
+        <TitleTrigger
+          title={title}
+          open={open}
+          panelId={DETAILS_PANEL_ID}
+          onToggle={onToggle}
+          triggerRef={triggerRef}
+          saveStatus={saveStatus}
+          notice={status?.notice}
+          attention={status?.attention}
         />
-      )}
-      {onSelect !== undefined && (
-        <ManuscriptSwitcher
-          manuscripts={manuscripts ?? []}
-          currentId={currentId}
-          onSelect={onSelect}
-          onSelectAll={onSelectAll}
-        />
-      )}
-    </span>
+      </span>
+      <span className="hidden min-w-0 items-center gap-1 md:flex">
+        {title !== undefined && (
+          <InlineEditField
+            value={title}
+            label="Manuscript name"
+            testId="manuscript-title-inline"
+            onSave={onRename}
+          />
+        )}
+        {canSwitch && (
+          <ManuscriptSwitcher
+            manuscripts={manuscripts ?? []}
+            currentId={currentId}
+            onSelect={onSelect}
+          />
+        )}
+      </span>
+    </>
   );
-}
-
-/** Props for {@link RepoSubtitle}. */
-interface RepoSubtitleProps {
-  /** Plain-language location label. */
-  prefix: string;
-  /** Repository in `owner/repo` form. */
-  repo?: string;
-  /** GitHub URL of the repository. */
-  href?: string;
-}
-
-/** Subtitle with a plain prefix and an optional linked repo and external icon. */
-function RepoSubtitle({ prefix, repo, href }: RepoSubtitleProps) {
-  return (
-    <span className="flex min-w-0 items-center gap-1">
-      <span>{prefix}</span>
-      {repo !== undefined && href !== undefined && (
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex min-w-0 items-center gap-0.5 text-black underline decoration-dashed underline-offset-2"
-        >
-          <span className="truncate">{repo}</span>
-          <SquareArrowUpRightExit className="size-3 shrink-0" aria-hidden="true" />
-        </a>
-      )}
-    </span>
-  );
-}
-
-/** Account menu node for the header's trailing slot. */
-function HeaderUserMenu(props: {
-  session: BffSession | null;
-  returnTo: string;
-  onLogout: () => void;
-  loginEnabled: boolean;
-}) {
-  return <UserMenu {...props} />;
 }
 
 /** Props for {@link AppHeader}. */
@@ -198,12 +152,12 @@ export interface AppHeaderProps {
   manuscriptId?: string;
   /** Called with the trimmed title when the user renames the manuscript. */
   onRenameManuscript?: (name: string) => void | Promise<void>;
-  /** Called with the id of the manuscript chosen in the switcher. */
+  /** Called with the id of the manuscript chosen in the picker. */
   onSelectManuscript?: (id: string) => void;
-  /** Adds an "All manuscripts" entry to the switcher when given. */
-  onSelectAllManuscripts?: () => void;
   /** Current autosave state. */
   saveStatus: SaveStatus;
+  /** Draft status shown in the details panel and the trigger dot. */
+  status?: HeaderStatus;
   /** Main action slot rendered before the account menu. */
   action?: ReactNode;
   /** Signed-in session, or null for a signed-out viewer. */
@@ -230,58 +184,113 @@ export interface AppHeaderProps {
   onSelectMode?: (mode: 'wysiwyg' | 'source') => void;
 }
 
+/** Props for {@link AppHeaderShell}. */
+interface AppHeaderShellProps extends AppHeaderProps {
+  overlays: HeaderOverlays;
+}
+
 /**
- * Editor header built on the shared two-line shell: drawer toggle, editable
- * manuscript title with its switcher, read-only repo subtitle, autosave
- * state, main action and account menu.
+ * Pick the overlay surface for the current header view.
+ *
+ * @param props - Header props carrying the overlay state.
+ * @param title - Resolved manuscript title shown in the details panel.
+ * @returns The details panel, the manuscript picker, or null when closed.
+ */
+function panelSlot(props: AppHeaderShellProps, title: string | undefined): ReactNode {
+  const { overlays } = props;
+  if (overlays.view === 'closed') return null;
+
+  if (overlays.view === 'picker') {
+    return (
+      <ManuscriptPicker
+        manuscripts={props.manuscripts ?? []}
+        currentId={props.manuscriptId}
+        onPick={(id) => {
+          overlays.pick();
+          props.onSelectManuscript?.(id);
+        }}
+        onClose={overlays.dismiss}
+      />
+    );
+  }
+
+  const canSwitch =
+    (props.manuscripts?.length ?? 0) >= 2 && props.onSelectManuscript !== undefined;
+  return (
+    <DetailsPanel
+      id={DETAILS_PANEL_ID}
+      onClose={overlays.dismiss}
+      onOpenPicker={canSwitch ? overlays.openPicker : undefined}
+      switchRef={canSwitch ? overlays.switchRef : undefined}
+      name={title}
+      onRename={props.onRenameManuscript}
+      source={props.source}
+      saveStatus={props.saveStatus}
+      status={props.status}
+    />
+  );
+}
+
+function AppHeaderShell(props: AppHeaderShellProps) {
+  const title = props.manuscriptName ?? props.manuscriptDir;
+  return (
+    <HeaderShell
+      leading={
+        <DrawerToggle
+          sidebarOpen={props.sidebarOpen ?? false}
+          onToggle={props.onToggleSidebar}
+          toggleButtonRef={props.toggleButtonRef}
+        />
+      }
+      title={
+        <HeaderTitle
+          title={title}
+          open={props.overlays.view !== 'closed'}
+          onToggle={props.overlays.toggleDetails}
+          triggerRef={props.overlays.triggerRef}
+          saveStatus={props.saveStatus}
+          status={props.status}
+          onRename={props.onRenameManuscript}
+          manuscripts={props.manuscripts}
+          currentId={props.manuscriptId}
+          onSelect={props.onSelectManuscript}
+        />
+      }
+      subtitle={props.source ? <RepoSubtitle {...repoSubtitle(props.source)} /> : undefined}
+      action={
+        <div className="flex min-w-0 items-center gap-1.5">
+          {props.status?.draftLabel ? <DraftStateChip label={props.status.draftLabel} /> : null}
+          {props.action}
+        </div>
+      }
+      userMenu={
+        <UserMenu
+          session={props.session ?? null}
+          returnTo={props.returnTo ?? '/'}
+          onLogout={props.onLogout ?? NOOP_LOGOUT}
+          loginEnabled={props.loginEnabled ?? true}
+        />
+      }
+      panel={<div className="md:hidden">{panelSlot(props, title)}</div>}
+    />
+  );
+}
+
+/**
+ * Editor header built on the shared two-line shell: drawer toggle, title
+ * trigger with its live save status, read-only repo subtitle, main action and
+ * account menu. Activating the title opens a details panel with the editable
+ * manuscript name and the draft status; from there a picker selects another
+ * manuscript.
  *
  * @param props - See {@link AppHeaderProps}.
- * @returns The editor header.
+ * @returns The editor header with its optional overlay surface.
  */
-export function AppHeader({
-  manuscriptName,
-  manuscriptDir,
-  source,
-  manuscripts,
-  manuscriptId,
-  onRenameManuscript,
-  onSelectManuscript,
-  onSelectAllManuscripts,
-  saveStatus,
-  action,
-  session = null,
-  loginEnabled = true,
-  onLogout = NOOP_LOGOUT,
-  returnTo = '/',
-  onToggleSidebar,
-  sidebarOpen = false,
-  toggleButtonRef,
-}: AppHeaderProps) {
+export function AppHeader(props: AppHeaderProps) {
+  const overlays = useHeaderOverlays(props.sidebarOpen ?? false);
   return (
-    <div data-testid="app-header">
-      <HeaderShell
-        leading={
-          <DrawerToggle
-            sidebarOpen={sidebarOpen}
-            onToggle={onToggleSidebar}
-            toggleButtonRef={toggleButtonRef}
-          />
-        }
-        title={
-          <HeaderTitle
-            title={manuscriptName ?? manuscriptDir}
-            manuscripts={manuscripts}
-            currentId={manuscriptId}
-            onRenameManuscript={onRenameManuscript}
-            onSelect={onSelectManuscript}
-            onSelectAll={onSelectAllManuscripts}
-          />
-        }
-        subtitle={source ? <RepoSubtitle {...repoSubtitle(source)} /> : undefined}
-        extra={<SaveIndicator status={saveStatus} />}
-        action={<HeaderActions action={action} />}
-        userMenu={<HeaderUserMenu session={session} returnTo={returnTo} onLogout={onLogout} loginEnabled={loginEnabled} />}
-      />
+    <div data-testid="app-header" ref={overlays.containerRef}>
+      <AppHeaderShell {...props} overlays={overlays} />
     </div>
   );
 }

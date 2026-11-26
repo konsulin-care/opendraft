@@ -15,17 +15,32 @@ export interface HeaderShellProps {
   action?: ReactNode;
   /** Account menu at the far right. */
   userMenu?: ReactNode;
+  /**
+   * Optional details panel rendered inside the header after the main row.
+   * When supplied, the subtitle is hidden below the `md` breakpoint to make
+   * room for the panel on narrow screens.
+   */
+  panel?: ReactNode;
 }
 
 /**
  * Shared two-line header used by the reader and the editor.
  *
- * The leading slot sits next to a flexible title column: the title on line
- * one and a plain, ellipsis-truncated subtitle on line two. Status content,
- * the main action and the account menu follow on the right. The bar keeps
- * the app bar height and border styling of the editor header.
+ * The main row places the leading slot next to a flexible title column: the
+ * title on line one and a plain subtitle on line two. The subtitle is clipped
+ * by its own inner text span rather than by this wrapper, so a dashed link
+ * underline is never cut off, and the column grows instead of clipping when
+ * both lines need more than one bar row. Status content, the main action and
+ * the account menu follow on the right.
+ * An optional panel slot is rendered inside the header after that row; the
+ * header is relatively positioned so the panel can anchor to it. Supplying a
+ * panel hides the subtitle below `md`, leaving the reader header unchanged.
+ * The bar keeps the app bar height, compact spacing and border styling of the
+ * editor header, and the title column keeps a minimum width so the layout
+ * holds at 320px.
  *
  * @param props - See {@link HeaderShellProps}.
+ * @returns The shared header shell with its optional details panel.
  */
 export function HeaderShell({
   leading,
@@ -34,24 +49,32 @@ export function HeaderShell({
   extra,
   action,
   userMenu,
+  panel,
 }: HeaderShellProps) {
+  const subtitleClassName =
+    panel !== undefined
+      ? 'hidden w-full min-w-0 text-xs font-normal leading-5 text-gray-700 md:block'
+      : 'block w-full min-w-0 text-xs font-normal leading-5 text-gray-700';
+
   return (
     <header
-      className={`flex items-center gap-2 border-b border-gray-200 bg-white px-3 py-2 ${APP_BAR_HEIGHT}`}
+      className={`relative flex flex-col gap-1.5 border-b border-gray-200 bg-white px-2 py-2 sm:gap-2 sm:px-3 ${APP_BAR_HEIGHT}`}
       data-testid="header-shell"
     >
-      {leading}
-      <div className="flex h-9 min-w-0 flex-1 flex-col items-start justify-center text-left">
-        <div className="min-w-0 max-w-full">{title}</div>
-        {subtitle !== undefined && (
-          <span className="block w-full truncate text-xs font-normal text-gray-700">
-            {subtitle}
-          </span>
-        )}
+      <div className="flex min-h-0 flex-1 items-center gap-1.5 sm:gap-2">
+        {leading}
+        <div
+          className="flex min-h-9 min-w-[7rem] flex-1 flex-col items-start justify-center text-left"
+          data-testid="header-title-column"
+        >
+          <div className="min-w-0 max-w-full">{title}</div>
+          {subtitle !== undefined && <span className={subtitleClassName}>{subtitle}</span>}
+        </div>
+        {extra}
+        {action}
+        {userMenu}
       </div>
-      {extra}
-      {action}
-      {userMenu}
+      {panel}
     </header>
   );
 }

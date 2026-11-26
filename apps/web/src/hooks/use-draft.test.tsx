@@ -72,7 +72,7 @@ describe('useDraft loading', () => {
     expect(deps.load).toHaveBeenCalledWith(PROJECT);
     expect(result.current.status).toEqual({ state: 'draft' });
     expect(result.current.pendingSaves).toBe(1);
-    expect(result.current.view.primary).toBe('Send for review');
+    expect(result.current.view.primary).toBe('Submit');
     expect(result.current.view.chip).toBe('Draft · 1 save waiting to upload');
   });
 

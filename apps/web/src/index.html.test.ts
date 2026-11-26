@@ -30,3 +30,11 @@ describe('index.html font loading', () => {
     expect(preconnectIdx).toBeLessThan(titleIdx);
   });
 });
+
+describe('index.html viewport', () => {
+  it('declares viewport-fit=cover so safe-area insets resolve', () => {
+    expect(html).toContain(
+      '<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />',
+    );
+  });
+});
