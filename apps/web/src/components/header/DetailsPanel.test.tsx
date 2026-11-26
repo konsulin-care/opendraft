@@ -145,12 +145,48 @@ describe('DetailsPanel status row', () => {
   });
 });
 
-describe('DetailsPanel scrim', () => {
-  it('closes through the scrim button labelled close details', () => {
+describe('DetailsPanel picker switch', () => {
+  it('keeps the editable name and calls onOpenPicker from the switch button', () => {
+    const onOpenPicker = vi.fn();
+    renderPanel({ onOpenPicker });
+
+    const input = within(panel()).getByLabelText('Manuscript name');
+    expect(input).toHaveValue('Alpha study');
+
+    const button = within(panel()).getByRole('button', { name: 'Switch manuscript' });
+    expect(button).toHaveAttribute('aria-haspopup', 'dialog');
+
+    fireEvent.click(button);
+
+    expect(onOpenPicker).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders the plain editable field without a switch button when onOpenPicker is absent', () => {
+    renderPanel();
+
+    expect(within(panel()).getByLabelText('Manuscript name')).toBeInTheDocument();
+    expect(within(panel()).queryByRole('button', { name: 'Switch manuscript' })).toBeNull();
+  });
+});
+
+describe('DetailsPanel close controls', () => {
+  it('closes through the close details button', () => {
     const onClose = vi.fn();
     renderPanel({ onClose });
 
     fireEvent.click(screen.getByRole('button', { name: 'Close details' }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes through the aria-hidden scrim below md', () => {
+    const onClose = vi.fn();
+    renderPanel({ onClose });
+
+    const scrim = screen.getByTestId('surface-scrim');
+    expect(scrim).toHaveAttribute('aria-hidden', 'true');
+
+    fireEvent.click(scrim);
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
