@@ -38,7 +38,7 @@ function stubBodyHeight(height: number): void { Object.defineProperty(screen.get
 /** Stub `window.matchMedia` so the narrow-viewport query matches or not. */
 function stubNarrowViewport(narrow: boolean): void {
   Object.defineProperty(window, 'matchMedia', { configurable: true, writable: true,
-    value: (query: string) => ({ matches: narrow && query.includes('639'), media: query,
+    value: (query: string) => ({ matches: narrow && query.includes('767'), media: query,
       addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {}, onchange: null, dispatchEvent: () => false }) });
 }
 /** Seed a memory workspace with manuscript metadata files. */
@@ -64,7 +64,7 @@ describe('MetadataPanel collapsed bar', () => {
     expect(screen.getByTestId('metadata-panel-bar-title').textContent).toBe('Deep Dive');
     expect(screen.getByTestId('metadata-panel-byline').textContent).toContain('Smith A. M., Lee B.');
   });
-  it('shows "N authors" below the 640px breakpoint', async () => {
+  it('shows "N authors" below the md breakpoint', async () => {
     stubNarrowViewport(true);
     localStorage.setItem(metadataPanelStorageKey(PROJECT), 'collapsed');
     await renderPanel();
