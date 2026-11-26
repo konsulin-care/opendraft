@@ -153,7 +153,7 @@ describe('DetailsPanel picker switch', () => {
     const input = within(panel()).getByLabelText('Manuscript name');
     expect(input).toHaveValue('Alpha study');
 
-    const button = within(panel()).getByRole('button', { name: 'Switch manuscript' });
+    const button = within(panel()).getByRole('button', { name: 'Choose manuscript' });
     expect(button).toHaveAttribute('aria-haspopup', 'dialog');
 
     fireEvent.click(button);
@@ -165,7 +165,7 @@ describe('DetailsPanel picker switch', () => {
     renderPanel();
 
     expect(within(panel()).getByLabelText('Manuscript name')).toBeInTheDocument();
-    expect(within(panel()).queryByRole('button', { name: 'Switch manuscript' })).toBeNull();
+    expect(within(panel()).queryByRole('button', { name: 'Choose manuscript' })).toBeNull();
   });
 });
 

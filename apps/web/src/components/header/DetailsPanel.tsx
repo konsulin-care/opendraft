@@ -149,8 +149,8 @@ function ManuscriptRow({ name, onRename, onOpenPicker, switchRef }: ManuscriptRo
           <button
             ref={switchRef}
             type="button"
-            aria-label="Switch manuscript"
-            title="Switch manuscript"
+            aria-label="Choose manuscript"
+            title="Choose manuscript"
             aria-haspopup="dialog"
             onClick={onOpenPicker}
             className={SWITCH_BUTTON_CLASS}

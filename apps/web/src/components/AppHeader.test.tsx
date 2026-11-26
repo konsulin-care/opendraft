@@ -147,13 +147,13 @@ describe('AppHeader desktop title', () => {
     const onSelectManuscript = vi.fn();
     renderHeader({ manuscripts: MANUSCRIPTS, manuscriptId: 'intro', onSelectManuscript });
     const switcher = screen.getByRole('button', { name: 'Switch manuscript' });
+    expect(screen.getAllByRole('button', { name: 'Switch manuscript' })).toHaveLength(1);
     expect(hasAncestorClass(switcher, 'md:flex')).toBe(true);
     fireEvent.click(switcher);
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Methods' }));
     expect(onSelectManuscript).toHaveBeenCalledWith('methods');
   });
 });
-
 describe('AppHeader fork subtitle', () => {
   it('describes forks with their upstream repository', () => {
     renderHeader({ source: FORK_SOURCE });
@@ -227,7 +227,7 @@ describe('AppHeader manuscript picker', () => {
     renderHeader({ manuscripts: MANUSCRIPTS, manuscriptId: 'intro', onSelectManuscript });
     fireEvent.click(screen.getByRole('button', { name: 'intro' }));
     const panel = screen.getByRole('region', { name: 'Manuscript details' });
-    fireEvent.click(within(panel).getByRole('button', { name: 'Switch manuscript' }));
+    fireEvent.click(within(panel).getByRole('button', { name: 'Choose manuscript' }));
     expect(screen.queryByRole('region', { name: 'Manuscript details' })).toBeNull();
     const picker = screen.getByRole('dialog', { name: 'Select manuscript' });
     expect(within(picker).getByText('Methods')).toBeDefined();
@@ -239,11 +239,11 @@ describe('AppHeader manuscript picker', () => {
     renderHeader({ manuscripts: MANUSCRIPTS, manuscriptId: 'intro', onSelectManuscript: vi.fn() });
     fireEvent.click(screen.getByRole('button', { name: 'intro' }));
     const panel = screen.getByRole('region', { name: 'Manuscript details' });
-    fireEvent.click(within(panel).getByRole('button', { name: 'Switch manuscript' }));
+    fireEvent.click(within(panel).getByRole('button', { name: 'Choose manuscript' }));
     fireEvent.click(screen.getByRole('button', { name: 'Close manuscript picker' }));
     const reopened = screen.getByRole('region', { name: 'Manuscript details' });
     expect(document.activeElement).toBe(
-      within(reopened).getByRole('button', { name: 'Switch manuscript' }),
+      within(reopened).getByRole('button', { name: 'Choose manuscript' }),
     );
   });
 });
