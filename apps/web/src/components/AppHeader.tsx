@@ -6,7 +6,7 @@ import type { HeaderStatus } from '../hooks/draft-header-status';
 import { PROJECT_DRAWER_ID } from './project-drawer/ProjectDrawer';
 import { DetailsPanel } from './header/DetailsPanel';
 import { DraftStateChip } from './header/DraftStateChip';
-import { HeaderShell } from './header/HeaderShell';
+import { HeaderFrame } from './header/HeaderFrame';
 import { InlineEditField } from './InlineEditField';
 import { ManuscriptPicker } from './header/ManuscriptPicker';
 import { ManuscriptSwitcher } from './header/ManuscriptSwitcher';
@@ -14,7 +14,6 @@ import type { ManuscriptSwitcherOption } from './header/ManuscriptSwitcher';
 import { RepoSubtitle } from './header/RepoSubtitle';
 import { repoSubtitle } from './header/repo-subtitle';
 import { TitleTrigger } from './header/TitleTrigger';
-import { useHeaderOverlays } from './header/use-header-overlays';
 import type { HeaderOverlays } from './header/use-header-overlays';
 import { UserMenu } from './header/UserMenu';
 
@@ -58,82 +57,78 @@ function DrawerToggle({ sidebarOpen, onToggle, toggleButtonRef }: DrawerTogglePr
   );
 }
 
-/** Props for {@link HeaderTitle}. */
-interface HeaderTitleProps {
+/** Props for {@link CompactTitle}. */
+interface CompactTitleProps {
   /** Display name of the open manuscript, falling back to the dir name. */
   title?: string;
-  /** Whether the details panel is open. */
-  open: boolean;
-  /** Called when the title trigger is activated. */
-  onToggle: () => void;
-  /** Receives the trigger element so closing can return focus to it. */
-  triggerRef: RefObject<HTMLButtonElement | null>;
+  /** Overlay state driving the details panel. */
+  overlays: HeaderOverlays;
   /** Current autosave state. */
   saveStatus: SaveStatus;
   /** Draft status supplying the notice and attention dot. */
   status?: HeaderStatus;
-  /** Called with the trimmed name when the desktop field saves. */
-  onRename?: (value: string) => void | Promise<void>;
+}
+
+/**
+ * Title trigger shown below md, opening the manuscript details panel.
+ *
+ * @param props - See {@link CompactTitleProps}.
+ * @returns The trigger with its live save status.
+ */
+function CompactTitle({ title, overlays, saveStatus, status }: CompactTitleProps) {
+  return (
+    <TitleTrigger
+      title={title}
+      open={overlays.view !== 'closed'}
+      panelId={DETAILS_PANEL_ID}
+      onToggle={overlays.toggleDetails}
+      triggerRef={overlays.triggerRef}
+      saveStatus={saveStatus}
+      notice={status?.notice}
+      attention={status?.attention}
+    />
+  );
+}
+
+/** Props for {@link WideTitle}. */
+interface WideTitleProps {
+  /** Display name of the open manuscript, falling back to the dir name. */
+  title?: string;
   /** Manuscripts offered by the desktop switcher. */
   manuscripts?: readonly ManuscriptSwitcherOption[];
   /** Id of the manuscript currently open. */
   currentId?: string;
   /** Called with the id chosen in the desktop switcher. */
   onSelect?: (id: string) => void;
+  /** Called with the trimmed name when the desktop field saves. */
+  onRename?: (value: string) => void | Promise<void>;
 }
 
 /**
- * Header title slot in two CSS-switched variants: the details trigger below
- * `md`, and an inline-editable name with the manuscript switcher from `md` up.
- * Both variants live in the DOM; only one is visible per breakpoint.
+ * Inline editable title plus switcher, shown from md up.
  *
- * @param props - See {@link HeaderTitleProps}.
- * @returns The mobile trigger and the desktop inline title.
+ * @param props - See {@link WideTitleProps}.
+ * @returns The editable name and its optional switcher.
  */
-function HeaderTitle({
-  title,
-  open,
-  onToggle,
-  triggerRef,
-  saveStatus,
-  status,
-  onRename,
-  manuscripts,
-  currentId,
-  onSelect,
-}: HeaderTitleProps) {
+function WideTitle({ title, manuscripts, currentId, onSelect, onRename }: WideTitleProps) {
   const canSwitch = (manuscripts?.length ?? 0) >= 2 && onSelect !== undefined;
   return (
     <>
-      <span className="flex min-w-0 items-center gap-1 md:hidden">
-        <TitleTrigger
-          title={title}
-          open={open}
-          panelId={DETAILS_PANEL_ID}
-          onToggle={onToggle}
-          triggerRef={triggerRef}
-          saveStatus={saveStatus}
-          notice={status?.notice}
-          attention={status?.attention}
+      {title !== undefined && (
+        <InlineEditField
+          value={title}
+          label="Manuscript name"
+          testId="manuscript-title-inline"
+          onSave={onRename}
         />
-      </span>
-      <span className="hidden min-w-0 items-center gap-1 md:flex">
-        {title !== undefined && (
-          <InlineEditField
-            value={title}
-            label="Manuscript name"
-            testId="manuscript-title-inline"
-            onSave={onRename}
-          />
-        )}
-        {canSwitch && (
-          <ManuscriptSwitcher
-            manuscripts={manuscripts ?? []}
-            currentId={currentId}
-            onSelect={onSelect}
-          />
-        )}
-      </span>
+      )}
+      {canSwitch && onSelect !== undefined && (
+        <ManuscriptSwitcher
+          manuscripts={manuscripts ?? []}
+          currentId={currentId}
+          onSelect={onSelect}
+        />
+      )}
     </>
   );
 }
@@ -184,20 +179,19 @@ export interface AppHeaderProps {
   onSelectMode?: (mode: 'wysiwyg' | 'source') => void;
 }
 
-/** Props for {@link AppHeaderShell}. */
-interface AppHeaderShellProps extends AppHeaderProps {
-  overlays: HeaderOverlays;
-}
-
 /**
  * Pick the overlay surface for the current header view.
  *
- * @param props - Header props carrying the overlay state.
+ * @param props - Header props carrying the manuscript data and handlers.
+ * @param overlays - Overlay state and actions driving the surface.
  * @param title - Resolved manuscript title shown in the details panel.
  * @returns The details panel, the manuscript picker, or null when closed.
  */
-function panelSlot(props: AppHeaderShellProps, title: string | undefined): ReactNode {
-  const { overlays } = props;
+function panelSlot(
+  props: AppHeaderProps,
+  overlays: HeaderOverlays,
+  title: string | undefined,
+): ReactNode {
   if (overlays.view === 'closed') return null;
 
   if (overlays.view === 'picker') {
@@ -231,10 +225,21 @@ function panelSlot(props: AppHeaderShellProps, title: string | undefined): React
   );
 }
 
-function AppHeaderShell(props: AppHeaderShellProps) {
+/**
+ * Editor header built on the shared responsive header frame: drawer toggle,
+ * title trigger with its live save status below md (opening a details panel
+ * with the editable manuscript name, the draft status and the picker), the
+ * inline editable title and switcher from md up, the read-only repo subtitle,
+ * the main action and the account menu.
+ *
+ * @param props - See {@link AppHeaderProps}.
+ * @returns The editor header with its optional overlay surface.
+ */
+export function AppHeader(props: AppHeaderProps) {
   const title = props.manuscriptName ?? props.manuscriptDir;
   return (
-    <HeaderShell
+    <HeaderFrame
+      testId="app-header"
       leading={
         <DrawerToggle
           sidebarOpen={props.sidebarOpen ?? false}
@@ -242,18 +247,21 @@ function AppHeaderShell(props: AppHeaderShellProps) {
           toggleButtonRef={props.toggleButtonRef}
         />
       }
-      title={
-        <HeaderTitle
+      compact={(overlays) => (
+        <CompactTitle
           title={title}
-          open={props.overlays.view !== 'closed'}
-          onToggle={props.overlays.toggleDetails}
-          triggerRef={props.overlays.triggerRef}
+          overlays={overlays}
           saveStatus={props.saveStatus}
           status={props.status}
-          onRename={props.onRenameManuscript}
+        />
+      )}
+      wide={
+        <WideTitle
+          title={title}
           manuscripts={props.manuscripts}
           currentId={props.manuscriptId}
           onSelect={props.onSelectManuscript}
+          onRename={props.onRenameManuscript}
         />
       }
       subtitle={props.source ? <RepoSubtitle {...repoSubtitle(props.source)} /> : undefined}
@@ -271,26 +279,10 @@ function AppHeaderShell(props: AppHeaderShellProps) {
           loginEnabled={props.loginEnabled ?? true}
         />
       }
-      panel={<div className="md:hidden">{panelSlot(props, title)}</div>}
+      sidebarOpen={props.sidebarOpen ?? false}
+      panel={(overlays) => panelSlot(props, overlays, title)}
     />
   );
 }
 
-/**
- * Editor header built on the shared two-line shell: drawer toggle, title
- * trigger with its live save status, read-only repo subtitle, main action and
- * account menu. Activating the title opens a details panel with the editable
- * manuscript name and the draft status; from there a picker selects another
- * manuscript.
- *
- * @param props - See {@link AppHeaderProps}.
- * @returns The editor header with its optional overlay surface.
- */
-export function AppHeader(props: AppHeaderProps) {
-  const overlays = useHeaderOverlays(props.sidebarOpen ?? false);
-  return (
-    <div data-testid="app-header" ref={overlays.containerRef}>
-      <AppHeaderShell {...props} overlays={overlays} />
-    </div>
-  );
-}
+export default AppHeader;
