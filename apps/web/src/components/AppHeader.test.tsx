@@ -128,6 +128,57 @@ describe('AppHeader title and subtitle', () => {
 
 });
 
+describe('AppHeader details panel disclosure', () => {
+  it('closes the panel on Escape and returns focus to the title trigger', () => {
+    renderHeader();
+    const trigger = screen.getByRole('button', { name: 'intro' });
+    fireEvent.click(trigger);
+    expect(screen.getByRole('region', { name: 'Manuscript details' })).toBeDefined();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('region', { name: 'Manuscript details' })).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('closes the panel on an outside press and returns focus to the trigger', () => {
+    renderHeader();
+    const trigger = screen.getByRole('button', { name: 'intro' });
+    fireEvent.click(trigger);
+    expect(screen.getByRole('region', { name: 'Manuscript details' })).toBeDefined();
+
+    fireEvent.mouseDown(document.body);
+
+    expect(screen.queryByRole('region', { name: 'Manuscript details' })).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('closes the panel when the scrim is pressed', () => {
+    renderHeader();
+    const trigger = screen.getByRole('button', { name: 'intro' });
+    fireEvent.click(trigger);
+    expect(screen.getByRole('region', { name: 'Manuscript details' })).toBeDefined();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close details' }));
+
+    expect(screen.queryByRole('region', { name: 'Manuscript details' })).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('closes the panel when the project drawer opens', () => {
+    const { rerender } = renderHeader();
+    fireEvent.click(screen.getByRole('button', { name: 'intro' }));
+    expect(screen.getByRole('region', { name: 'Manuscript details' })).toBeDefined();
+
+    rerender(<AppHeader {...BASE_PROPS} sidebarOpen />);
+
+    expect(screen.queryByRole('region', { name: 'Manuscript details' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'intro' }).getAttribute('aria-expanded')).toBe(
+      'false',
+    );
+  });
+});
+
 describe('AppHeader manuscript switcher', () => {
   it('offers the manuscript switcher when several manuscripts exist', () => {
     const onSelectManuscript = vi.fn();
