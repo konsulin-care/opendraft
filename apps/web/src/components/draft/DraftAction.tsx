@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, FilePlus, LoaderCircle, Send, Upload } from 'lucide-react';
 import type { DraftActionKind } from '../../suggest/draft-view';
+import { HEADER_ACTION_ICON, HEADER_ACTION_METRICS, HeaderActionLabel } from '../header/header-action';
 import { useOutsideClose } from '../header/use-outside-close';
 
 /** One entry in the chevron menu. */
@@ -49,8 +50,7 @@ export interface DraftActionProps {
   kind?: DraftActionKind;
 }
 
-const MAIN_BUTTON =
-  'inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-l-md bg-black px-3 py-1 text-sm font-medium text-white hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-50';
+const MAIN_BUTTON = `${HEADER_ACTION_METRICS} rounded-l-md`;
 const CHEVRON_BUTTON =
   'inline-flex min-h-9 shrink-0 items-center justify-center rounded-r-md border-l border-gray-700 bg-black px-2 py-1 text-white hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-50';
 const MENU_PANEL =
@@ -144,7 +144,9 @@ interface ActionIconProps {
  */
 function ActionIcon({ kind }: ActionIconProps) {
   const Icon = kind === 'new' ? FilePlus : kind === 'publish' ? Upload : Send;
-  return <Icon className="h-4 w-4" aria-hidden="true" data-testid="draft-action-icon" />;
+  return (
+    <Icon className={HEADER_ACTION_ICON} aria-hidden="true" data-testid="draft-action-icon" />
+  );
 }
 
 /** Props for {@link PrimaryButton}. */
@@ -176,14 +178,14 @@ function PrimaryButton({ label, progress, busy, blocked, kind, onPrimary }: Prim
     >
       {busy ? (
         <LoaderCircle
-          className="h-4 w-4 animate-spin"
+          className={`${HEADER_ACTION_ICON} animate-spin`}
           aria-hidden="true"
           data-testid="draft-action-spinner"
         />
       ) : (
         <ActionIcon kind={kind} />
       )}
-      <span className="hidden min-[400px]:inline">{name}</span>
+      <HeaderActionLabel label={name} />
     </button>
   );
 }
