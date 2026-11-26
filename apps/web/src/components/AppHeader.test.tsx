@@ -101,6 +101,13 @@ describe('AppHeader title and subtitle', () => {
     expect(title.value).toBe('my-thesis');
   });
 
+  it('hides the repo subtitle below md while the panel is closed', () => {
+    renderHeader({ source: LOCAL_SOURCE });
+    const subtitle = screen.getByText('Only on this device').parentElement;
+    expect(subtitle?.className.split(/\s+/)).toContain('hidden');
+    expect(subtitle?.className.split(/\s+/)).toContain('md:block');
+  });
+
   it('renders the repo subtitle as read-only text with no inline title input', () => {
     renderHeader({ source: LOCAL_SOURCE });
 
@@ -110,13 +117,16 @@ describe('AppHeader title and subtitle', () => {
     expect(within(header).queryByRole('textbox', { name: 'Project name' })).toBeNull();
     expect(within(header).queryByRole('textbox')).toBeNull();
     expect(within(header).queryByRole('button', { name: 'More actions' })).toBeNull();
+    expect(within(header).queryByRole('button', { name: 'Switch manuscript' })).toBeNull();
     expect(within(header).getByRole('status').textContent).toBe('Saved');
 
     fireEvent.click(within(header).getByRole('button', { name: 'intro' }));
     const title = screen.getByTestId('manuscript-title') as HTMLInputElement;
     expect(title.getAttribute('aria-label')).toBe('Manuscript name');
   });
+});
 
+describe('AppHeader fork subtitle', () => {
   it('describes forks with their upstream repository', () => {
     renderHeader({ source: FORK_SOURCE });
     expect(screen.getByText('Forked from')).toBeDefined();
@@ -125,7 +135,6 @@ describe('AppHeader title and subtitle', () => {
     expect(link.getAttribute('target')).toBe('_blank');
     expect(link.getAttribute('rel')).toBe('noopener noreferrer');
   });
-
 });
 
 describe('AppHeader details panel disclosure', () => {
@@ -159,7 +168,7 @@ describe('AppHeader details panel disclosure', () => {
     fireEvent.click(trigger);
     expect(screen.getByRole('region', { name: 'Manuscript details' })).toBeDefined();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close details' }));
+    fireEvent.click(screen.getByTestId('surface-scrim'));
 
     expect(screen.queryByRole('region', { name: 'Manuscript details' })).toBeNull();
     expect(document.activeElement).toBe(trigger);
@@ -179,8 +188,8 @@ describe('AppHeader details panel disclosure', () => {
   });
 });
 
-describe('AppHeader manuscript switcher', () => {
-  it('offers the manuscript switcher when several manuscripts exist', () => {
+describe('AppHeader manuscript picker', () => {
+  it('opens the picker from the details panel and picks a manuscript', () => {
     const onSelectManuscript = vi.fn();
     renderHeader({
       manuscripts: [
@@ -191,9 +200,37 @@ describe('AppHeader manuscript switcher', () => {
       onSelectManuscript,
     });
 
+    fireEvent.click(screen.getByRole('button', { name: 'intro' }));
+    expect(screen.getByRole('region', { name: 'Manuscript details' })).toBeDefined();
+
     fireEvent.click(screen.getByRole('button', { name: 'Switch manuscript' }));
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Methods' }));
+    expect(screen.queryByRole('region', { name: 'Manuscript details' })).toBeNull();
+    const picker = screen.getByRole('dialog', { name: 'Select manuscript' });
+    expect(within(picker).getByText('Methods')).toBeDefined();
+
+    fireEvent.click(within(picker).getByRole('button', { name: /^Methods/ }));
     expect(onSelectManuscript).toHaveBeenCalledWith('methods');
+    expect(screen.queryByRole('dialog', { name: 'Select manuscript' })).toBeNull();
+  });
+
+  it('reopens the details panel when the picker is closed without a pick', () => {
+    renderHeader({
+      manuscripts: [
+        { id: 'intro', title: 'Intro' },
+        { id: 'methods', title: 'Methods' },
+      ],
+      manuscriptId: 'intro',
+      onSelectManuscript: vi.fn(),
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'intro' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Switch manuscript' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close manuscript picker' }));
+
+    expect(screen.getByRole('region', { name: 'Manuscript details' })).toBeDefined();
+    expect(document.activeElement).toBe(
+      screen.getByRole('button', { name: 'Switch manuscript' }),
+    );
   });
 });
 
