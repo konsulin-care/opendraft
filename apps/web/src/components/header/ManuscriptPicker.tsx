@@ -5,7 +5,7 @@ import type { ManuscriptSwitcherOption } from './ManuscriptSwitcher';
 
 /** Row button listing one manuscript. */
 const ROW_CLASS =
-  'flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-gray-500';
+  'flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-500';
 
 /** Fixed-width column holding either the check icon or an empty spacer. */
 const ICON_COLUMN = 'flex h-4 w-4 shrink-0 items-center justify-center';

@@ -6,7 +6,7 @@ import type { SurfaceVariant } from './surface-styles';
 
 /** Shared button styling for the close control. */
 const CLOSE_BASE =
-  'items-center justify-center rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black';
+  'items-center justify-center rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-black';
 
 /** Close button visible at every breakpoint. */
 const CLOSE_ALWAYS = 'inline-flex';

@@ -48,7 +48,7 @@ const SWITCH_ROW_CLASS = 'flex items-center gap-1 rounded-md border border-gray-
 
 /** Trailing chevron button opening the manuscript picker. */
 const SWITCH_BUTTON_CLASS =
-  'inline-flex shrink-0 items-center justify-center rounded p-0.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black';
+  'inline-flex shrink-0 items-center justify-center rounded p-0.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-black';
 
 /** Props for the internal {@link Row} helper. */
 interface RowProps {
