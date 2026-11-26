@@ -8,4 +8,3 @@ minimumReleaseAgeStrict: true
 minimumReleaseAgeExcludePrune: true
 minimumReleaseAgeExclude:
   - '@codemirror/commands@6.11.1'
-  - lucide-react@1.57.0
