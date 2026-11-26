@@ -99,7 +99,7 @@ function runAction(context: SectionContext, label: string): void {
   else if (label === 'Start a new draft') void context.draft.startNew();
   else if (label === 'Publish to GitHub') context.openDialog('publish');
   else if (label === 'Send update') context.openDialog('update');
-  else if (label === 'Send for review' || label === 'Rename draft') {
+  else if (label === 'Submit' || label === 'Rename draft') {
     context.openDialog('send');
   }
 }

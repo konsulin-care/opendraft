@@ -111,7 +111,7 @@ describe('useDraftSection action and chip', () => {
   it('labels the action for an unsent draft and shows a status chip', async () => {
     render(<Section {...makeInput(DRAFT, makeDeps())} />);
 
-    expect(screen.getByRole('button', { name: 'Send for review' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Submit' })).toBeInTheDocument();
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Draft' })).toBeInTheDocument(),
     );
@@ -206,7 +206,7 @@ describe('useDraftSection dialogs', () => {
   it('opens the send dialog from the primary action of a draft', async () => {
     render(<Section {...makeInput(DRAFT, makeDeps())} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Send for review' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
 
     expect(
       await screen.findByRole('dialog', { name: 'Submit' }),
@@ -257,7 +257,7 @@ describe('useDraftSection send dialog', () => {
     const deps = makeDeps();
     render(<Section {...makeInput(DRAFT, deps)} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Send for review' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
     const dialog = await screen.findByRole('dialog', { name: 'Submit' });
     fireEvent.change(screen.getByLabelText('What did you change?'), {
       target: { value: 'Fix the abstract' },

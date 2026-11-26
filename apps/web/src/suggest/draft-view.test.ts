@@ -36,28 +36,36 @@ describe('draftView actions', () => {
       primary: 'Publish to GitHub',
       menu: [],
       chip: 'Draft',
+      kind: 'publish',
     });
   });
 
-  it('sends an unsent draft for review', () => {
+  it('submits an unsent draft', () => {
     expect(view('local-only')).toMatchObject({
-      primary: 'Send for review',
+      primary: 'Submit',
       menu: ['Save to GitHub', 'Rename draft'],
+      kind: 'submit',
     });
     expect(view('draft')).toMatchObject({
-      primary: 'Send for review',
+      primary: 'Submit',
       menu: ['Save to GitHub', 'Rename draft'],
+      kind: 'submit',
     });
   });
 
+});
+
+describe('draftView remote actions', () => {
   it('sends an update for an open or revision-needed draft', () => {
     expect(view('open')).toMatchObject({
       primary: 'Send update',
       menu: ['Save to GitHub', 'View on GitHub'],
+      kind: 'update',
     });
     expect(view('revision-needed')).toMatchObject({
       primary: 'Send update',
       menu: ['Save to GitHub', 'View on GitHub'],
+      kind: 'update',
     });
   });
 
@@ -66,6 +74,7 @@ describe('draftView actions', () => {
       expect(view(state)).toMatchObject({
         primary: 'Start a new draft',
         menu: ['View on GitHub'],
+        kind: 'new',
       });
     }
   });
@@ -74,6 +83,7 @@ describe('draftView actions', () => {
     expect(view('remote-moved')).toMatchObject({
       primary: 'Send update',
       menu: ['Save to GitHub', 'View on GitHub'],
+      kind: 'update',
     });
   });
 });
