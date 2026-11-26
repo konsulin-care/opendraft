@@ -6,7 +6,9 @@ import type { HeaderStatus } from '../hooks/draft-header-status';
 import { PROJECT_DRAWER_ID } from './project-drawer/ProjectDrawer';
 import { DetailsPanel } from './header/DetailsPanel';
 import { HeaderShell } from './header/HeaderShell';
+import { InlineEditField } from './InlineEditField';
 import { ManuscriptPicker } from './header/ManuscriptPicker';
+import { ManuscriptSwitcher } from './header/ManuscriptSwitcher';
 import type { ManuscriptSwitcherOption } from './header/ManuscriptSwitcher';
 import { RepoSubtitle } from './header/RepoSubtitle';
 import { repoSubtitle } from './header/repo-subtitle';
@@ -69,13 +71,23 @@ interface HeaderTitleProps {
   saveStatus: SaveStatus;
   /** Draft status supplying the notice and attention dot. */
   status?: HeaderStatus;
+  /** Called with the trimmed name when the desktop field saves. */
+  onRename?: (value: string) => void | Promise<void>;
+  /** Manuscripts offered by the desktop switcher. */
+  manuscripts?: readonly ManuscriptSwitcherOption[];
+  /** Id of the manuscript currently open. */
+  currentId?: string;
+  /** Called with the id chosen in the desktop switcher. */
+  onSelect?: (id: string) => void;
 }
 
 /**
- * Header title slot: the details trigger and its live status region.
+ * Header title slot in two CSS-switched variants: the details trigger below
+ * `md`, and an inline-editable name with the manuscript switcher from `md` up.
+ * Both variants live in the DOM; only one is visible per breakpoint.
  *
  * @param props - See {@link HeaderTitleProps}.
- * @returns The title trigger.
+ * @returns The mobile trigger and the desktop inline title.
  */
 function HeaderTitle({
   title,
@@ -84,29 +96,45 @@ function HeaderTitle({
   triggerRef,
   saveStatus,
   status,
+  onRename,
+  manuscripts,
+  currentId,
+  onSelect,
 }: HeaderTitleProps) {
+  const canSwitch = (manuscripts?.length ?? 0) >= 2 && onSelect !== undefined;
   return (
-    <TitleTrigger
-      title={title}
-      open={open}
-      panelId={DETAILS_PANEL_ID}
-      onToggle={onToggle}
-      triggerRef={triggerRef}
-      saveStatus={saveStatus}
-      notice={status?.notice}
-      attention={status?.attention}
-    />
+    <>
+      <span className="flex min-w-0 items-center gap-1 md:hidden">
+        <TitleTrigger
+          title={title}
+          open={open}
+          panelId={DETAILS_PANEL_ID}
+          onToggle={onToggle}
+          triggerRef={triggerRef}
+          saveStatus={saveStatus}
+          notice={status?.notice}
+          attention={status?.attention}
+        />
+      </span>
+      <span className="hidden min-w-0 items-center gap-1 md:flex">
+        {title !== undefined && (
+          <InlineEditField
+            value={title}
+            label="Manuscript name"
+            testId="manuscript-title-inline"
+            onSave={onRename}
+          />
+        )}
+        {canSwitch && (
+          <ManuscriptSwitcher
+            manuscripts={manuscripts ?? []}
+            currentId={currentId}
+            onSelect={onSelect}
+          />
+        )}
+      </span>
+    </>
   );
-}
-
-/** Account menu node for the header's trailing slot. */
-function HeaderUserMenu(props: {
-  session: BffSession | null;
-  returnTo: string;
-  onLogout: () => void;
-  loginEnabled: boolean;
-}) {
-  return <UserMenu {...props} />;
 }
 
 /** Props for {@link AppHeader}. */
@@ -221,19 +249,23 @@ function AppHeaderShell(props: AppHeaderShellProps) {
           triggerRef={props.overlays.triggerRef}
           saveStatus={props.saveStatus}
           status={props.status}
+          onRename={props.onRenameManuscript}
+          manuscripts={props.manuscripts}
+          currentId={props.manuscriptId}
+          onSelect={props.onSelectManuscript}
         />
       }
       subtitle={props.source ? <RepoSubtitle {...repoSubtitle(props.source)} /> : undefined}
       action={props.action}
       userMenu={
-        <HeaderUserMenu
+        <UserMenu
           session={props.session ?? null}
           returnTo={props.returnTo ?? '/'}
           onLogout={props.onLogout ?? NOOP_LOGOUT}
           loginEnabled={props.loginEnabled ?? true}
         />
       }
-      panel={panelSlot(props, title)}
+      panel={<div className="md:hidden">{panelSlot(props, title)}</div>}
     />
   );
 }
