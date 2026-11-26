@@ -3,6 +3,9 @@ packages:
   - "packages/*"
 allowBuilds:
   esbuild: true
+minimumReleaseAge: 4320
+minimumReleaseAgeStrict: true
+minimumReleaseAgeExcludePrune: true
 minimumReleaseAgeExclude:
   - '@codemirror/commands@6.11.1'
   - lucide-react@1.57.0
