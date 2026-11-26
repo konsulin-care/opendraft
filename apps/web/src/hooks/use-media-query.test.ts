@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 /**
- * useMediaQuery tests: matching the shared 640px and 1024px breakpoint
- * queries at simulated viewport widths, re-rendering on change, and the
- * exported query constants.
+ * useMediaQuery tests: matching the shared md (768px) and lg (1024px)
+ * breakpoint queries at simulated viewport widths, re-rendering on change,
+ * and the exported query constants.
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
@@ -90,15 +90,19 @@ afterEach(() => {
 });
 
 describe('useMediaQuery breakpoints', () => {
-  it('matches NARROW_QUERY below 640px only', () => {
+  it('matches NARROW_QUERY up to 767px and not at the md boundary', () => {
     stubMatchMedia();
     setViewport(375);
     const narrow = renderHook(() => useMediaQuery(NARROW_QUERY));
     expect(narrow.result.current).toBe(true);
     narrow.unmount();
-    setViewport(800);
-    const mid = renderHook(() => useMediaQuery(NARROW_QUERY));
-    expect(mid.result.current).toBe(false);
+    setViewport(767);
+    const edge = renderHook(() => useMediaQuery(NARROW_QUERY));
+    expect(edge.result.current).toBe(true);
+    edge.unmount();
+    setViewport(768);
+    const md = renderHook(() => useMediaQuery(NARROW_QUERY));
+    expect(md.result.current).toBe(false);
   });
 
   it('matches WIDE_QUERY at 1024px and above only', () => {
@@ -121,8 +125,8 @@ describe('useMediaQuery breakpoints', () => {
     expect(result.current).toBe(true);
   });
 
-  it('exports the shared 640px and 1024px breakpoint queries', () => {
-    expect(NARROW_QUERY).toBe('(max-width: 639px)');
+  it('exports the shared md and lg breakpoint queries', () => {
+    expect(NARROW_QUERY).toBe('(max-width: 767px)');
     expect(WIDE_QUERY).toBe('(min-width: 1024px)');
   });
 });

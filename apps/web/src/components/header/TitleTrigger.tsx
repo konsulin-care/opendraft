@@ -36,8 +36,8 @@ export interface TitleTriggerProps {
   onToggle: () => void;
   /** Receives the button element so the panel can return focus to it. */
   triggerRef?: RefObject<HTMLButtonElement | null>;
-  /** Current autosave state. */
-  saveStatus: SaveStatus;
+  /** Current autosave state; omit it for a header without save status. */
+  saveStatus?: SaveStatus;
   /** Transient message that replaces the status label for a few seconds. */
   notice?: string | null;
   /** Marks that the manuscript needs attention, e.g. a waiting draft. */
@@ -89,12 +89,14 @@ function StatusRegion({ label, Icon, iconClass, notice }: StatusRegionProps) {
  *
  * The button shows the manuscript title, a chevron that rotates while the
  * details panel is open, and an amber dot when the manuscript needs attention
- * or the last save failed. The neighbouring status region always carries the
- * save glyph; its label is screen-reader-only below `md` and visible from `md`
- * up, while a transient notice replaces the label at every width.
+ * or the last save failed. The neighbouring status region carries the save
+ * glyph; its label is screen-reader-only below `md` and visible from `md` up,
+ * while a transient notice replaces the label at every width. Without a save
+ * status the region is not rendered at all, so the reader header reuses the
+ * same trigger without an autosave state.
  *
  * @param props - See {@link TitleTriggerProps}.
- * @returns The disclosure trigger and the save-status live region.
+ * @returns The disclosure trigger and, with a save status, its live region.
  */
 export function TitleTrigger({
   title,
@@ -107,7 +109,7 @@ export function TitleTrigger({
   attention,
 }: TitleTriggerProps) {
   const visibleNotice = useTransientNotice(notice);
-  const { label, Icon, iconClass } = SAVE_STATE[saveStatus];
+  const saveState = saveStatus === undefined ? undefined : SAVE_STATE[saveStatus];
   const showDot = attention === true || saveStatus === 'error';
 
   return (
@@ -133,7 +135,14 @@ export function TitleTrigger({
           />
         )}
       </button>
-      <StatusRegion label={label} Icon={Icon} iconClass={iconClass} notice={visibleNotice} />
+      {saveState !== undefined && (
+        <StatusRegion
+          label={saveState.label}
+          Icon={saveState.Icon}
+          iconClass={saveState.iconClass}
+          notice={visibleNotice}
+        />
+      )}
     </span>
   );
 }

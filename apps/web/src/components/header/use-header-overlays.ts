@@ -36,7 +36,7 @@ export interface HeaderOverlays {
  * @param sidebarOpen - Whether the project drawer is currently open.
  * @returns The current overlay view, its actions and the element refs.
  */
-export function useHeaderOverlays(sidebarOpen: boolean): HeaderOverlays {
+export function useHeaderOverlays(sidebarOpen = false): HeaderOverlays {
   const [view, dispatch] = useReducer(headerOverlayReducer, 'closed');
   const containerRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);

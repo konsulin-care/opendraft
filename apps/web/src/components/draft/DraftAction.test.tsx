@@ -43,6 +43,7 @@ describe('DraftAction split button', () => {
     const main = screen.getByRole('button', { name: 'Submit' });
     expect(main).toHaveClass('whitespace-nowrap', 'shrink-0');
     expect(main).toHaveAttribute('title', 'Submit');
+    expect(main).toHaveAttribute('aria-label', 'Submit');
     expect(screen.getByRole('button', { name: 'More actions' })).toHaveClass('shrink-0');
     expect(screen.getByText('Submit')).toHaveClass('hidden', 'min-[400px]:inline');
   });

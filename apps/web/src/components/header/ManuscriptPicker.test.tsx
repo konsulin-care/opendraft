@@ -69,6 +69,37 @@ describe('ManuscriptPicker content', () => {
   });
 });
 
+describe('ManuscriptPicker all manuscripts row', () => {
+  it('lists an All manuscripts row that calls the handler and closes', () => {
+    const onSelectAll = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <ManuscriptPicker
+        manuscripts={manuscripts}
+        currentId="alpha"
+        onPick={vi.fn()}
+        onClose={onClose}
+        onSelectAll={onSelectAll}
+      />,
+    );
+
+    const rows = screen.getAllByRole('listitem');
+    expect(rows).toHaveLength(3);
+    expect(rows[2]).toHaveTextContent('All manuscripts');
+
+    fireEvent.click(screen.getByRole('button', { name: 'All manuscripts' }));
+    expect(onSelectAll).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('lists only the manuscripts when no handler is given', () => {
+    renderPicker('alpha');
+
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: 'All manuscripts' })).toBeNull();
+  });
+});
+
 describe('ManuscriptPicker layout', () => {
   it('is a bottom sheet below md and an anchored popover from md, capped at 80vh', () => {
     renderPicker('alpha');

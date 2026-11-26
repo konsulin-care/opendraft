@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { X } from 'lucide-react';
 import { APP_BAR_HEIGHT } from '../app-bar-layout';
+import { LG_PX, MD_PX } from '../breakpoints';
 
 /** DOM id of the drawer panel; referenced by the header toggle's aria-controls. */
 export const PROJECT_DRAWER_ID = 'project-drawer';
@@ -18,10 +19,10 @@ export const PROJECT_DRAWER_ID = 'project-drawer';
 export const DRAWER_OPEN_STORAGE_KEY = 'opendraft:drawer-open';
 
 /** Viewport width (px) at and above which the drawer persists its open state. */
-const PERSIST_MIN_WIDTH = 1024;
+const PERSIST_MIN_WIDTH = LG_PX;
 
 /** Viewport width (px) at and above which a backdrop is shown behind the drawer. */
-const BACKDROP_MIN_WIDTH = 640;
+const BACKDROP_MIN_WIDTH = MD_PX;
 
 /** Actions the drawer exposes to its children (e.g. the file tree). */
 export interface ProjectDrawerContextValue {
@@ -173,7 +174,7 @@ export interface ProjectDrawerProps {
   onRenameProject?: (name: string) => void | Promise<void>;
 }
 
-/** Dimmed backdrop behind the drawer at 640px and wider. */
+/** Dimmed backdrop behind the drawer at 768px and wider. */
 function DrawerBackdrop({
   dimmed,
   onClose,
@@ -193,7 +194,7 @@ function DrawerBackdrop({
   );
 }
 
-/** Drawer panel: pinned header (with close button below 640px) and scrollable body. */
+/** Drawer panel: pinned header (with close button below the md breakpoint) and scrollable body. */
 function DrawerPanel({
   compact,
   panelRef,
@@ -245,10 +246,9 @@ function DrawerPanel({
 }
 
 /**
- * Overlay project drawer. It is always an overlay (never reflows the
- * editor): below 640px it is a full-width sheet with a close button, from
- * 640px it sits beside a dimmed backdrop, and from 1024px it stays open
- * after a file is selected while persisting its open state.
+ * Overlay project drawer; it never reflows the editor. Below 768px it is a
+ * full-width sheet with a close button, from 768px it sits beside a dimmed
+ * backdrop, and from 1024px it stays open after a file is selected.
  *
  * @param props - See {@link ProjectDrawerProps}.
  */
