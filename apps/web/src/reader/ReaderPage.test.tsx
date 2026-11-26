@@ -89,7 +89,6 @@ const TWO = [
   { id: 'first', path: 'manuscripts/first' },
   { id: 'second', path: 'manuscripts/second' },
 ];
-
 describe('ReaderPage OpenDraft repository', () => {
   it('shows the manuscript index and All manuscripts title for several manuscripts', async () => {
     const deps = makeDeps({ loadRepo: vi.fn(async () => makeRepo(TWO)) });
@@ -97,8 +96,7 @@ describe('ReaderPage OpenDraft repository', () => {
     expect(await screen.findByTestId('manuscript-index')).toBeInTheDocument();
     expect(screen.queryByTestId('manuscript-view')).toBeNull();
     const header = screen.getByTestId('header-shell');
-    expect(within(header).getByText('All manuscripts')).toBeInTheDocument();
-    expect(within(header).getByText('Published at')).toBeInTheDocument();
+    expect(within(header).getByTestId('header-wide-title')).toHaveTextContent('All manuscripts');
     expect(
       within(header).getByRole('link', { name: /konsulin-care\/citizen-science/ }),
     ).toHaveAttribute('href', 'https://github.com/konsulin-care/citizen-science');
@@ -109,7 +107,6 @@ describe('ReaderPage OpenDraft repository', () => {
       within(header).getByRole('button', { name: 'Account' }),
     ) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
-
   it('shows the manuscript named by ?manuscript without a button-row switcher', async () => {
     const deps = makeDeps({ loadRepo: vi.fn(async () => makeRepo(TWO)) });
     render(<ReaderPage route={{ ...ROUTE, manuscript: 'second' }} deps={deps} />);
@@ -118,9 +115,11 @@ describe('ReaderPage OpenDraft repository', () => {
     expect(view).toHaveAttribute('data-project-key', 'reader:konsulin-care/citizen-science@sha1');
     expect(view).toHaveAttribute('data-readonly', 'true');
     expect(screen.queryByTestId('manuscript-index')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'second' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'second' })).not.toBeNull();
     const header = screen.getByTestId('header-shell');
-    expect(within(header).getByText('second')).toBeInTheDocument();
+    const wide = within(header).getByTestId('header-wide-title');
+    expect(wide).toHaveTextContent('second');
+    expect(within(wide).queryByRole('button', { name: 'second' })).toBeNull();
   });
 });
 describe('ReaderPage edit intent', () => {
@@ -149,8 +148,9 @@ describe('ReaderPage single manuscript', () => {
     expect(view).toHaveAttribute('data-dir', 'manuscripts/demo');
     expect(screen.queryByTestId('manuscript-index')).toBeNull();
     const header = screen.getByTestId('header-shell');
-    expect(within(header).getByText('demo')).toBeInTheDocument();
+    expect(within(header).getByTestId('header-wide-title')).toHaveTextContent('demo');
     expect(within(header).queryByTestId('manuscript-switcher')).toBeNull();
+    expect(within(header).getByTestId('header-compact-title')).toHaveTextContent('demo');
   });
 });
 describe('ReaderPage unlisted manuscripts', () => {
