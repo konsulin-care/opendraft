@@ -32,7 +32,7 @@
     "@opendraft/workspace": "workspace:*",
     "buffer": "^6.0.3",
     "katex": "^0.19.1",
-    "lucide-react": "1.78.0",
+    "lucide-react": "1.79.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "remark-math": "^6.0.0",
